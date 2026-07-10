@@ -50,7 +50,8 @@ export default function LikhAIDock() {
 
     try {
       const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-      const res = await fetch('http://localhost:3001/api/chatbot', {
+      const API_BASE = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${API_BASE}/api/chatbot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text.trim(), history, userId }),
