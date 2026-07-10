@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { ADMIN_EMAIL } from '../../lib/constants';
+import { ADMIN_EMAILS } from '../../lib/constants';
 import {
   LayoutDashboard, Package, Users, Store, Box, Sun,
   LogOut, Home,
@@ -28,7 +28,7 @@ export default function AdminLayout() {
   async function checkAdminAccess() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && session.user.email === ADMIN_EMAIL) {
+      if (session && ADMIN_EMAILS.includes(session.user.email)) {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);

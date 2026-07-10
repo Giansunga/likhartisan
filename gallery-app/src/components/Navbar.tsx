@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { getCartCount } from '../data/store';
 import { supabase } from '../lib/supabase';
-import { ADMIN_EMAIL, SHOP_EMAILS } from '../lib/constants';
+import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 
 export default function Navbar() {
@@ -326,7 +326,7 @@ export default function Navbar() {
                   </svg>
                 </Link>
 
-                {!isMobile && userEmail === ADMIN_EMAIL && (
+                {!isMobile && userEmail && ADMIN_EMAILS.includes(userEmail) && (
                   <Link to="/admin" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: '44px', height: '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
