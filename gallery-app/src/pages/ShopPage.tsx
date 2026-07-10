@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { mapSupabaseProduct, fmt } from '../lib/utils';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface Shop {
   id: string;
@@ -38,6 +39,7 @@ const REGALA_INFO: Record<string, { address: string; phone: string; years: strin
 export default function ShopPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [shop, setShop] = useState<Shop | null>(null);
   const [shopProducts, setShopProducts] = useState<Product[]>([]);
   const [productPrices, setProductPrices] = useState<Record<string, number>>({});
@@ -372,7 +374,7 @@ export default function ShopPage() {
 
       {/* 3. STATS ROW */}
       <div style={{ background: '#fff', borderBottom: '1px solid #E8E0D8' }}>
-        <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: '28px 24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+        <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: isMobile ? '16px 12px' : '28px 24px', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '20px' }}>
           {/* Products */}
           <div style={{ textAlign: 'center', borderRight: '1px solid #E8E0D8' }}>
             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{shopProducts.length}</div>
@@ -400,7 +402,7 @@ export default function ShopPage() {
       </div>
 
       {/* 4. ABOUT + SHOP INFORMATION */}
-      <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: '48px 24px', display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '40px' }}>
+      <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: isMobile ? '24px 12px' : '48px 24px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1fr', gap: isMobile ? '24px' : '40px' }}>
         {/* LEFT: About */}
         <div>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--text-dark)', marginBottom: '20px' }}>About {shop.name}</h2>

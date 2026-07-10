@@ -1278,6 +1278,11 @@ body {
   .control-section-title { font-size: 1.8rem; }
   .control-action-group { flex-direction: column; align-items: stretch; gap: 15px; }
   .search-bar-wrapper { width: 100%; }
+  .dashboard-layout { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .dashboard-sidebar { position: static !important; padding: 16px !important; }
+  .nav-icon-btn { width: 36px !important; height: 36px !important; }
+  .product-viewer-layout { grid-template-columns: 1fr !important; gap: 24px !important; }
+}
   .filter-toggles { justify-content: space-between; }
   .btn-filter-toggle { flex: 1; justify-content: center; }
   .sort-select-wrapper select { width: 100%; }

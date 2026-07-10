@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { displayVariation } from '../lib/utils';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 
@@ -82,6 +83,7 @@ const SIDEBAR_ITEMS = [
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [activePanel, setActivePanel] = useState<string>(() => {
     const tab = searchParams.get('tab');
     return tab === 'purchases' || tab === 'notifications' || tab === 'account' ? tab : 'account';
@@ -503,10 +505,10 @@ export default function DashboardPage() {
     <div className="dashboard-page" style={{ minHeight: '100vh' }}>
       <div className="dashboard-wrapper" style={{ paddingTop: '12px', paddingBottom: '60px' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="dashboard-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '30px', alignItems: 'flex-start' }}>
+          <div className="dashboard-layout" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '240px 1fr', gap: isMobile ? '16px' : '30px', alignItems: 'flex-start' }}>
 
             {/* Sidebar */}
-            <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: '28px 20px', position: 'sticky', top: 'calc(var(--nav-height) + 12px)' }}>
+            <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: isMobile ? '16px' : '28px 20px', position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 12px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
                   {profileImage ? (

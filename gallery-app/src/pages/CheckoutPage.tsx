@@ -5,6 +5,7 @@ import { getCart } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { fmt } from '../lib/utils';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
@@ -53,6 +54,7 @@ function estimateWeight(lCm: number, wCm: number, hCm: number): number {
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const items = getCart();
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
   const [userName, setUserName] = useState('');
@@ -439,8 +441,8 @@ export default function CheckoutPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', paddingTop: 'calc(var(--nav-height) + 30px)', paddingBottom: 80 }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '30px', alignItems: 'flex-start' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.6fr 1fr', gap: isMobile ? '20px' : '30px', alignItems: 'flex-start' }}>
 
           {/* LEFT COLUMN */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -462,7 +464,7 @@ export default function CheckoutPage() {
 
               {editAddress ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
                     <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                       placeholder="Full Name" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem' }} />
                     <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
@@ -506,7 +508,7 @@ export default function CheckoutPage() {
               <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', margin: '0 0 12px' }}>
                 Click on the map or drag the marker to adjust your delivery location
               </p>
-              <div style={{ height: '300px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #E8E0D8' }}>
+              <div style={{ height: isMobile ? 'min(250px, 40vh)' : '300px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #E8E0D8' }}>
                 {isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -619,7 +621,7 @@ export default function CheckoutPage() {
           )}
 
           {/* RIGHT COLUMN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'sticky', top: 'calc(var(--nav-height) + 30px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 30px)' }}>
 
             {/* Order Details */}
             <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E8E0D8', overflow: 'hidden' }}>

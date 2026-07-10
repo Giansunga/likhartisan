@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import type { CartItem } from '../types';
 import { fmt } from '../lib/utils';
 import { geocodeAddress } from '../lib/geocoder';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
@@ -54,6 +55,7 @@ function groupByShop(items: CartItem[]): Record<string, CartItem[]> {
 
 export default function CartPage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
   const [items, setItems] = useState<CartItem[]>(getCart);
   const [selected, setSelected] = useState<Set<string>>(new Set(items.map(i => `${i.productId}\v${i.variationId || ''}`)));
@@ -219,7 +221,7 @@ export default function CartPage() {
 
   return (
     <div style={{ background: 'var(--bg-secondary)', minHeight: '100vh', paddingTop: 'calc(var(--nav-height) + 20px)', paddingBottom: '100px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
         {/* Header */}
         <div style={{ background: 'var(--bg-primary)', borderRadius: '0 0 2px 2px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)' }}>
           <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>Shopping Cart</h1>
@@ -242,7 +244,7 @@ export default function CartPage() {
             </Link>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '12px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '12px', alignItems: 'flex-start' }}>
             {/* Left: Cart Items */}
             <div>
               {/* Select All Bar */}
@@ -287,70 +289,78 @@ export default function CartPage() {
                     {/* Product Rows */}
                     {shopItems.map(item => (
                       <div key={`${item.productId}\v${item.variationId || ''}`} style={{
-                        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px',
+                        padding: isMobile ? '12px' : '16px 20px',
+                        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                        alignItems: isMobile ? 'stretch' : 'center',
+                        gap: isMobile ? '10px' : '16px',
                         borderBottom: '1px solid var(--bg-secondary)'
                       }}>
-                        {/* Checkbox */}
-                        <input type="checkbox" checked={selected.has(`${item.productId}\v${item.variationId || ''}`)}
-                          onChange={() => toggleProduct(item.productId, item.variationId)}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)', flexShrink: 0 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {/* Checkbox */}
+                          <input type="checkbox" checked={selected.has(`${item.productId}\v${item.variationId || ''}`)}
+                            onChange={() => toggleProduct(item.productId, item.variationId)}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)', flexShrink: 0 }} />
 
-                        {/* Product Image */}
-                        <Link to={`/product/${item.productId}`} style={{ flexShrink: 0 }}>
-                          <img src={item.image} alt={item.productName}
-                            style={{ width: '90px', height: '90px', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
-                        </Link>
-
-                        {/* Product Info */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none' }}>
-                            <p style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.92rem', marginBottom: '4px', lineHeight: 1.4 }}>
-                              {item.productName}
-                            </p>
+                          {/* Product Image */}
+                          <Link to={`/product/${item.productId}`} style={{ flexShrink: 0 }}>
+                            <img src={item.image} alt={item.productName}
+                              style={{ width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
                           </Link>
-                          {item.variation && (
-                            <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</p>
-                          )}
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
+
+                          {/* Product Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none' }}>
+                              <p style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.92rem', marginBottom: '4px', lineHeight: 1.4 }}>
+                                {item.productName}
+                              </p>
+                            </Link>
+                            {item.variation && (
+                              <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</p>
+                            )}
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
+                          </div>
+
+                          {/* Delete */}
+                          <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
+                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
+                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0, transition: 'color 0.15s'
+                          }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-light)'}>
+                            X
+                          </button>
                         </div>
 
-                        {/* Unit Price */}
-                        <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
-                        </div>
+                        {/* Bottom row: price, qty, subtotal */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: isMobile ? '30px' : '0' }}>
+                          {/* Unit Price */}
+                          <div style={{ flex: isMobile ? 1 : 'none', width: isMobile ? 'auto' : '100px', textAlign: isMobile ? 'left' : 'right', flexShrink: 0 }}>
+                            <span style={{ fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
+                          </div>
 
-                        {/* Quantity Controls */}
-                        <div style={{
-                          display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '2px',
-                          flexShrink: 0, overflow: 'hidden'
-                        }}>
-                          <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
-                            width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
-                            cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
-                          }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>−</button>
-                          <span style={{ width: '40px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)', lineHeight: '32px' }}>
-                            {item.qty}
-                          </span>
-                          <button onClick={() => handleQty(item.productId, item.variationId, 1)} style={{
-                            width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
-                            cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
-                          }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>+</button>
-                        </div>
+                          {/* Quantity Controls */}
+                          <div style={{
+                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '2px',
+                            flexShrink: 0, overflow: 'hidden'
+                          }}>
+                            <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
+                              width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
+                              cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
+                            }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>−</button>
+                            <span style={{ width: '40px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)', lineHeight: '32px' }}>
+                              {item.qty}
+                            </span>
+                            <button onClick={() => handleQty(item.productId, item.variationId, 1)} style={{
+                              width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
+                              cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
+                            }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>+</button>
+                          </div>
 
-                        {/* Subtotal */}
-                        <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                          <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
+                          {/* Subtotal */}
+                          <div style={{ flex: isMobile ? 1 : 'none', width: isMobile ? 'auto' : '100px', textAlign: 'right', flexShrink: 0 }}>
+                            <span style={{ fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
+                          </div>
                         </div>
-
-                        {/* Delete */}
-                        <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
-                          background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-                          fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0, transition: 'color 0.15s'
-                        }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-light)'}>
-                          X
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -359,7 +369,7 @@ export default function CartPage() {
             </div>
 
             {/* Right: Order Summary */}
-            <div style={{ position: 'sticky', top: 'calc(var(--nav-height) + 20px)' }}>
+            <div style={{ position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 20px)' }}>
               <div style={{ background: 'var(--bg-primary)', borderRadius: '2px', padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--bg-secondary)' }}>
                   Order Summary
@@ -368,7 +378,7 @@ export default function CartPage() {
                 {/* Delivery Options */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#999', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery Method</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
                     <button onClick={() => setDeliveryOption('pickup')} style={{
                       padding: '10px', borderRadius: '8px', border: deliveryOption === 'pickup' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
                       background: deliveryOption === 'pickup' ? '#FFF8F0' : '#fff', cursor: 'pointer', textAlign: 'left',

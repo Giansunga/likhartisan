@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmt, formatTime } from '../lib/utils';
 import DesignMessageCard from '../components/chat/DesignMessageCard';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface Shop {
   id: string;
@@ -46,6 +47,7 @@ function ShopAvatar({ shopId: _shopId, shopName, image, size, style }: { shopId:
 }
 
 export default function ChatPage() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
@@ -62,6 +64,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   const lastMsgCountRef = useRef(0);
+  const [mobileShowChat, setMobileShowChat] = useState(false);
 
   useEffect(() => { init(); }, []);
 
@@ -273,7 +276,7 @@ export default function ChatPage() {
         <div className="chat-layout">
 
           {/* === LEFT SIDEBAR === */}
-          <div className="chat-sidebar">
+          <div className={`chat-sidebar${isMobile && !mobileShowChat ? ' mobile-active' : ''}`}>
             <div className="sidebar-header">
               <h2>Messages</h2>
               <button className="btn-new-chat" onClick={() => { setShopSearch(''); setShowNewChat(true); }}>
@@ -306,7 +309,7 @@ export default function ChatPage() {
                   <div
                     key={conv.id}
                     className={`conversation-item ${selectedConv?.id === conv.id ? 'active' : ''}`}
-                    onClick={() => setSelectedConv(conv)}
+                    onClick={() => { setSelectedConv(conv); if (isMobile) setMobileShowChat(true); }}
                     style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px', cursor: 'pointer', transition: 'background 0.15s', borderBottom: '1px solid rgba(130,62,11,0.05)' }}
                   >
                     <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -340,11 +343,17 @@ export default function ChatPage() {
           </div>
 
           {/* === MAIN CHAT === */}
-          <div className="chat-main">
+          <div className={`chat-main${isMobile && mobileShowChat ? ' mobile-active' : ''}`}>
             {selectedConv ? (
               <>
                 <div className="chat-header-bar">
                   <div className="chat-header-left">
+                    {isMobile && (
+                      <button onClick={() => setMobileShowChat(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px 4px 0', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 600, flexShrink: 0 }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}><path d="M15 18l-6-6 6-6"/></svg>
+                        Back
+                      </button>
+                    )}
                     <div className="chat-header-avatar-wrap">
                       <ShopAvatar shopId={selectedConv.shop_id} shopName={selectedConv.shop_name} image={shopImageMap[selectedConv.shop_id]} size={44} />
                       <span className="chat-header-online-dot"></span>

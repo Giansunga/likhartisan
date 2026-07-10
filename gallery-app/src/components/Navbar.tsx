@@ -210,7 +210,7 @@ export default function Navbar() {
                 )}
               </button>
               {showNotifications && (
-                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', zIndex: 100 }}>
+                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', zIndex: 100 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>Notifications</span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>{notifications.filter(n => !n.read).length} unread</span>
