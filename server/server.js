@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import chatbotRoutes from './routes/chatbot.js';
@@ -15,8 +16,35 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
+// Rate limiters
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const chatbotLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: 'Too many chatbot requests, please wait' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const paymongoLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many payment requests, please wait' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+app.use(apiLimiter);
 app.use(express.json({
+  limit: '50kb',
   verify: (req, _res, buf) => { req.rawBody = buf; },
 }));
 
@@ -29,7 +57,7 @@ app.get('/health', (req, res) => {
 initChatbotController(supabase);
 
 // Chatbot routes
-app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 
 // Lalamove routes
 app.use('/api/lalamove', lalamoveRoutes);
@@ -38,7 +66,7 @@ app.use('/api/lalamove', lalamoveRoutes);
 app.use('/api/geocode', geocodeRoutes);
 
 // Create PayMongo Checkout Session
-app.post('/api/create-checkout', async (req, res) => {
+app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
     const { items, shippingFee, userName, userPhone, userAddress, deliveryOption, userId, lalamoveQuoteId } = req.body;
 
@@ -209,7 +237,7 @@ app.get('/api/session/:sessionId', async (req, res) => {
 });
 
 // Confirm payment and update order status (called by success page only)
-app.post('/api/confirm-payment', async (req, res) => {
+app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
   try {
     const { sessionId, userId } = req.body;
 
@@ -518,11 +546,6 @@ app.post('/api/notifications', async (req, res) => {
     console.error('Notification error:', e);
     res.status(500).json({ error: 'Server error' });
   }
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ── Role-based access middleware ────────────────────────────────────────────
