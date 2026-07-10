@@ -12,16 +12,8 @@ interface SavedDesign {
 }
 
 export default function SaveTab({
-  modelFile,
-  modelName,
-  shapeParams,
-  materialParams,
   onLoad,
 }: {
-  modelFile: string;
-  modelName: string;
-  shapeParams: any;
-  materialParams: any;
   onLoad: (design: SavedDesign) => void;
 }) {
   const [designs, setDesigns] = useState<SavedDesign[]>([]);

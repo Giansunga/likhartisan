@@ -1,0 +1,7 @@
+name: likhartisan-api
+type: web
+env: node
+buildCommand: npm install
+startCommand: npm start
+rootDir: server
+plan: free

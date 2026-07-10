@@ -20,6 +20,11 @@ app.use(express.json({
   verify: (req, _res, buf) => { req.rawBody = buf; },
 }));
 
+// Health check endpoint (for auto-ping)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Initialize chatbot controller with Supabase
 initChatbotController(supabase);
 

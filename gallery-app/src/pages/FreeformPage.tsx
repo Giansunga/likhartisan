@@ -492,10 +492,6 @@ export default function FreeformPage() {
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or send to a shop.</p>
                     </div>
                     <SaveTab
-                      modelFile={selectedModel}
-                      modelName={modelName}
-                      shapeParams={shapeParams}
-                      materialParams={materialParams}
                       onLoad={(d) => { applyDesign(d); setActiveStep('review'); }}
                     />
                   </div>

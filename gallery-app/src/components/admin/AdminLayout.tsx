@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAIL } from '../../lib/constants';
 import {
   LayoutDashboard, Package, Users, Store, Box, Sun,
-  Settings, LogOut, Home,
+  LogOut, Home,
 } from 'lucide-react';
 
 const sidebarLinks = [
