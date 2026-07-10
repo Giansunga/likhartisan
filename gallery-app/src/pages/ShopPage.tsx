@@ -152,7 +152,7 @@ export default function ShopPage() {
   }, [id]);
 
   async function handleFollow() {
-    if (!userId) { alert('Please sign in to follow this shop.'); return; }
+    if (!userId) { window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } })); return; }
     if (!id) return;
     if (following) {
       await supabase.from('shop_followers').delete().eq('shop_id', id).eq('user_id', userId);

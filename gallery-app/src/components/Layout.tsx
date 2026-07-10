@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { Component, type ReactNode } from 'react';
+import { useEffect, Component, type ReactNode } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
@@ -32,6 +32,10 @@ export default function Layout() {
   const isArtisan = location.pathname.startsWith('/artisan-dashboard');
   const isFreeform = location.pathname === '/freeform';
   const hideNavPadding = isAdmin || isArtisan || isFreeform;
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   return (
     <LayoutErrorBoundary>
