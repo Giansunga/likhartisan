@@ -225,7 +225,7 @@ export default function LikhAIDock() {
 
         .likhai-dock-launcher {
           position: fixed;
-          bottom: 32px;
+          bottom: 100px;
           right: 20px;
           z-index: 9999;
           display: flex;
@@ -273,12 +273,12 @@ export default function LikhAIDock() {
 
         .likhai-dock-window {
           position: fixed;
-          bottom: 32px;
+          bottom: 100px;
           right: 20px;
           z-index: 10000;
           width: 320px;
           height: 440px;
-          max-height: calc(100vh - 40px);
+          max-height: calc(100vh - 120px);
           border-radius: 16px 16px 0 0;
           background: #fff;
           box-shadow: 0 8px 40px rgba(0,0,0,0.18);
