@@ -168,7 +168,7 @@ export default function ShopPage() {
   }
 
   async function handleMessageShop() {
-    if (!userId) { alert('Please sign in to message this shop.'); return; }
+    if (!userId) { window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' })); return; }
     if (!shop) return;
 
     const { data: existing } = await supabase
