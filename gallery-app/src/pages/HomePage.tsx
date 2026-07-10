@@ -279,9 +279,9 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { name: 'Vases', img: '/images/vases_collection.png', desc: 'Beautifully handcrafted pottery pieces designed to showcase timeless elegance, traditional craftsmanship, and the artistic heritage of Santo Tomas\'s local artisans.', link: '/gallery' },
-              { name: 'Amphoras', img: '/images/amphoras_collection.png', desc: 'Classic handcrafted pottery pieces inspired by traditional forms, reflecting cultural significance, detailed craftsmanship, and enduring artistic tradition.', link: '/gallery' },
-              { name: 'Tea Light Vases', img: '/images/tealights_collection.png', desc: 'Carefully crafted pottery pieces designed to create a warm and inviting ambiance while showcasing the beauty of traditional artisan craftsmanship.', link: '/gallery' },
+              { name: 'Vases', img: '/images/vases_collection.png', desc: 'Beautifully handcrafted pottery pieces designed to showcase timeless elegance, traditional craftsmanship, and the artistic heritage of Santo Tomas\'s local artisans.', link: '/gallery?category=Vases' },
+              { name: 'Amphoras', img: '/images/amphoras_collection.png', desc: 'Classic handcrafted pottery pieces inspired by traditional forms, reflecting cultural significance, detailed craftsmanship, and enduring artistic tradition.', link: '/gallery?category=Amphoras' },
+              { name: 'Tea Light Vases', img: '/images/tealights_collection.png', desc: 'Carefully crafted pottery pieces designed to create a warm and inviting ambiance while showcasing the beauty of traditional artisan craftsmanship.', link: '/gallery?category=Tea%20Light%20Vases' },
             ].map((c, i) => (
               <div key={i} className="bg-white rounded-[10px] overflow-hidden shadow-[var(--shadow-sm)] border border-black/3 flex flex-col group hover:-translate-y-2.5 hover:shadow-[var(--shadow-lg)] hover:border-primary/15 transition-all duration-[0.3s]">
                 <div className="h-[320px] overflow-hidden">

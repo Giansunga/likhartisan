@@ -72,14 +72,14 @@ export default function Footer() {
               <ul className="footer-links">
                 {CATEGORIES_LEFT.map((label) => (
                   <li key={label}>
-                    <Link to="/gallery">{label}</Link>
+                    <Link to={`/gallery?category=${encodeURIComponent(label)}`}>{label}</Link>
                   </li>
                 ))}
               </ul>
               <ul className="footer-links">
                 {CATEGORIES_RIGHT.map((label) => (
                   <li key={label}>
-                    <Link to="/gallery">{label}</Link>
+                    <Link to={`/gallery?category=${encodeURIComponent(label)}`}>{label}</Link>
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
@@ -13,10 +13,11 @@ const categories = [
 ];
 
 export default function GalleryPage() {
+  const [searchParams] = useSearchParams();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('popularity');
   const [showFavorites, setShowFavorites] = useState(false);
