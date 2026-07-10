@@ -225,7 +225,7 @@ export default function LikhAIDock() {
 
         .likhai-dock-launcher {
           position: fixed;
-          bottom: 20px;
+          bottom: 32px;
           right: 20px;
           z-index: 9999;
           display: flex;
@@ -273,7 +273,7 @@ export default function LikhAIDock() {
 
         .likhai-dock-window {
           position: fixed;
-          bottom: 20px;
+          bottom: 32px;
           right: 20px;
           z-index: 10000;
           width: 320px;
@@ -318,6 +318,7 @@ export default function LikhAIDock() {
         .likhai-dock-messages {
           flex: 1;
           overflow-y: auto;
+          overscroll-behavior: contain;
           padding: 16px;
           background: #FAF8F5;
           display: flex;
@@ -467,7 +468,7 @@ export default function LikhAIDock() {
         @media (max-width: 480px) {
           .likhai-dock-window {
             width: calc(100vw - 16px);
-            height: calc(100vh - 90px);
+            height: calc(100vh - 100px);
             bottom: 8px;
             right: 8px;
             border-radius: 12px 12px 0 0;

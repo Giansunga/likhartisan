@@ -280,6 +280,15 @@ export default function ProductDetailPage() {
     navigate('/chat');
   };
 
+  const handleAskClick = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
+      return;
+    }
+    setAskModal(true);
+  };
+
 
   return (
     <div>
@@ -377,7 +386,7 @@ export default function ProductDetailPage() {
 
               <div className="product-viewer-actions">
                 <button className="btn-product-buy" onClick={handleBuy}>Buy Now</button>
-                <button className="btn-product-ask" onClick={() => setAskModal(true)}>Ask a Question</button>
+                <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
                 <button className="btn-product-design" onClick={handleAddToCart}>Add to Cart</button>
               </div>
             </div>
