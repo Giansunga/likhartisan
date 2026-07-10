@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { usePermissions, Role } from '../hooks/usePermissions';
+import { usePermissions } from '../../hooks/usePermissions';
+import type { Role } from '../../hooks/usePermissions';
 
 interface RequireRoleProps {
   roles: Role[];
