@@ -1,4 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useState, useEffect } from 'react';
 
 const QUICK_LINKS_LEFT = [
   { label: 'Home', to: '/' },
@@ -14,12 +16,20 @@ const QUICK_LINKS_RIGHT = [
 const CATEGORIES_LEFT = ['Vases', 'Planters', 'Jars', 'Amphoras'];
 const CATEGORIES_RIGHT = ['Tea Light Vases', 'Decorative Pieces', 'Others'];
 
-function openAuth(view: 'signin' | 'signup') {
-  window.dispatchEvent(new CustomEvent('open-auth', { detail: { view } }));
-}
-
 export default function Footer() {
   const location = useLocation();
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setLoggedIn(!!session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(!!session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/artisan-dashboard')) {
     return null;
   }
@@ -90,16 +100,26 @@ export default function Footer() {
           <div className="footer-col">
             <h5 className="footer-heading">CUSTOMERS</h5>
             <ul className="footer-links">
-              <li>
-                <button type="button" className="footer-link-btn" onClick={() => openAuth('signin')}>
-                  Log in
-                </button>
-              </li>
-              <li>
-                <button type="button" className="footer-link-btn" onClick={() => openAuth('signup')}>
-                  Sign up
-                </button>
-              </li>
+              {loggedIn ? (
+                <li>
+                  <Link to="/dashboard?tab=account" className="footer-link-btn">
+                    My Account
+                  </Link>
+                </li>
+              ) : (
+                <>
+                  <li>
+                    <button type="button" className="footer-link-btn" onClick={() => window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }))}>
+                      Log in
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" className="footer-link-btn" onClick={() => window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signup' } }))}>
+                      Sign up
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 

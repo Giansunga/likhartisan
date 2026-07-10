@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { getCartCount } from '../data/store';
+import { getCartCount, onCartUpdate } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
@@ -26,6 +26,7 @@ export default function Navbar() {
   const [shopInitials, setShopInitials] = useState('SN');
   const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [cartCount, setCartCount] = useState(getCartCount());
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -33,6 +34,12 @@ export default function Navbar() {
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    setCartCount(getCartCount());
+    const unsubscribe = onCartUpdate(() => setCartCount(getCartCount()));
+    return unsubscribe;
   }, []);
 
   async function fetchBuyerNotifications() {
@@ -302,7 +309,7 @@ export default function Navbar() {
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                   </svg>
                   <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.6rem' : '0.7rem' }}>
-                    {getCartCount()}
+                    {cartCount}
                   </span>
                 </Link>
 
