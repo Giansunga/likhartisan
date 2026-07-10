@@ -18,60 +18,75 @@ export default function CheckoutSuccessPage() {
     clearCart();
     localStorage.removeItem('likhartisan_checkout_session_id');
 
-    async function markOrderPaid() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setMessage('You are not logged in. Please log in and check your orders.');
-          setStatus('success');
-          return;
-        }
-
-        // Get session ID from URL param, falling back to localStorage
-        let checkoutSessionId = searchParams.get('session_id');
-        if (!checkoutSessionId || checkoutSessionId === '{checkout_session.id}') {
-          checkoutSessionId = localStorage.getItem('likhartisan_checkout_session_id');
-        }
-
-        // Call server endpoint to verify payment and update order status
-        try {
-          const res = await fetch(`${PAYMONGO_API_URL}/api/confirm-payment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: checkoutSessionId,
-              userId: session.user.id,
-            }),
-          });
-
-          const result = await res.json();
-          console.log('[CheckoutSuccess] Server response:', res.status, result);
-
-          if (res.ok && result.success) {
-            setStatus('success');
-            setMessage('Payment confirmed!');
-            return;
-          }
-        } catch (e) {
-          console.warn('[CheckoutSuccess] Server confirm-payment call failed:', e);
-        }
-
-        // Retry if order might not be inserted yet
-        if (attempts < MAX_ATTEMPTS) {
-          attempts++;
-          setTimeout(markOrderPaid, 2000);
-          return;
-        }
-
-        // All strategies exhausted
+async function markOrderPaid() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setMessage('You are not logged in. Please log in and check your orders.');
         setStatus('success');
-        setMessage('Payment is being processed. Your order will update shortly.');
-      } catch (err) {
-        console.error('[CheckoutSuccess] Error:', err);
-        setStatus('success');
-        setMessage('Payment is being processed. Check your orders shortly.');
+        return;
       }
+
+      // Get session ID from URL param, falling back to localStorage
+      let checkoutSessionId = searchParams.get('session_id');
+      if (!checkoutSessionId || checkoutSessionId === '{checkout_session.id}') {
+        checkoutSessionId = localStorage.getItem('likhartisan_checkout_session_id');
+      }
+
+      if (!checkoutSessionId) {
+        throw new Error('No checkout session ID found. Please check your orders.');
+      }
+
+      console.log('[CheckoutSuccess] Checking payment for session:', checkoutSessionId, 'user:', session.user.id);
+
+      // Call server endpoint to verify payment and update order status
+      try {
+        const res = await fetch(`${PAYMONGO_API_URL}/api/confirm-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: checkoutSessionId,
+            userId: session.user.id,
+          }),
+        });
+
+        const result = await res.json();
+        console.log('[CheckoutSuccess] Server response:', res.status, result);
+
+        if (!res.ok) {
+          throw new Error(result.error || `Server returned ${res.status}`);
+        }
+
+        if (result.success) {
+          setStatus('success');
+          setMessage('Payment confirmed!');
+          return;
+        }
+        throw new Error('Server returned success: false');
+      } catch (e) {
+        console.error('[CheckoutSuccess] Server confirm-payment call failed:', e);
+        // Don't silently succeed - show the error
+        setStatus('error');
+        setMessage(`Payment verification failed: ${e.message}. Please check your orders or contact support.`);
+        return;
+      }
+
+      // Retry if order might not be inserted yet
+      if (attempts < MAX_ATTEMPTS) {
+        attempts++;
+        setTimeout(markOrderPaid, 2000);
+        return;
+      }
+
+      // All strategies exhausted
+      setStatus('error');
+      setMessage('Payment verification timed out. Please check your orders or contact support.');
+    } catch (err) {
+      console.error('[CheckoutSuccess] Error:', err);
+      setStatus('error');
+      setMessage('An unexpected error occurred. Please check your orders or contact support.');
     }
+  }
 
     markOrderPaid();
   }, [searchParams]);

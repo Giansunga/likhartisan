@@ -392,6 +392,7 @@ export default function CheckoutPage() {
     if (!deliveryOption) { alert('Please select a delivery option.'); return; }
     if (items.length === 0) return;
     if (!userName || !userAddress) { alert('Please complete your shipping address.'); return; }
+    if (!userId) { alert('User session not loaded. Please wait a moment and try again.'); return; }
 
     setPlacing(true);
 
