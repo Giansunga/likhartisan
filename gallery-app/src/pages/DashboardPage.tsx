@@ -462,7 +462,7 @@ export default function DashboardPage() {
       if (res.ok) {
         const sessionData = await res.json();
         // If the session is already paid, just refresh orders
-        if (sessionData.payment_status === 'paid') {
+        if (sessionData.status === 'paid') {
           alert('This order has already been paid. Refreshing your orders.');
           loadOrders();
           return;

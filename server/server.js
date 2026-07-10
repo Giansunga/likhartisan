@@ -251,7 +251,36 @@ app.post('/api/confirm-payment', async (req, res) => {
       return res.status(402).json({ success: false, error: 'Payment not verified by PayMongo', verified: false });
     }
 
-    // Step 2: Extract order data from PayMongo session metadata
+    // Step 2: Try to find and UPDATE existing order (created by frontend with 'pending' status)
+    const { data: existingOrders } = await supabase
+      .from('orders')
+      .select('id, status')
+      .eq('checkout_session_id', sessionId)
+      .limit(1);
+
+    if (existingOrders && existingOrders.length > 0) {
+      const order = existingOrders[0];
+      if (order.status === 'paid') {
+        console.log(`[confirm-payment] Order ${order.id} already paid — skipping`);
+        return res.json({ success: true, verified: true });
+      }
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'paid' })
+        .eq('id', order.id);
+
+      if (updateError) {
+        console.error('[confirm-payment] Order update failed:', updateError.message);
+        return res.status(500).json({ success: false, error: 'Failed to update order status' });
+      }
+
+      console.log(`[confirm-payment] Updated order ${order.id} from pending to paid`);
+      return res.json({ success: true, verified: true });
+    }
+
+    // Fallback: Order not created by frontend — create from PayMongo metadata
+    console.warn(`[confirm-payment] No existing order for session ${sessionId} — creating from metadata`);
     const meta = pmData.data?.attributes?.metadata || {};
     const referenceNumber = pmData.data?.attributes?.reference_number || `LA-${Date.now()}`;
 
@@ -278,7 +307,6 @@ app.post('/api/confirm-payment', async (req, res) => {
     const shippingFee = parseFloat(meta.verifiedShippingFee) || 0;
     const total = subtotal + shippingFee;
 
-    // Step 3: Insert order (only create after payment is confirmed)
     const { data: newOrder, error: insertError } = await supabase
       .from('orders')
       .insert({
@@ -301,11 +329,11 @@ app.post('/api/confirm-payment', async (req, res) => {
       .single();
 
     if (insertError) {
-      console.error('[confirm-payment] Order insert failed:', insertError.message);
+      console.error('[confirm-payment] Fallback order insert failed:', insertError.message);
       return res.status(500).json({ success: false, error: 'Failed to create order after payment' });
     }
 
-    console.log(`[confirm-payment] Created order ${newOrder.id} for session ${sessionId}`);
+    console.log(`[confirm-payment] Created fallback order ${newOrder.id} for session ${sessionId}`);
     return res.json({ success: true, verified: true });
 
   } catch (error) {
@@ -495,6 +523,100 @@ app.post('/api/notifications', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ── Role-based access middleware ────────────────────────────────────────────
+async function requireRole(userId, ...allowedRoles) {
+  if (!userId) return false;
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role, shop_id')
+    .eq('user_id', userId);
+  return roles?.some(r => allowedRoles.includes(r.role)) ?? false;
+}
+
+function requireSuperAdmin(userId) {
+  return requireRole(userId, 'super_admin');
+}
+
+function requireShopOwner(userId) {
+  return requireRole(userId, 'shop_owner');
+}
+
+// ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────
+app.post('/api/admin/assign-role', async (req, res) => {
+  try {
+    const { userId, role, shopId } = req.body;
+    const requesterId = req.body.requesterId || req.headers['x-user-id'];
+
+    if (!requesterId || !(await requireSuperAdmin(requesterId))) {
+      return res.status(403).json({ error: 'Forbidden: super_admin required' });
+    }
+
+    if (!userId || !role || !['shop_owner', 'buyer'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role or userId' });
+    }
+
+    let finalShopId = shopId;
+
+    if (role === 'shop_owner' && !shopId) {
+      // Auto-create shop
+      const { data: profile } = await supabase.auth.admin.getUserById(userId);
+      const email = profile?.user?.email || `${userId}@example.com`;
+      const name = email.split('@')[0] + "'s Shop";
+
+      const { data: shop, error: shopError } = await supabase
+        .from('shops')
+        .insert({ name, email, owner_id: userId, auto_created: true })
+        .select('id')
+        .single();
+
+      if (shopError) {
+        console.error('Auto-create shop error:', shopError);
+        return res.status(500).json({ error: 'Failed to create shop' });
+      }
+      finalShopId = shop.id;
+    }
+
+    const { error } = await supabase
+      .from('user_roles')
+      .upsert({ user_id: userId, role, shop_id: finalShopId, assigned_by: requesterId }, { onConflict: 'user_id,role,shop_id' });
+
+    if (error) {
+      console.error('Assign role error:', error);
+      return res.status(500).json({ error: 'Failed to assign role' });
+    }
+
+    res.json({ success: true, shopId: finalShopId });
+  } catch (e) {
+    console.error('Assign role error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: List users with roles
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const requesterId = req.headers['x-user-id'];
+    if (!requesterId || !(await requireSuperAdmin(requesterId))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const { data: roles } = await supabase.from('user_roles').select('user_id, role, shop_id');
+
+    const usersWithRoles = users.users.map(u => ({
+      id: u.id,
+      email: u.email,
+      created_at: u.created_at,
+      roles: roles?.filter(r => r.user_id === u.id) || [],
+    }));
+
+    res.json({ users: usersWithRoles });
+  } catch (e) {
+    console.error('List users error:', e);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.listen(PORT, () => {

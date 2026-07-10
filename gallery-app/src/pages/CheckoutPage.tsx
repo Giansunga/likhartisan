@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
-import { getCart } from '../data/store';
+import { getCart, clearCart } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { fmt } from '../lib/utils';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
@@ -429,6 +429,42 @@ export default function CheckoutPage() {
         return;
       }
 
+      // Save order to Supabase with 'pending' status before redirecting to PayMongo
+      const { error: orderError } = await supabase.from('orders').insert({
+        user_id: userId,
+        user_name: userName,
+        user_phone: userPhone,
+        user_address: userAddress,
+        items: items.map(i => ({
+          product_id: i.productId,
+          product_name: i.productName,
+          qty: i.qty,
+          price: i.price,
+          image: i.image,
+          shop_id: i.shopId || null,
+          shop_name: i.shopName,
+          variation_id: i.variationId || null,
+          variation: i.variation || '',
+        })),
+        subtotal,
+        shipping_fee: shippingFee,
+        total: data.total || total,
+        delivery_option: deliveryOption,
+        delivery_status: 'pending',
+        status: 'pending',
+        payment_reference: data.referenceNumber,
+        checkout_session_id: data.sessionId,
+        lalamove_quote_id: lalamoveQuote?.quotationId || null,
+      });
+
+      if (orderError) {
+        console.error('Order insert failed:', orderError);
+        alert('Failed to save order. Please try again.');
+        setPlacing(false);
+        return;
+      }
+
+      clearCart();
       localStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
       window.location.href = data.checkoutUrl;
     } catch (error) {
