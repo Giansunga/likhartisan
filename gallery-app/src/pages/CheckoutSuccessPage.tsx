@@ -14,6 +14,10 @@ export default function CheckoutSuccessPage() {
     let attempts = 0;
     const MAX_ATTEMPTS = 5;
 
+    // Clear cart immediately on success page load — user already passed PayMongo
+    clearCart();
+    localStorage.removeItem('likhartisan_checkout_session_id');
+
     async function markOrderPaid() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -24,12 +28,10 @@ export default function CheckoutSuccessPage() {
         }
 
         // Get session ID from URL param, falling back to localStorage
-        // (PayMongo may not substitute {checkout_session.id} in the success_url)
         let checkoutSessionId = searchParams.get('session_id');
         if (!checkoutSessionId || checkoutSessionId === '{checkout_session.id}') {
           checkoutSessionId = localStorage.getItem('likhartisan_checkout_session_id');
         }
-        console.log('[CheckoutSuccess] Confirming payment — session_id:', checkoutSessionId, 'user:', session.user.id);
 
         // Call server endpoint to verify payment and update order status
         try {
@@ -46,8 +48,6 @@ export default function CheckoutSuccessPage() {
           console.log('[CheckoutSuccess] Server response:', res.status, result);
 
           if (res.ok && result.success) {
-            localStorage.removeItem('likhartisan_checkout_session_id');
-            clearCart();
             setStatus('success');
             setMessage('Payment confirmed!');
             return;
@@ -59,13 +59,11 @@ export default function CheckoutSuccessPage() {
         // Retry if order might not be inserted yet
         if (attempts < MAX_ATTEMPTS) {
           attempts++;
-          console.log(`[CheckoutSuccess] Retry attempt ${attempts}/${MAX_ATTEMPTS}`);
           setTimeout(markOrderPaid, 2000);
           return;
         }
 
         // All strategies exhausted
-        console.warn('[CheckoutSuccess] All strategies exhausted');
         setStatus('success');
         setMessage('Payment is being processed. Your order will update shortly.');
       } catch (err) {
