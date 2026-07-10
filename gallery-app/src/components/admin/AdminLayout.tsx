@@ -28,7 +28,7 @@ export default function AdminLayout() {
   async function checkAdminAccess() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && ADMIN_EMAILS.includes(session.user.email)) {
+      if (session && session.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);
