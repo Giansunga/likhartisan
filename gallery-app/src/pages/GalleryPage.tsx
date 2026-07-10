@@ -31,6 +31,11 @@ export default function GalleryPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    setActiveCategory(cat);
+  }, [searchParams]);
+
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
