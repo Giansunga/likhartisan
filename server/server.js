@@ -225,13 +225,14 @@ app.post('/api/confirm-payment', async (req, res) => {
 
     // Step 1: Verify payment with PayMongo — MUST be paid before updating DB
     let paymongoVerified = false;
+    let pmData = null;
     try {
       const pmResponse = await fetch(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`, {
         headers: {
           'Authorization': `Basic ${Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString('base64')}`,
         },
       });
-      const pmData = await pmResponse.json();
+      pmData = await pmResponse.json();
       if (pmResponse.ok) {
         const pmStatus = pmData.data?.attributes?.status;
         const piStatus = pmData.data?.attributes?.payment_intent?.attributes?.status;
