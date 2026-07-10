@@ -7,6 +7,8 @@ interface Message {
   timestamp: Date;
 }
 
+const API_BASE = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+
 const QUICK_ACTIONS = [
   { label: 'Track My Order', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
   { label: 'Shipping Info', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
@@ -45,7 +47,7 @@ export default function ChatbotPage() {
 
     try {
       const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-      const res = await fetch('http://localhost:3001/api/chatbot', {
+      const res = await fetch(`${API_BASE}/api/chatbot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text.trim(), history, userId }),
