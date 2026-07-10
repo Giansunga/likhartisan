@@ -109,6 +109,7 @@ export default function CheckoutPage() {
       }
 
       if (!pickupCoords || !dropoffCoords) {
+        console.error('Lalamove geocoding failed:', { pickupCoords, dropoffCoords, pickup, dropoff });
         setLalamoveError('Could not geocode addresses. Please try again.');
         setLalamoveQuote(null);
         setLalamoveLoading(false);

@@ -8,18 +8,25 @@ function getGeocoder(): google.maps.Geocoder | null {
 }
 
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  const g = getGeocoder();
-  if (!g) return null;
-  try {
-    const result = await g.geocode({ address, region: 'PH' });
-    if (result.results.length > 0) {
-      const loc = result.results[0].geometry.location;
-      return { lat: loc.lat(), lng: loc.lng() };
+  // Retry up to 3 times with delay to wait for Google Maps API to load
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const g = getGeocoder();
+    if (!g) {
+      await new Promise(r => setTimeout(r, 500));
+      continue;
     }
-    return null;
-  } catch {
-    return null;
+    try {
+      const result = await g.geocode({ address, region: 'PH' });
+      if (result.results.length > 0) {
+        const loc = result.results[0].geometry.location;
+        return { lat: loc.lat(), lng: loc.lng() };
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
+  return null;
 }
 
 export async function reverseGeocodeCoords(lat: number, lng: number): Promise<string> {
