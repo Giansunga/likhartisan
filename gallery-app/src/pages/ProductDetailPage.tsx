@@ -247,7 +247,6 @@ export default function ProductDetailPage() {
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
     });
-    alert('Added to cart!');
   };
 
   const handleBuy = async (e: React.FormEvent) => {
