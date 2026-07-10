@@ -204,14 +204,14 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
             {/* ════ SIGN IN ════ */}
             {view === 'signin' && (
-              <motion.div key="signin" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '28px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+              <motion.div key="signin" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Log in
                 </h1>
 
-                <form onSubmit={handleSignIn}>
+                <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   {/* Email */}
-                  <div style={{ marginBottom: '16px' }}>
+                  <div>
                     <label style={S.label}>E-mail Address</label>
                     <input
                       type="email" name="email" required
@@ -223,7 +223,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   </div>
 
                   {/* Password */}
-                  <div style={{ marginBottom: '24px' }}>
+                  <div>
                     <label style={S.label}>Password</label>
                     <div style={{ position: 'relative' }}>
                       <input
@@ -284,13 +284,13 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
             {/* ════ SIGN UP ════ */}
             {view === 'signup' && (
-              <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '24px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+              <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Create Account
                 </h1>
 
-                <form onSubmit={handleSignUp}>
-                  <div style={{ marginBottom: '14px' }}>
+                <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div>
                     <label style={S.label}>Full Name</label>
                     <input
                       type="text" name="name" required placeholder="Your name"
@@ -299,7 +299,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                       onBlur={e  => (e.currentTarget.style.borderColor = '#DDD5CC')}
                     />
                   </div>
-                  <div style={{ marginBottom: '14px' }}>
+                  <div>
                     <label style={S.label}>E-mail Address</label>
                     <input
                       type="email" name="email" required placeholder="e.g., name@example.com"
@@ -308,7 +308,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                       onBlur={e  => (e.currentTarget.style.borderColor = '#DDD5CC')}
                     />
                   </div>
-                  <div style={{ marginBottom: '22px' }}>
+                  <div>
                     <label style={S.label}>Password</label>
                     <div style={{ position: 'relative' }}>
                       <input
