@@ -3,8 +3,9 @@ Database Migrations — LikhArtisan
 
 MIGRATION ORDER (run in this sequence on a fresh Supabase project):
 
-  1. 000-master-schema.sql    ← All tables, indexes, constraints, storage bucket
-  2. FIX-RLS.sql               ← Row Level Security policies (run AFTER schema)
+   1. 000-master-schema.sql    ← All tables, indexes, constraints, storage bucket
+   2. FIX-RLS.sql               ← Row Level Security policies (run AFTER schema)
+   3. add-user-roles.sql        ← RBAC: user_roles table, helper funcs, role-seeded policies
 
 OPTIONAL / INCREMENTAL FILES (for existing databases, column additions):
 
