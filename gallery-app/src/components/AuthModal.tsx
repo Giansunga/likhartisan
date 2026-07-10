@@ -168,7 +168,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         {/* ── RIGHT: Form ── */}
         <div style={{
           flex: 1,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column',
           padding: '40px 44px',
           background: '#FAF8F5',
           overflowY: 'auto',
@@ -203,8 +203,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
             {/* ════ SIGN IN ════ */}
             {view === 'signin' && (
-              <motion.div key="signin" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+              <motion.div key="signin" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Log in
                 </h1>
 
@@ -251,7 +251,9 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   </button>
                 </form>
 
-                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '14px' }}>
+                <div style={{ flex: 1 }} />
+
+                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558' }}>
                   Don't have an account yet?{' '}
                   <button type="button" onClick={() => setView('signup')} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
                     Sign up
@@ -273,7 +275,9 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   Continue with Google
                 </button>
 
-                <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#A89688', marginTop: '14px' }}>
+                <div style={{ flex: 1 }} />
+
+                <p style={{ textAlign: 'center', fontSize: '0.78rem', color: '#A89688' }}>
                   <button type="button" onClick={() => setView('forgot')} style={{ background: 'none', border: 'none', color: '#A89688', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
                     Forgot password?
                   </button>
@@ -283,8 +287,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
             {/* ════ SIGN UP ════ */}
             {view === 'signup' && (
-              <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+              <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Create Account
                 </h1>
 
@@ -334,7 +338,9 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   </button>
                 </form>
 
-                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '14px' }}>
+                <div style={{ flex: 1 }} />
+
+                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558' }}>
                   Already have an account?{' '}
                   <button type="button" onClick={() => setView('signin')} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
                     Log in
