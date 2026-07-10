@@ -23,6 +23,13 @@ export default function GalleryPage() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
   const [designModalOpen, setDesignModalOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setLoggedIn(!!session));
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
@@ -173,6 +180,7 @@ export default function GalleryPage() {
                 </svg>
                 <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
+              {loggedIn && (
               <button
                 onClick={() => setShowFavorites(!showFavorites)}
                 style={{
@@ -188,6 +196,7 @@ export default function GalleryPage() {
                 </svg>
                 Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
               </button>
+              )}
               <div className="sort-select-wrapper">
                 <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
                   <option value="popularity">Popularity</option>
@@ -223,6 +232,7 @@ export default function GalleryPage() {
                 <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group">
                   <div className="product-img-wrapper">
                     <img src={p.image} alt={p.name} />
+                    {loggedIn && (
                     <button
                       onClick={(e) => toggleFavorite(e, p.id)}
                       style={{
@@ -241,6 +251,7 @@ export default function GalleryPage() {
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                       </svg>
                     </button>
+                    )}
                   </div>
                   <div className="product-details">
                     <div className="product-card-header">
