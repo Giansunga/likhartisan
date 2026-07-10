@@ -63,7 +63,7 @@ async function markOrderPaid() {
           return;
         }
         throw new Error('Server returned success: false');
-      } catch (e) {
+      } catch (e: any) {
         console.error('[CheckoutSuccess] Server confirm-payment call failed:', e);
         // Don't silently succeed - show the error
         setStatus('error');
@@ -81,11 +81,11 @@ async function markOrderPaid() {
       // All strategies exhausted
       setStatus('error');
       setMessage('Payment verification timed out. Please check your orders or contact support.');
-    } catch (err) {
-      console.error('[CheckoutSuccess] Error:', err);
-      setStatus('error');
-      setMessage('An unexpected error occurred. Please check your orders or contact support.');
-    }
+} catch (err: any) {
+        console.error('[CheckoutSuccess] Error:', err);
+        setStatus('error');
+        setMessage(`Payment processing failed: ${err.message}. Please check your orders or contact support.`);
+      }
   }
 
     markOrderPaid();
