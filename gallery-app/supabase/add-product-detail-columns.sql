@@ -1,0 +1,3 @@
+ALTER TABLE products ADD COLUMN IF NOT EXISTS height TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS opening_diameter TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS technique TEXT DEFAULT 'Handcrafted & Kiln-Fired';
