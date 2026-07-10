@@ -108,6 +108,13 @@ export default function CheckoutPage() {
         console.error('Dropoff geocoding error:', err);
       }
 
+      if (!pickupCoords || !dropoffCoords) {
+        setLalamoveError('Could not geocode addresses. Please try again.');
+        setLalamoveQuote(null);
+        setLalamoveLoading(false);
+        return;
+      }
+
       const response = await fetch(`${PAYMONGO_API_URL}/api/lalamove/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,12 +240,12 @@ export default function CheckoutPage() {
 
   // Fetch Lalamove quote when delivery option, address, or vehicle changes
   useEffect(() => {
-    if (deliveryOption === 'courier' && userAddress) {
+    if (deliveryOption === 'courier' && userAddress && isLoaded) {
       fetchLalamoveQuote(shopAddress, userAddress, selectedVehicle.serviceType, mapCoords.pickup);
     } else {
       setLalamoveQuote(null);
     }
-  }, [deliveryOption, userAddress, shopAddress, selectedVehicle, fetchLalamoveQuote, mapCoords.pickup]);
+  }, [deliveryOption, userAddress, shopAddress, selectedVehicle, fetchLalamoveQuote, mapCoords.pickup, isLoaded]);
 
   // Fit map bounds to show both markers when coordinates change
   useEffect(() => {
