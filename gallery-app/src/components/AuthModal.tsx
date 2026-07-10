@@ -137,6 +137,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         style={{
           display: 'flex',
           width: '100%', maxWidth: '820px',
+          minHeight: '520px',
           background: '#fff',
           borderRadius: '20px',
           overflow: 'hidden',
@@ -149,7 +150,6 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
           flex: '0 0 42%',
           position: 'relative',
           display: 'none',
-          minHeight: '520px',
         }}
           className="auth-modal-image-panel"
         >
@@ -168,11 +168,10 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         {/* ── RIGHT: Form ── */}
         <div style={{
           flex: 1,
-          display: 'flex', flexDirection: 'column',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
           padding: '40px 44px',
           background: '#FAF8F5',
           overflowY: 'auto',
-          justifyContent: 'space-between',
         }}>
           {/* Close button */}
           <button
