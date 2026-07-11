@@ -299,8 +299,8 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
               {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
-              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} />}
-              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} />}
+              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} />}
+              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} setLoadingShop={setLoadingShop} />}
             </PanelErrorBoundary>
           )}
         </main>
@@ -1357,7 +1357,7 @@ return (
   );
 }
 
-function MessagesPanel({ shopId, loadingMessages }: { shopId: string | null; loadingMessages: boolean }) {
+function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId: string | null; loadingMessages: boolean; setLoadingMessages: (v: boolean) => void }) {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -1807,7 +1807,7 @@ function MessagesPanel({ shopId, loadingMessages }: { shopId: string | null; loa
     </div>
   );
 }
-function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean }) {
+function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop, setLoadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean; setLoadingShop: (v: boolean) => void }) {
   const [name, setName] = useState(shopData?.name || '');
   const [description, setDescription] = useState(shopData?.description || '');
   const [about, setAbout] = useState(shopData?.about || '');
