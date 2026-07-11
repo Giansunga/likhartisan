@@ -12,7 +12,7 @@ envVars:
     sync: false
   - key: FROM_EMAIL
     sync: false
-    value: LikhArtisan <orders@likhartisan.ph>
+    value: LikhArtisan <onboarding@resend.dev>
   - key: SUPABASE_URL
     sync: false
   - key: PAYMONGO_SECRET_KEY
