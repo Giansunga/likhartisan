@@ -18,7 +18,7 @@ export default function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string }[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string; isReal?: boolean }[]>([]);
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
@@ -116,7 +116,7 @@ export default function Navbar() {
   useEffect(() => {
     if (!isArtisanDashboard || !userEmail || !SHOP_EMAILS.includes(userEmail)) return;
     async function fetchNotifications() {
-      const notifs: { id: string; type: string; text: string; time: string; read: boolean }[] = [];
+      const notifs: { id: string; type: string; text: string; time: string; read: boolean; isReal?: boolean }[] = [];
       const userId = user?.id;
       if (!userId) return;
       const { data: shop } = await supabase.from('shops').select('id').eq('email', userEmail).maybeSingle();
@@ -128,7 +128,7 @@ export default function Navbar() {
           return items.some((i: any) => i.shop_id === shop.id);
         }).forEach((o: any) => {
           notifs.push({
-            id: o.id, type: 'order',
+            id: o.id, type: 'order', isReal: false,
             text: `New order from ${o.user_name || 'Customer'} — ₱${(o.total || 0).toLocaleString()}`,
             time: o.created_at, read: o.status !== 'pending',
           });
@@ -138,7 +138,7 @@ export default function Navbar() {
       if (convs) {
         convs.filter((c: any) => (c.buyer_unread || 0) > 0).forEach((c: any) => {
           notifs.push({
-            id: c.id, type: 'message',
+            id: c.id, type: 'message', isReal: false,
             text: c.last_message || 'New message',
             time: c.last_message_at, read: false,
           });
@@ -229,7 +229,7 @@ export default function Navbar() {
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
           Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
-        <button onClick={() => { setShowNotifications(false); navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+        <button onClick={() => { setShowNotifications(false); if (!SHOP_EMAILS.includes(userEmail || '')) navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
       </div>
       <div style={{ maxHeight: '360px', overflowY: 'auto', paddingBottom: '6px' }}>
         {notifications.length === 0 ? (
@@ -246,7 +246,7 @@ export default function Navbar() {
           notifications.map(n => {
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
-            <button key={n.id} onClick={() => { markNotificationRead(n.id); setShowNotifications(false); navigate('/dashboard?tab=notifications'); }}
+            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); } }}
               style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #F5F0EB', display: 'flex', gap: '12px', alignItems: 'flex-start', background: n.read ? 'transparent' : '#FDF8F4', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
               onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
