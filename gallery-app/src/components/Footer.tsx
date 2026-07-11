@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const QUICK_LINKS_LEFT = [
   { label: 'Home', to: '/' },
@@ -18,17 +17,8 @@ const CATEGORIES_RIGHT = ['Tea Light Vases', 'Decorative Pieces', 'Others'];
 
 export default function Footer() {
   const location = useLocation();
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setLoggedIn(!!session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setLoggedIn(!!session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user } = useAuth();
+  const loggedIn = !!user;
 
   if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/artisan-dashboard')) {
     return null;

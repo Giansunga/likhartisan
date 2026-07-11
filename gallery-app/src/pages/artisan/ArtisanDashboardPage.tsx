@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, Component, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
 import DesignMessageCard from '../../components/chat/DesignMessageCard';
@@ -77,18 +78,19 @@ export default function ArtisanDashboardPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadingShop] = useState(true);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
     let cancelled = false;
     async function checkArtisanAccess() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
-        if (session && SHOP_EMAILS.includes(session.user.email || '')) {
+        if (user && SHOP_EMAILS.includes(user.email || '')) {
           const { data: shopResult } = await supabase
             .from('shops')
             .select('*')
-            .eq('email', session.user.email)
+            .eq('email', user.email)
             .single();
 
           if (cancelled) return;
@@ -113,7 +115,8 @@ export default function ArtisanDashboardPage() {
     }
     checkArtisanAccess();
     return () => { cancelled = true; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
   async function fetchProducts(sid: string) {
     setLoadingProducts(true);
@@ -1357,6 +1360,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => { init(); }, [shopId]);
   useEffect(() => {
@@ -1400,8 +1404,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
 
   async function init() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) setArtisanUserId(session.user.id);
+      if (user) setArtisanUserId(user.id);
       if (shopId) {
         const { data } = await supabase
           .from('conversations').select('*').eq('shop_id', shopId)

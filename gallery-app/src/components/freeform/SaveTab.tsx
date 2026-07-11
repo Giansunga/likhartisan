@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SavedDesign {
   id: string;
@@ -19,19 +20,20 @@ export default function SaveTab({
   const [designs, setDesigns] = useState<SavedDesign[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        setUserId(session.user.id);
-        await fetchDesigns(session.user.id);
+      if (user?.id) {
+        setUserId(user.id);
+        await fetchDesigns(user.id);
       } else {
         setLoading(false);
       }
     }
     init();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function fetchDesigns(uid: string) {
     setLoading(true);

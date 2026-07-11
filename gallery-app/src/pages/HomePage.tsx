@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const FreeformViewer = lazy(() => import('../components/freeform/FreeformViewer'));
 
@@ -19,20 +20,8 @@ interface HomeArtisan {
 export default function HomePage() {
   const navigate = useNavigate();
   const [counted, setCounted] = useState(false);
-  const [user, setUser] = useState<any>(undefined);
-  const [authChecked, setAuthChecked] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthChecked(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null);
-      setAuthChecked(true);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, loading } = useAuth();
+  const authChecked = !loading;
   const statsRef = useRef<HTMLDivElement>(null);
   const [artisansOffset, setArtisansOffset] = useState(0);
   const artisanTrackRef = useRef<HTMLDivElement>(null);

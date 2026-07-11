@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { displayVariation } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OrderItem {
   productId: string;
@@ -47,22 +48,23 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || authLoading) return;
     loadOrder();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, user, authLoading]);
 
   async function loadOrder() {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { navigate('/'); return; }
+    if (!user) { navigate('/'); return; }
 
     const { data } = await supabase
       .from('orders')
       .select('*')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (data) {

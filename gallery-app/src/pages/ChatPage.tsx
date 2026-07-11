@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { fmt, formatTime } from '../lib/utils';
 import DesignMessageCard from '../components/chat/DesignMessageCard';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -65,8 +67,10 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const lastMsgCountRef = useRef(0);
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const { user } = useAuth();
 
-  useEffect(() => { init(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { init(); }, [user]);
 
   useEffect(() => {
     if (selectedConv) {
@@ -139,10 +143,9 @@ export default function ChatPage() {
   }, [messages, userId]);
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setUserId(session.user.id);
-      await fetchConversations(session.user.id);
+    if (user) {
+      setUserId(user.id);
+      await fetchConversations(user.id);
     }
     await fetchShops();
     setLoading(false);
@@ -204,12 +207,11 @@ export default function ChatPage() {
   }
 
   async function startConversation(shop: Shop) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
-    if (!uid) { alert('Please sign in to start a conversation.'); return; }
+    const uid = user?.id;
+    if (!uid) { toast.error('Please sign in to start a conversation.'); return; }
 
-    const meta = session?.user?.user_metadata || {};
-    const buyerName = meta.name || session?.user?.email || 'Buyer';
+    const meta = user?.user_metadata || {};
+    const buyerName = meta.name || user?.email || 'Buyer';
     const buyerAvatar = meta.avatar_url || '';
 
     const existing = conversations.find(c => c.shop_id === shop.id);
@@ -220,7 +222,7 @@ export default function ChatPage() {
       .insert({ buyer_id: uid, shop_id: shop.id, shop_name: shop.name, buyer_name: buyerName, buyer_avatar: buyerAvatar, last_message: '', last_message_at: new Date().toISOString() })
       .select().single();
 
-    if (error) { alert('Failed: ' + error.message); return; }
+    if (error) { toast.error('Failed: ' + error.message); return; }
     if (data) { setConversations(prev => [data, ...prev]); setSelectedConv(data); setShowNewChat(false); }
   }
 

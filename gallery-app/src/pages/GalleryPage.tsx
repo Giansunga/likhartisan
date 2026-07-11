@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
 import Pagination from '../components/Pagination';
+import { useAuth } from '../contexts/AuthContext';
 
 const PAGE_SIZE = 24;
 
@@ -26,14 +27,9 @@ export default function GalleryPage() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
   const [designModalOpen, setDesignModalOpen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setLoggedIn(!!session));
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user } = useAuth();
+  const loggedIn = !!user;
 
   useEffect(() => {
     const cat = searchParams.get('category');

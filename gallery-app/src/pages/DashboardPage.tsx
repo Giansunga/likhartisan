@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { displayVariation } from '../lib/utils';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
@@ -120,6 +122,7 @@ export default function DashboardPage() {
   const [userReviews, setUserReviews] = useState<Record<string, any>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
   const rateFileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     return () => { if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current); };
@@ -129,7 +132,8 @@ export default function DashboardPage() {
     loadOrders();
     loadUserReviews();
     loadNotifications();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -144,10 +148,8 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   async function loadProfile() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!user) return;
 
-    const user = session.user;
     const meta = user.user_metadata || {};
     const fullName = meta.name || '';
     const userEmail = user.email || '';
@@ -166,8 +168,7 @@ export default function DashboardPage() {
   }
 
   async function saveProfile() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!user) return;
 
     const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Customer Name';
 
@@ -175,7 +176,7 @@ export default function DashboardPage() {
       data: { name: fullName, phone, address, avatar_url: profileImage },
     });
 
-    if (error) { alert('Failed to save: ' + error.message); return; }
+    if (error) { toast.error('Failed to save: ' + error.message); return; }
 
     setUsername(fullName);
     setSaved(true);
@@ -187,15 +188,14 @@ export default function DashboardPage() {
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
-    if (file.size > 5 * 1024 * 1024) { alert('Image must be under 5MB'); return; }
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
 
     setUploading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!user) return;
       const ext = file.name.split('.').pop();
-      const path = `avatars/${session.user.id}.${ext}`;
+      const path = `avatars/${user.id}.${ext}`;
       const { error } = await supabase.storage.from('products').upload(path, file, { upsert: true });
       if (error) throw error;
       const { data: urlData } = supabase.storage.from('products').getPublicUrl(path);
@@ -203,20 +203,19 @@ export default function DashboardPage() {
       setProfileImage(imageUrl);
       await supabase.auth.updateUser({ data: { avatar_url: imageUrl } });
     } catch (err: any) {
-      alert('Upload failed: ' + err.message);
+      toast.error('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
     }
   }
 
   async function loadOrders() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!user) return;
 
     const { data } = await supabase
       .from('orders')
       .select('*')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (!data) return;
@@ -271,12 +270,11 @@ export default function DashboardPage() {
 
   async function loadUserReviews() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!user) return;
       const { data } = await supabase
         .from('product_reviews')
         .select('*')
-        .eq('user_id', session.user.id);
+        .eq('user_id', user.id);
       if (data) {
         const map: Record<string, any> = {};
         data.forEach((r: any) => { map[r.product_id] = r; });
@@ -289,12 +287,11 @@ export default function DashboardPage() {
 
   async function loadNotifications() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!user) return;
       const { data } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (data) setNotifications(data);
     } catch (e) {
@@ -313,9 +310,8 @@ export default function DashboardPage() {
 
   async function markAllNotificationsRead() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      await supabase.from('notifications').update({ read: true }).eq('user_id', session.user.id).eq('read', false);
+      if (!user) return;
+      await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (e) {
       console.error('Mark all read error:', e);
@@ -338,8 +334,7 @@ export default function DashboardPage() {
 
     setSubmittingRate(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setSubmittingRate(false); return; }
+      if (!user) { setSubmittingRate(false); return; }
 
       let imageUrls: string[] = [];
       if (rateImages.length > 0) {
@@ -359,7 +354,7 @@ export default function DashboardPage() {
         : imageUrls;
 
       const reviewData = {
-        user_name: rateForm.showName ? (session.user.user_metadata?.name || session.user.email || 'Anonymous') : 'Anonymous',
+        user_name: rateForm.showName ? (user.user_metadata?.name || user.email || 'Anonymous') : 'Anonymous',
         rating: rateForm.rating,
         body: rateForm.body,
         images: finalImages.length > 0 ? finalImages : undefined,
@@ -378,7 +373,7 @@ export default function DashboardPage() {
         // Create new review
         const res = await supabase.from('product_reviews').insert({
           product_id: item.productId,
-          user_id: session.user.id,
+          user_id: user.id,
           ...reviewData,
         });
         error = res.error;
@@ -386,9 +381,9 @@ export default function DashboardPage() {
 
       if (error) {
         if (error.code === '23505') {
-          alert('You have already reviewed this product.');
+          toast.error('You have already reviewed this product.');
         } else {
-          alert('Failed to submit review: ' + error.message);
+          toast.error('Failed to submit review: ' + error.message);
         }
       } else {
         await loadUserReviews();
@@ -435,7 +430,7 @@ export default function DashboardPage() {
     const review = userReviews[productId];
     if (!review) return;
     const { error } = await supabase.from('product_reviews').delete().eq('id', review.id);
-    if (error) { alert('Failed to delete review: ' + error.message); return; }
+    if (error) { toast.error('Failed to delete review: ' + error.message); return; }
     setUserReviews(prev => { const next = { ...prev }; delete next[productId]; return next; });
     setDeleteReviewId(null);
   }
@@ -445,13 +440,13 @@ export default function DashboardPage() {
       .from('orders')
       .update({ status: 'completed', delivery_status: 'completed' })
       .eq('id', orderId);
-    if (error) { alert('Failed to update: ' + error.message); return; }
+    if (error) { toast.error('Failed to update: ' + error.message); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'completed' as const } : o));
   }
 
   async function handlePayNow(order: DashboardOrder) {
     if (!order.checkoutSessionId) {
-      alert('No payment session found for this order. Please contact support.');
+      toast.error('No payment session found for this order. Please contact support.');
       return;
     }
 
@@ -463,7 +458,7 @@ export default function DashboardPage() {
         const sessionData = await res.json();
         // If the session is already paid, just refresh orders
         if (sessionData.status === 'paid') {
-          alert('This order has already been paid. Refreshing your orders.');
+          toast.info('This order has already been paid. Refreshing your orders.');
           loadOrders();
           return;
         }
@@ -473,10 +468,10 @@ export default function DashboardPage() {
           return;
         }
       }
-      alert('Payment session has expired. Please place a new order.');
+      toast.info('Payment session has expired. Please place a new order.');
     } catch (err) {
       console.error('Pay Now error:', err);
-      alert('Something went wrong. Please try again.');
+      toast.error('Something went wrong. Please try again.');
     }
   }
 
@@ -488,7 +483,7 @@ export default function DashboardPage() {
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
     } catch (err) {
       console.error('Cancel order error:', err);
-      alert('Failed to cancel order. Please try again.');
+      toast.error('Failed to cancel order. Please try again.');
     }
   }
 
@@ -1160,7 +1155,7 @@ export default function DashboardPage() {
                   <input ref={rateFileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
                     onChange={e => {
                       const files = Array.from(e.target.files || []);
-                      if (rateImages.length + files.length > 5) { alert('Maximum 5 images allowed.'); return; }
+                      if (rateImages.length + files.length > 5) { toast.error('Maximum 5 images allowed.'); return; }
                       setRateImages(prev => [...prev, ...files]);
                       setRateImagePreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
                     }} />

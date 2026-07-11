@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS } from '../../lib/constants';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, Package, Users, Store, Box, Sun,
   LogOut, Home,
@@ -20,15 +21,17 @@ export default function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return;
     checkAdminAccess();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
-  async function checkAdminAccess() {
+  function checkAdminAccess() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && session.user?.email && ADMIN_EMAILS.includes(session.user.email)) {
+      if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);

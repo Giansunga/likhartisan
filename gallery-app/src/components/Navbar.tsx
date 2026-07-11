@@ -5,6 +5,7 @@ import { getCartCount, onCartUpdate } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Navbar() {
   const location = useLocation();
@@ -19,7 +20,6 @@ export default function Navbar() {
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean }[]>([]);
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
-  const [loggedIn, setLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
   const [shopDisplayName, setShopDisplayName] = useState('Shop');
@@ -27,6 +27,8 @@ export default function Navbar() {
   const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [cartCount, setCartCount] = useState(getCartCount());
+  const { user } = useAuth();
+  const loggedIn = !!user;
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -43,12 +45,11 @@ export default function Navbar() {
   }, []);
 
   async function fetchBuyerNotifications() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setNotifications([]); return; }
+    if (!user) { setNotifications([]); return; }
     const { data } = await supabase
       .from('notifications')
       .select('id, type, title, message, created_at, read')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10);
     if (data) {
@@ -68,38 +69,22 @@ export default function Navbar() {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setLoggedIn(!!session);
-      setUserEmail(session?.user?.email ?? null);
-      setUserAvatar(session?.user?.user_metadata?.avatar_url || '');
-      if (session?.user?.email && SHOP_EMAILS.includes(session.user.email)) {
-        const name = session.user.user_metadata?.name || session.user.email;
-        setShopDisplayName(name);
-        setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
-        const { data: shopData } = await supabase.from('shops').select('image').eq('email', session.user.email).single();
+    setUserEmail(user?.email ?? null);
+    setUserAvatar(user?.user_metadata?.avatar_url || '');
+    if (user?.email && SHOP_EMAILS.includes(user.email)) {
+      const name = user.user_metadata?.name || user.email;
+      setShopDisplayName(name);
+      setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
+      supabase.from('shops').select('image').eq('email', user.email).single().then(({ data: shopData }) => {
         if (shopData?.image) setShopImage(shopData.image);
-      } else if (session) {
-        fetchBuyerNotifications();
-      }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setLoggedIn(!!session);
-      setUserEmail(session?.user?.email ?? null);
-      setUserAvatar(session?.user?.user_metadata?.avatar_url || '');
-      if (session?.user?.email && SHOP_EMAILS.includes(session.user.email)) {
-        const name = session.user.user_metadata?.name || session.user.email;
-        setShopDisplayName(name);
-        setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
-        const { data: shopData } = await supabase.from('shops').select('image').eq('email', session.user.email).single();
-        if (shopData?.image) setShopImage(shopData.image);
-      } else {
-        setShopImage('');
-        if (session) fetchBuyerNotifications();
-        else setNotifications([]);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+      });
+    } else {
+      setShopImage('');
+      if (user) fetchBuyerNotifications();
+      else setNotifications([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     function handleOpenAuth(e: Event) {
@@ -129,8 +114,7 @@ export default function Navbar() {
     if (!isArtisanDashboard || !userEmail || !SHOP_EMAILS.includes(userEmail)) return;
     async function fetchNotifications() {
       const notifs: { id: string; type: string; text: string; time: string; read: boolean }[] = [];
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const userId = user?.id;
       if (!userId) return;
       const { data: shop } = await supabase.from('shops').select('id').eq('email', userEmail).maybeSingle();
       if (!shop) return;
@@ -169,7 +153,6 @@ export default function Navbar() {
   }, [loggedIn, isArtisanDashboard, userEmail]);
 
   function handleAuthChange(email?: string) {
-    setLoggedIn(true);
     const userEmailStr = email || userEmail || '';
     if (SHOP_EMAILS.includes(userEmailStr)) {
       navigate('/artisan-dashboard');
@@ -180,7 +163,6 @@ export default function Navbar() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    setLoggedIn(false);
     window.location.reload();
   }
 

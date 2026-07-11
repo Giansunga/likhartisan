@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart } from '../data/store';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Product, ProductVariation, ProductReview } from '../types';
 import type { ReactElement } from 'react';
 import { loadFavorites, saveFavorites, mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
@@ -41,6 +43,7 @@ const ModelViewer = lazy(() => import('../components/ModelViewer'));
 export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
@@ -49,6 +52,7 @@ export default function ProductDetailPage() {
   const [shopProductCount, setShopProductCount] = useState(0);
   const [shopRating, setShopRating] = useState({ avg: 0, count: 0 });
   const [soldCount, setSoldCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [askModal, setAskModal] = useState(false);
   const [askSuccess, setAskSuccess] = useState(false);
   const [askMessage, setAskMessage] = useState('');
@@ -70,10 +74,9 @@ export default function ProductDetailPage() {
     if (!askMessage.trim() || !product) return;
     setAskSending(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { alert('Please sign in to send a message.'); setAskSending(false); return; }
+    if (!user) { toast.error('Please sign in to send a message.'); setAskSending(false); return; }
 
-    const uid = session.user.id;
+    const uid = user.id;
     const text = askMessage.trim();
     const productPayload = JSON.stringify({
       type: 'product_inquiry',
@@ -109,7 +112,7 @@ export default function ProductDetailPage() {
         })
         .select('id')
         .single();
-      if (convErr || !newConv) { alert('Failed to start conversation.'); setAskSending(false); return; }
+      if (convErr || !newConv) { toast.error('Failed to start conversation.'); setAskSending(false); return; }
       convId = newConv.id;
     } else {
       await supabase
@@ -123,17 +126,23 @@ export default function ProductDetailPage() {
       .insert({ conversation_id: convId, sender_id: uid, text: productPayload });
 
     setAskSending(false);
-    if (msgErr) { alert('Failed to send message.'); return; }
+    if (msgErr) { toast.error('Failed to send message.'); return; }
     setAskSuccess(true);
   }
 
   useEffect(() => {
     async function fetchProduct() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
+        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
         .eq('id', id)
         .single();
+
+      if (error) {
+        console.error('Product fetch error:', error);
+        setLoading(false);
+        return;
+      }
 
       if (data) {
         const mapped: Product = mapSupabaseProduct(data);
@@ -204,8 +213,18 @@ export default function ProductDetailPage() {
         }
       }
     }
+    setLoading(false);
     fetchProduct();
   }, [id]);
+
+  if (loading && !product) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center" style={{ paddingTop: '80px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid #E8E0D8', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -219,8 +238,7 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
@@ -239,8 +257,7 @@ export default function ProductDetailPage() {
 
   const handleBuy = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
@@ -259,8 +276,7 @@ export default function ProductDetailPage() {
   };
 
   const handleChatNow = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
@@ -268,8 +284,7 @@ export default function ProductDetailPage() {
   };
 
   const handleAskClick = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
@@ -68,6 +70,7 @@ export default function FreeformPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
+  const { user } = useAuth();
 
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
 
@@ -124,13 +127,12 @@ export default function FreeformPage() {
 
       // Load from saved design URL
       if (designId) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        if (user) {
           const { data } = await supabase
             .from('designs')
             .select('*')
             .eq('id', designId)
-            .eq('user_id', session.user.id)
+            .eq('user_id', user.id)
             .maybeSingle();
           if (data) {
             applyDesign(data);
@@ -169,7 +171,8 @@ export default function FreeformPage() {
     }
 
     bootstrap();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   /* ─── Viewport controls ─── */
 
@@ -231,7 +234,7 @@ export default function FreeformPage() {
 
   async function handleShare() {
     if (!selectedModel) {
-      alert('Select a model before sharing.');
+      toast.error('Select a model before sharing.');
       return;
     }
     const url = captureScreenshot();
@@ -255,7 +258,7 @@ export default function FreeformPage() {
 
   function openSaveModal() {
     if (!selectedModel) {
-      alert('Please select a model before saving.');
+      toast.error('Please select a model before saving.');
       setActiveStep('model');
       return;
     }
@@ -264,13 +267,12 @@ export default function FreeformPage() {
   }
 
   async function handleSaveDesign() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
     if (!selectedModel) {
-      alert('Please select a model before saving.');
+      toast.error('Please select a model before saving.');
       setActiveStep('model');
       return;
     }
@@ -281,7 +283,7 @@ export default function FreeformPage() {
 
     const thumbnail = captureScreenshot();
     const { error } = await supabase.from('designs').insert({
-      user_id: session.user.id,
+      user_id: user.id,
       name: designName.trim(),
       model_name: modelName,
       model_file: selectedModel,
@@ -306,12 +308,11 @@ export default function FreeformPage() {
 
   async function handleCheckout() {
     if (!selectedModel) {
-      alert('Please select a model before sending to a shop.');
+      toast.error('Please select a model before sending to a shop.');
       setActiveStep('model');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
@@ -321,7 +322,7 @@ export default function FreeformPage() {
       setSelectedShop(null);
       setShowShopModal(true);
     } else {
-      alert('No shops available yet.');
+      toast.error('No shops available yet.');
     }
   }
 
@@ -329,8 +330,7 @@ export default function FreeformPage() {
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setSubmitting(false); return; }
+    if (!user) { setSubmitting(false); return; }
 
     const shop = shops.find((s) => s.id === selectedShop);
     if (!shop) { setSubmitting(false); return; }
@@ -350,20 +350,20 @@ export default function FreeformPage() {
     const { data: existing } = await supabase
       .from('conversations')
       .select('id')
-      .eq('buyer_id', session.user.id)
+      .eq('buyer_id', user.id)
       .eq('shop_id', shop.id)
       .maybeSingle();
 
     let convId = existing?.id;
     if (!convId) {
-      const meta = session.user.user_metadata || {};
+      const meta = user.user_metadata || {};
       const { data: newConv, error } = await supabase
         .from('conversations')
         .insert({
-          buyer_id: session.user.id,
+          buyer_id: user.id,
           shop_id: shop.id,
           shop_name: shop.name,
-          buyer_name: meta.name || session.user.email || 'Buyer',
+          buyer_name: meta.name || user.email || 'Buyer',
           buyer_avatar: meta.avatar_url || '',
           last_message: payload,
           last_message_at: new Date().toISOString(),
@@ -373,7 +373,7 @@ export default function FreeformPage() {
         .select('id')
         .single();
       if (error) {
-        alert('Could not start conversation. Please try again.');
+        toast.error('Could not start conversation. Please try again.');
         setSubmitting(false);
         return;
       }
@@ -384,7 +384,7 @@ export default function FreeformPage() {
     if (convId) {
       await supabase.from('messages').insert({
         conversation_id: convId,
-        sender_id: session.user.id,
+        sender_id: user.id,
         text: payload,
       });
       await supabase

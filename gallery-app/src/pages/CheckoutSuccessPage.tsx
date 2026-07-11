@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import { clearCart } from '../data/store';
+import { useAuth } from '../contexts/AuthContext';
 
 const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 
@@ -13,6 +13,7 @@ export default function CheckoutSuccessPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_ATTEMPTS = 6;
   const RETRY_DELAY = 3000; // 3 seconds between retries
+  const { user } = useAuth();
 
   useEffect(() => {
     // Read localStorage BEFORE clearing it (needed as fallback for session ID)
@@ -32,8 +33,7 @@ export default function CheckoutSuccessPage() {
       const attempt = attemptRef.current;
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        if (!user) {
           setMessage('You are not logged in. Please log in and check your orders.');
           setStatus('success'); // Show success-ish — payment likely went through
           return;
@@ -58,7 +58,7 @@ export default function CheckoutSuccessPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId: checkoutSessionId,
-            userId: session.user.id,
+            userId: user.id,
           }),
         });
 
@@ -110,7 +110,8 @@ export default function CheckoutSuccessPage() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

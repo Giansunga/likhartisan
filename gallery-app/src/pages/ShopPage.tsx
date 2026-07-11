@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { mapSupabaseProduct, fmt } from '../lib/utils';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Shop {
   id: string;
@@ -49,6 +50,7 @@ export default function ShopPage() {
   const [following, setFollowing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     async function fetchShop() {
@@ -135,21 +137,20 @@ export default function ShopPage() {
 
   useEffect(() => {
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        setUserId(session.user.id);
+      if (user?.id) {
+        setUserId(user.id);
         if (id) {
           const { count } = await supabase
             .from('shop_followers')
             .select('*', { count: 'exact', head: true })
             .eq('shop_id', id)
-            .eq('user_id', session.user.id);
+            .eq('user_id', user.id);
           setFollowing((count || 0) > 0);
         }
       }
     }
     checkAuth();
-  }, [id]);
+  }, [id, user]);
 
   async function handleFollow() {
     if (!userId) { window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } })); return; }

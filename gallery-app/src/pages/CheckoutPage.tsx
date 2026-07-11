@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
 import { getCart, clearCart } from '../data/store';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { fmt } from '../lib/utils';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -67,6 +69,7 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { user } = useAuth();
   const [confirmMapClick, setConfirmMapClick] = useState<{ lat: number; lng: number; address: string } | null>(null);
 
   // Lalamove quote state
@@ -149,7 +152,8 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     if (items.length === 0) navigate('/cart', { replace: true });
@@ -272,12 +276,11 @@ export default function CheckoutPage() {
     if (address) {
       setUserAddress(address);
       setEditForm(prev => ({ ...prev, address }));
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (user) {
         await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
       }
     }
-  }, [reverseGeocode]);
+  }, [reverseGeocode, user]);
 
   // Handle map click - reverse geocode and show confirmation
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
@@ -292,25 +295,23 @@ export default function CheckoutPage() {
     setMapCoords(prev => ({ ...prev, dropoff: { lat, lng } }));
     setUserAddress(address);
     setEditForm(prev => ({ ...prev, address }));
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    if (user) {
       await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
     }
     setConfirmMapClick(null);
-  }, [confirmMapClick]);
+  }, [confirmMapClick, user]);
 
   async function fetchProfile() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const meta = session.user.user_metadata || {};
-    const name = meta.name || session.user.email || '';
+    if (!user) return;
+    const meta = user.user_metadata || {};
+    const name = meta.name || user.email || '';
     const phone = meta.phone || '';
     const address = meta.address || '';
     setUserName(name);
     setUserPhone(phone);
     setUserAddress(address);
     setEditForm({ name, phone, address });
-    setUserId(session.user.id);
+    setUserId(user.id);
 
     // Use saved coordinates if available, otherwise geocode
     if (meta.address_lat && meta.address_lng) {
@@ -335,15 +336,14 @@ export default function CheckoutPage() {
 
   async function saveAddress() {
     if (!editForm.name || !editForm.address) {
-      alert('Name and address are required.');
+      toast.error('Name and address are required.');
       return;
     }
 
     setSaving(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setSaving(false); return; }
+      if (!user) { setSaving(false); return; }
 
       // Geocode the address text to get coordinates
       let newLat: number | null = null;
@@ -382,17 +382,17 @@ export default function CheckoutPage() {
       setEditAddress(false);
     } catch (err) {
       console.error('Failed to save address:', err);
-      alert('Failed to save address. Please try again.');
+      toast.error('Failed to save address. Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
   async function handlePlaceOrder() {
-    if (!deliveryOption) { alert('Please select a delivery option.'); return; }
+    if (!deliveryOption) { toast.error('Please select a delivery option.'); return; }
     if (items.length === 0) return;
-    if (!userName || !userAddress) { alert('Please complete your shipping address.'); return; }
-    if (!userId) { alert('User session not loaded. Please wait a moment and try again.'); return; }
+    if (!userName || !userAddress) { toast.error('Please complete your shipping address.'); return; }
+    if (!userId) { toast.error('User session not loaded. Please wait a moment and try again.'); return; }
 
     setPlacing(true);
 
@@ -424,7 +424,7 @@ export default function CheckoutPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert('Payment failed: ' + (data.error?.message || data.error || 'Unknown error'));
+        toast.error('Payment failed: ' + (data.error?.message || data.error || 'Unknown error'));
         setPlacing(false);
         return;
       }
@@ -459,7 +459,7 @@ export default function CheckoutPage() {
 
       if (orderError) {
         console.error('Order insert failed:', orderError);
-        alert('Failed to save order. Please try again.');
+        toast.error('Failed to save order. Please try again.');
         setPlacing(false);
         return;
       }
@@ -469,7 +469,7 @@ export default function CheckoutPage() {
       window.location.href = data.checkoutUrl;
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('An error occurred. Please try again.');
+      toast.error('An error occurred. Please try again.');
       setPlacing(false);
     }
   }

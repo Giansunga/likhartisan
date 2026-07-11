@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -25,13 +25,12 @@ export default function ChatbotPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.id) setUserId(session.user.id);
-    });
+    if (user?.id) setUserId(user.id);
     inputRef.current?.focus();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

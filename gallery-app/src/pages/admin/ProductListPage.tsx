@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import ProductTable from '../../components/admin/ProductTable';
 import type { Product } from '../../types';
@@ -109,7 +110,7 @@ export default function ProductListPage() {
       })
       .eq('id', editing.id);
     setSaving(false);
-    if (error) { alert('Failed to save: ' + error.message); return; }
+    if (error) { toast.error('Failed to save: ' + error.message); return; }
 
     for (const v of variations) {
       if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) continue;

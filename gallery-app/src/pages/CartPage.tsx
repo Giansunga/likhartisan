@@ -7,6 +7,7 @@ import type { CartItem } from '../types';
 import { fmt } from '../lib/utils';
 import { geocodeAddress } from '../lib/geocoder';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useAuth } from '../contexts/AuthContext';
 
 const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
@@ -66,6 +67,7 @@ export default function CartPage() {
   const [userAddress, setUserAddress] = useState('');
   const [shopAddress, setShopAddress] = useState(DEFAULT_PICKUP_ADDRESS);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  const { user, loading: authLoading } = useAuth();
 
   // Fetch stock for cart items
   useEffect(() => {
@@ -103,14 +105,13 @@ export default function CartPage() {
   const allSelected = items.length > 0 && items.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate('/', { replace: true });
-      else {
-        const meta = session.user.user_metadata || {};
-        if (meta.address) setUserAddress(meta.address);
-      }
-    });
-  }, [navigate]);
+    if (authLoading) return;
+    if (!user) navigate('/', { replace: true });
+    else {
+      const meta = user.user_metadata || {};
+      if (meta.address) setUserAddress(meta.address);
+    }
+  }, [navigate, user, authLoading]);
 
   // Fetch shop address from DB
   useEffect(() => {
