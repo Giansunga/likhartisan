@@ -300,7 +300,7 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'requests'  && <RequestsPanel />}
               {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
               {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} />}
-              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} setLoadingShop={setLoadingShop} />}
+              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} />}
             </PanelErrorBoundary>
           )}
         </main>
@@ -1807,7 +1807,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
     </div>
   );
 }
-function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop, setLoadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean; setLoadingShop: (v: boolean) => void }) {
+function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean }) {
   const [name, setName] = useState(shopData?.name || '');
   const [description, setDescription] = useState(shopData?.description || '');
   const [about, setAbout] = useState(shopData?.about || '');
