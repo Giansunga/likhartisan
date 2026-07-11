@@ -1289,8 +1289,8 @@ return (
           </thead>
           <tbody>
             {loadingOrders ? (
-                {[1,2,3,4,5].map(i => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
+              [1,2,3,4,5].map(i => (
+                <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
                     <td style={{ padding: '14px 18px' }}><div style={{ height: '16px', width: '60px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
                     <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ width: '44px', height: '44px', borderRadius: '6px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
                     <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
@@ -1299,7 +1299,7 @@ return (
                     <td style={{ padding: '14px 18px' }}><div style={{ height: '30px', width: '100px', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '6px' }} /></td>
                   </tr>
                 )}
-              )}
+              )
             ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: '48px 18px', textAlign: 'center', color: 'var(--text-light)' }}>No orders found.</td></tr>
             ) : filtered.map((order) => (
