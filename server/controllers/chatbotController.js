@@ -108,6 +108,7 @@ async function buildContext(intents, message, userId) {
           total: o.total,
           createdAt: o.created_at,
           itemCount: Array.isArray(o.items) ? o.items.length : 0,
+          image: Array.isArray(o.items) && o.items.length > 0 ? o.items[0].image : null,
         }));
         const orderList = orderRows.map(o =>
           `Order ${o.id.slice(0, 8)}... | Status: ${o.status} | Delivery: ${o.delivery_status || 'pending'} | Total: ₱${o.total} | Date: ${new Date(o.created_at).toLocaleDateString()}`
