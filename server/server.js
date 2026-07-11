@@ -9,7 +9,6 @@ import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import geocodeRoutes from './routes/geocode.js';
-import { sendOrderConfirmation } from './lib/email.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -427,11 +426,6 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         } catch (e) { console.error('[stock] Decrement failed:', e.message); }
       })();
 
-      // Send order confirmation email (non-blocking)
-      supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', order.id).single()
-        .then(({ data: fullOrder }) => sendConfirmationEmail(userId, fullOrder))
-        .catch(e => console.error('[email] Failed:', e.message));
-
       return res.json({ success: true, verified: true });
     }
 
@@ -497,18 +491,6 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         await decrementStockForItems(mappedItems);
       } catch (e) { console.error('[stock] Decrement failed:', e.message); }
     })();
-
-    // Send order confirmation email (non-blocking)
-    sendConfirmationEmail(userId, {
-      id: newOrder.id,
-      user_name: meta.userName || 'Customer',
-      items: mappedItems,
-      subtotal,
-      shipping_fee: shippingFee,
-      total,
-      delivery_option: meta.deliveryOption || 'pickup',
-      shopName: orderItems[0]?.shopName || '',
-    });
 
     return res.json({ success: true, verified: true });
 
@@ -621,12 +603,6 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
                 await decrementStockForItems(fullOrder.items);
               } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
             })();
-            // Send email (non-blocking)
-            if (meta.userId) {
-              supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', existingOrders[0].id).single()
-                .then(({ data: fullOrder }) => sendConfirmationEmail(meta.userId, fullOrder))
-                .catch(e => console.error('[email] Failed:', e.message));
-            }
           }
         } else {
           console.log(`Order ${existingOrders[0].id} already paid — skipping`);
@@ -686,19 +662,6 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
             await decrementStockForItems(mappedItems);
           } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
         })();
-        // Send email (non-blocking)
-        if (meta.userId) {
-          sendConfirmationEmail(meta.userId, {
-            id: `webhook-${sessionId}`,
-            user_name: meta.userName || 'Customer',
-            items: mappedItems,
-            subtotal,
-            shipping_fee: shippingFee,
-            total,
-            delivery_option: meta.deliveryOption || 'pickup',
-            shopName: orderItems[0]?.shopName || '',
-          });
-        }
       }
     }
 
@@ -785,27 +748,6 @@ async function decrementStockForItems(items) {
     const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
     await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
   }
-}
-
-// Fetch buyer email and send the order confirmation email (non-blocking, self-contained)
-async function sendConfirmationEmail(userId, order) {
-  if (!order) return;
-  try {
-    const { data: userData } = await supabase.auth.admin.getUserById(userId);
-    const email = userData?.user?.email;
-    if (!email) return;
-    await sendOrderConfirmation({
-      orderId: order.id,
-      userName: order.user_name || 'Customer',
-      userEmail: email,
-      items: (order.items || []).map(i => ({ productName: i.product_name ?? i.productName, qty: i.qty, price: i.price, variation: i.variation })),
-      subtotal: order.subtotal,
-      shippingFee: order.shipping_fee,
-      total: order.total,
-      deliveryOption: order.delivery_option,
-      shopName: order.shopName,
-    });
-  } catch (e) { console.error('[email] Failed:', e.message); }
 }
 
 // ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────

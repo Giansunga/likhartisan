@@ -8,12 +8,9 @@ plan: free
 envVars:
   - key: NODE_ENV
     value: production
-  - key: RESEND_API_KEY
-    sync: false
-  - key: FROM_EMAIL
-    sync: false
-    value: LikhArtisan <onboarding@resend.dev>
   - key: SUPABASE_URL
+    sync: false
+  - key: SUPABASE_SERVICE_KEY
     sync: false
   - key: PAYMONGO_SECRET_KEY
     sync: false
