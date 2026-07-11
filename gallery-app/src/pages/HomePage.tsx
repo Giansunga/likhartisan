@@ -19,11 +19,18 @@ interface HomeArtisan {
 export default function HomePage() {
   const navigate = useNavigate();
   const [counted, setCounted] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(undefined);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
     return () => subscription.unsubscribe();
   }, []);
   const statsRef = useRef<HTMLDivElement>(null);
@@ -611,7 +618,7 @@ export default function HomePage() {
       </section>
 
       {/* ── CTA SECTION (hidden for logged-in users) ── */}
-      {!user && (
+      {authChecked && !user && (
         <section className="relative py-[120px] bg-black text-center overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center blur-[2px] brightness-[0.4] scale-105"
             style={{ backgroundImage: 'url(/images/vases_collection.png)' }} />

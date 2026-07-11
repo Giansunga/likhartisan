@@ -2,12 +2,22 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import geocodeRoutes from './routes/geocode.js';
+
+// ── Env var validation ──────────────────────────────────────────────────────
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
+for (const v of requiredEnvVars) {
+  if (!process.env[v]) {
+    console.error(`[FATAL] Missing required env var: ${v}`);
+    process.exit(1);
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +51,15 @@ const paymongoLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const proxyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests to external service, please wait' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(helmet());
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(apiLimiter);
 app.use(express.json({
@@ -60,10 +79,10 @@ initChatbotController(supabase);
 app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 
 // Lalamove routes
-app.use('/api/lalamove', lalamoveRoutes);
+app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
 
 // Geocode routes
-app.use('/api/geocode', geocodeRoutes);
+app.use('/api/geocode', proxyLimiter, geocodeRoutes);
 
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
@@ -78,44 +97,87 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    if (!userName || typeof userName !== 'string' || userName.trim().length < 2) {
+      return res.status(400).json({ error: 'Valid userName is required' });
+    }
+    if (!userPhone || typeof userPhone !== 'string' || userPhone.trim().length < 7) {
+      return res.status(400).json({ error: 'Valid userPhone is required' });
+    }
+    if (deliveryOption === 'delivery' && (!userAddress || typeof userAddress !== 'string' || userAddress.trim().length < 5)) {
+      return res.status(400).json({ error: 'Valid userAddress is required for delivery' });
+    }
+    if (!['pickup', 'delivery'].includes(deliveryOption)) {
+      return res.status(400).json({ error: 'deliveryOption must be pickup or delivery' });
+    }
+
     // Server-side price verification: fetch real prices from Supabase
-    let verifiedSubtotal = 0;
-    const verifiedItems = [];
-    for (const item of items) {
+    const validatedItems = items.map(item => {
       const qty = Number(item.qty) || 0;
       if (!item.productId || qty <= 0) {
-        return res.status(400).json({ error: 'Invalid cart item' });
+        return { valid: false, error: 'Invalid cart item' };
       }
+      return { valid: true, item, qty };
+    });
 
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('id, name, price, image, shop_id, shop_name')
-        .eq('id', item.productId)
-        .single();
+    const firstInvalid = validatedItems.find(v => !v.valid);
+    if (firstInvalid) {
+      return res.status(400).json({ error: firstInvalid.error });
+    }
 
+    // Fetch all products in parallel
+    const productIds = [...new Set(validatedItems.map(v => v.item.productId))];
+    const productResults = await Promise.all(
+      productIds.map(id =>
+        supabase.from('products').select('id, name, price, image, shop_id, shop_name').eq('id', id).single()
+      )
+    );
+
+    const productMap = new Map();
+    for (const { data: product, error: productError } of productResults) {
       if (productError || !product) {
-        return res.status(400).json({ error: `Product not found: ${item.productId}` });
+        return res.status(400).json({ error: `Product not found: ${productError?.message || 'unknown'}` });
       }
+      productMap.set(product.id, product);
+    }
+
+    // Fetch all variations in parallel (for items that have variationId)
+    const variationItems = validatedItems.filter(v => v.item.variationId);
+    const variationResults = await Promise.all(
+      variationItems.map(v =>
+        supabase.from('product_variations')
+          .select('id, product_id, price, dimensions, height, opening_diameter')
+          .eq('id', v.item.variationId)
+          .single()
+      )
+    );
+
+    const variationMap = new Map();
+    for (let i = 0; i < variationItems.length; i++) {
+      const { data: variation, error: variationError } = variationResults[i];
+      const itemId = variationItems[i].item.variationId;
+      if (variationError || !variation) {
+        return res.status(400).json({ error: `Variation not found: ${itemId}` });
+      }
+      variationMap.set(itemId, variation);
+    }
+
+    // Build verified items
+    let verifiedSubtotal = 0;
+    const verifiedItems = [];
+    for (const { item, qty } of validatedItems) {
+      const product = productMap.get(item.productId);
 
       let unitPrice = Number(product.price) || 0;
       let variationLabel = item.variation || '';
 
-      // If variationId provided, fetch variation price from Supabase
       if (item.variationId) {
-        const { data: variation, error: variationError } = await supabase
-          .from('product_variations')
-          .select('id, product_id, price, dimensions, height, opening_diameter')
-          .eq('id', item.variationId)
-          .single();
-
-        if (variationError || !variation || variation.product_id !== item.productId) {
+        const variation = variationMap.get(item.variationId);
+        if (!variation || variation.product_id !== item.productId) {
           return res.status(400).json({ error: `Invalid variation for ${product.name}` });
         }
-
         if (variation.price !== null && variation.price !== undefined) {
           unitPrice = Number(variation.price) || unitPrice;
         }
-
         variationLabel = [
           variation.dimensions,
           variation.height ? `H: ${variation.height}` : '',
@@ -375,8 +437,8 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
 function verifyPayMongoSignature(req) {
   const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.warn('PAYMONGO_WEBHOOK_SECRET not set — skipping signature verification');
-    return true; // Skip if secret not configured (dev mode)
+    console.error('PAYMONGO_WEBHOOK_SECRET not set — rejecting webhook');
+    return false;
   }
 
   const signatureHeader = req.headers['paymongo-signature'];
@@ -562,21 +624,35 @@ function requireSuperAdmin(userId) {
   return requireRole(userId, 'super_admin');
 }
 
-function requireShopOwner(userId) {
-  return requireRole(userId, 'shop_owner');
+// ── JWT verification middleware (replaces x-user-id trust) ──────────────────
+async function verifyAuth(req, res) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Missing authorization header' });
+    return null;
+  }
+  const token = authHeader.slice(7);
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return null;
+  }
+  return user.id;
 }
 
 // ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────
 app.post('/api/admin/assign-role', async (req, res) => {
   try {
-    const { userId, role, shopId } = req.body;
-    const requesterId = req.body.requesterId || req.headers['x-user-id'];
+    const userId = await verifyAuth(req, res);
+    if (!userId) return;
 
-    if (!requesterId || !(await requireSuperAdmin(requesterId))) {
+    const { userId: targetUserId, role, shopId } = req.body;
+
+    if (!(await requireSuperAdmin(userId))) {
       return res.status(403).json({ error: 'Forbidden: super_admin required' });
     }
 
-    if (!userId || !role || !['shop_owner', 'buyer'].includes(role)) {
+    if (!targetUserId || !role || !['shop_owner', 'buyer'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role or userId' });
     }
 
@@ -584,13 +660,13 @@ app.post('/api/admin/assign-role', async (req, res) => {
 
     if (role === 'shop_owner' && !shopId) {
       // Auto-create shop
-      const { data: profile } = await supabase.auth.admin.getUserById(userId);
-      const email = profile?.user?.email || `${userId}@example.com`;
+      const { data: profile } = await supabase.auth.admin.getUserById(targetUserId);
+      const email = profile?.user?.email || `${targetUserId}@example.com`;
       const name = email.split('@')[0] + "'s Shop";
 
       const { data: shop, error: shopError } = await supabase
         .from('shops')
-        .insert({ name, email, owner_id: userId, auto_created: true })
+        .insert({ name, email, owner_id: targetUserId, auto_created: true })
         .select('id')
         .single();
 
@@ -603,7 +679,7 @@ app.post('/api/admin/assign-role', async (req, res) => {
 
     const { error } = await supabase
       .from('user_roles')
-      .upsert({ user_id: userId, role, shop_id: finalShopId, assigned_by: requesterId }, { onConflict: 'user_id,role,shop_id' });
+      .upsert({ user_id: targetUserId, role, shop_id: finalShopId, assigned_by: userId }, { onConflict: 'user_id,role,shop_id' });
 
     if (error) {
       console.error('Assign role error:', error);
@@ -620,9 +696,11 @@ app.post('/api/admin/assign-role', async (req, res) => {
 // Admin: List users with roles
 app.get('/api/admin/users', async (req, res) => {
   try {
-    const requesterId = req.headers['x-user-id'];
-    if (!requesterId || !(await requireSuperAdmin(requesterId))) {
-      return res.status(403).json({ error: 'Forbidden' });
+    const userId = await verifyAuth(req, res);
+    if (!userId) return;
+
+    if (!(await requireSuperAdmin(userId))) {
+      return res.status(403).json({ error: 'Forbidden: super_admin required' });
     }
 
     const { data: users } = await supabase.auth.admin.listUsers();

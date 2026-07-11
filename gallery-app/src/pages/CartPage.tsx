@@ -295,7 +295,7 @@ export default function CartPage() {
                         gap: isMobile ? '10px' : '16px',
                         borderBottom: '1px solid var(--bg-secondary)'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                           {/* Checkbox */}
                           <input type="checkbox" checked={selected.has(`${item.productId}\v${item.variationId || ''}`)}
                             onChange={() => toggleProduct(item.productId, item.variationId)}
@@ -319,26 +319,18 @@ export default function CartPage() {
                             )}
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
                           </div>
-
-                          {/* Delete */}
-                          <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
-                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0, transition: 'color 0.15s'
-                          }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-light)'}>
-                            X
-                          </button>
                         </div>
 
-                        {/* Bottom row: price, qty, subtotal */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: isMobile ? '30px' : '0' }}>
+                        {/* Right side: price, qty, subtotal, delete */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                           {/* Unit Price */}
-                          <div style={{ flex: isMobile ? 1 : 'none', width: isMobile ? 'auto' : '100px', textAlign: isMobile ? 'left' : 'right', flexShrink: 0 }}>
-                            <span style={{ fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
+                          <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
+                            <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
                           </div>
 
                           {/* Quantity Controls */}
                           <div style={{
-                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '8px',
+                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '10px',
                             flexShrink: 0, overflow: 'hidden'
                           }}>
                             <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
@@ -357,9 +349,17 @@ export default function CartPage() {
                           </div>
 
                           {/* Subtotal */}
-                          <div style={{ flex: isMobile ? 1 : 'none', width: isMobile ? 'auto' : '100px', textAlign: 'right', flexShrink: 0 }}>
-                            <span style={{ fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
+                          <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
                           </div>
+
+                          {/* Delete */}
+                          <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
+                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
+                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0, transition: 'color 0.15s'
+                          }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-light)'}>
+                            X
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -370,7 +370,7 @@ export default function CartPage() {
 
             {/* Right: Order Summary */}
             <div style={{ position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 20px)' }}>
-              <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--bg-secondary)' }}>
                   Order Summary
                 </h3>
@@ -380,7 +380,7 @@ export default function CartPage() {
                   <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#999', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery Method</div>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
                     <button onClick={() => setDeliveryOption('pickup')} style={{
-                      padding: '10px', borderRadius: '8px', border: deliveryOption === 'pickup' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
+                      padding: '10px', borderRadius: '10px', border: deliveryOption === 'pickup' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
                       background: deliveryOption === 'pickup' ? '#FFF8F0' : '#fff', cursor: 'pointer', textAlign: 'left',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -389,7 +389,7 @@ export default function CartPage() {
                       </div>
                     </button>
                     <button onClick={() => setDeliveryOption('courier')} style={{
-                      padding: '10px', borderRadius: '8px', border: deliveryOption === 'courier' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
+                      padding: '10px', borderRadius: '10px', border: deliveryOption === 'courier' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
                       background: deliveryOption === 'courier' ? '#FFF8F0' : '#fff', cursor: 'pointer', textAlign: 'left',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

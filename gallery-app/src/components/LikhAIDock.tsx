@@ -7,6 +7,8 @@ interface Message {
   timestamp: Date;
 }
 
+const API_BASE = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+
 const QUICK_ACTIONS = [
   { label: 'Track My Order' },
   { label: 'Shipping Info' },
@@ -50,7 +52,6 @@ export default function LikhAIDock() {
 
     try {
       const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-      const API_BASE = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
       const res = await fetch(`${API_BASE}/api/chatbot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

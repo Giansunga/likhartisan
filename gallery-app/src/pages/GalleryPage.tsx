@@ -48,7 +48,8 @@ export default function GalleryPage() {
     async function fetchProducts() {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
+        .eq('archived', false)
         .order('created_at', { ascending: false });
 
       if (error) {

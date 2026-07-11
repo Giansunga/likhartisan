@@ -166,7 +166,7 @@ export default function Navbar() {
   useEffect(() => {
     if (!loggedIn || isArtisanDashboard || !userEmail || SHOP_EMAILS.includes(userEmail)) return;
     fetchBuyerNotifications();
-  }, [loggedIn, isArtisanDashboard, userEmail, location.pathname]);
+  }, [loggedIn, isArtisanDashboard, userEmail]);
 
   function handleAuthChange(email?: string) {
     setLoggedIn(true);
