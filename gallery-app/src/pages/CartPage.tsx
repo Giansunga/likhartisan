@@ -249,16 +249,16 @@ export default function CartPage() {
   }
 
   return (
-    <div style={{ background: 'var(--bg-secondary)', minHeight: '100vh', paddingTop: 'calc(var(--nav-height) + 20px)', paddingBottom: '100px' }}>
+    <div style={{ background: '#f7f5f2', minHeight: '100vh', paddingTop: 'calc(var(--nav-height) + 20px)', paddingBottom: '100px' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
         {/* Header */}
-        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)' }}>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
           <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>Shopping Cart</h1>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{items.length} item(s) in cart</span>
         </div>
 
         {items.length === 0 ? (
-          <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '80px 20px', textAlign: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '80px 20px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: 64, height: 64, margin: '0 auto 16px', opacity: 0.55 }}>
               <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
@@ -278,8 +278,8 @@ export default function CartPage() {
             <div>
               {/* Select All Bar */}
               <div style={{
-                background: 'var(--bg-primary)', borderRadius: '12px', padding: '14px 20px', marginBottom: '12px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                background: '#fff', borderRadius: '12px', padding: '14px 20px', marginBottom: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
@@ -300,7 +300,7 @@ export default function CartPage() {
               {Object.entries(shops).map(([shopName, shopItems]) => {
                 const shopAllChecked = shopItems.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
                 return (
-                  <div key={shopName} style={{ background: 'var(--bg-primary)', borderRadius: '12px', marginBottom: '12px', overflow: 'hidden' }}>
+                  <div key={shopName} style={{ background: '#fff', borderRadius: '12px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                     {/* Shop Header */}
                     <div style={{
                       padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px',
@@ -409,7 +409,7 @@ export default function CartPage() {
 
             {/* Right: Order Summary */}
             <div style={{ position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 20px)' }}>
-              <div style={{ background: 'var(--bg-primary)', borderRadius: '16px', padding: '20px' }}>
+              <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--bg-secondary)' }}>
                   Order Summary
                 </h3>
@@ -482,7 +482,7 @@ export default function CartPage() {
               })()}
 
               {/* Trust Badges */}
-              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--bg-secondary)' }}>
+              <div style={{ marginTop: '16px', padding: '16px', background: '#fff', borderRadius: '12px', border: '1px solid var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                 {[
                   { icon: '/images/secure_checkout.png', title: 'Secure Checkout', desc: 'Your payment information is safe with us' },
                   { icon: '/images/authentic_artisan.png', title: 'Authentic Artisan Products', desc: 'Every pottery piece is handcrafted by local artisans.' },
