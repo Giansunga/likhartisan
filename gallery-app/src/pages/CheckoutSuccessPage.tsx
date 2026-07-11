@@ -41,16 +41,17 @@ export default function CheckoutSuccessPage() {
         }
 
         // Resolve the session id from (in order):
-        // 1. URL ?session_id (PayMongo-substituted)
-        // 2. URL ?sid / ?ref (redundant params embedded by the server)
-        // 3. localStorage fallback
-        // 4. sessionStorage fallback
+        // 1. URL ?session_id (PayMongo-substituted — but PayMongo does NOT
+        //    substitute the {checkout_session.id} placeholder, so this is
+        //    usually the literal placeholder and we fall through)
+        // 2. localStorage / sessionStorage fallback (holds the real cs_... id
+        //    saved by CheckoutPage before redirect)
+        // NOTE: ?ref is the reference number (LA-...), NOT a checkout session
+        // id, so it must never be used here — PayMongo can't look it up.
         const refParam = searchParams.get('ref');
         let checkoutSessionId = searchParams.get('session_id');
-        if (!checkoutSessionId || checkoutSessionId === '{checkout_session.id}') {
+        if (!checkoutSessionId || !checkoutSessionId.startsWith('cs_')) {
           checkoutSessionId =
-            searchParams.get('sid') ||
-            searchParams.get('ref') ||
             localStorage.getItem('likhartisan_checkout_session_id') ||
             sessionStorage.getItem('likhartisan_checkout_session_id') ||
             '';
