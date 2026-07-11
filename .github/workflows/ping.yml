@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Health Endpoint
         run: |
-          curl -s https://likhartisan-api.onrender.com/health || echo "Ping failed"
+          curl -s https://likhartisan.onrender.com/health || echo "Ping failed"
