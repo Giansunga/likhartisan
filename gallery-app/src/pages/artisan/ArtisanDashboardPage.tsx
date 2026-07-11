@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Component, type ReactNode } from 'react';
+import React, { useState, useEffect, useRef, Component, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { fmt, displayVariation } from '../../lib/utils';
@@ -19,13 +19,18 @@ shimmerStyle.textContent = `
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
+  .shimmer-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  .shimmer-skeleton-warm {
+    background: linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
 `;
 if (typeof document !== 'undefined') document.head.appendChild(shimmerStyle);
-
-// Shimmer background style string to avoid JSX parsing issues
-const SHIMMER_BG = 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)';
-const SHIMMER_BG_WARM = 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)';
-const SHIMMER_STYLE = { backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' };
 
 class PanelErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { hasError: boolean; error: string }> {
   state = { hasError: false, error: '' };
@@ -293,7 +298,7 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'listings'  && <ListingsPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} loadingProducts={loadingProducts} />}
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
-              {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} />}
+              {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
               {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} />}
               {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} />}
             </PanelErrorBoundary>
@@ -1119,9 +1124,8 @@ function RequestsPanel() {
   );
 }
 
-function OrdersPanel({ shopId, shopName, loadingOrders }: { shopId: string | null; shopName?: string; loadingOrders: boolean }) {
+function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { shopId: string | null; shopName?: string; loadingOrders: boolean; setLoadingOrders: (v: boolean) => void }) {
   const [orders, setOrders] = useState<any[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
@@ -1295,17 +1299,16 @@ return (
           <tbody>
             {loadingOrders ? (
               [1,2,3,4,5].map(i => (
-                <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
-                    <td style={{ padding: '14px 18px' }}><div style={{ height: '16px', width: '60px', borderRadius: '4px', background: SHIMMER_BG, ...SHIMMER_STYLE }} /></td>
-                    <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ width: '44px', height: '44px', borderRadius: '6px', background: SHIMMER_BG, ...SHIMMER_STYLE }} /></td>
-                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: SHIMMER_BG, ...SHIMMER_STYLE }} /></td>
-                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: SHIMMER_BG, ...SHIMMER_STYLE }} /></td>
-                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '4px', background: SHIMMER_BG, ...SHIMMER_STYLE }} /></td>
-                    <td style={{ padding: '14px 18px' }}><div style={{ height: '30px', width: '100px', background: SHIMMER_BG_WARM, ...SHIMMER_STYLE, borderRadius: '6px' }} /></td>
-                  </tr>
-                )}
-              )
-            ) : filtered.length === 0 ? (
+                  <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '16px', width: '60px', borderRadius: '4px' }}></div></td>
+                      <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div className="shimmer-skeleton" style={{ width: '44px', height: '44px', borderRadius: '6px' }}></div></div></td>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '20px' }}></div></td>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '20px' }}></div></td>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '4px' }}></div></td>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton-warm" style={{ height: '30px', width: '100px', borderRadius: '6px' }}></div></td>
+                    </tr>
+                  ))
+              ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: '48px 18px', textAlign: 'center', color: 'var(--text-light)' }}>No orders found.</td></tr>
             ) : filtered.map((order) => (
               <tr key={`${order.id}-${order.item_name}`} style={{ borderBottom: '1px solid #f5f0eb' }}>
@@ -1891,11 +1894,12 @@ function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData:
           </div>
         </div>
       ) : (
-        <>
-        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
-          {message}
-        </div>
-      )}
+          <>
+            <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
+              {message}
+            </div>
+          </>
+        )}
 
       <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', overflow: 'hidden' }}>
 
@@ -1974,9 +1978,8 @@ function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData:
           <button onClick={handleSave} disabled={saving} style={{ padding: '14px 36px', borderRadius: '10px', border: 'none', background: saving ? '#ccc' : 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.95rem', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
-        </div>
-      </div>
+</div>
     </div>
-  </>
+  </div>
   );
 }
