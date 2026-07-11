@@ -5,11 +5,10 @@ update storage.buckets
 set public = true
 where name = 'products';
 
--- Ensure a permissive read policy exists on objects in the products bucket
--- (public buckets still need a SELECT policy for the anon/public role).
-insert into storage.policies (name, bucket_id, definition, action)
-select 'Public read products', 'products', 'true', 'SELECT'
-where not exists (
-  select 1 from storage.policies
-  where bucket_id = 'products' and action = 'SELECT' and name = 'Public read products'
-);
+-- Permissive public READ policy on objects in the products bucket (idempotent).
+-- In current Supabase, storage policies are PostgreSQL RLS policies on
+-- storage.objects (there is no storage.policies table).
+drop policy if exists "Public read products" on storage.objects;
+create policy "Public read products"
+  on storage.objects for select
+  using ( bucket_id = 'products' );
