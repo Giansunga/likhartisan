@@ -43,3 +43,7 @@ server/.env
 opencode.jsonc
 
 .vercel
+
+# Hermes agent temp files
+server/.hermes-tmp.*
+.hermes-tmp.*
