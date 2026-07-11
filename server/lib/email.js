@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'LikhArtisan <orders@likhartisan.ph>';
 
-function fmt(amount: number): string {
+function fmt(amount) {
   return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -17,16 +17,6 @@ export async function sendOrderConfirmation({
   total,
   deliveryOption,
   shopName,
-}: {
-  orderId: string;
-  userName: string;
-  userEmail: string;
-  items: Array<{ productName: string; qty: number; price: number; variation?: string }>;
-  subtotal: number;
-  shippingFee: number;
-  total: number;
-  deliveryOption: string;
-  shopName?: string;
 }) {
   if (!resend) {
     console.warn('[email] RESEND_API_KEY not set — skipping order confirmation email');
