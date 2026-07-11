@@ -1185,25 +1185,28 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
           cancelled: { title: 'Order Cancelled', message: `Your order #${orderId.slice(-6)} has been cancelled by the seller.` },
         };
         const notif = notifications[newStatus];
-        if (notif) {
-          const PAYMONGO_API_URL = API_BASE;
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          const { data: authData } = await supabase.auth.getSession();
-          const token = authData.session?.access_token;
-          if (token) headers['Authorization'] = `Bearer ${token}`;
-          await fetch(`${PAYMONGO_API_URL}/api/notifications`, {
-            method: 'POST',
-            headers,
-            credentials: 'include',
-            body: JSON.stringify({
-              user_id: order.user_id,
-              type: newStatus,
-              title: notif.title,
-              message: notif.message,
-              order_id: orderId,
-              product_image: productImage,
-            }),
-          });
+        if (!notif) return;
+        const PAYMONGO_API_URL = API_BASE;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const { data: authData } = await supabase.auth.getSession();
+        const token = authData.session?.access_token;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${PAYMONGO_API_URL}/api/notifications`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({
+            user_id: order.user_id,
+            type: newStatus,
+            title: notif.title,
+            message: notif.message,
+            order_id: orderId,
+            product_image: productImage,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          setUpdateError(`Notification failed: ${text || res.status}`);
         }
       }
     } catch (e) {
