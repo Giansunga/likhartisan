@@ -12,6 +12,16 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 
+// Shimmer animation keyframes
+const shimmerStyle = document.createElement('style');
+shimmerStyle.textContent = `
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+`;
+if (typeof document !== 'undefined') document.head.appendChild(shimmerStyle);
+
 class PanelErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { hasError: boolean; error: string }> {
   state = { hasError: false, error: '' };
   static getDerivedStateFromError(err: any) { return { hasError: true, error: err?.message || 'Something went wrong' }; }
@@ -71,6 +81,10 @@ export default function ArtisanDashboardPage() {
   const [shopData, setShopData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingShop, setLoadingShop] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +124,7 @@ export default function ArtisanDashboardPage() {
   }, []);
 
   async function fetchProducts(sid: string) {
+    setLoadingProducts(true);
     const { data } = await supabase
       .from('products')
       .select('*')
@@ -137,6 +152,7 @@ export default function ArtisanDashboardPage() {
         }
       }
     }
+    setLoadingProducts(false);
   }
 
   if (!authChecked) {
@@ -223,7 +239,14 @@ export default function ArtisanDashboardPage() {
             ].map(({ label, icon, danger }) => (
               <button
                 key={label}
-                onClick={async () => { if (label === 'Logout') { await supabase.auth.signOut(); window.location.href = '/'; } }}
+                onClick={() => {
+                  if (label === 'Logout') {
+                    supabase.auth.signOut();
+                    window.location.href = '/';
+                  } else if (label === 'Settings') {
+                    setActivePanel('settings');
+                  }
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '11px',
                   padding: '10px 14px', border: 'none', background: 'transparent',
@@ -262,12 +285,12 @@ export default function ArtisanDashboardPage() {
           ) : (
             <PanelErrorBoundary resetKey={activePanel}>
               {activePanel === 'overview'  && <OverviewPanel products={products} productPrices={productPrices} shopId={artisanShopId} shopName={shopData?.name} />}
-              {activePanel === 'listings'  && <ListingsPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
+              {activePanel === 'listings'  && <ListingsPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} loadingProducts={loadingProducts} />}
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
-              {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} />}
-              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} />}
-              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} />}
+              {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} />}
+              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} />}
+              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} />}
             </PanelErrorBoundary>
           )}
         </main>
@@ -278,9 +301,10 @@ export default function ArtisanDashboardPage() {
 
 function OverviewPanel({ products, productPrices, shopId, shopName }: { products: Product[]; productPrices: Record<string, number>; shopId: string | null; shopName?: string }) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
 
   useEffect(() => {
-    if (!shopId) return;
+    if (!shopId) { setLoadingOrders(false); return; }
     let cancelled = false;
     async function fetchOrders() {
       try {
@@ -293,11 +317,33 @@ function OverviewPanel({ products, productPrices, shopId, shopName }: { products
         setOrders(shopOrders);
       } catch (e) {
         console.error('Overview fetch error:', e);
+      } finally {
+        if (!cancelled) setLoadingOrders(false);
       }
     }
     fetchOrders();
     return () => { cancelled = true; };
   }, [shopId, shopName]);
+
+  if (loadingOrders) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Stat cards skeletons */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(130,62,11,0.06)' }}>
+              <div style={{ height: '14px', width: '60%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px', marginBottom: '12px' }} />
+              <div style={{ height: '28px', width: '80%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px' }} />
+            </div>
+          ))}
+        </div>
+        {/* Chart skeleton */}
+        <div style={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(130,62,11,0.06)' }}>
+          <div style={{ height: '300px', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '8px' }} />
+        </div>
+      </div>
+    );
+  }
 
   const safeProducts = Array.isArray(products) ? products : [];
   const safeOrders = Array.isArray(orders) ? orders : [];
@@ -462,7 +508,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName }: { products
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>Top Products by Revenue</h3>
-            <button style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button onClick={() => setActivePanel('listings')} style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
               View All <ArrowUpRight size={13} />
             </button>
           </div>
@@ -526,7 +572,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName }: { products
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>Recent Listings</h3>
-            <button style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button onClick={() => setActivePanel('listings')} style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
               Manage All <ArrowUpRight size={13} />
             </button>
           </div>
@@ -572,7 +618,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName }: { products
   );
 }
 
-function ListingsPanel({ products, productPrices, onProductsUpdated }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void }) {
+function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProducts }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void; loadingProducts: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({ materials: '', technique: '' });
   const [saving, setSaving] = useState(false);
@@ -679,7 +725,24 @@ function ListingsPanel({ products, productPrices, onProductsUpdated }: { product
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
       </div>
-      {products.length === 0 ? (
+      {loadingProducts ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '18px', padding: '16px 18px', border: '1px solid #eee', borderRadius: '10px', background: '#fff' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: 'var(--bg-secondary)' }}>
+                <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ height: '16px', width: '60%', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+                <div style={{ height: '12px', width: '40%', borderRadius: '4px', marginTop: '8px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+                <div style={{ height: '24px', width: '60px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : products.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--text-light)', padding: '48px 20px' }}>No listings yet.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1035,6 +1098,7 @@ function RequestsPanel() {
 
 function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: string }) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
@@ -1042,6 +1106,7 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
 
   async function fetchOrders() {
+    setLoadingOrders(true);
     try {
       const { data } = await supabase
         .from('orders')
@@ -1077,6 +1142,8 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
       setOrders(shopOrders);
     } catch (e) {
       console.error('Orders fetch error:', e);
+    } finally {
+      setLoadingOrders(false);
     }
   }
 
@@ -1156,7 +1223,35 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Shop Orders</h1>
       </div>
 
-      {/* Toolbar */}
+      {loadingOrders ? (
+        <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #E8E0D8', textAlign: 'left' }}>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Order ID</th>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Item</th>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment</th>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery</th>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Amount</th>
+                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[1,2,3,4,5].map(i => (
+                <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
+                  <td style={{ padding: '14px 18px' }}><div style={{ height: '16px', width: '60px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                  <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ width: '44px', height: '44px', borderRadius: '6px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                  <td style={{ padding: '14px 18px' }}><div style={{ height: '32px', width: '100px', borderRadius: '8px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', pointerEvents: 'none' }}>
@@ -1195,7 +1290,20 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loadingOrders ? (
+              <>
+                {[1,2,3,4,5].map(i => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
+                    <td style={{ padding: '14px 18px' }}><div style={{ height: '16px', width: '60px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                    <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ width: '44px', height: '44px', borderRadius: '6px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                    <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
+                    <td style={{ padding: '14px 18px' }}><div style={{ height: '30px', width: '100px', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '6px' }} /></td>
+                  </tr>
+                ))}
+              </>
+            ) : filtered.length === 0 ? (
               <tr><td colSpan={6} style={{ padding: '48px 18px', textAlign: 'center', color: 'var(--text-light)' }}>No orders found.</td></tr>
             ) : filtered.map((order) => (
               <tr key={`${order.id}-${order.item_name}`} style={{ borderBottom: '1px solid #f5f0eb' }}>
@@ -1245,7 +1353,7 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
   );
 }
 
-function MessagesPanel({ shopId }: { shopId: string | null }) {
+function MessagesPanel({ shopId, loadingMessages }: { shopId: string | null; loadingMessages: boolean }) {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -1306,6 +1414,8 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
       }
     } catch (e) {
       console.error('Messages init error:', e);
+    } finally {
+      setLoadingMessages(false);
     }
   }
 
@@ -1342,7 +1452,7 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
 
   const filteredConvs = conversations.filter(c => {
     const q = convSearch.toLowerCase();
-    return !q || c.shop_name?.toLowerCase().includes(q) || c.buyer_id?.toLowerCase().includes(q);
+    return !q || c.buyer_name?.toLowerCase().includes(q) || c.buyer_id?.toLowerCase().includes(q);
   });
 
   // ── Responsive breakpoints ──
@@ -1391,7 +1501,19 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
 
         {/* Conversation items */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredConvs.length === 0 ? (
+          {loadingMessages ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[1,2,3,4,5].map(i => (
+                <div key={i} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 18px', borderBottom: '1px solid #F7F3EE' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ height: '14px', width: '50%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px' }} />
+                    <div style={{ height: '12px', width: '70%', marginTop: '4px', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredConvs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 20px', color: '#A89688' }}>
               <MessageSquare size={40} style={{ opacity: 0.25, marginBottom: '10px' }} />
               <p style={{ fontSize: '0.85rem' }}>No conversations yet.</p>
@@ -1419,7 +1541,6 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
                       ? <img src={conv.buyer_avatar} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
                       : <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(conv.buyer_name || 'B').charAt(0)}</div>
                     }
-                    <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '10px', height: '10px', borderRadius: '50%', background: '#22C55E', border: '2px solid #fff' }} />
                   </div>
 
                   {/* Name + preview */}
@@ -1474,14 +1595,10 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
                   ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
                   : <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
                 }
-                <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '10px', height: '10px', borderRadius: '50%', background: '#22C55E', border: '2px solid #fff' }} />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || 'Buyer'}</div>
-                <div style={{ fontSize: '0.72rem', color: '#22C55E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-                  Online
-                </div>
+                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', fontWeight: 500 }}>Active now</div>
               </div>
             </div>
 
@@ -1634,9 +1751,8 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
               : <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.8rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
             }
             <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '4px', textAlign: 'center' }}>{selectedConv.buyer_name || 'Buyer'}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#22C55E', fontWeight: 600, marginBottom: '24px' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-              Online
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#8C7B6E', fontWeight: 500, marginBottom: '24px', justifyContent: 'center' }}>
+              Active now
             </div>
 
             {/* Conversation info */}
@@ -1687,7 +1803,7 @@ function MessagesPanel({ shopId }: { shopId: string | null }) {
     </div>
   );
 }
-function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopUpdated: (d: any) => void }) {
+function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean }) {
   const [name, setName] = useState(shopData?.name || '');
   const [description, setDescription] = useState(shopData?.description || '');
   const [about, setAbout] = useState(shopData?.about || '');
@@ -1757,7 +1873,23 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Update your shop's profile information, cover photo, and branding.</p>
       </div>
 
-      {message && (
+      {loadingShop ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ width: '100%', height: '260px', borderRadius: '12px', overflow: 'hidden', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+          <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', padding: '32px' }}>
+            <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', marginBottom: '28px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {[1,2,3,4,5].map(i => (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ height: '14px', width: '30%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px' }} />
+                  <div style={{ height: '44px', width: '100%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '8px' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
         <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
           {message}
         </div>
@@ -1843,5 +1975,6 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
         </div>
       </div>
     </div>
+  </>
   );
 }
