@@ -147,8 +147,22 @@ export default function Navbar() {
       notifs.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       setNotifications(notifs.slice(0, 10));
     }
+
     fetchNotifications();
-  }, [isArtisanDashboard, userEmail]);
+
+    const shopId = user?.id ? `shop:${user.id}` : undefined;
+    if (shopId) {
+      const channel = supabase
+        .channel(`orders:${shopId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchNotifications)
+        .subscribe();
+      const poll = setInterval(fetchNotifications, 30000);
+      return () => {
+        supabase.removeChannel(channel);
+        clearInterval(poll);
+      };
+    }
+  }, [isArtisanDashboard, userEmail, user?.id]);
 
   useEffect(() => {
     if (!loggedIn || isArtisanDashboard || !userEmail || SHOP_EMAILS.includes(userEmail)) return;
