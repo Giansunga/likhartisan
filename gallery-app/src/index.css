@@ -1300,7 +1300,7 @@ body {
 }
 
 /* ── Dashboard Page ── */
-.dashboard-page { background-color: #FAF5EF; min-height: 100vh; }
+.dashboard-page { background-color: #f7f5f2; min-height: 100vh; }
 .dashboard-wrapper { padding-top: calc(var(--nav-height) + 40px); padding-bottom: 80px; }
 .dashboard-layout { display: grid; grid-template-columns: 240px 1fr; gap: 30px; align-items: flex-start; }
 .dashboard-sidebar { background: #fff; border-radius: var(--radius-md); border: 1px solid #E8E0D8; box-shadow: 0 1px 4px rgba(0,0,0,0.04); padding: 28px 20px; }
