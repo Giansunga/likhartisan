@@ -1391,17 +1391,29 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
     if (!selectedConv) return;
     const channel = supabase
       .channel(`artisan-messages:${selectedConv.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, async (payload) => {
         const newMsg = payload.new as any;
         setMessages(prev => {
           if (prev.some((m: any) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
+        // Incoming (buyer) message → increment this artisan's unread counter.
+        if (artisanUserId && newMsg.sender_id !== artisanUserId) {
+          await supabase.from('conversations').update({ artisan_unread: (selectedConv.artisan_unread || 0) + 1 }).eq('id', selectedConv.id);
+        }
         setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
+
+  // When a conversation is opened, mark it read for the artisan.
+  useEffect(() => {
+    if (selectedConv && selectedConv.artisan_unread > 0) {
+      setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, artisan_unread: 0 } : c));
+      supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
+    }
+  }, [selectedConv]);
 
   async function init() {
     try {
@@ -1553,6 +1565,10 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
                       {conv.last_message || 'Start a conversation'}
                     </div>
                   </div>
+
+                  {conv.artisan_unread > 0 && (
+                    <span style={{ position: 'absolute', top: '12px', right: '40px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.artisan_unread > 99 ? '99+' : conv.artisan_unread}</span>
+                  )}
 
                   {/* Delete button */}
                   <button

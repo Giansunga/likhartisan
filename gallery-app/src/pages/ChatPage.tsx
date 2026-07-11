@@ -22,6 +22,7 @@ interface Conversation {
   shop_id: string;
   shop_name: string;
   buyer_id: string;
+  buyer_unread: number;
   last_message: string;
   last_message_at: string;
   created_at: string;
@@ -32,6 +33,7 @@ interface Message {
   conversation_id: string;
   sender_id: string;
   text: string;
+  image_url?: string | null;
   created_at: string;
 }
 
@@ -56,6 +58,10 @@ export default function ChatPage() {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [shopSearch, setShopSearch] = useState('');
   const [convSearch, setConvSearch] = useState('');
@@ -64,8 +70,8 @@ export default function ChatPage() {
   const [shopImageMap, setShopImageMap] = useState<Record<string, string>>({});
   const [shopStats, setShopStats] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const lastMsgCountRef = useRef(0);
+  const [remoteTyping, setRemoteTyping] = useState(false);
+  const remoteTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const { user } = useAuth();
 
@@ -90,18 +96,50 @@ export default function ChatPage() {
     if (!selectedConv) return;
     const channel = supabase
       .channel(`messages:${selectedConv.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, async (payload) => {
         const newMsg = payload.new as Message;
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
+        // Incoming (seller) message → increment this buyer's unread counter.
+        if (newMsg.sender_id !== userId) {
+          await supabase.from('conversations').update({ buyer_unread: (selectedConv.buyer_unread || 0) + 1 }).eq('id', selectedConv.id);
+        }
         // Update conversation sidebar
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
+
+  // Real-time typing indicator (broadcast — no DB writes).
+  const typingChannelRef = useRef<any>(null);
+  useEffect(() => {
+    if (!selectedConv) return;
+    const ch = supabase
+      .channel(`typing:${selectedConv.id}`)
+      .on('broadcast', { event: 'typing' }, () => {
+        setRemoteTyping(true);
+        if (remoteTypingRef.current) clearTimeout(remoteTypingRef.current);
+        remoteTypingRef.current = setTimeout(() => setRemoteTyping(false), 3000);
+      })
+      .subscribe();
+    typingChannelRef.current = ch;
+    return () => { supabase.removeChannel(ch); typingChannelRef.current = null; };
+  }, [selectedConv?.id]);
+
+  function broadcastTyping() {
+    typingChannelRef.current?.send({ type: 'broadcast', event: 'typing' });
+  }
+
+  // When a conversation is opened, mark it read for the buyer.
+  useEffect(() => {
+    if (selectedConv && selectedConv.buyer_unread > 0) {
+      setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, buyer_unread: 0 } : c));
+      supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
+    }
+  }, [selectedConv]);
 
   // Real-time: subscribe to conversation updates (for sidebar last message)
   useEffect(() => {
@@ -127,20 +165,6 @@ export default function ChatPage() {
       }
     }
   }, [messages]);
-
-  // Show typing indicator briefly when a new message arrives from the other person
-  useEffect(() => {
-    if (messages.length > lastMsgCountRef.current && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender_id !== userId) {
-        setIsTyping(true);
-        const t = setTimeout(() => setIsTyping(false), 2000);
-        lastMsgCountRef.current = messages.length;
-        return () => clearTimeout(t);
-      }
-    }
-    lastMsgCountRef.current = messages.length;
-  }, [messages, userId]);
 
   async function init() {
     if (user) {
@@ -226,20 +250,52 @@ export default function ChatPage() {
     if (data) { setConversations(prev => [data, ...prev]); setSelectedConv(data); setShowNewChat(false); }
   }
 
+  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+    if (e.target) e.target.value = '';
+  }
+
+  function removeImage() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setPendingImage(null);
+    setImagePreview(null);
+  }
+
+  async function uploadImage(file: File): Promise<string | null> {
+    const path = `chat/${selectedConv!.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-]/g, '_')}`;
+    const { error: upErr } = await supabase.storage.from('products').upload(path, file, { cacheControl: '3600', upsert: false });
+    if (upErr) { toast.error('Upload failed: ' + upErr.message); return null; }
+    const { data } = supabase.storage.from('products').getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   async function sendMessage() {
-    if (!newMessage.trim() || !selectedConv || !userId) return;
+    if ((!newMessage.trim() && !pendingImage) || !selectedConv || !userId) return;
     const text = newMessage.trim();
     setNewMessage('');
-
-    const { data } = await supabase
-      .from('messages')
-      .insert({ conversation_id: selectedConv.id, sender_id: userId, text })
-      .select().single();
-
-    if (data) {
-      setMessages(prev => [...prev, data]);
-      await supabase.from('conversations').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
-      setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text, last_message_at: new Date().toISOString() } : c));
+    setUploading(true);
+    try {
+      let imageUrl: string | null = null;
+      if (pendingImage) {
+        imageUrl = await uploadImage(pendingImage);
+        if (imageUrl === null) { setUploading(false); return; }
+      }
+      const { data } = await supabase
+        .from('messages')
+        .insert({ conversation_id: selectedConv.id, sender_id: userId, text, image_url: imageUrl })
+        .select().single();
+      if (data) {
+        setMessages(prev => [...prev, data]);
+        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
+        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+      }
+    } finally {
+      removeImage();
+      setUploading(false);
     }
   }
 
@@ -327,6 +383,9 @@ export default function ChatPage() {
                         {conv.last_message || 'Start a conversation'}
                       </div>
                     </div>
+                    {conv.buyer_unread > 0 && (
+                      <span style={{ position: 'absolute', top: '10px', right: '10px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.buyer_unread > 99 ? '99+' : conv.buyer_unread}</span>
+                    )}
                     <button
                       onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
                       title="Delete conversation"
@@ -482,7 +541,12 @@ export default function ChatPage() {
                                         </div>
                                       </a>
                                     ) : null}
-                                    <div className={`msg-bubble msg-bubble--${dir}`}>{text}</div>
+                                    {msg.image_url && (
+                                      <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="chat-image-bubble">
+                                        <img src={msg.image_url} alt="attachment" style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block', border: '1px solid rgba(0,0,0,0.08)' }} />
+                                      </a>
+                                    )}
+                                    {text && <div className={`msg-bubble msg-bubble--${dir}`}>{text}</div>}
                                   </div>
 
                                 </div>
@@ -506,8 +570,8 @@ export default function ChatPage() {
                       });
                     })()}
 
-                    {/* ── Typing indicator ── */}
-                    {isTyping && (
+                    {/* ── Typing indicator (real, from broadcast) ── */}
+                    {remoteTyping && (
                       <div className="msg-typing-row msg-fade-in">
                         <div className="msg-avatar">
                           {shopImageMap[selectedConv.shop_id]
@@ -530,13 +594,24 @@ export default function ChatPage() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', background: '#fff', borderTop: '1px solid #E8E0D8' }}>
+                  {imagePreview && (
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <img src={imagePreview} alt="attachment" style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
+                      <button onClick={removeImage} title="Remove" style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%', background: '#d32f2f', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', lineHeight: 1 }}>×</button>
+                    </div>
+                  )}
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
+                  <button onClick={() => fileInputRef.current?.click()} title="Attach image" disabled={uploading} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: 'var(--bg-secondary)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploading ? 'not-allowed' : 'pointer', flexShrink: 0, transition: 'background 0.15s' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  </button>
                   <input
                     type="text" placeholder="Type a message..." value={newMessage}
-                    onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                    onChange={e => { setNewMessage(e.target.value); broadcastTyping(); }} onKeyDown={e => e.key === 'Enter' && sendMessage()}
                     style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #E8E0D8', borderRadius: '24px', fontSize: '0.9rem', outline: 'none', background: 'var(--bg-primary)', color: 'var(--text-dark)' }}
                   />
-                  <button onClick={sendMessage} disabled={!newMessage.trim()} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: newMessage.trim() ? 'var(--primary-color)' : '#D4C8BB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: newMessage.trim() ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                  <button onClick={sendMessage} disabled={(!newMessage.trim() && !pendingImage) || uploading} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: (newMessage.trim() || pendingImage) && !uploading ? 'var(--primary-color)' : '#D4C8BB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (newMessage.trim() || pendingImage) && !uploading ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s' }}>
+                    {uploading ? <span style={{ width: '16px', height: '16px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'chatSpin 0.8s linear infinite' }} /> :
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>}
                   </button>
                 </div>
               </>

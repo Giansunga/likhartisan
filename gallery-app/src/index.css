@@ -1547,6 +1547,10 @@ body {
   flex-direction: column;
 }
 
+@keyframes chatSpin { to { transform: rotate(360deg); } }
+.chat-image-bubble { display: block; margin-bottom: 4px; }
+.chat-image-bubble img { cursor: zoom-in; }
+
 /* ===== Message List — scrollable, fills height ===== */
 .msg-list {
   display: flex;
