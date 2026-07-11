@@ -623,6 +623,8 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
   const [form, setForm] = useState({ materials: '', technique: '' });
   const [saving, setSaving] = useState(false);
   const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
+  const [editError, setEditError] = useState('');
+  const [archiveError, setArchiveError] = useState('');
 
   async function openEdit(p: Product) {
     setEditing(p);
@@ -661,6 +663,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
   async function saveEdit() {
     if (!editing) return;
     setSaving(true);
+    setEditError('');
     const { error } = await supabase
       .from('products')
       .update({
@@ -668,7 +671,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
         technique: form.technique,
       })
       .eq('id', editing.id);
-    if (error) { alert('Failed to save: ' + error.message); setSaving(false); return; }
+    if (error) { setEditError('Failed to save: ' + error.message); setSaving(false); return; }
 
     for (const v of variations) {
       if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) continue;
@@ -711,11 +714,12 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
   async function archiveProduct(p: Product) {
     if (!confirm(`Archive "${p.name}"? It will be hidden from the gallery.`)) return;
+    setArchiveError('');
     const { error } = await supabase
       .from('products')
       .update({ status: 'archived' })
       .eq('id', p.id);
-    if (error) { alert('Failed to archive: ' + error.message); return; }
+    if (error) { setArchiveError('Failed to archive: ' + error.message); return; }
     onProductsUpdated(products.filter(item => item.id !== p.id));
   }
 
@@ -725,6 +729,13 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
       </div>
+
+      {(editError || archiveError) && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500, border: '1px solid #FECACA' }}>
+          {editError || archiveError}
+        </div>
+      )}
+
       {loadingProducts ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {[1,2,3,4].map(i => (
@@ -1015,13 +1026,15 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
 function VaultPanel({ products, productPrices, onProductsUpdated }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void }) {
   const archived = products.filter(p => p.status === 'archived');
+  const [restoreError, setRestoreError] = useState('');
 
   async function restoreProduct(p: Product) {
+    setRestoreError('');
     const { error } = await supabase
       .from('products')
       .update({ status: 'active' })
       .eq('id', p.id);
-    if (error) { alert('Failed to restore: ' + error.message); return; }
+    if (error) { setRestoreError('Failed to restore: ' + error.message); return; }
     onProductsUpdated(products.map(item => item.id === p.id ? { ...item, status: 'active' } : item));
   }
 
@@ -1031,6 +1044,11 @@ function VaultPanel({ products, productPrices, onProductsUpdated }: { products: 
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Design Vault</h1>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Archived listings — restore them to make visible again</p>
       </div>
+      {restoreError && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500 }}>
+          {restoreError}
+        </div>
+      )}
       {archived.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="#D4C8BB" strokeWidth="1.5" style={{ width: '56px', height: '56px', margin: '0 auto 16px' }}>
@@ -1096,12 +1114,13 @@ function RequestsPanel() {
   );
 }
 
-function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: string }) {
+function OrdersPanel({ shopId, shopName, loadingOrders }: { shopId: string | null; shopName?: string; loadingOrders: boolean }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [updateError, setUpdateError] = useState('');
 
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
 
@@ -1148,13 +1167,14 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
   }
 
   async function updateDeliveryStatus(orderId: string, newStatus: string) {
+    setUpdateError('');
     const updates: Record<string, string> = { delivery_status: newStatus };
     if (newStatus === 'completed') updates.status = 'completed';
     const { error } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', orderId);
-    if (error) { alert('Failed: ' + error.message); return; }
+    if (error) { setUpdateError('Failed: ' + error.message); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) } : o));
 
     // Create notification for buyer
@@ -1222,6 +1242,12 @@ function OrdersPanel({ shopId, shopName }: { shopId: string | null; shopName?: s
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Shop Orders</h1>
       </div>
+
+      {updateError && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500, border: '1px solid #FECACA' }}>
+          {updateError}
+        </div>
+      )}
 
       {loadingOrders ? (
         <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', overflow: 'hidden' }}>
