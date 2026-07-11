@@ -93,8 +93,6 @@ export default function ArtisanDashboardPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(true);
-  const [loadingShop, setLoadingShop] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,7 +292,7 @@ export default function ArtisanDashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-light)', fontSize: '0.95rem' }}>Loading shop data...</div>
           ) : (
             <PanelErrorBoundary resetKey={activePanel}>
-              {activePanel === 'overview'  && <OverviewPanel products={products} productPrices={productPrices} shopId={artisanShopId} shopName={shopData?.name} />}
+              {activePanel === 'overview'  && <OverviewPanel products={products} productPrices={productPrices} shopId={artisanShopId} shopName={shopData?.name} setLoadingOrders={setLoadingOrders} setActivePanel={setActivePanel} />}
               {activePanel === 'listings'  && <ListingsPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} loadingProducts={loadingProducts} />}
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
@@ -309,9 +307,8 @@ export default function ArtisanDashboardPage() {
   );
 }
 
-function OverviewPanel({ products, productPrices, shopId, shopName }: { products: Product[]; productPrices: Record<string, number>; shopId: string | null; shopName?: string }) {
+function OverviewPanel({ products, productPrices, shopId, shopName, setLoadingOrders, setActivePanel }: { products: Product[]; productPrices: Record<string, number>; shopId: string | null; shopName?: string; setLoadingOrders: (v: boolean) => void; setActivePanel: (v: Panel) => void }) {
   const [orders, setOrders] = useState<any[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
 
   useEffect(() => {
     if (!shopId) { setLoadingOrders(false); return; }
