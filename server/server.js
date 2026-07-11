@@ -104,11 +104,11 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     if (!userPhone || typeof userPhone !== 'string' || userPhone.trim().length < 7) {
       return res.status(400).json({ error: 'Valid userPhone is required' });
     }
-    if (deliveryOption === 'delivery' && (!userAddress || typeof userAddress !== 'string' || userAddress.trim().length < 5)) {
+    if (deliveryOption === 'courier' && (!userAddress || typeof userAddress !== 'string' || userAddress.trim().length < 5)) {
       return res.status(400).json({ error: 'Valid userAddress is required for delivery' });
     }
-    if (!['pickup', 'delivery'].includes(deliveryOption)) {
-      return res.status(400).json({ error: 'deliveryOption must be pickup or delivery' });
+    if (!['pickup', 'courier'].includes(deliveryOption)) {
+      return res.status(400).json({ error: 'deliveryOption must be pickup or courier' });
     }
 
     // Server-side price verification: fetch real prices from Supabase
