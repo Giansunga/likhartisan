@@ -418,6 +418,13 @@ export default function CheckoutPage() {
           deliveryOption,
           userId,
           lalamoveQuoteId: lalamoveQuote?.quotationId || null,
+          // Server re-quotes courier shipping itself; we only ship the same
+          // inputs the client already used so the charged fee matches the
+          // amount shown on this screen.
+          pickupCoords: mapCoords.pickup,
+          dropoffCoords: mapCoords.dropoff,
+          serviceType: selectedVehicle?.serviceType || 'MOTORCYCLE',
+          shopAddress,
         }),
       });
 

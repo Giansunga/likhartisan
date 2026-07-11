@@ -9,6 +9,7 @@ import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import geocodeRoutes from './routes/geocode.js';
+import { getQuotation } from './services/lalamoveService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -98,7 +99,7 @@ app.use('/api/geocode', proxyLimiter, geocodeRoutes);
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
-    const { items, shippingFee, userName, userPhone, userAddress, deliveryOption, userId, lalamoveQuoteId } = req.body;
+    const { items, shippingFee, userName, userPhone, userAddress, deliveryOption, userId, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
@@ -227,8 +228,42 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       });
     }
 
-    // Use server-calculated total, not frontend total
-    const verifiedShippingFee = Math.max(0, Number(shippingFee) || 0);
+    // ── Server-authorized shipping fee ───────────────────────────────────────
+    // The client may NOT dictate the fee it is charged. Only the cart subtotal
+    // was previously server-verified; shippingFee arrived verbatim from the
+    // browser, so a buyer could send 0 on a courier order and underpay.
+    //   pickup    → always free (server-enforced, ignores any client value)
+    //   courier   → re-quote server-side via Lalamove (sandbox) using the same
+    //               pickup/dropoff coords + serviceType the client used, so the
+    //               charged amount matches what the buyer saw on the checkout
+    //               screen. If we can't compute a quote, fail loudly — never
+    //               silently charge ₱0.
+    let verifiedShippingFee = 0;
+    if (deliveryOption === 'courier') {
+      const validCoords =
+        pickupCoords && typeof pickupCoords.lat === 'number' && typeof pickupCoords.lng === 'number' &&
+        dropoffCoords && typeof dropoffCoords.lat === 'number' && typeof dropoffCoords.lng === 'number';
+      if (!validCoords || !serviceType) {
+        return res.status(400).json({ error: 'Courier orders require geocoded pickup/dropoff coordinates and a vehicle type' });
+      }
+      try {
+        const quote = await getQuotation({
+          pickupCoords,
+          dropoffCoords,
+          pickupAddress: shopAddress || '',     // seller (shop) address label
+          dropoffAddress: userAddress || '',      // buyer address label
+          serviceType,
+        });
+        const fee = parseFloat(quote?.priceBreakdown?.total);
+        if (!fee || fee <= 0) {
+          return res.status(400).json({ error: 'Unable to compute shipping fee. Please try again.' });
+        }
+        verifiedShippingFee = fee;
+      } catch (err) {
+        console.error('[create-checkout] Lalamove re-quote failed:', err.message);
+        return res.status(400).json({ error: 'Shipping quote unavailable right now. Please try again.' });
+      }
+    }
     const serverTotal = verifiedSubtotal + verifiedShippingFee;
 
     const lineItems = verifiedItems.map(item => ({
@@ -239,10 +274,10 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     }));
 
     // Add shipping fee as a line item if applicable
-    if (shippingFee && shippingFee > 0) {
+    if (verifiedShippingFee && verifiedShippingFee > 0) {
       lineItems.push({
         name: 'Shipping Fee',
-        amount: Math.round(shippingFee * 100),
+        amount: Math.round(verifiedShippingFee * 100),
         currency: 'PHP',
         quantity: 1,
       });
@@ -734,19 +769,54 @@ async function verifyAuth(req, res) {
   return user.id;
 }
 
-// Decrement stock for ordered items and recompute product-level stock
+// Decrement stock for ordered items and recompute product-level stock.
+//   Variation-based product → decrement the variation row (rpc exists in DB),
+//     then recompute the product stock as the SUM of its variation stocks.
+//   Variation-less product  → decrement the product row directly. There are no
+//     product_variations rows to sum, so the recompute step below is GUARDED to
+//     skip these — the old code ran the recompute for every product and wrongly
+//     zeroed variation-less stock on every sale.
+// No custom migrations required: only standard select/update + the existing
+// decrement_stock rpc are used.
 async function decrementStockForItems(items) {
   if (!items || items.length === 0) return;
-  for (const item of items) {
-    if (item.variation_id) {
+
+  // 1) Decrement each ordered variation.
+  const variationItems = items.filter(i => i.variation_id);
+  for (const item of variationItems) {
+    try {
       await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+    } catch (e) {
+      console.error('[stock] decrement_stock failed:', e.message);
     }
   }
-  const productIds = [...new Set(items.filter(i => i.product_id).map(i => i.product_id))];
-  for (const pid of productIds) {
-    const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-    const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-    await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+
+  // 2) Decrement variation-less products directly on the product row.
+  const variationless = items.filter(i => !i.variation_id && i.product_id);
+  for (const item of variationless) {
+    try {
+      const { data: p } = await supabase.from('products').select('stock').eq('id', item.product_id).single();
+      const current = Number(p?.stock) || 0;
+      const next = Math.max(0, current - (Number(item.qty) || 0));
+      await supabase.from('products').update({ stock: next }).eq('id', item.product_id);
+    } catch (e) {
+      console.error('[stock] product decrement failed:', e.message);
+    }
+  }
+
+  // 3) Recompute product stock ONLY for products that have variations, so a
+  //    variation-less product's direct decrement above is never overwritten.
+  const productIdsWithVariations = [...new Set(
+    items.filter(i => i.variation_id && i.product_id).map(i => i.product_id)
+  )];
+  for (const pid of productIdsWithVariations) {
+    try {
+      const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+      const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+      await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+    } catch (e) {
+      console.error('[stock] recompute failed:', e.message);
+    }
   }
 }
 
