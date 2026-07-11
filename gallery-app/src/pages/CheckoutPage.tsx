@@ -466,6 +466,7 @@ export default function CheckoutPage() {
 
       clearCart();
       localStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
+      sessionStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
       window.location.href = data.checkoutUrl;
     } catch (error) {
       console.error('Checkout error:', error);

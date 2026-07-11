@@ -25,6 +25,17 @@ const PORT = process.env.PORT || 3001;
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+// Warn if the frontend URL points at localhost in a deployed environment.
+// PayMongo redirects users to FRONTEND_URL after payment, so a localhost value
+// breaks the return trip to /checkout/success.
+if (FRONTEND_URL.includes('localhost') || FRONTEND_URL.includes('127.0.0.1')) {
+  console.warn(
+    '[WARN] FRONTEND_URL is set to a localhost URL. In production this will cause ' +
+    'PayMongo to redirect users to localhost (unreachable). Set FRONTEND_URL to your ' +
+    'public frontend URL (e.g. https://likhartisan.vercel.app).'
+  );
+}
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 // Rate limiters
@@ -251,7 +262,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
           attributes: {
             line_items: lineItems,
             payment_method_types: ['gcash', 'paymaya', 'qrph', 'card'],
-            success_url: `${FRONTEND_URL}/checkout/success?session_id={checkout_session.id}`,
+            success_url: `${FRONTEND_URL}/checkout/success?session_id={checkout_session.id}&ref=${referenceNumber}`,
             cancel_url: `${FRONTEND_URL}/checkout?cancelled=true`,
             reference_number: referenceNumber,
             description: `LikhArtisan Order - ${verifiedItems.length} item(s)`,

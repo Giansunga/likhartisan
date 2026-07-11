@@ -11,17 +11,17 @@ export default function CheckoutSuccessPage() {
   const [searchParams] = useSearchParams();
   const attemptRef = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishedRef = useRef(false);
   const MAX_ATTEMPTS = 6;
   const RETRY_DELAY = 3000; // 3 seconds between retries
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    // Read localStorage BEFORE clearing it (needed as fallback for session ID)
-    const savedSessionId = localStorage.getItem('likhartisan_checkout_session_id');
-
-    // Clear cart — user already passed PayMongo checkout
-    clearCart();
-    localStorage.removeItem('likhartisan_checkout_session_id');
+    // Wait until auth state is resolved before deciding anything.
+    // Previously this ran with user=null on first paint and bailed out early
+    // (Cause 1), consuming the saved session id before the user was known.
+    if (authLoading) return;
+    if (finishedRef.current) return;
 
     function scheduleRetry(fn: () => void, delay: number) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -34,20 +34,35 @@ export default function CheckoutSuccessPage() {
 
       try {
         if (!user) {
+          finishedRef.current = true;
           setMessage('You are not logged in. Please log in and check your orders.');
-          setStatus('success'); // Show success-ish — payment likely went through
+          setStatus('success'); // Payment likely went through; user just needs to sign in
           return;
         }
 
-        // Get session ID from URL param, falling back to saved localStorage value
+        // Resolve the session id from (in order):
+        // 1. URL ?session_id (PayMongo-substituted)
+        // 2. URL ?sid / ?ref (redundant params embedded by the server)
+        // 3. localStorage fallback
+        // 4. sessionStorage fallback
+        const refParam = searchParams.get('ref');
         let checkoutSessionId = searchParams.get('session_id');
         if (!checkoutSessionId || checkoutSessionId === '{checkout_session.id}') {
-          checkoutSessionId = savedSessionId;
+          checkoutSessionId =
+            searchParams.get('sid') ||
+            searchParams.get('ref') ||
+            localStorage.getItem('likhartisan_checkout_session_id') ||
+            sessionStorage.getItem('likhartisan_checkout_session_id') ||
+            '';
         }
 
         if (!checkoutSessionId) {
+          finishedRef.current = true;
           setStatus('error');
-          setMessage('No checkout session ID found. Please check your orders in the dashboard.');
+          setMessage(
+            `No checkout session ID found. Please check your orders in the dashboard.` +
+            (refParam ? ` (Reference: ${refParam})` : '')
+          );
           return;
         }
 
@@ -67,6 +82,11 @@ export default function CheckoutSuccessPage() {
 
         // Success — payment confirmed and order updated
         if (res.ok && result.success) {
+          finishedRef.current = true;
+          // Only now: clear cart and the saved session id (both storages).
+          clearCart();
+          localStorage.removeItem('likhartisan_checkout_session_id');
+          sessionStorage.removeItem('likhartisan_checkout_session_id');
           setStatus('success');
           setMessage('Payment confirmed!');
           return;
@@ -87,6 +107,7 @@ export default function CheckoutSuccessPage() {
         }
 
         // All retries exhausted
+        finishedRef.current = true;
         setStatus('error');
         setMessage(result.error || 'Payment verification timed out. Please check your orders in the dashboard.');
 
@@ -99,6 +120,7 @@ export default function CheckoutSuccessPage() {
           return;
         }
 
+        finishedRef.current = true;
         setStatus('error');
         setMessage('Unable to verify payment. Please check your orders in the dashboard.');
       }
@@ -111,7 +133,7 @@ export default function CheckoutSuccessPage() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [authLoading, user, searchParams]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
