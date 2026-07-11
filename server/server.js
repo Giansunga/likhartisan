@@ -725,7 +725,7 @@ app.post('/api/notifications', async (req, res) => {
 
     const { data, error } = await supabase
       .from('notifications')
-      .insert({ user_id, type, title, message, order_id, product_image })
+      .insert({ user_id: finalUserId, type, title, message, order_id, product_image })
       .select()
       .single();
     if (error) {
