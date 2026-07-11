@@ -5,7 +5,7 @@
 2. Click **New** → **Web Service**
 3. Connect GitHub: `Giansunga/likhartisan`
 4. Settings:
-   - **Name:** likhartisan-api
+   - **Name:** likhartisan
    - **Root Directory:** `server`
    - **Runtime:** Node
    - **Build Command:** `npm install`
@@ -27,13 +27,13 @@
 
 ## 2. Set Up Auto-Ping
 After deployment, Render gives you a URL like:
-`https://likhartisan-api.onrender.com`
+`https://likhartisan.onrender.com`
 
 ### Option A: cron-job.org (Free)
 1. Go to https://cron-job.org
 2. Sign up (free)
 3. Create new cron job:
-   - **URL:** `https://likhartisan-api.onrender.com/health`
+   - **URL:** `https://likhartisan.onrender.com/health`
    - **Schedule:** Every 10 minutes
    - **Method:** GET
 
@@ -42,7 +42,7 @@ After deployment, Render gives you a URL like:
 2. Sign up (free)
 3. Add monitor:
    - **Type:** HTTP(s)
-   - **URL:** `https://likhartisan-api.onrender.com/health`
+   - **URL:** `https://likhartisan.onrender.com/health`
    - **Interval:** 5 minutes
 
 ### Option C: GitHub Actions (Free)
@@ -57,17 +57,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Health Endpoint
-        run: curl https://likhartisan-api.onrender.com/health
+        run: curl https://likhartisan.onrender.com/health
 ```
 
 ## 3. Update Frontend
 Update `gallery-app/.env`:
 ```
-VITE_API_URL=https://likhartisan-api.onrender.com
+VITE_PAYMONGO_API_URL=https://likhartisan.onrender.com
 ```
 
 ## 4. Update Vercel
 Add environment variable in Vercel dashboard:
 ```
-VITE_API_URL=https://likhartisan-api.onrender.com
+VITE_PAYMONGO_API_URL=https://likhartisan.onrender.com
 ```
+> **Important:** the variable MUST be named `VITE_PAYMONGO_API_URL` — that is
+> the exact name the frontend reads (see `CheckoutSuccessPage.tsx`,
+> `CheckoutPage.tsx`, etc.). If it's missing or misnamed, the app silently
+> falls back to `http://localhost:3001` and every payment shows
+> "Verification Pending". Vite bakes env vars at build time, so **redeploy the
+> frontend** after changing it.
