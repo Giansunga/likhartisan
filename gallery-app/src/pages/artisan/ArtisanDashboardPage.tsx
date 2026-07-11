@@ -12,25 +12,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 
-// Shimmer animation keyframes
-const shimmerStyle = document.createElement('style');
-shimmerStyle.textContent = `
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  .shimmer-skeleton {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-  .shimmer-skeleton-warm {
-    background: linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-`;
-if (typeof document !== 'undefined') document.head.appendChild(shimmerStyle);
+// Shimmer keyframes & classes are defined globally in src/index.css
 
 class PanelErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { hasError: boolean; error: string }> {
   state = { hasError: false, error: '' };
@@ -628,17 +610,11 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
 }
 function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProducts }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void; loadingProducts: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: '', category: 'Vases', description: '', materials: '', technique: '',
-    image: '', model3d: '', height: '', openingDiameter: '', dimensions: '',
-    variations: [{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]
-  });
+  const [form, setForm] = useState<{ materials: string; technique: string }>({ materials: '', technique: '' });
   const [saving, setSaving] = useState(false);
   const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
   const [editError, setEditError] = useState('');
   const [archiveError, setArchiveError] = useState('');
-  const [createError, setCreateError] = useState('');
 
   async function openEdit(p: Product) {
     setEditing(p);
@@ -660,17 +636,6 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
     } else {
       setVariations([]);
     }
-  }
-
-  async function openCreate() {
-    setCreating(true);
-    setCreateForm({
-      name: '', category: 'Vases', description: '', materials: '', technique: '',
-      image: '', model3d: '', height: '', openingDiameter: '', dimensions: '',
-      variations: [{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]
-    });
-    setVariations([{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]);
-    setCreateError('');
   }
 
   function addVariation() {
@@ -737,77 +702,6 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
     setEditing(null);
   }
 
-  async function saveCreate() {
-    if (!artisanShopId) return;
-    setSaving(true);
-    setCreateError('');
-
-    // Validate required fields
-    if (!createForm.name.trim() || !createForm.category.trim()) {
-      setCreateError('Name and category are required');
-      setSaving(false);
-      return;
-    }
-
-    // Insert product
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .insert({
-        shop_id: artisanShopId,
-        name: createForm.name.trim(),
-        category: createForm.category.trim(),
-        description: createForm.description.trim(),
-        materials: createForm.materials.trim(),
-        technique: createForm.technique.trim(),
-        image: createForm.image.trim(),
-        model3d: createForm.model3d?.trim() || null,
-        height: createForm.height.trim() || 'N/A',
-        opening_diameter: createForm.openingDiameter.trim() || 'N/A',
-        dimensions: createForm.dimensions.trim() || 'N/A',
-        status: 'active',
-        stock: 0,
-      })
-      .select()
-      .single();
-
-    if (productError) { setCreateError('Failed to create product: ' + productError.message); setSaving(false); return; }
-
-    const productId = product.id;
-
-    // Insert variations
-    const validVariations = createForm.variations.filter(v => 
-      v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim()
-    );
-
-    if (validVariations.length > 0) {
-      const { error: varError } = await supabase
-        .from('product_variations')
-        .insert(validVariations.map((v, idx) => ({
-          product_id: productId,
-          dimensions: v.dimensions.trim() || 'N/A',
-          height: v.height.trim() || 'N/A',
-          opening_diameter: v.openingDiameter.trim() || 'N/A',
-          price: v.price ? Number(v.price) : null,
-          stock: Number(v.stock) || 0,
-          sort_order: idx,
-        })));
-
-      if (varError) { 
-        setCreateError('Failed to create variations: ' + varError.message); 
-        setSaving(false); 
-        return; 
-      }
-    }
-
-    // Recompute stock
-    const newTotalStock = await recomputeProductStock(productId);
-
-    const newProduct = { ...product, stock: newTotalStock, inStock: newTotalStock > 0 };
-    onProductsUpdated([newProduct, ...products]);
-    setSaving(false);
-    setCreating(false);
-  }
-
   async function archiveProduct(p: Product) {
     if (!confirm(`Archive "${p.name}"? It will be hidden from the gallery.`)) return;
     setArchiveError('');
@@ -821,22 +715,9 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
   return (
     <div>
-      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
-        </div>
-        <button onClick={openCreate} style={{
-          padding: '12px 24px', borderRadius: '10px', border: 'none',
-          background: 'linear-gradient(135deg, #8B5E3C, #A0522D)', color: '#fff',
-          fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          transition: 'transform 0.15s, box-shadow 0.15s',
-          boxShadow: '0 4px 14px rgba(139,94,60,0.3)'
-        }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-          <Plus size={18} style={{ display: 'inline-block', marginRight: '8px', verticalAlign: 'middle' }} />
-          Create New Product
-        </button>
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
       </div>
 
       {(editError || archiveError) && (
@@ -910,27 +791,6 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Create New Product Button */}
-      <div style={{ marginTop: '24px', textAlign: 'center' }}>
-        <button onClick={openCreate} style={{
-          padding: '14px 32px', borderRadius: '10px', border: 'none',
-          background: 'linear-gradient(135deg, #8B5E3C, #A0522D)', color: '#fff',
-          fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
-          transition: 'transform 0.15s, box-shadow 0.15s',
-          boxShadow: '0 4px 14px rgba(139,94,60,0.3)'
-        }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-          <Plus size={18} style={{ display: 'inline-block', marginRight: '8px', verticalAlign: 'middle' }} />
-          Create New Product
-        </button>
-      </div>
-
-      {/* Create Error */}
-      {createError && (
-        <div style={{ padding: '12px 18px', borderRadius: '8px', marginTop: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500, border: '1px solid #FECACA' }}>
-          {createError}
         </div>
       )}
 

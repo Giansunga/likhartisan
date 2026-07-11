@@ -2056,3 +2056,19 @@ body {
     text-align: center;
   }
 }
+
+/* ── Shimmer skeletons (Artisan Dashboard) ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.shimmer-skeleton-warm {
+  background: linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

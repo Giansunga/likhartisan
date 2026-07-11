@@ -293,7 +293,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
 });
 
 // Retrieve Checkout Session status
-app.get('/api/session/:sessionId', async (req, res) => {
+app.get('/api/session/:sessionId', paymongoLimiter, async (req, res) => {
   try {
     const { sessionId } = req.params;
 
@@ -390,39 +390,14 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         try {
           const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', order.id).single();
           if (!fullOrder?.items) return;
-          for (const item of fullOrder.items) {
-            if (item.variation_id) {
-              await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
-            }
-          }
-          // Recompute product-level stock for affected products
-          const productIds = [...new Set(fullOrder.items.filter(i => i.product_id).map(i => i.product_id))];
-          for (const pid of productIds) {
-            const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-            const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-            await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
-          }
+          await decrementStockForItems(fullOrder.items);
         } catch (e) { console.error('[stock] Decrement failed:', e.message); }
       })();
 
       // Send order confirmation email (non-blocking)
       supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', order.id).single()
-        .then(async ({ data: fullOrder }) => {
-          if (!fullOrder) return;
-          const { data: userData } = await supabase.auth.admin.getUserById(userId);
-          const email = userData?.user?.email;
-          if (!email) return;
-          await sendOrderConfirmation({
-            orderId: fullOrder.id,
-            userName: fullOrder.user_name || 'Customer',
-            userEmail: email,
-            items: (fullOrder.items || []).map(i => ({ productName: i.product_name, qty: i.qty, price: i.price, variation: i.variation })),
-            subtotal: fullOrder.subtotal,
-            shippingFee: fullOrder.shipping_fee,
-            total: fullOrder.total,
-            deliveryOption: fullOrder.delivery_option,
-          });
-        }).catch(e => console.error('[email] Failed:', e.message));
+        .then(({ data: fullOrder }) => sendConfirmationEmail(userId, fullOrder))
+        .catch(e => console.error('[email] Failed:', e.message));
 
       return res.json({ success: true, verified: true });
     }
@@ -486,36 +461,21 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
     // Decrement stock for each item (non-blocking)
     (async () => {
       try {
-        for (const item of mappedItems) {
-          if (item.variation_id) {
-            await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
-          }
-        }
-        const productIds = [...new Set(mappedItems.filter(i => i.product_id).map(i => i.product_id))];
-        for (const pid of productIds) {
-          const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-          const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-          await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
-        }
+        await decrementStockForItems(mappedItems);
       } catch (e) { console.error('[stock] Decrement failed:', e.message); }
     })();
 
     // Send order confirmation email (non-blocking)
-    const { data: userData } = await supabase.auth.admin.getUserById(userId);
-    const email = userData?.user?.email;
-    if (email) {
-      sendOrderConfirmation({
-        orderId: newOrder.id,
-        userName: meta.userName || 'Customer',
-        userEmail: email,
-        items: orderItems,
-        subtotal,
-        shippingFee,
-        total,
-        deliveryOption: meta.deliveryOption || 'pickup',
-        shopName: orderItems[0]?.shopName || '',
-      }).catch(e => console.error('[email] Failed:', e.message));
-    }
+    sendConfirmationEmail(userId, {
+      id: newOrder.id,
+      user_name: meta.userName || 'Customer',
+      items: mappedItems,
+      subtotal,
+      shipping_fee: shippingFee,
+      total,
+      delivery_option: meta.deliveryOption || 'pickup',
+      shopName: orderItems[0]?.shopName || '',
+    });
 
     return res.json({ success: true, verified: true });
 
@@ -622,38 +582,14 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
               try {
                 const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', existingOrders[0].id).single();
                 if (!fullOrder?.items) return;
-                for (const item of fullOrder.items) {
-                  if (item.variation_id) {
-                    await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
-                  }
-                }
-                const productIds = [...new Set(fullOrder.items.filter(i => i.product_id).map(i => i.product_id))];
-                for (const pid of productIds) {
-                  const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-                  const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-                  await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
-                }
+                await decrementStockForItems(fullOrder.items);
               } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
             })();
             // Send email (non-blocking)
             if (meta.userId) {
               supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', existingOrders[0].id).single()
-                .then(async ({ data: fullOrder }) => {
-                  if (!fullOrder) return;
-                  const { data: userData } = await supabase.auth.admin.getUserById(meta.userId);
-                  const email = userData?.user?.email;
-                  if (!email) return;
-                  await sendOrderConfirmation({
-                    orderId: fullOrder.id,
-                    userName: fullOrder.user_name || 'Customer',
-                    userEmail: email,
-            items: (fullOrder.items || []).map(i => ({ productName: i.product_name, qty: i.qty, price: i.price, variation: i.variation })),
-                    subtotal: fullOrder.subtotal,
-                    shippingFee: fullOrder.shipping_fee,
-                    total: fullOrder.total,
-                    deliveryOption: fullOrder.delivery_option,
-                  });
-                }).catch(e => console.error('[email] Failed:', e.message));
+                .then(({ data: fullOrder }) => sendConfirmationEmail(meta.userId, fullOrder))
+                .catch(e => console.error('[email] Failed:', e.message));
             }
           }
         } else {
@@ -711,36 +647,21 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         // Decrement stock (non-blocking)
         (async () => {
           try {
-            for (const item of mappedItems) {
-              if (item.variation_id) {
-                await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
-              }
-            }
-            const productIds = [...new Set(mappedItems.filter(i => i.product_id).map(i => i.product_id))];
-            for (const pid of productIds) {
-              const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-              const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-              await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
-            }
+            await decrementStockForItems(mappedItems);
           } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
         })();
         // Send email (non-blocking)
         if (meta.userId) {
-          const { data: userData } = await supabase.auth.admin.getUserById(meta.userId);
-          const email = userData?.user?.email;
-          if (email) {
-            sendOrderConfirmation({
-              orderId: `webhook-${sessionId}`,
-              userName: meta.userName || 'Customer',
-              userEmail: email,
-              items: orderItems,
-              subtotal,
-              shippingFee,
-              total,
-              deliveryOption: meta.deliveryOption || 'pickup',
-              shopName: orderItems[0]?.shopName || '',
-            }).catch(e => console.error('[email] Failed:', e.message));
-          }
+          sendConfirmationEmail(meta.userId, {
+            id: `webhook-${sessionId}`,
+            user_name: meta.userName || 'Customer',
+            items: mappedItems,
+            subtotal,
+            shipping_fee: shippingFee,
+            total,
+            delivery_option: meta.deliveryOption || 'pickup',
+            shopName: orderItems[0]?.shopName || '',
+          });
         }
       }
     }
@@ -755,10 +676,19 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
 // Create notification for buyer
 app.post('/api/notifications', async (req, res) => {
   try {
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+
     const { user_id, type, title, message, order_id, product_image } = req.body;
-    if (!user_id || !type || !title || !message) {
+    if (!type || !title || !message) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    // A caller may only create notifications for their own account
+    if (user_id && user_id !== authUserId) {
+      return res.status(403).json({ error: 'Cannot create notifications for another user' });
+    }
+    const finalUserId = user_id || authUserId;
+
     const { data, error } = await supabase
       .from('notifications')
       .insert({ user_id, type, title, message, order_id, product_image })
@@ -803,6 +733,43 @@ async function verifyAuth(req, res) {
     return null;
   }
   return user.id;
+}
+
+// Decrement stock for ordered items and recompute product-level stock
+async function decrementStockForItems(items) {
+  if (!items || items.length === 0) return;
+  for (const item of items) {
+    if (item.variation_id) {
+      await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+    }
+  }
+  const productIds = [...new Set(items.filter(i => i.product_id).map(i => i.product_id))];
+  for (const pid of productIds) {
+    const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+    const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+    await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+  }
+}
+
+// Fetch buyer email and send the order confirmation email (non-blocking, self-contained)
+async function sendConfirmationEmail(userId, order) {
+  if (!order) return;
+  try {
+    const { data: userData } = await supabase.auth.admin.getUserById(userId);
+    const email = userData?.user?.email;
+    if (!email) return;
+    await sendOrderConfirmation({
+      orderId: order.id,
+      userName: order.user_name || 'Customer',
+      userEmail: email,
+      items: (order.items || []).map(i => ({ productName: i.product_name ?? i.productName, qty: i.qty, price: i.price, variation: i.variation })),
+      subtotal: order.subtotal,
+      shippingFee: order.shipping_fee,
+      total: order.total,
+      deliveryOption: order.delivery_option,
+      shopName: order.shopName,
+    });
+  } catch (e) { console.error('[email] Failed:', e.message); }
 }
 
 // ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────
@@ -885,7 +852,24 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`LikhArtisan server running on port ${PORT}`);
   console.log(`Frontend URL: ${FRONTEND_URL}`);
 });
+
+// Graceful shutdown
+async function shutdown(signal) {
+  console.log(`[shutdown] Received ${signal} — closing server...`);
+  server.close(() => {
+    console.log('[shutdown] Server closed');
+    process.exit(0);
+  });
+  // Force-exit if connections don't drain in time
+  setTimeout(() => {
+    console.error('[shutdown] Forcing exit after timeout');
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

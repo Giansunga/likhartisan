@@ -131,7 +131,7 @@ export default function ProductDetailPage() {
     async function fetchProduct() {
       const { data } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
         .eq('id', id)
         .single();
 
@@ -140,20 +140,18 @@ export default function ProductDetailPage() {
         setProduct(mapped);
 
         if (mapped.shopId) {
-          const { data: shopData } = await supabase.from('shops').select('image').eq('id', mapped.shopId).single();
-          if (shopData?.image) setShopImage(shopData.image);
-
-          const { count } = await supabase.from('products').select('*', { count: 'exact', head: true })
-            .eq('shop_id', mapped.shopId).eq('status', 'active');
-          setShopProductCount(count || 0);
-
-          const { data: shopProducts } = await supabase
-            .from('products')
-            .select('id')
-            .eq('shop_id', mapped.shopId)
-            .eq('status', 'active');
-          if (shopProducts && shopProducts.length > 0) {
-            const productIds = shopProducts.map(p => p.id);
+          const shopId = mapped.shopId;
+          // Fetch shop image, product count, and shop product ids in parallel
+          const [shopData, countRes, shopProducts] = await Promise.all([
+            supabase.from('shops').select('image').eq('id', shopId).single(),
+            supabase.from('products').select('id', { count: 'exact', head: true })
+              .eq('shop_id', shopId).eq('status', 'active'),
+            supabase.from('products').select('id').eq('shop_id', shopId).eq('status', 'active'),
+          ]);
+          if (shopData.data?.image) setShopImage(shopData.data.image);
+          setShopProductCount(countRes.count || 0);
+          if (shopProducts.data && shopProducts.data.length > 0) {
+            const productIds = shopProducts.data.map(p => p.id);
             const { data: shopReviews } = await supabase
               .from('product_reviews')
               .select('rating')
@@ -165,26 +163,16 @@ export default function ProductDetailPage() {
           }
         }
 
-        supabase.from('products').update({ views: ((data as any).views || 0) + 1 }).eq('id', id).then();
+        // Atomic view increment (avoids read-modify-write race)
+        supabase.rpc('increment_views', { p_id: id });
 
-        const { data: orderData } = await supabase
-          .from('orders')
-          .select('items')
-          .or('status.eq.paid,status.eq.completed');
-        if (orderData) {
-          let total = 0;
-          for (const order of orderData) {
-            const items = order.items || [];
-            for (const item of items) {
-              if ((item.product_id || item.productId) === id) total += item.qty || 0;
-            }
-          }
-          setSoldCount(total);
-        }
+        // Safe server-side sold count (no full-order download / privacy leak)
+        const { data: soldRes } = await supabase.rpc('get_product_sold_count', { p_product_id: id });
+        setSoldCount(soldRes || 0);
 
         const { data: varData, error: varErr } = await supabase
           .from('product_variations')
-          .select('*')
+          .select('id, product_id, dimensions, height, opening_diameter, price, stock, sort_order')
           .eq('product_id', id)
           .order('sort_order');
         if (varErr) console.error('Variations fetch error:', varErr);
@@ -200,7 +188,7 @@ export default function ProductDetailPage() {
 
         const { data: revData } = await supabase
           .from('product_reviews')
-          .select('*')
+          .select('id, product_id, user_id, user_name, rating, title, body, images, seller_service_rating, delivery_service_rating, created_at')
           .eq('product_id', id)
           .order('created_at', { ascending: false });
         if (revData) {

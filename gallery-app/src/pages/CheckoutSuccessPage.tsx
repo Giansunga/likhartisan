@@ -10,6 +10,7 @@ export default function CheckoutSuccessPage() {
   const [message, setMessage] = useState('');
   const [searchParams] = useSearchParams();
   const attemptRef = useRef(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_ATTEMPTS = 6;
   const RETRY_DELAY = 3000; // 3 seconds between retries
 
@@ -20,6 +21,11 @@ export default function CheckoutSuccessPage() {
     // Clear cart — user already passed PayMongo checkout
     clearCart();
     localStorage.removeItem('likhartisan_checkout_session_id');
+
+    function scheduleRetry(fn: () => void, delay: number) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(fn, delay);
+    }
 
     async function confirmPayment() {
       attemptRef.current++;
@@ -69,14 +75,14 @@ export default function CheckoutSuccessPage() {
         // 402 = PayMongo hasn't marked payment as paid yet — retry after delay
         if (res.status === 402 && attempt < MAX_ATTEMPTS) {
           console.log(`[CheckoutSuccess] Payment not verified yet, retrying in ${RETRY_DELAY / 1000}s...`);
-          setTimeout(confirmPayment, RETRY_DELAY);
+          scheduleRetry(confirmPayment, RETRY_DELAY);
           return;
         }
 
         // Other server errors — retry if attempts remain
         if (!res.ok && attempt < MAX_ATTEMPTS) {
           console.log(`[CheckoutSuccess] Server error ${res.status}, retrying...`);
-          setTimeout(confirmPayment, RETRY_DELAY);
+          scheduleRetry(confirmPayment, RETRY_DELAY);
           return;
         }
 
@@ -89,7 +95,7 @@ export default function CheckoutSuccessPage() {
 
         // Network error — retry if attempts remain
         if (attempt < MAX_ATTEMPTS) {
-          setTimeout(confirmPayment, RETRY_DELAY);
+          scheduleRetry(confirmPayment, RETRY_DELAY);
           return;
         }
 
@@ -99,7 +105,11 @@ export default function CheckoutSuccessPage() {
     }
 
     // Start first attempt after a short delay to give PayMongo time to process
-    setTimeout(confirmPayment, 1500);
+    scheduleRetry(confirmPayment, 1500);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, [searchParams]);
 
   return (
