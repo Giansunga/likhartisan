@@ -3,12 +3,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../lib/api';
 import ChatOrderCard from '../components/chat/ChatOrderCard';
+import ChatProductCard from '../components/chat/ChatProductCard';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   orders?: any[];
+  products?: any[];
 }
 
 const QUICK_ACTIONS = [
@@ -57,7 +59,7 @@ export default function ChatbotPage() {
 
       const data = await res.json();
       const reply = data.reply || data.error || 'Sorry, I could not process your request.';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date(), orders: data.orders || [] }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date(), orders: data.orders || [], products: data.products || [] }]);
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -255,6 +257,13 @@ export default function ChatbotPage() {
                   <div style={{ marginTop: '8px' }}>
                     {msg.orders.map((o: any) => (
                       <ChatOrderCard key={o.id} order={o} />
+                    ))}
+                  </div>
+                )}
+                {msg.role === 'assistant' && msg.products && msg.products.length > 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    {msg.products.map((p: any) => (
+                      <ChatProductCard key={p.id} product={p} />
                     ))}
                   </div>
                 )}

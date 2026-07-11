@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
 import ChatOrderCard from './chat/ChatOrderCard';
+import ChatProductCard from './chat/ChatProductCard';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   orders?: any[];
+  products?: any[];
 }
 
 const QUICK_ACTIONS = [
@@ -60,7 +62,7 @@ export default function LikhAIDock() {
 
       const data = await res.json();
       const reply = data.reply || data.error || 'Sorry, I could not process your request.';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date(), orders: data.orders || [] }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date(), orders: data.orders || [], products: data.products || [] }]);
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -161,6 +163,13 @@ export default function LikhAIDock() {
                   <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column' }}>
                     {msg.orders.map((o: any) => (
                       <ChatOrderCard key={o.id} order={o} />
+                    ))}
+                  </div>
+                )}
+                {msg.role === 'assistant' && msg.products && msg.products.length > 0 && (
+                  <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column' }}>
+                    {msg.products.map((p: any) => (
+                      <ChatProductCard key={p.id} product={p} />
                     ))}
                   </div>
                 )}

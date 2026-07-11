@@ -1187,9 +1187,14 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
         const notif = notifications[newStatus];
         if (notif) {
           const PAYMONGO_API_URL = API_BASE;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          const { data: authData } = await supabase.auth.getSession();
+          const token = authData.session?.access_token;
+          if (token) headers['Authorization'] = `Bearer ${token}`;
           await fetch(`${PAYMONGO_API_URL}/api/notifications`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
+            credentials: 'include',
             body: JSON.stringify({
               user_id: order.user_id,
               type: newStatus,
@@ -1319,16 +1324,12 @@ return (
                       <>
                         <button onClick={() => updateDeliveryStatus(order.id, 'preparing')}
                           style={{ padding: '5px 12px', border: '1.5px solid var(--primary-color)', borderRadius: '6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
-                        <button onClick={() => { if (confirm('Reject this order? The customer will be notified.')) updateDeliveryStatus(order.id, 'cancelled'); }}
-                          style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: 'transparent', color: '#d32f2f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Reject</button>
                       </>
                     )}
                     {order.delivery_status === 'preparing' && (
                       <>
                         <button onClick={() => updateDeliveryStatus(order.id, 'shipped')}
                           style={{ padding: '5px 12px', border: '1.5px solid #6A1B9A', borderRadius: '6px', background: '#6A1B9A', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
-                        <button onClick={() => { if (confirm('Cancel this order? The customer will be notified.')) updateDeliveryStatus(order.id, 'cancelled'); }}
-                          style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: 'transparent', color: '#d32f2f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
                       </>
                     )}
                     {order.delivery_status === 'shipped' && (
@@ -1358,6 +1359,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1439,18 +1443,43 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   }
 
   async function sendMessage() {
-    if (!newMessage.trim() || !selectedConv || !artisanUserId) return;
+    if ((!newMessage.trim() && !pendingImage) || !selectedConv || !artisanUserId) return;
     const text = newMessage.trim();
     setNewMessage('');
-    const { data } = await supabase
-      .from('messages')
-      .insert({ conversation_id: selectedConv.id, sender_id: artisanUserId, text })
-      .select().single();
-    if (data) {
-      setMessages(prev => [...prev, data]);
-      await supabase.from('conversations').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
-      setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text, last_message_at: new Date().toISOString() } : c));
+    setUploading(true);
+    try {
+      let imageUrl: string | null = null;
+      if (pendingImage) {
+        const path = `chat/${selectedConv.id}/${Date.now()}-${pendingImage.name.replace(/[^a-zA-Z0-9.\-]/g, '_')}`;
+        const { error: upErr } = await supabase.storage.from('products').upload(path, pendingImage, { cacheControl: '3600', upsert: false });
+        if (upErr) { console.error('Upload failed:', upErr.message); setUploading(false); return; }
+        const { data } = supabase.storage.from('products').getPublicUrl(path);
+        imageUrl = data.publicUrl;
+      }
+      const { data } = await supabase
+        .from('messages')
+        .insert({ conversation_id: selectedConv.id, sender_id: artisanUserId, text, image_url: imageUrl })
+        .select().single();
+      if (data) {
+        setMessages(prev => [...prev, data]);
+        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
+        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+      }
+    } finally {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setPendingImage(null);
+      setImagePreview(null);
+      setUploading(false);
     }
+  }
+
+  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+    if (e.target) e.target.value = '';
   }
 
   async function deleteConversation(convId: string) {
@@ -1702,7 +1731,14 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
                                     </div>
                                   </a>
                                 ) : null}
-                                <div className={`msg-bubble msg-bubble--${dir}`}>{text}</div>
+                                <div className={`msg-bubble msg-bubble--${dir}`}>
+                                  {msg.image_url && (
+                                    <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="chat-image-bubble">
+                                      <img src={msg.image_url} alt="attachment" style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block', border: '1px solid rgba(0,0,0,0.08)' }} />
+                                    </a>
+                                  )}
+                                  {text}
+                                </div>
                               </div>
 
                             </div>
@@ -1730,21 +1766,33 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
             </div>
 
             {/* Input bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 20px', background: '#fff', borderTop: '1px solid #EDE8E2', flexShrink: 0 }}>
-              <input
-                type="text" placeholder="Type a message..." value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                style={{ flex: 1, padding: '10px 18px', border: '1.5px solid #EDE8E2', borderRadius: '24px', fontSize: '0.875rem', outline: 'none', background: '#FAFAF9', color: 'var(--text-dark)', fontFamily: 'var(--font-sans)', transition: 'border-color 0.15s' }}
-                onFocus={e => e.currentTarget.style.borderColor = 'var(--primary-color)'}
-                onBlur={e => e.currentTarget.style.borderColor = '#EDE8E2'}
-              />
-              <button
-                onClick={sendMessage} disabled={!newMessage.trim()}
-                style={{ width: '42px', height: '42px', borderRadius: '50%', border: 'none', background: newMessage.trim() ? 'var(--primary-color)' : '#D4C8BB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: newMessage.trim() ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s', boxShadow: newMessage.trim() ? '0 2px 8px rgba(130,62,11,0.3)' : 'none' }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-              </button>
+            <div style={{ padding: '12px 20px', background: '#fff', borderTop: '1px solid #EDE8E2', flexShrink: 0 }}>
+              {imagePreview && (
+                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '10px' }}>
+                  <img src={imagePreview} alt="preview" style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #EDE8E2' }} />
+                  <button onClick={() => { URL.revokeObjectURL(imagePreview); setPendingImage(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#d32f2f', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>×</button>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label title="Attach image" style={{ width: '42px', height: '42px', borderRadius: '50%', border: '1.5px solid #EDE8E2', background: '#FAFAF9', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                  <input type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
+                </label>
+                <input
+                  type="text" placeholder="Type a message..." value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                  style={{ flex: 1, padding: '10px 18px', border: '1.5px solid #EDE8E2', borderRadius: '24px', fontSize: '0.875rem', outline: 'none', background: '#FAFAF9', color: 'var(--text-dark)', fontFamily: 'var(--font-sans)', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--primary-color)'}
+                  onBlur={e => e.currentTarget.style.borderColor = '#EDE8E2'}
+                />
+                <button
+                  onClick={sendMessage} disabled={(!newMessage.trim() && !pendingImage) || uploading}
+                  style={{ width: '42px', height: '42px', borderRadius: '50%', border: 'none', background: ((newMessage.trim() || pendingImage) && !uploading) ? 'var(--primary-color)' : '#D4C8BB', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: ((newMessage.trim() || pendingImage) && !uploading) ? 'pointer' : 'not-allowed', flexShrink: 0, transition: 'background 0.15s', boxShadow: ((newMessage.trim() || pendingImage) && !uploading) ? '0 2px 8px rgba(130,62,11,0.3)' : 'none' }}
+                >
+                  {uploading ? <span style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'chatSpin 0.8s linear infinite' }} /> : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>}
+                </button>
+              </div>
             </div>
           </>
         ) : (
