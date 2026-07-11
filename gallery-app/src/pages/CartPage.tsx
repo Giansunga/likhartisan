@@ -223,13 +223,13 @@ export default function CartPage() {
     <div style={{ background: 'var(--bg-secondary)', minHeight: '100vh', paddingTop: 'calc(var(--nav-height) + 20px)', paddingBottom: '100px' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
         {/* Header */}
-        <div style={{ background: 'var(--bg-primary)', borderRadius: '0 0 2px 2px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)' }}>
+        <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)' }}>
           <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>Shopping Cart</h1>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{items.length} item(s) in cart</span>
         </div>
 
         {items.length === 0 ? (
-          <div style={{ background: 'var(--bg-primary)', borderRadius: '2px', padding: '80px 20px', textAlign: 'center' }}>
+          <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '80px 20px', textAlign: 'center' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: 64, height: 64, margin: '0 auto 16px', opacity: 0.55 }}>
               <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
@@ -237,7 +237,7 @@ export default function CartPage() {
             <p style={{ fontSize: '1rem', color: 'var(--text-light)', marginBottom: '24px' }}>Your cart is empty</p>
             <Link to="/gallery" style={{
               display: 'inline-block', background: 'var(--accent-color)', color: '#fff',
-              padding: '12px 40px', borderRadius: '2px', fontWeight: 600, fontSize: '0.95rem',
+              padding: '12px 40px', borderRadius: '12px', fontWeight: 600, fontSize: '0.95rem',
               textDecoration: 'none', transition: 'background 0.2s'
             }}>
               Continue Shopping
@@ -249,7 +249,7 @@ export default function CartPage() {
             <div>
               {/* Select All Bar */}
               <div style={{
-                background: 'var(--bg-primary)', borderRadius: '2px', padding: '14px 20px', marginBottom: '12px',
+                background: 'var(--bg-primary)', borderRadius: '12px', padding: '14px 20px', marginBottom: '12px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -271,7 +271,7 @@ export default function CartPage() {
               {Object.entries(shops).map(([shopName, shopItems]) => {
                 const shopAllChecked = shopItems.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
                 return (
-                  <div key={shopName} style={{ background: 'var(--bg-primary)', borderRadius: '2px', marginBottom: '12px', overflow: 'hidden' }}>
+                  <div key={shopName} style={{ background: 'var(--bg-primary)', borderRadius: '12px', marginBottom: '12px', overflow: 'hidden' }}>
                     {/* Shop Header */}
                     <div style={{
                       padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px',
@@ -304,7 +304,7 @@ export default function CartPage() {
                           {/* Product Image */}
                           <Link to={`/product/${item.productId}`} style={{ flexShrink: 0 }}>
                             <img src={item.image} alt={item.productName}
-                              style={{ width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px', borderRadius: '4px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
+                              style={{ width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
                           </Link>
 
                           {/* Product Info */}
@@ -338,7 +338,7 @@ export default function CartPage() {
 
                           {/* Quantity Controls */}
                           <div style={{
-                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '2px',
+                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '8px',
                             flexShrink: 0, overflow: 'hidden'
                           }}>
                             <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
@@ -370,7 +370,7 @@ export default function CartPage() {
 
             {/* Right: Order Summary */}
             <div style={{ position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 20px)' }}>
-              <div style={{ background: 'var(--bg-primary)', borderRadius: '2px', padding: '20px' }}>
+              <div style={{ background: 'var(--bg-primary)', borderRadius: '12px', padding: '20px' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--bg-secondary)' }}>
                   Order Summary
                 </h3>
@@ -430,7 +430,7 @@ export default function CartPage() {
               {/* Checkout Button */}
               <button onClick={() => navigate('/checkout', { state: { deliveryOption } })} style={{
                 width: '100%', marginTop: '12px', background: selectedItems.length > 0 ? 'var(--accent-color)' : 'var(--bg-tertiary)',
-                color: '#fff', border: 'none', padding: '14px', borderRadius: '2px',
+                color: '#fff', border: 'none', padding: '14px', borderRadius: '12px',
                 fontWeight: 700, fontSize: '1rem', cursor: selectedItems.length > 0 ? 'pointer' : 'not-allowed',
                 transition: 'background 0.2s', boxShadow: selectedItems.length > 0 ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
               }}>
@@ -438,7 +438,7 @@ export default function CartPage() {
               </button>
 
               {/* Trust Badges */}
-              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '2px', border: '1px solid var(--bg-secondary)' }}>
+              <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--bg-secondary)' }}>
                 {[
                   { icon: '/images/secure_checkout.png', title: 'Secure Checkout', desc: 'Your payment information is safe with us' },
                   { icon: '/images/authentic_artisan.png', title: 'Authentic Artisan Products', desc: 'Every pottery piece is handcrafted by local artisans.' },

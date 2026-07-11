@@ -19,6 +19,13 @@ interface HomeArtisan {
 export default function HomePage() {
   const navigate = useNavigate();
   const [counted, setCounted] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
+    return () => subscription.unsubscribe();
+  }, []);
   const statsRef = useRef<HTMLDivElement>(null);
   const [artisansOffset, setArtisansOffset] = useState(0);
   const artisanTrackRef = useRef<HTMLDivElement>(null);
@@ -603,20 +610,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── CTA SECTION ── */}
-      <section className="relative py-[120px] bg-black text-center overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center blur-[2px] brightness-[0.4] scale-105"
-          style={{ backgroundImage: 'url(/images/vases_collection.png)' }} />
-        <div className="relative z-[5] max-w-[900px] mx-auto px-6 text-cream-secondary flex flex-col items-center gap-5">
-          <h2 className="font-serif text-[3rem] font-medium text-cream-secondary max-md:text-[2.15rem]">Ready to Explore Santo Tomas?</h2>
-          <p className="text-[1.25rem] leading-[1.6] opacity-90 max-md:text-[1.1rem]">Discover local artisans, browse handcrafted pottery collections, and experience the town's rich pottery heritage through LikhArtisan.</p>
-          <p className="text-[0.9rem] font-light opacity-80 mb-4">Create your free account and start exploring today.</p>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signup' } }))}
-            className="bg-cream-secondary text-primary text-[1.1rem] font-semibold tracking-[0.05em] py-3.5 px-11 rounded-[10px] shadow-[0_4px_15px_rgba(0,0,0,0.3)] hover:bg-white hover:text-accent hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] transition-all">
-            CREATE ACCOUNT
-          </button>
-        </div>
-      </section>
+      {/* ── CTA SECTION (hidden for logged-in users) ── */}
+      {!user && (
+        <section className="relative py-[120px] bg-black text-center overflow-hidden">
+          <div className="absolute inset-0 bg-cover bg-center blur-[2px] brightness-[0.4] scale-105"
+            style={{ backgroundImage: 'url(/images/vases_collection.png)' }} />
+          <div className="relative z-[5] max-w-[900px] mx-auto px-6 text-cream-secondary flex flex-col items-center gap-5">
+            <h2 className="font-serif text-[3rem] font-medium text-cream-secondary max-md:text-[2.15rem]">Ready to Explore Santo Tomas?</h2>
+            <p className="text-[1.25rem] leading-[1.6] opacity-90 max-md:text-[1.1rem]">Discover local artisans, browse handcrafted pottery collections, and experience the town's rich pottery heritage through LikhArtisan.</p>
+            <p className="text-[0.9rem] font-light opacity-80 mb-4">Create your free account and start exploring today.</p>
+            <button onClick={() => window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signup' } }))}
+              className="bg-cream-secondary text-primary text-[1.1rem] font-semibold tracking-[0.05em] py-3.5 px-11 rounded-[10px] shadow-[0_4px_15px_rgba(0,0,0,0.3)] hover:bg-white hover:text-accent hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] transition-all">
+              CREATE ACCOUNT
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
