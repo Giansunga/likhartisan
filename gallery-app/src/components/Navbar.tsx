@@ -259,7 +259,7 @@ export default function Navbar() {
           </div>
         ) : (
           notifications.map(n => {
-            const href = (n as any).order_id ? `/order/${(n as any).order_id}` : null;
+            const href = (n as any).order_id ? `/dashboard?tab=purchases` : null;
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
             <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); if (href) navigate(href); else navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); } }}

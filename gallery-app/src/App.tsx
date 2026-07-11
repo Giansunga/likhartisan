@@ -17,9 +17,9 @@ import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import OrderDetailPage from './pages/OrderDetailPage';
 import LikhAIDock from './components/LikhAIDock';
 import AdminLayout from './components/admin/AdminLayout';
+
 
 // Lazy-loaded heavy pages
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
@@ -75,7 +75,6 @@ export default function App() {
             <Route path="checkout" element={<CheckoutPage />} />
             <Route path="checkout/success" element={<CheckoutSuccessPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="order/:id" element={<OrderDetailPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />

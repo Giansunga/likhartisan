@@ -59,7 +59,7 @@ export default function ChatOrderCard({ order }: { order: ChatOrder }) {
       </div>
       <div style={{ display: 'flex', gap: '8px', padding: '0 14px 12px' }}>
         <Link
-          to={`/order/${order.id}`}
+          to={`/dashboard?tab=purchases`}
           style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '8px', border: '1.5px solid var(--primary-color)', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.78rem', textDecoration: 'none', fontFamily: 'var(--font-sans)' }}
         >
           View Order
