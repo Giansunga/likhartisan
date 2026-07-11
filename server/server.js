@@ -9,6 +9,7 @@ import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import geocodeRoutes from './routes/geocode.js';
+import { sendOrderConfirmation } from './lib/email.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -366,6 +367,26 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
       }
 
       console.log(`[confirm-payment] Updated order ${order.id} from pending to paid`);
+
+      // Send order confirmation email (non-blocking)
+      supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', order.id).single()
+        .then(async ({ data: fullOrder }) => {
+          if (!fullOrder) return;
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          const email = userData?.user?.email;
+          if (!email) return;
+          await sendOrderConfirmation({
+            orderId: fullOrder.id,
+            userName: fullOrder.user_name || 'Customer',
+            userEmail: email,
+            items: (fullOrder.items || []).map(i => ({ productName: i.product_name, qty: i.qty, price: i.price, variation: i.variation })),
+            subtotal: fullOrder.subtotal,
+            shippingFee: fullOrder.shipping_fee,
+            total: fullOrder.total,
+            deliveryOption: fullOrder.delivery_option,
+          });
+        }).catch(e => console.error('[email] Failed:', e.message));
+
       return res.json({ success: true, verified: true });
     }
 
@@ -424,6 +445,24 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
     }
 
     console.log(`[confirm-payment] Created fallback order ${newOrder.id} for session ${sessionId}`);
+
+    // Send order confirmation email (non-blocking)
+    const { data: userData } = await supabase.auth.admin.getUserById(userId);
+    const email = userData?.user?.email;
+    if (email) {
+      sendOrderConfirmation({
+        orderId: newOrder.id,
+        userName: meta.userName || 'Customer',
+        userEmail: email,
+        items: orderItems,
+        subtotal,
+        shippingFee,
+        total,
+        deliveryOption: meta.deliveryOption || 'pickup',
+        shopName: orderItems[0]?.shopName || '',
+      }).catch(e => console.error('[email] Failed:', e.message));
+    }
+
     return res.json({ success: true, verified: true });
 
   } catch (error) {
@@ -524,6 +563,26 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
             console.error('Error updating order:', updateError.message);
           } else {
             console.log(`Order ${existingOrders[0].id} marked as paid (webhook)`);
+            // Send email (non-blocking)
+            if (meta.userId) {
+              supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', existingOrders[0].id).single()
+                .then(async ({ data: fullOrder }) => {
+                  if (!fullOrder) return;
+                  const { data: userData } = await supabase.auth.admin.getUserById(meta.userId);
+                  const email = userData?.user?.email;
+                  if (!email) return;
+                  await sendOrderConfirmation({
+                    orderId: fullOrder.id,
+                    userName: fullOrder.user_name || 'Customer',
+                    userEmail: email,
+            items: (fullOrder.items || []).map(i => ({ productName: i.product_name, qty: i.qty, price: i.price, variation: i.variation })),
+                    subtotal: fullOrder.subtotal,
+                    shippingFee: fullOrder.shipping_fee,
+                    total: fullOrder.total,
+                    deliveryOption: fullOrder.delivery_option,
+                  });
+                }).catch(e => console.error('[email] Failed:', e.message));
+            }
           }
         } else {
           console.log(`Order ${existingOrders[0].id} already paid — skipping`);
@@ -577,6 +636,24 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         console.error('Error creating order from webhook:', insertError.message);
       } else {
         console.log(`Order created from webhook for session ${sessionId}`);
+        // Send email (non-blocking)
+        if (meta.userId) {
+          const { data: userData } = await supabase.auth.admin.getUserById(meta.userId);
+          const email = userData?.user?.email;
+          if (email) {
+            sendOrderConfirmation({
+              orderId: `webhook-${sessionId}`,
+              userName: meta.userName || 'Customer',
+              userEmail: email,
+              items: orderItems,
+              subtotal,
+              shippingFee,
+              total,
+              deliveryOption: meta.deliveryOption || 'pickup',
+              shopName: orderItems[0]?.shopName || '',
+            }).catch(e => console.error('[email] Failed:', e.message));
+          }
+        }
       }
     }
 

@@ -40,8 +40,33 @@ export default function Layout() {
   return (
     <LayoutErrorBoundary>
       <div className="min-h-screen bg-cream">
+        <a href="#main-content" style={{
+          position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden',
+        }} onFocus={(e) => {
+          e.currentTarget.style.position = 'fixed';
+          e.currentTarget.style.left = '16px';
+          e.currentTarget.style.top = '16px';
+          e.currentTarget.style.width = 'auto';
+          e.currentTarget.style.height = 'auto';
+          e.currentTarget.style.overflow = 'visible';
+          e.currentTarget.style.zIndex = '9999';
+          e.currentTarget.style.padding = '12px 24px';
+          e.currentTarget.style.background = 'var(--primary-color)';
+          e.currentTarget.style.color = '#fff';
+          e.currentTarget.style.borderRadius = '8px';
+          e.currentTarget.style.fontWeight = '600';
+          e.currentTarget.style.textDecoration = 'none';
+        }} onBlur={(e) => {
+          e.currentTarget.style.position = 'absolute';
+          e.currentTarget.style.left = '-10000px';
+          e.currentTarget.style.width = '1px';
+          e.currentTarget.style.height = '1px';
+          e.currentTarget.style.overflow = 'hidden';
+        }}>
+          Skip to content
+        </a>
         <Navbar />
-        <main className={hideNavPadding ? '' : 'pt-16 md:pt-20'}>
+        <main id="main-content" className={hideNavPadding ? '' : 'pt-16 md:pt-20'}>
           <Outlet />
         </main>
         {!isFreeform && <Footer />}

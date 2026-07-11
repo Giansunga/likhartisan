@@ -128,10 +128,10 @@ export default function Footer() {
             <h5 className="footer-heading">USEFUL LINKS</h5>
             <ul className="footer-links">
               <li>
-                <Link to="/about">Privacy Policy</Link>
+                <Link to="/privacy">Privacy Policy</Link>
               </li>
               <li>
-                <Link to="/about">Terms and Conditions</Link>
+                <Link to="/terms">Terms and Conditions</Link>
               </li>
             </ul>
           </div>

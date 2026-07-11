@@ -227,7 +227,7 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]" id="main-navbar">
+    <nav className="fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]" id="main-navbar" aria-label="Main navigation">
       {isArtisanDashboard ? (
         <div className="h-full flex items-center justify-between" style={{ padding: '0 24px' }}>
           <Link to="/" className="logo flex items-center gap-2">
@@ -303,7 +303,7 @@ export default function Navbar() {
           <div className="flex items-center" style={{ gap: isMobile ? '4px' : '24px' }}>
             {loggedIn ? (
               <>
-                <Link to="/cart" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                <Link to="/cart" aria-label="Shopping cart" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -314,7 +314,7 @@ export default function Navbar() {
                 </Link>
 
                 <div ref={notifDropdownRef} className="relative">
-                  <button onClick={() => setShowNotifications(!showNotifications)} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                  <button onClick={() => setShowNotifications(!showNotifications)} aria-label="Notifications" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                     </svg>
@@ -327,14 +327,14 @@ export default function Navbar() {
                   {showNotifications && notifDropdown}
                 </div>
 
-                <Link to="/chat" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                <Link to="/chat" aria-label="Chat" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </Link>
 
                 {!isMobile && userEmail && ADMIN_EMAILS.includes(userEmail) && (
-                  <Link to="/admin" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: '44px', height: '44px' }}>
+                  <Link to="/admin" aria-label="Admin dashboard" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: '44px', height: '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
                       <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
@@ -345,7 +345,7 @@ export default function Navbar() {
                 {/* Profile: tap-based on mobile, hover on desktop */}
                 {isMobile ? (
                   <div ref={profileDropdownRef} className="relative">
-                    <button onClick={() => setShowProfileDropdown(!showProfileDropdown)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    <button onClick={() => setShowProfileDropdown(!showProfileDropdown)} aria-label="User menu" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <div className="rounded-full bg-[#D9D9D9] border-2 border-cream-tertiary overflow-hidden" style={{ width: '34px', height: '34px' }}>
                         {userAvatar ? (
                           <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />

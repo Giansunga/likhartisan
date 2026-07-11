@@ -11,6 +11,9 @@ import ShopPage from './pages/ShopPage';
 import CartPage from './pages/CartPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import AboutPage from './pages/AboutPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
+import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -74,6 +77,8 @@ export default function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="order/:id" element={<OrderDetailPage />} />
             <Route path="about" element={<AboutPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
+            <Route path="terms" element={<TermsPage />} />
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<SignUpPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
@@ -91,7 +96,7 @@ export default function App() {
             <Route path="models" element={<ModelManagePage />} />
           </Route>
           <Route path="*" element={<Layout />}>
-            <Route path="*" element={<HomePage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </Suspense>

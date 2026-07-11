@@ -61,6 +61,43 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       setShowPw2(false);
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
+
+      // Auto-focus first input after render
+      requestAnimationFrame(() => {
+        const modal = document.querySelector('[data-auth-modal]');
+        const firstInput = modal?.querySelector('input') as HTMLInputElement | null;
+        firstInput?.focus();
+      });
+
+      // Escape key handler
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      document.addEventListener('keydown', handleEscape);
+
+      // Focus trap
+      const handleTab = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+        const modal = document.querySelector('[data-auth-modal]');
+        if (!modal) return;
+        const focusable = modal.querySelectorAll<HTMLElement>('input, button, a, [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      };
+      document.addEventListener('keydown', handleTab);
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.removeEventListener('keydown', handleTab);
+      };
     } else {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
@@ -69,7 +106,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
     };
-  }, [open, initialView]);
+  }, [open, initialView, onClose]);
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -134,6 +171,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         exit={{   opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
+        data-auth-modal
         style={{
           display: 'flex',
           width: '100%', maxWidth: '820px',
@@ -193,7 +231,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
           {/* Error banner */}
           {error && (
-            <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '0.82rem', textAlign: 'center' }}>
+            <div role="alert" aria-live="polite" style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '0.82rem', textAlign: 'center' }}>
               {error}
             </div>
           )}

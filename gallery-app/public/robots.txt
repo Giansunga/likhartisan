@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://likhartisan.ph/sitemap.xml

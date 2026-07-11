@@ -291,6 +291,26 @@ export default function ProductDetailPage() {
 
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: product.name,
+        description: product.description,
+        image: product.image,
+        brand: { '@type': 'Brand', name: 'LikhArtisan' },
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: 'PHP',
+          price: displayPrice,
+          availability: product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          url: `https://likhartisan.ph/product/${product.id}`,
+        },
+        aggregateRating: productRating.count > 0 ? {
+          '@type': 'AggregateRating',
+          ratingValue: productRating.avg.toFixed(1),
+          reviewCount: productRating.count,
+        } : undefined,
+      }) }} />
       <main className="product-viewer-section" style={{ marginTop: 'var(--nav-height)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
           <div className="breadcrumbs viewer-breadcrumbs">

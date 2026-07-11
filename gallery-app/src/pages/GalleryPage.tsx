@@ -3,6 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 24;
 
 const categories = [
   { name: 'Vases', bg: '/images/vases_collection.png' },
@@ -24,6 +27,7 @@ export default function GalleryPage() {
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setLoggedIn(!!session));
@@ -37,6 +41,9 @@ export default function GalleryPage() {
   }, [searchParams]);
 
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
@@ -104,7 +111,7 @@ export default function GalleryPage() {
     fetchProducts();
   }, []);
 
-  const products = useMemo(() => {
+  const filteredProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
     if (showFavorites) {
       list = list.filter(p => favorites.includes(p.id));
@@ -125,6 +132,12 @@ export default function GalleryPage() {
     }
     return list;
   }, [allProducts, activeCategory, search, sort, showFavorites, favorites, variantPrices, productRatings]);
+
+  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
+  const products = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredProducts.slice(start, start + PAGE_SIZE);
+  }, [filteredProducts, page]);
 
   return (
     <div>
@@ -292,6 +305,13 @@ export default function GalleryPage() {
               ))}
             </div>
           )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filteredProducts.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       </section>
 
