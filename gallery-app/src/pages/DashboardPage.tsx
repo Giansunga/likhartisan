@@ -158,7 +158,7 @@ export default function DashboardPage() {
   // scroll-to-top on route change). Skipped for the order deep-link,
   // which intentionally scrolls to the expanded card instead.
   useEffect(() => {
-    if (!searchParams.get('order')) window.scrollTo({ top: 0 });
+    if (!searchParams.get('order')) window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activePanel]);
 
   // Once orders have loaded and we have a deep-linked order ID, scroll to it.
@@ -551,7 +551,7 @@ export default function DashboardPage() {
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {SIDEBAR_ITEMS.map(item => (
                   <div key={item.key}>
-                    <button onClick={() => setActivePanel(item.key)}
+                    <button onClick={() => setSearchParams({ tab: item.key })}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
                         padding: '8px 8px', border: 'none', borderRadius: 'var(--radius-sm)', width: '100%', textAlign: 'left',
@@ -586,7 +586,7 @@ export default function DashboardPage() {
                     {item.key === 'purchases' && activePanel === 'purchases' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', margin: '2px 0 8px 32px' }}>
                         {ORDER_TABS.filter(tab => tab.key !== 'all').map(tab => (
-                          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                          <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
                             style={{
                               border: 'none',
                               background: 'transparent',
