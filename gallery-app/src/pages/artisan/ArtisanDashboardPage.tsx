@@ -94,7 +94,7 @@ export default function ArtisanDashboardPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [loadingShop, setLoadingShop] = useState(true);
+  const [loadingShop] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
