@@ -858,22 +858,6 @@ export default function DashboardPage() {
                       const isShipped = ds === 'shipped';
                       const isDelivered = ds === 'delivered';
 
-                      const statusHeadline = isCancelled
-                        ? 'Order Cancelled'
-                        : isToPay
-                        ? 'Awaiting Payment'
-                        : isToShip
-                        ? isPreparing
-                          ? 'Your Order Is Being Prepared'
-                          : 'Your Order Has Been Confirmed'
-                        : isToReceive
-                        ? 'Your Order Has Been Shipped'
-                        : isCompleted
-                        ? 'Order Completed'
-                        : isReturn
-                        ? 'Return / Refund in Progress'
-                        : s.label;
-
                       const timelineSteps = isCancelled ? [
                         { title: 'Order Placed', desc: 'Your order has been successfully placed.', date: placedDateTime, done: true },
                         { title: 'Order Cancelled', desc: 'This order has been cancelled.', date: placedDateTime, done: true, active: true },
