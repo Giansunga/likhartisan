@@ -416,7 +416,7 @@ export default function ProductDetailPage() {
                     )}
                     {isLowStock && (
                       <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: '0.88rem', fontWeight: 600, marginBottom: '16px' }}>
-                        Only {stock} left in stock -- order soon.
+                        Only {stock} left in stock.
                       </div>
                     )}
                   </>
