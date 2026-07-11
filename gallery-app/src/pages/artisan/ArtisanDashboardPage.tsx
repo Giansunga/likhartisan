@@ -1237,7 +1237,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders }: { shopId: string | nul
     })
     .sort((a, b) => sortOrder === 'newest' ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime() : new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  return (
+return (
     <div>
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Shop Orders</h1>
@@ -1249,35 +1249,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders }: { shopId: string | nul
         </div>
       )}
 
-      {loadingOrders ? (
-        <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #E8E0D8', textAlign: 'left' }}>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Order ID</th>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Item</th>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment</th>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery</th>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Amount</th>
-                <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[1,2,3,4,5].map(i => (
-                <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
-                  <td style={{ padding: '14px 18px' }}><div style={{ height: '16px', width: '60px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                  <td style={{ padding: '14px 18px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><div style={{ width: '44px', height: '44px', borderRadius: '6px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '20px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                  <td style={{ padding: '14px 18px' }}><div style={{ height: '20px', width: '80px', borderRadius: '4px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                  <td style={{ padding: '14px 18px' }}><div style={{ height: '32px', width: '100px', borderRadius: '8px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <>
+      {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', pointerEvents: 'none' }}>
