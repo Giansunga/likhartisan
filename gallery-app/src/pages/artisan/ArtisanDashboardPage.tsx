@@ -626,14 +626,19 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     </div>
   );
 }
-
 function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProducts }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void; loadingProducts: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState({ materials: '', technique: '' });
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '', category: 'Vases', description: '', materials: '', technique: '',
+    image: '', model3d: '', height: '', openingDiameter: '', dimensions: '',
+    variations: [{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]
+  });
   const [saving, setSaving] = useState(false);
   const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
   const [editError, setEditError] = useState('');
   const [archiveError, setArchiveError] = useState('');
+  const [createError, setCreateError] = useState('');
 
   async function openEdit(p: Product) {
     setEditing(p);
@@ -655,6 +660,17 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
     } else {
       setVariations([]);
     }
+  }
+
+  async function openCreate() {
+    setCreating(true);
+    setCreateForm({
+      name: '', category: 'Vases', description: '', materials: '', technique: '',
+      image: '', model3d: '', height: '', openingDiameter: '', dimensions: '',
+      variations: [{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]
+    });
+    setVariations([{ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]);
+    setCreateError('');
   }
 
   function addVariation() {
@@ -721,6 +737,77 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
     setEditing(null);
   }
 
+  async function saveCreate() {
+    if (!artisanShopId) return;
+    setSaving(true);
+    setCreateError('');
+
+    // Validate required fields
+    if (!createForm.name.trim() || !createForm.category.trim()) {
+      setCreateError('Name and category are required');
+      setSaving(false);
+      return;
+    }
+
+    // Insert product
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .insert({
+        shop_id: artisanShopId,
+        name: createForm.name.trim(),
+        category: createForm.category.trim(),
+        description: createForm.description.trim(),
+        materials: createForm.materials.trim(),
+        technique: createForm.technique.trim(),
+        image: createForm.image.trim(),
+        model3d: createForm.model3d?.trim() || null,
+        height: createForm.height.trim() || 'N/A',
+        opening_diameter: createForm.openingDiameter.trim() || 'N/A',
+        dimensions: createForm.dimensions.trim() || 'N/A',
+        status: 'active',
+        stock: 0,
+      })
+      .select()
+      .single();
+
+    if (productError) { setCreateError('Failed to create product: ' + productError.message); setSaving(false); return; }
+
+    const productId = product.id;
+
+    // Insert variations
+    const validVariations = createForm.variations.filter(v => 
+      v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim()
+    );
+
+    if (validVariations.length > 0) {
+      const { error: varError } = await supabase
+        .from('product_variations')
+        .insert(validVariations.map((v, idx) => ({
+          product_id: productId,
+          dimensions: v.dimensions.trim() || 'N/A',
+          height: v.height.trim() || 'N/A',
+          opening_diameter: v.openingDiameter.trim() || 'N/A',
+          price: v.price ? Number(v.price) : null,
+          stock: Number(v.stock) || 0,
+          sort_order: idx,
+        })));
+
+      if (varError) { 
+        setCreateError('Failed to create variations: ' + varError.message); 
+        setSaving(false); 
+        return; 
+      }
+    }
+
+    // Recompute stock
+    const newTotalStock = await recomputeProductStock(productId);
+
+    const newProduct = { ...product, stock: newTotalStock, inStock: newTotalStock > 0 };
+    onProductsUpdated([newProduct, ...products]);
+    setSaving(false);
+    setCreating(false);
+  }
+
   async function archiveProduct(p: Product) {
     if (!confirm(`Archive "${p.name}"? It will be hidden from the gallery.`)) return;
     setArchiveError('');
@@ -734,9 +821,22 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
   return (
     <div>
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
+      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>My Listings</h1>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Manage and track all your listings</p>
+        </div>
+        <button onClick={openCreate} style={{
+          padding: '12px 24px', borderRadius: '10px', border: 'none',
+          background: 'linear-gradient(135deg, #8B5E3C, #A0522D)', color: '#fff',
+          fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          transition: 'transform 0.15s, box-shadow 0.15s',
+          boxShadow: '0 4px 14px rgba(139,94,60,0.3)'
+        }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+          <Plus size={18} style={{ display: 'inline-block', marginRight: '8px', verticalAlign: 'middle' }} />
+          Create New Product
+        </button>
       </div>
 
       {(editError || archiveError) && (
@@ -810,6 +910,27 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Create New Product Button */}
+      <div style={{ marginTop: '24px', textAlign: 'center' }}>
+        <button onClick={openCreate} style={{
+          padding: '14px 32px', borderRadius: '10px', border: 'none',
+          background: 'linear-gradient(135deg, #8B5E3C, #A0522D)', color: '#fff',
+          fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
+          transition: 'transform 0.15s, box-shadow 0.15s',
+          boxShadow: '0 4px 14px rgba(139,94,60,0.3)'
+        }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+          <Plus size={18} style={{ display: 'inline-block', marginRight: '8px', verticalAlign: 'middle' }} />
+          Create New Product
+        </button>
+      </div>
+
+      {/* Create Error */}
+      {createError && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginTop: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500, border: '1px solid #FECACA' }}>
+          {createError}
         </div>
       )}
 
@@ -1178,12 +1299,13 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
     setUpdateError('');
     const updates: Record<string, string> = { delivery_status: newStatus };
     if (newStatus === 'completed') updates.status = 'completed';
+    if (newStatus === 'cancelled') updates.status = 'cancelled';
     const { error } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', orderId);
     if (error) { setUpdateError('Failed: ' + error.message); return; }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : newStatus === 'cancelled' ? { status: 'cancelled' } : {}) } : o));
 
     // Create notification for buyer
     try {
@@ -1196,6 +1318,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
           shipped: { title: 'Shipped Out', message: `Your order #${orderId.slice(-6)} has been shipped out by the seller.` },
           delivered: { title: 'Received Order?', message: `Your order #${orderId.slice(-6)} has been delivered. Please confirm receipt.` },
           completed: { title: 'Your Order is Completed', message: `Your order #${orderId.slice(-6)} has been completed. Thank you!` },
+          cancelled: { title: 'Order Cancelled', message: `Your order #${orderId.slice(-6)} has been cancelled by the seller.` },
         };
         const notif = notifications[newStatus];
         if (notif) {
@@ -1226,6 +1349,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
       shipped: { bg: '#F3E5F5', color: '#6A1B9A' },
       delivered: { bg: '#E8F5E9', color: '#2E7D32' },
       completed: { bg: '#E8F5E9', color: '#1B5E20' },
+      cancelled: { bg: '#FFEBEE', color: '#C62828' },
     };
     const s = styles[status] || styles.pending;
     return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color, textTransform: 'capitalize' }}>{status}</span>;
@@ -1328,12 +1452,20 @@ return (
                 <td style={{ padding: '14px 18px' }}>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {order.delivery_status === 'pending' && (
-                      <button onClick={() => updateDeliveryStatus(order.id, 'preparing')}
-                        style={{ padding: '5px 12px', border: '1.5px solid var(--primary-color)', borderRadius: '6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
+                      <>
+                        <button onClick={() => updateDeliveryStatus(order.id, 'preparing')}
+                          style={{ padding: '5px 12px', border: '1.5px solid var(--primary-color)', borderRadius: '6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
+                        <button onClick={() => { if (confirm('Reject this order? The customer will be notified.')) updateDeliveryStatus(order.id, 'cancelled'); }}
+                          style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: 'transparent', color: '#d32f2f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Reject</button>
+                      </>
                     )}
                     {order.delivery_status === 'preparing' && (
-                      <button onClick={() => updateDeliveryStatus(order.id, 'shipped')}
-                        style={{ padding: '5px 12px', border: '1.5px solid #6A1B9A', borderRadius: '6px', background: '#6A1B9A', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
+                      <>
+                        <button onClick={() => updateDeliveryStatus(order.id, 'shipped')}
+                          style={{ padding: '5px 12px', border: '1.5px solid #6A1B9A', borderRadius: '6px', background: '#6A1B9A', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
+                        <button onClick={() => { if (confirm('Cancel this order? The customer will be notified.')) updateDeliveryStatus(order.id, 'cancelled'); }}
+                          style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: 'transparent', color: '#d32f2f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                      </>
                     )}
                     {order.delivery_status === 'shipped' && (
                       <button onClick={() => updateDeliveryStatus(order.id, 'delivered')}
