@@ -43,7 +43,6 @@ export default function RecommendationsSection({
         .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
         .in('category', preferredCategories)
         .eq('status', 'active')
-        .eq('archived', false)
         .order('created_at', { ascending: false })
         .limit(limit + excludeProductIds.length);
 
@@ -62,7 +61,6 @@ export default function RecommendationsSection({
         .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
         .in('shop_id', preferredShopIds)
         .eq('status', 'active')
-        .eq('archived', false)
         .order('created_at', { ascending: false })
         .limit(limit + excludeProductIds.length + 10);
 
@@ -81,7 +79,6 @@ export default function RecommendationsSection({
         .from('products')
         .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, rating_avg, rating_count, created_at, updated_at')
         .eq('status', 'active')
-        .eq('archived', false)
         .order('views', { ascending: false })
         .limit(limit + excludeProductIds.length + 10);
 

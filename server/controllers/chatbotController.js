@@ -110,7 +110,7 @@ async function buildContext(intents, message, userId) {
           const { data: products } = await supabase
             .from('products')
             .select('id, name, category, material, price')
-            .eq('archived', false)
+            .eq('status', 'active')
             .limit(10);
 
           if (products && products.length > 0) {
