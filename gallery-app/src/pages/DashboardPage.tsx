@@ -153,6 +153,14 @@ export default function DashboardPage() {
     else if (tab === 'account') setActivePanel('account');
   }, [searchParams]);
 
+  // Reset scroll to top on in-page panel switches so a shorter panel
+  // doesn't leave the viewport clamped on the footer (matches Layout's
+  // scroll-to-top on route change). Skipped for the order deep-link,
+  // which intentionally scrolls to the expanded card instead.
+  useEffect(() => {
+    if (!searchParams.get('order')) window.scrollTo({ top: 0 });
+  }, [activePanel]);
+
   // Once orders have loaded and we have a deep-linked order ID, scroll to it.
   useEffect(() => {
     const orderId = searchParams.get('order');
