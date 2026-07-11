@@ -48,7 +48,7 @@ export default function Navbar() {
     if (!user) { setNotifications([]); return; }
     const { data } = await supabase
       .from('notifications')
-      .select('id, type, title, message, product_image, created_at, read')
+      .select('id, type, title, message, product_image, created_at, read, order_id')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10);
@@ -62,6 +62,7 @@ export default function Navbar() {
         product_image: n.product_image || '',
         time: n.created_at,
         read: !!n.read,
+        order_id: n.order_id || '',
       })));
     }
   }
@@ -258,9 +259,10 @@ export default function Navbar() {
           </div>
         ) : (
           notifications.map(n => {
+            const href = (n as any).order_id ? `/order/${(n as any).order_id}` : null;
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
-            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); } }}
+            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); if (href) navigate(href); else navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); } }}
               style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #F5F0EB', display: 'flex', gap: '12px', alignItems: 'flex-start', background: n.read ? 'transparent' : '#FDF8F4', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
               onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
