@@ -356,12 +356,29 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         const pmStatus = pmData.data?.attributes?.status;
         const piStatus = pmData.data?.attributes?.payment_intent?.attributes?.status;
         console.log(`[confirm-payment] PayMongo status=${pmStatus}, intent=${piStatus}`);
-        if (pmStatus === 'paid' || piStatus === 'succeeded') {
+        const PAID_SESSION = ['paid', 'completed'];
+        const PAID_INTENT = ['succeeded', 'paid', 'captured'];
+        if (PAID_SESSION.includes(pmStatus) || PAID_INTENT.includes(piStatus)) {
           paymongoVerified = true;
         }
+      } else {
+        console.warn(`[confirm-payment] PayMongo fetch not ok: ${pmResponse.status}`, pmData?.errors);
       }
     } catch (e) {
       console.warn('[confirm-payment] PayMongo check failed:', e.message);
+    }
+
+    // Step 2: Look up any existing order for this session first.
+    // The webhook (checkout_session.payment.paid) may have already marked it paid.
+    const { data: existingOrders } = await supabase
+      .from('orders')
+      .select('id, status')
+      .eq('checkout_session_id', sessionId)
+      .limit(1);
+
+    if (existingOrders && existingOrders.length > 0 && existingOrders[0].status === 'paid') {
+      console.log(`[confirm-payment] Order ${existingOrders[0].id} already paid (webhook) — skipping`);
+      return res.json({ success: true, verified: true });
     }
 
     // ✅ Only proceed if PayMongo confirms payment is actually paid
@@ -370,20 +387,9 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
       return res.status(402).json({ success: false, error: 'Payment not verified by PayMongo', verified: false });
     }
 
-    // Step 2: Try to find and UPDATE existing order (created by frontend with 'pending' status)
-    const { data: existingOrders } = await supabase
-      .from('orders')
-      .select('id, status')
-      .eq('checkout_session_id', sessionId)
-      .limit(1);
-
+    // Step 3: Update existing pending order or create one from session metadata
     if (existingOrders && existingOrders.length > 0) {
       const order = existingOrders[0];
-      if (order.status === 'paid') {
-        console.log(`[confirm-payment] Order ${order.id} already paid — skipping`);
-        return res.json({ success: true, verified: true });
-      }
-
       const { error: updateError } = await supabase
         .from('orders')
         .update({ status: 'paid' })
