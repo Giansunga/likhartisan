@@ -356,19 +356,26 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         const attrs = pmData.data?.attributes || {};
         const pmStatus = attrs.status;                                   // session status: active/expired
         const piStatus = attrs.payment_intent?.attributes?.status;       // card payments only
-        // e-wallet payments (gcash/paymaya/qrph) land here, NOT in payment_intent
-        const payments = Array.isArray(attrs.payments) ? attrs.payments : [];
-        const paymentStatuses = payments.map(p => p?.attributes?.status).filter(Boolean);
+        // Paid payment records can live in two places depending on method:
+        //   attrs.payments[]                          (some flows)
+        //   attrs.payment_intent.attributes.payments[] (gcash/maya/qrph)
+        const paymentRecords = [
+          ...(Array.isArray(attrs.payments) ? attrs.payments : []),
+          ...(Array.isArray(attrs.payment_intent?.attributes?.payments) ? attrs.payment_intent.attributes.payments : []),
+        ];
+        const paymentStatuses = paymentRecords.map(p => p?.attributes?.status).filter(Boolean);
         console.log(`[confirm-payment] PayMongo session=${pmStatus}, intent=${piStatus}, payments=[${paymentStatuses.join(',')}]`);
         const PAID_SESSION = ['paid', 'completed'];
         const PAID_INTENT = ['succeeded', 'paid', 'captured'];
-        const PAID_PAYMENT = ['paid'];
         if (
           PAID_SESSION.includes(pmStatus) ||
           PAID_INTENT.includes(piStatus) ||
-          paymentStatuses.some(s => PAID_PAYMENT.includes(s))
+          paymentStatuses.includes('paid')
         ) {
           paymongoVerified = true;
+        } else {
+          // Not verified — dump the raw shape so logs reveal where the paid status actually is
+          console.warn('[confirm-payment] NOT verified. Raw attributes:', JSON.stringify(attrs));
         }
       } else {
         console.warn(`[confirm-payment] PayMongo fetch not ok: ${pmResponse.status}`, pmData?.errors);
