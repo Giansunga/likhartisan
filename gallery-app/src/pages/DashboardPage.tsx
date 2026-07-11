@@ -121,6 +121,7 @@ export default function DashboardPage() {
   const [userReviews, setUserReviews] = useState<Record<string, any>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
   const rateFileInputRef = useRef<HTMLInputElement>(null);
+  const orderCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { user } = useAuth();
 
   useEffect(() => {
@@ -137,14 +138,35 @@ export default function DashboardPage() {
   useEffect(() => {
     const tab = searchParams.get('tab');
     const status = searchParams.get('status');
+    const orderId = searchParams.get('order');
     if (tab === 'purchases') {
       setActivePanel('purchases');
       if (status && ORDER_TABS.some(t => t.key === status)) {
         setActiveTab(status);
+      } else if (orderId) {
+        // Deep-link from chat "View Order": show all orders so the order is visible.
+        setActiveTab('all');
       }
+      // Deep-link from chat "View Order": auto-expand the specific order.
+      if (orderId) setExpandedOrderId(orderId);
     } else if (tab === 'notifications') setActivePanel('notifications');
     else if (tab === 'account') setActivePanel('account');
   }, [searchParams]);
+
+  // Once orders have loaded and we have a deep-linked order ID, scroll to it.
+  useEffect(() => {
+    const orderId = searchParams.get('order');
+    if (!orderId || orders.length === 0) return;
+    // Give the DOM a tick to render the expanded card, then scroll to it.
+    const timer = setTimeout(() => {
+      const el = orderCardRefs.current[orderId];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, expandedOrderId]);
 
   async function loadProfile() {
     if (!user) return;
@@ -870,6 +892,7 @@ export default function DashboardPage() {
                         <div
                           className="order-card"
                           key={order.id}
+                          ref={el => { orderCardRefs.current[order.id] = el; }}
                           onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
                           style={{ cursor: 'pointer', marginBottom: '16px' }}
                         >
