@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
-import { getCart, clearCart } from '../data/store';
+import { getCart } from '../data/store';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -464,7 +464,10 @@ export default function CheckoutPage() {
         return;
       }
 
-      clearCart();
+      // NOTE: do NOT clearCart() here. Clearing fires a cart-update event that
+      // empties `items`, which trips `if (items.length === 0) return null`
+      // (line ~478) and unmounts this page for one frame — flashing the <Footer/>.
+      // The cart is cleared on success in CheckoutSuccessPage.tsx instead.
       localStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
       sessionStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
       window.location.href = data.checkoutUrl;
@@ -475,7 +478,10 @@ export default function CheckoutPage() {
     }
   }
 
-  if (items.length === 0) return null;
+  // Keep the page mounted while a redirect to PayMongo is in flight, otherwise
+  // the layout's <Footer/> flashes for one frame. The empty-cart view is still
+  // reachable from CartPage, so this only affects the placing window.
+  if (items.length === 0 && !placing) return null;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', paddingTop: 'calc(var(--nav-height) + 30px)', paddingBottom: 80 }}>
