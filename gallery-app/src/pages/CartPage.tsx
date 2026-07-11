@@ -8,8 +8,7 @@ import { fmt } from '../lib/utils';
 import { geocodeAddress } from '../lib/geocoder';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useAuth } from '../contexts/AuthContext';
-
-const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../lib/api';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
 
 // Lalamove vehicle tiers (smallest to largest) for PH market
@@ -170,7 +169,7 @@ export default function CartPage() {
           console.error('Geocoding error:', err);
         }
 
-        const res = await fetch(`${PAYMONGO_API_URL}/api/lalamove/quote`, {
+        const res = await fetch(`${API_BASE}/api/lalamove/quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pickupAddress: shopAddress, dropoffAddress: userAddress, serviceType: selectedVehicle.serviceType, pickupCoords, dropoffCoords }),

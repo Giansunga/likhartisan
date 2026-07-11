@@ -8,8 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fmt } from '../lib/utils';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-
-const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../lib/api';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
 
 // Lalamove vehicle tiers (smallest to largest) for PH market — dimensions in cm, weight in kg
@@ -121,7 +120,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      const response = await fetch(`${PAYMONGO_API_URL}/api/lalamove/quote`, {
+      const response = await fetch(`${API_BASE}/api/lalamove/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -397,7 +396,7 @@ export default function CheckoutPage() {
     setPlacing(true);
 
     try {
-      const response = await fetch(`${PAYMONGO_API_URL}/api/create-checkout`, {
+      const response = await fetch(`${API_BASE}/api/create-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -77,89 +77,79 @@ async function buildContext(intents, message, userId) {
   const parts = [];
   const fetchedIntents = new Set(); // Avoid duplicate fetches
 
-  try {
-    for (const intent of intents) {
-      if (fetchedIntents.has(intent)) continue;
-      fetchedIntents.add(intent);
+  // Static (no DB) intents can be appended immediately in intent order.
+  const staticParts = {
+    shipping: 'Shipping options: Local pickup (free) or delivery via courier. Delivery fees vary by location. Contact the shop for exact shipping quotes.',
+    checkout: 'LikhArtisan supports GCash, Maya, QR Ph, and Card payments via PayMongo. Complete checkout from your cart page.',
+    returns: 'Returns and refunds are handled on a case-by-case basis. Contact the artisan shop directly through the messaging system to discuss any issues with your order.',
+    freeform: 'The Freeform Designer lets you customize pottery in 3D — choose a model, adjust shape, select material/color, add text engravings, and save or submit your design to a shop for creation.',
+  };
 
-      switch (intent) {
-        case 'order': {
-          if (userId) {
-            const { data: orders } = await supabase
-              .from('orders')
-              .select('id, status, delivery_status, total, created_at, items')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(5);
-
-            if (orders && orders.length > 0) {
-              const orderList = orders.map(o =>
-                `Order ${o.id.slice(0, 8)}... | Status: ${o.status} | Delivery: ${o.delivery_status || 'pending'} | Total: ₱${o.total} | Date: ${new Date(o.created_at).toLocaleDateString()}`
-              ).join('\n');
-              parts.push(`Recent orders for this customer:\n${orderList}`);
-            } else {
-              parts.push('No orders found for this customer.');
-            }
-          } else {
-            parts.push('Customer is not logged in. Ask them to sign in to view their orders.');
-          }
-          break;
-        }
-
-        case 'product': {
-          const { data: products } = await supabase
-            .from('products')
-            .select('id, name, category, material, price')
-            .eq('status', 'active')
-            .limit(10);
-
-          if (products && products.length > 0) {
-            const productList = products.map(p =>
-              `${p.name} | Category: ${p.category} | Material: ${p.material || 'N/A'} | Price: ₱${p.price}`
-            ).join('\n');
-            parts.push(`Available products:\n${productList}`);
-          }
-          break;
-        }
-
-        case 'shop': {
-          const { data: shops } = await supabase
-            .from('shops')
-            .select('id, name, description, location')
-            .limit(5);
-
-          if (shops && shops.length > 0) {
-            const shopList = shops.map(s =>
-              `${s.name} | Location: ${s.location || 'N/A'} | ${s.description || ''}`
-            ).join('\n');
-            parts.push(`Shops on LikhArtisan:\n${shopList}`);
-          }
-          break;
-        }
-
-        case 'shipping': {
-          parts.push('Shipping options: Local pickup (free) or delivery via courier. Delivery fees vary by location. Contact the shop for exact shipping quotes.');
-          break;
-        }
-
-        case 'checkout': {
-          parts.push('LikhArtisan supports GCash, Maya, QR Ph, and Card payments via PayMongo. Complete checkout from your cart page.');
-          break;
-        }
-
-        case 'returns': {
-          parts.push('Returns and refunds are handled on a case-by-case basis. Contact the artisan shop directly through the messaging system to discuss any issues with your order.');
-          break;
-        }
-
-        case 'freeform': {
-          parts.push('The Freeform Designer lets you customize pottery in 3D — choose a model, adjust shape, select material/color, add text engravings, and save or submit your design to a shop for creation.');
-          break;
-        }
+  // DB-backed intents: fetch concurrently, then attach by intent so the
+  // final context preserves the order the intents were detected in.
+  const dbFetchers = {
+    order: async () => {
+      if (!userId) return 'Customer is not logged in. Ask them to sign in to view their orders.';
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, status, delivery_status, total, created_at, items')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (orders && orders.length > 0) {
+        const orderList = orders.map(o =>
+          `Order ${o.id.slice(0, 8)}... | Status: ${o.status} | Delivery: ${o.delivery_status || 'pending'} | Total: ₱${o.total} | Date: ${new Date(o.created_at).toLocaleDateString()}`
+        ).join('\n');
+        return `Recent orders for this customer:\n${orderList}`;
       }
+      return 'No orders found for this customer.';
+    },
+    product: async () => {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, category, material, price')
+        .eq('status', 'active')
+        .limit(10);
+      if (products && products.length > 0) {
+        const productList = products.map(p =>
+          `${p.name} | Category: ${p.category} | Material: ${p.material || 'N/A'} | Price: ₱${p.price}`
+        ).join('\n');
+        return `Available products:\n${productList}`;
+      }
+      return '';
+    },
+    shop: async () => {
+      const { data: shops } = await supabase
+        .from('shops')
+        .select('id, name, description, location')
+        .limit(5);
+      if (shops && shops.length > 0) {
+        const shopList = shops.map(s =>
+          `${s.name} | Location: ${s.location || 'N/A'} | ${s.description || ''}`
+        ).join('\n');
+        return `Shops on LikhArtisan:\n${shopList}`;
+      }
+      return '';
+    },
+  };
+
+  const dbResults = {};
+  const dbPromises = [];
+  for (const intent of intents) {
+    if (fetchedIntents.has(intent)) continue;
+    fetchedIntents.add(intent);
+    if (dbFetchers[intent]) {
+      const p = dbFetchers[intent]().then(r => { dbResults[intent] = r; });
+      dbPromises.push(p);
     }
-  } catch (err) {
-    console.error('Context build error:', err);
+  }
+  // Run DB-backed fetches concurrently (latency win), fail-safe per intent.
+  await Promise.allSettled(dbPromises);
+
+  // Assemble in detected-intent order so the LLM context stays stable.
+  for (const intent of intents) {
+    if (staticParts[intent] !== undefined) parts.push(staticParts[intent]);
+    else if (dbResults[intent] !== undefined && dbResults[intent] !== '') parts.push(dbResults[intent]);
   }
 
   return parts.join('\n\n');

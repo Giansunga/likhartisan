@@ -5,8 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { displayVariation } from '../lib/utils';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-
-const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../lib/api';
 
 interface OrderItem {
   productId: string;
@@ -453,7 +452,7 @@ export default function DashboardPage() {
     try {
       // Always redirect to PayMongo checkout — never auto-confirm here.
       // Confirmation only happens via the webhook / return-URL flow.
-      const res = await fetch(`${PAYMONGO_API_URL}/api/session/${order.checkoutSessionId}`);
+      const res = await fetch(`${API_BASE}/api/session/${order.checkoutSessionId}`);
       if (res.ok) {
         const sessionData = await res.json();
         // If the session is already paid, just refresh orders

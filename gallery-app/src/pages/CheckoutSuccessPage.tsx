@@ -2,8 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { clearCart } from '../data/store';
 import { useAuth } from '../contexts/AuthContext';
-
-const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../lib/api';
 
 export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -69,7 +68,7 @@ export default function CheckoutSuccessPage() {
 
         console.log(`[CheckoutSuccess] Attempt ${attempt}/${MAX_ATTEMPTS} — session: ${checkoutSessionId}`);
 
-        const res = await fetch(`${PAYMONGO_API_URL}/api/confirm-payment`, {
+        const res = await fetch(`${API_BASE}/api/confirm-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

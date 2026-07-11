@@ -8,7 +8,6 @@ import { createClient } from '@supabase/supabase-js';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
-import geocodeRoutes from './routes/geocode.js';
 import { getQuotation } from './services/lalamoveService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
@@ -21,6 +20,10 @@ for (const v of requiredEnvVars) {
 }
 
 const app = express();
+// Render terminates TLS at its proxy; without this, every request looks like
+// one IP and express-rate-limit keys on the proxy — either 429-ing all users
+// or being trivially bypassed. trust proxy makes per-client IP limiting work.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -92,9 +95,6 @@ app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 
 // Lalamove routes
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
-
-// Geocode routes
-app.use('/api/geocode', proxyLimiter, geocodeRoutes);
 
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {

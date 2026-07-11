@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
+import { API_BASE } from '../../lib/api';
 import DesignMessageCard from '../../components/chat/DesignMessageCard';
 import { motion } from 'framer-motion';
 import {
@@ -1185,7 +1186,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
         };
         const notif = notifications[newStatus];
         if (notif) {
-          const PAYMONGO_API_URL = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
+          const PAYMONGO_API_URL = API_BASE;
           await fetch(`${PAYMONGO_API_URL}/api/notifications`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

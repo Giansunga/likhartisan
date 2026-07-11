@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../lib/api';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
-
-const API_BASE = import.meta.env.VITE_PAYMONGO_API_URL || 'http://localhost:3001';
 
 const QUICK_ACTIONS = [
   { label: 'Track My Order', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
