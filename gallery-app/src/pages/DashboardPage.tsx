@@ -889,13 +889,13 @@ export default function DashboardPage() {
                       ];
 
                       return (
-                        <div
-                          className="order-card"
-                          key={order.id}
-                          ref={el => { orderCardRefs.current[order.id] = el; }}
-                          onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                          style={{ cursor: 'pointer', marginBottom: '16px' }}
-                        >
+                          <div
+                            className="order-card"
+                            key={order.id}
+                            ref={el => { orderCardRefs.current[order.id] = el; }}
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            style={{ cursor: 'pointer', marginBottom: '16px', scrollMarginTop: '100px' }}
+                          >
                           {/* ── Header ── */}
                           <div className="order-card-header" style={{ marginBottom: isExpanded ? '8px' : undefined }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
