@@ -984,121 +984,89 @@ export default function DashboardPage() {
 
                           {/* ── Expanded Tracking Section ── */}
                           <div style={{
-                            maxHeight: isExpanded ? '1200px' : '0',
+                            maxHeight: isExpanded ? '900px' : '0',
                             opacity: isExpanded ? 1 : 0,
                             overflow: 'hidden',
-                            transition: 'max-height 0.45s ease, opacity 0.3s ease',
+                            transition: 'max-height 0.4s ease, opacity 0.3s ease',
                           }}>
                             <div style={{ borderTop: '1px solid #E8E0D8', marginTop: '14px', paddingTop: '20px' }} onClick={e => e.stopPropagation()}>
 
-                              {/* ── Status Banner ── */}
-                              {(() => {
-                                const bannerCfg = isCancelled
-                                  ? { bg: '#FEF2F2', border: '#FECACA', iconBg: '#DC2626', color: '#DC2626', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>, label: 'Order Cancelled', sub: 'This order has been cancelled.' }
-                                  : isToPay
-                                  ? { bg: '#FFFBEB', border: '#FDE68A', iconBg: '#D97706', color: '#D97706', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>, label: 'Awaiting Payment', sub: 'Please complete your payment to proceed.' }
-                                  : isToShip && isPreparing
-                                  ? { bg: '#EFF6FF', border: '#BFDBFE', iconBg: '#2563EB', color: '#2563EB', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, label: 'Seller Is Preparing Your Order', sub: 'Your pottery is being carefully crafted and packaged.' }
-                                  : isToShip
-                                  ? { bg: '#F0FDF4', border: '#BBF7D0', iconBg: '#16A34A', color: '#16A34A', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>, label: 'Order Confirmed', sub: 'Your order has been confirmed by the seller.' }
-                                  : isToReceive
-                                  ? { bg: '#F5F3FF', border: '#DDD6FE', iconBg: '#7C3AED', color: '#7C3AED', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><rect x="2" y="7" width="15" height="13" rx="2"/><path d="M17 11h3l2 2v5h-5v-7z"/><circle cx="6.5" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/></svg>, label: 'Your Order Is On Its Way!', sub: 'Your package has been shipped and is in transit.' }
-                                  : isCompleted
-                                  ? { bg: '#FFF7F0', border: '#FDBA74', iconBg: '#C1570D', color: '#C1570D', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>, label: 'Order Completed', sub: 'Thank you for your purchase! We hope you love it.' }
-                                  : isReturn
-                                  ? { bg: '#FFF1F2', border: '#FECDD3', iconBg: '#E11D48', color: '#E11D48', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>, label: 'Return / Refund In Progress', sub: 'We are processing your return request.' }
-                                  : { bg: '#FFF7F0', border: '#F5D9C0', iconBg: '#C1570D', color: '#C1570D', icon: null, label: s.label, sub: '' };
-                                return (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', padding: '14px 16px', background: bannerCfg.bg, border: `1px solid ${bannerCfg.border}`, borderRadius: '12px' }}>
-                                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bannerCfg.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 2px 8px ${bannerCfg.iconBg}44` }}>
-                                      {bannerCfg.icon}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: bannerCfg.color, fontFamily: 'var(--font-sans)', lineHeight: 1.3 }}>{bannerCfg.label}</div>
-                                      {bannerCfg.sub && <div style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'var(--font-sans)', marginTop: '2px', lineHeight: 1.4 }}>{bannerCfg.sub}</div>}
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4 }}>
-                                      <div>{new Date(order.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                                      <div>{new Date(order.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* ── Vertical Timeline ── */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0', paddingLeft: '4px' }}>
-                                {timelineSteps.map((step, i) => {
-                                  const isLastStep = i === timelineSteps.length - 1;
-                                  const isActiveStep = step.done && (isLastStep || !timelineSteps[i + 1]?.done);
-                                  const isPendingStep = !step.done;
+                              {/* ── Horizontal Stepper ── */}
+                              <div style={{ position: 'relative', marginBottom: '20px', padding: '0 8px' }}>
+                                {/* Background track */}
+                                <div style={{ position: 'absolute', top: '14px', left: '8px', right: '8px', height: '3px', background: '#E8E0D8', borderRadius: '2px', zIndex: 0 }} />
+                                {/* Filled progress track */}
+                                {(() => {
+                                  const doneCount = timelineSteps.filter(s => s.done).length;
+                                  const pct = timelineSteps.length > 1
+                                    ? Math.max(0, ((doneCount - 1) / (timelineSteps.length - 1)) * 100)
+                                    : 0;
                                   return (
-                                    <div key={i} style={{ display: 'flex', gap: '14px', position: 'relative' }}>
-                                      {/* Connector line */}
-                                      {!isLastStep && (
+                                    <div style={{ position: 'absolute', top: '14px', left: '8px', height: '3px', background: '#C1570D', borderRadius: '2px', zIndex: 0, width: `${pct}%`, transition: 'width 0.5s ease' }} />
+                                  );
+                                })()}
+
+                                {/* Step nodes */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+                                  {timelineSteps.map((step, i) => {
+                                    const isActive = step.done && (i === timelineSteps.length - 1 || !timelineSteps[i + 1]?.done);
+                                    return (
+                                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
+                                        {/* Node */}
                                         <div style={{
-                                          position: 'absolute',
-                                          left: '15px',
-                                          top: '30px',
-                                          bottom: '0',
-                                          width: '2px',
-                                          background: step.done ? 'linear-gradient(to bottom, #C1570D, #E8A87C)' : '#E8E0D8',
-                                          zIndex: 0,
-                                        }} />
-                                      )}
-                                      {/* Node */}
-                                      <div style={{ position: 'relative', zIndex: 1, flexShrink: 0, paddingTop: '2px' }}>
-                                        <div style={{
-                                          width: '30px', height: '30px', borderRadius: '50%',
-                                          background: isPendingStep ? '#F5F0EB' : isActiveStep ? '#C1570D' : '#C1570D',
-                                          border: isPendingStep ? '2px solid #E0D6CC' : 'none',
+                                          width: '28px', height: '28px', borderRadius: '50%',
+                                          background: step.done ? '#C1570D' : '#fff',
+                                          border: step.done ? 'none' : '2px solid #D1D5DB',
                                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                          boxShadow: isActiveStep ? '0 0 0 5px rgba(193,87,13,0.15), 0 2px 8px rgba(193,87,13,0.3)' : 'none',
-                                          transition: 'all 0.25s ease',
+                                          flexShrink: 0,
+                                          boxShadow: isActive ? '0 0 0 4px rgba(193,87,13,0.18)' : step.done ? '0 1px 4px rgba(193,87,13,0.25)' : 'none',
+                                          transition: 'all 0.2s',
                                         }}>
-                                          {isPendingStep
-                                            ? <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#D0C6BC' }} />
-                                            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                          {step.done
+                                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            : <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#D1D5DB' }} />
                                           }
                                         </div>
+                                        {/* Label */}
+                                        <span style={{
+                                          fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2, maxWidth: '52px',
+                                          color: step.done ? '#C1570D' : '#B0B0B0',
+                                          fontWeight: step.done ? 600 : 400,
+                                          fontFamily: 'var(--font-sans)',
+                                        }}>
+                                          {step.title}
+                                        </span>
                                       </div>
-                                      {/* Content */}
-                                      <div style={{ flex: 1, paddingBottom: isLastStep ? '0' : '18px', paddingTop: '4px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                                          <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{
-                                              fontSize: '0.84rem',
-                                              fontWeight: isPendingStep ? 500 : 600,
-                                              color: isPendingStep ? '#B0A89E' : isActiveStep ? '#C1570D' : '#333',
-                                              fontFamily: 'var(--font-sans)',
-                                              lineHeight: 1.3,
-                                            }}>
-                                              {step.title}
-                                              {isActiveStep && (
-                                                <span style={{ marginLeft: '8px', fontSize: '0.65rem', fontWeight: 700, color: '#C1570D', background: '#FFF0E6', padding: '2px 7px', borderRadius: '20px', letterSpacing: '0.3px', verticalAlign: 'middle' }}>CURRENT</span>
-                                              )}
-                                            </div>
-                                            <div style={{
-                                              fontSize: '0.75rem',
-                                              color: isPendingStep ? '#C8BFB7' : '#888',
-                                              fontFamily: 'var(--font-sans)',
-                                              marginTop: '2px',
-                                              lineHeight: 1.4,
-                                            }}>
-                                              {step.desc}
-                                            </div>
-                                          </div>
-                                          {step.date && (
-                                            <div style={{ fontSize: '0.68rem', color: '#BDB5AD', fontFamily: 'var(--font-sans)', flexShrink: 0, textAlign: 'right', lineHeight: 1.4, paddingTop: '2px' }}>
-                                              {step.date.split(' \u2022 ').map((part, pi) => (
-                                                <div key={pi}>{part}</div>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* ── Current Status Pill ── */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', padding: '10px 14px', background: '#FFF7F0', border: '1px solid #F5D9C0', borderRadius: '10px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="2" style={{ width: 16, height: 16, flexShrink: 0 }}>
+                                  <rect x="2" y="7" width="15" height="13" rx="2"/><path d="M17 11h3l2 2v5h-5v-7z"/><circle cx="6.5" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/>
+                                </svg>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#C1570D', fontFamily: 'var(--font-sans)', flex: 1 }}>{statusHeadline}</span>
+                                <span style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)' }}>{placedDate}</span>
+                              </div>
+
+
+                              {/* ── Compact Step Log (completed steps only) ── */}
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                                {timelineSteps.filter(s => s.done).map((step, i, arr) => (
+                                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px dashed #EDE8E2' : 'none' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#C1570D', flexShrink: 0, marginTop: '5px' }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#222', fontFamily: 'var(--font-sans)' }}>{step.title}</span>
+                                      <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)', marginLeft: '6px' }}>{step.desc}</span>
                                     </div>
-                                  );
-                                })}
+                                    {step.date && (
+                                      <span style={{ fontSize: '0.68rem', color: '#bbb', fontFamily: 'var(--font-sans)', flexShrink: 0, whiteSpace: 'nowrap' }}>{step.date}</span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
 
                             </div>
