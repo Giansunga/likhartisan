@@ -582,11 +582,14 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
-    const event = req.body.data;
-    console.log('Webhook received (verified):', event.type);
+    // PayMongo wraps the event: req.body.data is the "event" resource, and the
+    // real event type + payload live under .attributes (.type / .data).
+    const eventResource = req.body.data;
+    const eventType = eventResource?.attributes?.type;
+    console.log('Webhook received (verified):', eventType);
 
-    if (event.type === 'checkout_session.payment.paid') {
-      const session = event.data;
+    if (eventType === 'checkout_session.payment.paid') {
+      const session = eventResource.attributes.data;
       const sessionId = session.id;
       const referenceNumber = session.attributes.reference_number;
       const meta = session.attributes.metadata || {};
