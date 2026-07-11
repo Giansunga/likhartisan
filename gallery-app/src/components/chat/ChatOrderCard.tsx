@@ -9,6 +9,7 @@ type ChatOrder = {
   createdAt: string;
   itemCount: number;
   image?: string | null;
+  productName?: string | null;
 };
 
 // Map an order's status/delivery_status to a unified badge (label + color).
@@ -53,8 +54,11 @@ export default function ChatOrderCard({ order }: { order: ChatOrder }) {
           <img src={order.image} alt="Order item" style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover' }} />
         )}
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>{order.itemCount} item{order.itemCount !== 1 ? 's' : ''} · {fmtDate}</span>
-          <span style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.85rem' }}>{fmtTotal}</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.85rem', lineHeight: 1.2 }}>
+            {order.productName || 'Order Items'}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-light)' }}>{order.itemCount} item{order.itemCount !== 1 ? 's' : ''} · {fmtDate}</span>
+          <span style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.85rem', marginTop: '2px' }}>{fmtTotal}</span>
         </div>
       </div>
       <div style={{ display: 'flex', gap: '8px', padding: '0 14px 12px' }}>
