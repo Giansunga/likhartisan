@@ -343,33 +343,6 @@ export default function ShopPage() {
               </div>
             </div>
           </div>
-
-          {/* Design Yours Button - Right Side */}
-          <div style={{ 
-            position: 'absolute', 
-            bottom: '28px', 
-            right: '24px'
-          }}>
-            <button style={{ 
-              padding: '14px 28px', 
-              borderRadius: '8px', 
-              border: '2px solid #fff', 
-              background: 'rgba(255,255,255,0.1)', 
-              color: '#fff', 
-              fontWeight: 600, 
-              fontSize: '0.9rem', 
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>
-              Design Yours
-            </button>
-          </div>
         </div>
       </div>
 

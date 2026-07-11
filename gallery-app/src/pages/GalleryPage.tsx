@@ -179,12 +179,6 @@ export default function GalleryPage() {
               <h2 className="control-section-title" id="control-active-title">
                 {activeCategory || 'All Crafts'}
               </h2>
-              <Link to="/freeform" className="btn-design-yours">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Design Yours
-              </Link>
             </div>
 
             <div className="control-action-group">
