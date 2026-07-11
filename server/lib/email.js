@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'LikhArtisan <orders@likhartisan.ph>';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'LikhArtisan <onboarding@resend.dev>';
 
 function fmt(amount) {
   return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -88,13 +88,17 @@ export async function sendOrderConfirmation({
   `;
 
   try {
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: userEmail,
       subject: `Order Confirmed - ${orderId}`,
       html,
     });
-    console.log(`[email] Order confirmation sent to ${userEmail} for order ${orderId}`);
+    if (error) {
+      console.error(`[email] Resend rejected order confirmation for ${orderId}:`, error);
+      return;
+    }
+    console.log(`[email] Order confirmation sent to ${userEmail} for order ${orderId}`, data?.id || '');
   } catch (err) {
     console.error('[email] Failed to send order confirmation:', err);
   }
