@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import ProductTable from '../../components/admin/ProductTable';
 import type { Product } from '../../types';
 import { mapSupabaseProduct } from '../../lib/utils';
+import { recomputeProductStock } from '../../lib/stockSync';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
 
@@ -140,12 +141,17 @@ export default function ProductListPage() {
       await supabase.from('product_variations').delete().eq('product_id', editing.id);
     }
 
+    // Recompute product-level stock from variations
+    const newTotalStock = await recomputeProductStock(editing.id);
+
     setProductsList(prev => prev.map(p => p.id === editing.id ? {
       ...p,
       name: form.name,
       category: form.category,
       materials: form.materials,
       technique: form.technique,
+      stock: newTotalStock,
+      inStock: newTotalStock > 0,
     } : p));
     setEditing(null);
   }
@@ -290,7 +296,27 @@ export default function ProductListPage() {
                   fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
                   letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
                   borderBottom: '1px solid #F0EBE5',
-                }}>Variations</h3>
+                }}>Variations                </h3>
+
+                {/* Total Stock Summary */}
+                {variations.length > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
+                    padding: '10px 14px', borderRadius: '10px', background: '#F0EBE4',
+                  }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E' }}>Total Stock:</span>
+                    <span style={{
+                      fontSize: '0.95rem', fontWeight: 700,
+                      color: variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) === 0 ? '#d32f2f' :
+                             variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) <= 3 ? '#E67E22' : '#823E0B',
+                    }}>
+                      {variations.reduce((s, v) => s + (Number(v.stock) || 0), 0)}
+                    </span>
+                    {variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) === 0 && (
+                      <span style={{ fontSize: '0.75rem', color: '#d32f2f', fontWeight: 600 }}>(Out of Stock)</span>
+                    )}
+                  </div>
+                )}
 
                 {variations.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>

@@ -65,6 +65,33 @@ export default function CartPage() {
   const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_TIERS[0]);
   const [userAddress, setUserAddress] = useState('');
   const [shopAddress, setShopAddress] = useState(DEFAULT_PICKUP_ADDRESS);
+  const [stockMap, setStockMap] = useState<Record<string, number>>({});
+
+  // Fetch stock for cart items
+  useEffect(() => {
+    async function fetchStock() {
+      if (items.length === 0) return;
+      const variationIds = items.filter(i => i.variationId).map(i => i.variationId!);
+      const productIds = items.filter(i => !i.variationId).map(i => i.productId);
+      const map: Record<string, number> = {};
+
+      if (variationIds.length > 0) {
+        const { data } = await supabase.from('product_variations').select('id, stock').in('id', variationIds);
+        if (data) data.forEach((v: any) => { map[`v:${v.id}`] = Number(v.stock) || 0; });
+      }
+      if (productIds.length > 0) {
+        const { data } = await supabase.from('products').select('id, stock').in('id', productIds);
+        if (data) data.forEach((p: any) => { map[`p:${p.id}`] = Number(p.stock) || 0; });
+      }
+      setStockMap(map);
+    }
+    fetchStock();
+  }, [items]);
+
+  function getStock(item: CartItem): number {
+    if (item.variationId) return stockMap[`v:${item.variationId}`] ?? -1;
+    return stockMap[`p:${item.productId}`] ?? -1;
+  }
 
   const shops = groupByShop(items);
   const selectedItems = useMemo(() => items.filter(i => selected.has(`${i.productId}\v${i.variationId || ''}`)), [items, selected]);
@@ -192,6 +219,8 @@ export default function CartPage() {
     const updated = items.map(i => {
       if (i.productId === productId && (i.variationId || '') === (variationId || '')) {
         const newQty = i.qty + delta;
+        const maxStock = getStock(i);
+        if (maxStock >= 0 && newQty > maxStock) return i;
         return newQty <= 0 ? null : { ...i, qty: newQty };
       }
       return i;
@@ -318,6 +347,12 @@ export default function CartPage() {
                               <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</p>
                             )}
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
+                            {(() => {
+                              const stock = getStock(item);
+                              if (stock === 0) return <p style={{ fontSize: '0.78rem', color: '#d32f2f', fontWeight: 600, marginTop: 4 }}>Out of Stock</p>;
+                              if (stock > 0 && stock <= 3) return <p style={{ fontSize: '0.78rem', color: '#E67E22', fontWeight: 600, marginTop: 4 }}>Only {stock} left</p>;
+                              return null;
+                            })()}
                           </div>
                         </div>
 
@@ -341,11 +376,15 @@ export default function CartPage() {
                             <span style={{ width: '40px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)', lineHeight: '32px' }}>
                               {item.qty}
                             </span>
-                            <button onClick={() => handleQty(item.productId, item.variationId, 1)} style={{
+                            <button onClick={() => handleQty(item.productId, item.variationId, 1)}
+                              disabled={getStock(item) >= 0 && item.qty >= getStock(item)}
+                              style={{
                               width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
-                              cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
-                            }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>+</button>
+                              cursor: getStock(item) >= 0 && item.qty >= getStock(item) ? 'not-allowed' : 'pointer',
+                              fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+                              opacity: getStock(item) >= 0 && item.qty >= getStock(item) ? 0.4 : 1,
+                            }} onMouseEnter={e => { if (!(getStock(item) >= 0 && item.qty >= getStock(item))) e.currentTarget.style.background = 'var(--bg-tertiary)'; }} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>+</button>
                           </div>
 
                           {/* Subtotal */}
@@ -428,14 +467,19 @@ export default function CartPage() {
               </div>
 
               {/* Checkout Button */}
-              <button onClick={() => navigate('/checkout', { state: { deliveryOption } })} style={{
-                width: '100%', marginTop: '12px', background: selectedItems.length > 0 ? 'var(--accent-color)' : 'var(--bg-tertiary)',
-                color: '#fff', border: 'none', padding: '14px', borderRadius: '12px',
-                fontWeight: 700, fontSize: '1rem', cursor: selectedItems.length > 0 ? 'pointer' : 'not-allowed',
-                transition: 'background 0.2s', boxShadow: selectedItems.length > 0 ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
-              }}>
-                Checkout ({itemCount})
-              </button>
+              {(() => {
+                const anyOutOfStock = selectedItems.some(i => getStock(i) === 0);
+                return (
+                  <button onClick={() => !anyOutOfStock && navigate('/checkout', { state: { deliveryOption } })} style={{
+                    width: '100%', marginTop: '12px', background: selectedItems.length > 0 && !anyOutOfStock ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                    color: '#fff', border: 'none', padding: '14px', borderRadius: '12px',
+                    fontWeight: 700, fontSize: '1rem', cursor: selectedItems.length > 0 && !anyOutOfStock ? 'pointer' : 'not-allowed',
+                    transition: 'background 0.2s', boxShadow: selectedItems.length > 0 && !anyOutOfStock ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
+                  }}>
+                    {anyOutOfStock ? 'Remove out-of-stock items' : `Checkout (${itemCount})`}
+                  </button>
+                );
+              })()}
 
               {/* Trust Badges */}
               <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--bg-secondary)' }}>

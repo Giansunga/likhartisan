@@ -129,7 +129,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const productIds = [...new Set(validatedItems.map(v => v.item.productId))];
     const productResults = await Promise.all(
       productIds.map(id =>
-        supabase.from('products').select('id, name, price, image, shop_id, shop_name').eq('id', id).single()
+        supabase.from('products').select('id, name, price, image, shop_id, shop_name, stock').eq('id', id).single()
       )
     );
 
@@ -146,7 +146,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const variationResults = await Promise.all(
       variationItems.map(v =>
         supabase.from('product_variations')
-          .select('id, product_id, price, dimensions, height, opening_diameter')
+          .select('id, product_id, price, stock, dimensions, height, opening_diameter')
           .eq('id', v.item.variationId)
           .single()
       )
@@ -160,6 +160,23 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         return res.status(400).json({ error: `Variation not found: ${itemId}` });
       }
       variationMap.set(itemId, variation);
+    }
+
+    // Stock validation
+    for (const { item, qty } of validatedItems) {
+      if (item.variationId) {
+        const variation = variationMap.get(item.variationId);
+        const available = Number(variation?.stock) || 0;
+        if (available < qty) {
+          return res.status(400).json({ error: `Insufficient stock for ${item.productId}. Available: ${available}, requested: ${qty}` });
+        }
+      } else {
+        const product = productMap.get(item.productId);
+        const available = Number(product?.stock) || 0;
+        if (available < qty) {
+          return res.status(400).json({ error: `Insufficient stock for ${product?.name || item.productId}. Available: ${available}, requested: ${qty}` });
+        }
+      }
     }
 
     // Build verified items
@@ -368,6 +385,26 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
 
       console.log(`[confirm-payment] Updated order ${order.id} from pending to paid`);
 
+      // Decrement stock for each item (non-blocking)
+      (async () => {
+        try {
+          const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', order.id).single();
+          if (!fullOrder?.items) return;
+          for (const item of fullOrder.items) {
+            if (item.variation_id) {
+              await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+            }
+          }
+          // Recompute product-level stock for affected products
+          const productIds = [...new Set(fullOrder.items.filter(i => i.product_id).map(i => i.product_id))];
+          for (const pid of productIds) {
+            const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+            const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+            await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+          }
+        } catch (e) { console.error('[stock] Decrement failed:', e.message); }
+      })();
+
       // Send order confirmation email (non-blocking)
       supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', order.id).single()
         .then(async ({ data: fullOrder }) => {
@@ -445,6 +482,23 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
     }
 
     console.log(`[confirm-payment] Created fallback order ${newOrder.id} for session ${sessionId}`);
+
+    // Decrement stock for each item (non-blocking)
+    (async () => {
+      try {
+        for (const item of mappedItems) {
+          if (item.variation_id) {
+            await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+          }
+        }
+        const productIds = [...new Set(mappedItems.filter(i => i.product_id).map(i => i.product_id))];
+        for (const pid of productIds) {
+          const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+          const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+          await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+        }
+      } catch (e) { console.error('[stock] Decrement failed:', e.message); }
+    })();
 
     // Send order confirmation email (non-blocking)
     const { data: userData } = await supabase.auth.admin.getUserById(userId);
@@ -563,6 +617,24 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
             console.error('Error updating order:', updateError.message);
           } else {
             console.log(`Order ${existingOrders[0].id} marked as paid (webhook)`);
+            // Decrement stock (non-blocking)
+            (async () => {
+              try {
+                const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', existingOrders[0].id).single();
+                if (!fullOrder?.items) return;
+                for (const item of fullOrder.items) {
+                  if (item.variation_id) {
+                    await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+                  }
+                }
+                const productIds = [...new Set(fullOrder.items.filter(i => i.product_id).map(i => i.product_id))];
+                for (const pid of productIds) {
+                  const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+                  const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+                  await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+                }
+              } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
+            })();
             // Send email (non-blocking)
             if (meta.userId) {
               supabase.from('orders').select('id, user_name, items, subtotal, shipping_fee, total, delivery_option').eq('id', existingOrders[0].id).single()
@@ -636,6 +708,22 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         console.error('Error creating order from webhook:', insertError.message);
       } else {
         console.log(`Order created from webhook for session ${sessionId}`);
+        // Decrement stock (non-blocking)
+        (async () => {
+          try {
+            for (const item of mappedItems) {
+              if (item.variation_id) {
+                await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
+              }
+            }
+            const productIds = [...new Set(mappedItems.filter(i => i.product_id).map(i => i.product_id))];
+            for (const pid of productIds) {
+              const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
+              const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
+              await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
+            }
+          } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
+        })();
         // Send email (non-blocking)
         if (meta.userId) {
           const { data: userData } = await supabase.auth.admin.getUserById(meta.userId);

@@ -403,10 +403,39 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
+              {(() => {
+                const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+                const isOutOfStock = stock === 0;
+                const isLowStock = stock > 0 && stock <= 3;
+                return (
+                  <>
+                    {isOutOfStock && (
+                      <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '0.88rem', fontWeight: 600, marginBottom: '16px' }}>
+                        This item is currently out of stock.
+                      </div>
+                    )}
+                    {isLowStock && (
+                      <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: '0.88rem', fontWeight: 600, marginBottom: '16px' }}>
+                        Only {stock} left in stock -- order soon.
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
               <div className="product-viewer-actions">
-                <button className="btn-product-buy" onClick={handleBuy}>Buy Now</button>
-                <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
-                <button className="btn-product-design" onClick={handleAddToCart}>Add to Cart</button>
+                {(() => {
+                  const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+                  const isOutOfStock = stock === 0;
+                  const needsVariation = variations.length > 0 && !selectedVariation;
+                  return (
+                    <>
+                      <button className="btn-product-buy" onClick={handleBuy} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Buy Now</button>
+                      <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
+                      <button className="btn-product-design" onClick={handleAddToCart} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Add to Cart</button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

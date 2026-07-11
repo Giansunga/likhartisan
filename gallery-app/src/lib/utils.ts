@@ -41,6 +41,7 @@ export function mapSupabaseProduct(row: any) {
     category: row.category || '',
     price: row.price || 0,
     stock: row.stock || 0,
+    inStock: (row.stock || 0) > 0,
     image: row.image || '',
     model3d: row.model3d || undefined,
     materials: row.materials || '',

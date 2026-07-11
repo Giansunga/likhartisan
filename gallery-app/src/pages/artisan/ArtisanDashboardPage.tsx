@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Component, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { fmt, displayVariation } from '../../lib/utils';
+import { recomputeProductStock } from '../../lib/stockSync';
 import DesignMessageCard from '../../components/chat/DesignMessageCard';
 import { motion } from 'framer-motion';
 import {
@@ -653,8 +654,11 @@ function ListingsPanel({ products, productPrices, onProductsUpdated }: { product
       await supabase.from('product_variations').delete().eq('product_id', editing.id);
     }
 
+    // Recompute product-level stock from variations
+    const newTotalStock = await recomputeProductStock(editing.id);
+
     setSaving(false);
-    const updated = products.map(p => p.id === editing.id ? { ...p, ...form } : p);
+    const updated = products.map(p => p.id === editing.id ? { ...p, ...form, stock: newTotalStock, inStock: newTotalStock > 0 } : p);
     onProductsUpdated(updated);
     setEditing(null);
   }
@@ -694,7 +698,11 @@ function ListingsPanel({ products, productPrices, onProductsUpdated }: { product
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '2px' }}>{item.name}</div>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '6px' }}>{item.category}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>Stock: {item.stock}</div>
+                <div style={{ fontSize: '0.78rem', color: item.stock === 0 ? '#d32f2f' : item.stock <= 3 ? '#E67E22' : 'var(--text-light)' }}>
+                  Stock: {item.stock}
+                  {item.stock === 0 && ' (Out of Stock)'}
+                  {item.stock > 0 && item.stock <= 3 && ' (Low)'}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
                 <div style={{ textAlign: 'right' }}>
@@ -984,7 +992,11 @@ function VaultPanel({ products, productPrices, onProductsUpdated }: { products: 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '2px' }}>{item.name}</div>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '6px' }}>{item.category}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>Stock: {item.stock}</div>
+                <div style={{ fontSize: '0.78rem', color: item.stock === 0 ? '#d32f2f' : item.stock <= 3 ? '#E67E22' : 'var(--text-light)' }}>
+                  Stock: {item.stock}
+                  {item.stock === 0 && ' (Out of Stock)'}
+                  {item.stock > 0 && item.stock <= 3 && ' (Low)'}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
                 <div style={{ textAlign: 'right' }}>

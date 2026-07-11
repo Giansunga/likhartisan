@@ -108,7 +108,11 @@ export default function ProductTable({ products, onDelete, onArchive, onEdit }: 
                 <td className="py-3 px-4"><span className="px-3 py-1 rounded-full bg-cream-secondary text-brown-medium text-xs font-medium">{p.category}</span></td>
                 <td className="py-3 px-4 font-semibold text-brown-dark">₱{p.price.toLocaleString()}</td>
                 <td className="py-3 px-4">
-                  <span className={p.stock === 0 ? 'text-accent font-semibold' : 'text-brown-medium'}>{p.stock}</span>
+                  <span className={p.stock === 0 ? 'text-red-500 font-semibold' : p.stock <= 3 ? 'text-amber-500 font-semibold' : 'text-brown-medium'}>
+                    {p.stock}
+                    {p.stock === 0 && <span className="ml-1 text-xs">(Out)</span>}
+                    {p.stock > 0 && p.stock <= 3 && <span className="ml-1 text-xs">(Low)</span>}
+                  </span>
                 </td>
                 <td className="py-3 px-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${

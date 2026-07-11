@@ -53,6 +53,7 @@ export interface Product {
   category: string;
   price: number;
   stock: number;
+  inStock: boolean;
   image: string;
   model3d?: string;
   materials: string;

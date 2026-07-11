@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { recomputeProductStock } from '../../lib/stockSync';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
 
@@ -152,6 +153,8 @@ export default function ProductCreatePage() {
       model3dUrl = await uploadFile(glbFile);
     }
 
+    const totalStock = variations.reduce((s, v) => s + (Number(v.stock) || 0), 0);
+
     const { data: productData, error } = await supabase
       .from('products')
       .insert({
@@ -159,7 +162,7 @@ export default function ProductCreatePage() {
         description: '',
         category: form.category,
         price: 0,
-        stock: 0,
+        stock: totalStock,
         image: imageUrl,
         model3d: model3dUrl,
         materials: form.materials,
@@ -194,6 +197,8 @@ export default function ProductCreatePage() {
         }));
       if (variationRows.length > 0) {
         await supabase.from('product_variations').insert(variationRows);
+        // Recompute in case some variations were filtered out
+        await recomputeProductStock(productData.id);
       }
     }
 
