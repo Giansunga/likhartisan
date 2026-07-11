@@ -353,12 +353,21 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
       });
       pmData = await pmResponse.json();
       if (pmResponse.ok) {
-        const pmStatus = pmData.data?.attributes?.status;
-        const piStatus = pmData.data?.attributes?.payment_intent?.attributes?.status;
-        console.log(`[confirm-payment] PayMongo status=${pmStatus}, intent=${piStatus}`);
+        const attrs = pmData.data?.attributes || {};
+        const pmStatus = attrs.status;                                   // session status: active/expired
+        const piStatus = attrs.payment_intent?.attributes?.status;       // card payments only
+        // e-wallet payments (gcash/paymaya/qrph) land here, NOT in payment_intent
+        const payments = Array.isArray(attrs.payments) ? attrs.payments : [];
+        const paymentStatuses = payments.map(p => p?.attributes?.status).filter(Boolean);
+        console.log(`[confirm-payment] PayMongo session=${pmStatus}, intent=${piStatus}, payments=[${paymentStatuses.join(',')}]`);
         const PAID_SESSION = ['paid', 'completed'];
         const PAID_INTENT = ['succeeded', 'paid', 'captured'];
-        if (PAID_SESSION.includes(pmStatus) || PAID_INTENT.includes(piStatus)) {
+        const PAID_PAYMENT = ['paid'];
+        if (
+          PAID_SESSION.includes(pmStatus) ||
+          PAID_INTENT.includes(piStatus) ||
+          paymentStatuses.some(s => PAID_PAYMENT.includes(s))
+        ) {
           paymongoVerified = true;
         }
       } else {
