@@ -35,7 +35,8 @@ export async function chatWithGroq(messages, context = '') {
       ...messages,
     ],
     temperature: 0.7,
-    max_tokens: 1024,
+    max_tokens: 512,
+    top_p: 0.9,
     stream: false,
   };
 

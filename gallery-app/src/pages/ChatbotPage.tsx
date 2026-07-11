@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../lib/api';
+import ChatOrderCard from '../components/chat/ChatOrderCard';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  orders?: any[];
 }
 
 const QUICK_ACTIONS = [
@@ -55,7 +57,7 @@ export default function ChatbotPage() {
 
       const data = await res.json();
       const reply = data.reply || data.error || 'Sorry, I could not process your request.';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date() }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date(), orders: data.orders || [] }]);
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -249,6 +251,13 @@ export default function ChatbotPage() {
                 }}>
                   {msg.content}
                 </div>
+                {msg.role === 'assistant' && msg.orders && msg.orders.length > 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    {msg.orders.map((o: any) => (
+                      <ChatOrderCard key={o.id} order={o} />
+                    ))}
+                  </div>
+                )}
                 <div style={{
                   fontSize: '0.68rem',
                   color: 'var(--text-light)',

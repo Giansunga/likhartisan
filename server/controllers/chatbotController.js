@@ -76,6 +76,7 @@ function detectIntent(message) {
 async function buildContext(intents, message, userId) {
   const parts = [];
   const fetchedIntents = new Set(); // Avoid duplicate fetches
+  let orders = []; // Structured order data for UI cards (when order intent + logged in)
 
   // Static (no DB) intents can be appended immediately in intent order.
   const staticParts = {
@@ -90,14 +91,24 @@ async function buildContext(intents, message, userId) {
   const dbFetchers = {
     order: async () => {
       if (!userId) return 'Customer is not logged in. Ask them to sign in to view their orders.';
-      const { data: orders } = await supabase
+      const { data: orderRows } = await supabase
         .from('orders')
         .select('id, status, delivery_status, total, created_at, items')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(5);
-      if (orders && orders.length > 0) {
-        const orderList = orders.map(o =>
+      if (orderRows && orderRows.length > 0) {
+        // Expose structured data to the UI for order cards.
+        orders = orderRows.map(o => ({
+          id: o.id,
+          shortId: o.id.slice(0, 8),
+          status: o.status,
+          deliveryStatus: o.delivery_status || 'pending',
+          total: o.total,
+          createdAt: o.created_at,
+          itemCount: Array.isArray(o.items) ? o.items.length : 0,
+        }));
+        const orderList = orderRows.map(o =>
           `Order ${o.id.slice(0, 8)}... | Status: ${o.status} | Delivery: ${o.delivery_status || 'pending'} | Total: ₱${o.total} | Date: ${new Date(o.created_at).toLocaleDateString()}`
         ).join('\n');
         return `Recent orders for this customer:\n${orderList}`;
@@ -152,7 +163,7 @@ async function buildContext(intents, message, userId) {
     else if (dbResults[intent] !== undefined && dbResults[intent] !== '') parts.push(dbResults[intent]);
   }
 
-  return parts.join('\n\n');
+  return { context: parts.join('\n\n'), orders };
 }
 
 export async function handleChat(req, res) {
@@ -165,7 +176,7 @@ export async function handleChat(req, res) {
 
     const sanitized = xss(message.trim().slice(0, 1000));
     const { primary, all } = detectIntent(sanitized);
-    const context = await buildContext(all, sanitized, userId);
+    const { context, orders } = await buildContext(all, sanitized, userId);
 
     const messages = [
       ...history.slice(-10).map(m => ({
@@ -177,7 +188,7 @@ export async function handleChat(req, res) {
 
     const reply = await chatWithGroq(messages, context);
 
-    res.json({ reply, intent: primary });
+    res.json({ reply, intent: primary, orders: orders || [] });
   } catch (err) {
     console.error('Chatbot error:', err);
     res.status(500).json({
