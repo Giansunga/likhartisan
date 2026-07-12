@@ -45,7 +45,6 @@ const ORDER_TABS = [
   { key: 'to-receive', label: 'To Receive' },
   { key: 'completed', label: 'Completed' },
   { key: 'return-refund', label: 'Return Refund' },
-  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const SIDEBAR_ITEMS = [
@@ -537,86 +536,88 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard-page" style={{ minHeight: '100vh' }}>
-      <div className="dashboard-wrapper" style={{ paddingTop: '12px', paddingBottom: '60px' }}>
-        <div className="max-w-[var(--container-width)] mx-auto px-6">
+      <div className="dashboard-wrapper" style={{ paddingTop: '12px', paddingBottom: '80px' }}>
+        <div className={`mx-auto ${isMobile && activePanel === 'purchases' ? 'w-full px-0' : 'max-w-[var(--container-width)] px-6'}`}>
           <div className="dashboard-layout" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '240px 1fr', gap: isMobile ? '16px' : '30px', alignItems: 'flex-start' }}>
 
             {/* Sidebar */}
-            <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: isMobile ? '16px' : '28px 20px', position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 12px)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
-                  {profileImage ? (
-                    <img src={profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-sans)' }}>
-                      {firstName?.charAt(0) || 'U'}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#333', fontFamily: 'var(--font-sans)' }}>{username}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>Edit Profile</span>
-                </div>
-              </div>
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {SIDEBAR_ITEMS.map(item => (
-                  <div key={item.key}>
-                    <button onClick={() => setSearchParams({ tab: item.key })}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '8px 8px', border: 'none', borderRadius: 'var(--radius-sm)', width: '100%', textAlign: 'left',
-                        background: 'transparent',
-                        color: activePanel === item.key ? 'var(--accent-color)' : '#666',
-                        fontSize: '0.82rem', fontWeight: activePanel === item.key ? 600 : 500,
-                        fontFamily: 'var(--font-sans)', cursor: 'pointer', transition: 'var(--transition-fast)',
-                      }}>
-                      <span style={{ display: 'flex', alignItems: 'center' }}>{item.icon}</span>
-                      {item.label}
-                      {item.key === 'notifications' && unreadNotificationCount > 0 && (
-                        <span style={{
-                          marginLeft: 'auto',
-                          minWidth: '18px',
-                          height: '18px',
-                          padding: '0 6px',
-                          borderRadius: '999px',
-                          background: 'var(--accent-color)',
-                          color: '#fff',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          lineHeight: 1,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontFamily: 'var(--font-sans)',
-                        }}>
-                          {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-                        </span>
-                      )}
-                    </button>
-                    {item.key === 'purchases' && activePanel === 'purchases' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', margin: '2px 0 8px 32px' }}>
-                        {ORDER_TABS.filter(tab => tab.key !== 'all').map(tab => (
-                          <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              textAlign: 'left',
-                              padding: '5px 0',
-                              color: activeTab === tab.key ? 'var(--accent-color)' : '#666',
-                              fontSize: '0.78rem',
-                              fontWeight: activeTab === tab.key ? 600 : 500,
-                              fontFamily: 'var(--font-sans)',
-                              cursor: 'pointer',
-                            }}>
-                            {tab.label}
-                          </button>
-                        ))}
+            {(!isMobile || activePanel !== 'purchases') && (
+              <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: isMobile ? '16px' : '28px 20px', position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 12px)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
+                    {profileImage ? (
+                      <img src={profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-sans)' }}>
+                        {firstName?.charAt(0) || 'U'}
                       </div>
                     )}
                   </div>
-                ))}
-              </nav>
-            </aside>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#333', fontFamily: 'var(--font-sans)' }}>{username}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>Edit Profile</span>
+                  </div>
+                </div>
+                <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {SIDEBAR_ITEMS.map(item => (
+                    <div key={item.key}>
+                      <button onClick={() => setSearchParams({ tab: item.key })}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '8px 8px', border: 'none', borderRadius: 'var(--radius-sm)', width: '100%', textAlign: 'left',
+                          background: 'transparent',
+                          color: activePanel === item.key ? 'var(--accent-color)' : '#666',
+                          fontSize: '0.82rem', fontWeight: activePanel === item.key ? 600 : 500,
+                          fontFamily: 'var(--font-sans)', cursor: 'pointer', transition: 'var(--transition-fast)',
+                        }}>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>{item.icon}</span>
+                        {item.label}
+                        {item.key === 'notifications' && unreadNotificationCount > 0 && (
+                          <span style={{
+                            marginLeft: 'auto',
+                            minWidth: '18px',
+                            height: '18px',
+                            padding: '0 6px',
+                            borderRadius: '999px',
+                            background: 'var(--accent-color)',
+                            color: '#fff',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontFamily: 'var(--font-sans)',
+                          }}>
+                            {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                          </span>
+                        )}
+                      </button>
+                      {item.key === 'purchases' && activePanel === 'purchases' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', margin: '2px 0 8px 32px' }}>
+                          {ORDER_TABS.filter(tab => tab.key !== 'all').map(tab => (
+                            <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: 'left',
+                                padding: '5px 0',
+                                color: activeTab === tab.key ? 'var(--accent-color)' : '#666',
+                                fontSize: '0.78rem',
+                                fontWeight: activeTab === tab.key ? 600 : 500,
+                                fontFamily: 'var(--font-sans)',
+                                cursor: 'pointer',
+                              }}>
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </nav>
+              </aside>
+            )}
 
             {/* Main Content */}
             {activePanel === 'account' ? (
@@ -857,20 +858,22 @@ export default function DashboardPage() {
               <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 
                 {/* Horizontal Mobile Filter Tabs (Shopee Style) */}
-                <div className="shopee-tabs-container">
-                  <div className="dashboard-tabs shopee-style-tabs">
-                    {ORDER_TABS.map(tab => (
-                      <button 
-                        key={tab.key}
-                        className={`dashboard-tab ${activeTab === tab.key ? 'active' : ''}`}
-                        onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
-                        style={{ flex: '1 0 auto', textAlign: 'center', padding: '12px 16px' }}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
+                {isMobile && (
+                  <div className="shopee-tabs-container">
+                    <div className="dashboard-tabs shopee-style-tabs">
+                      {ORDER_TABS.map(tab => (
+                        <button 
+                          key={tab.key}
+                          className={`dashboard-tab ${activeTab === tab.key ? 'active' : ''}`}
+                          onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
+                          style={{ flex: '1 0 auto', textAlign: 'center', padding: '12px 16px' }}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Orders */}
                 <div className="purchase-orders-list">

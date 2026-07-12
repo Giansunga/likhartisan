@@ -178,16 +178,16 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         background: 'rgba(10, 6, 3, 0.72)',
         backdropFilter: 'blur(4px)',
         display: 'flex', 
-        alignItems: isMobile ? 'flex-end' : 'center', 
+        alignItems: 'center', 
         justifyContent: 'center',
-        padding: isMobile ? '0' : '16px',
+        padding: '16px',
       }}
       onClick={onClose}
     >
       <motion.div
-        initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96, y: 12 }}
-        animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
-        exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96, y: 12 }}
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
         data-auth-modal
@@ -195,11 +195,11 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
           display: 'flex',
           width: '100%', maxWidth: '820px',
           background: '#fff',
-          borderRadius: isMobile ? '24px 24px 0 0' : '20px',
+          borderRadius: '20px',
           overflow: 'hidden',
           boxShadow: '0 -10px 40px rgba(0,0,0,0.15)',
           position: 'relative',
-          maxHeight: isMobile ? '90vh' : 'auto',
+          maxHeight: '90vh',
         }}
       >
         {/* ── LEFT: Pottery image ── */}
