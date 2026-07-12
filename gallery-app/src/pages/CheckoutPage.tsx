@@ -808,25 +808,51 @@ export default function CheckoutPage() {
               </div>
 
               {/* Place Order Button */}
-              <div style={{ padding: '0 24px 24px' }}>
-                <button onClick={handlePlaceOrder} disabled={placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote)} style={{
-                  width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
-                  background: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? '#D4C8BB' : 'linear-gradient(135deg, #8B5E3C, #A0522D)',
-                  color: '#fff', fontSize: '0.95rem', fontWeight: 700, cursor: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'not-allowed' : 'pointer',
-                  letterSpacing: '0.5px', boxShadow: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'none' : '0 4px 14px rgba(139,94,60,0.3)',
-                  transition: 'all 0.2s ease',
-                }}>{placing ? 'PLACING ORDER...' : 'PLACE ORDER NOW'}</button>
-                <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#B8A89A', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  Secure & encrypted payment
-                </p>
-              </div>
+              {/* Place Order Button */}
+              {!isMobile && (
+                <div style={{ padding: '0 24px 24px' }}>
+                  <button onClick={handlePlaceOrder} disabled={placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote)} style={{
+                    width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
+                    background: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? '#D4C8BB' : 'linear-gradient(135deg, #8B5E3C, #A0522D)',
+                    color: '#fff', fontSize: '0.95rem', fontWeight: 700, cursor: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'not-allowed' : 'pointer',
+                    letterSpacing: '0.5px', boxShadow: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'none' : '0 4px 14px rgba(139,94,60,0.3)',
+                    transition: 'all 0.2s ease',
+                  }}>{placing ? 'PLACING ORDER...' : 'PLACE ORDER NOW'}</button>
+                  <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#B8A89A', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    Secure & encrypted payment
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Sticky Mobile Place Order Bar */}
+      {isMobile && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 40,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Total</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</div>
+          </div>
+          <button onClick={handlePlaceOrder} disabled={placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote)} style={{
+            background: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? '#D4C8BB' : 'linear-gradient(135deg, #8B5E3C, #A0522D)',
+            color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px',
+            fontWeight: 700, fontSize: '0.95rem', cursor: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'not-allowed' : 'pointer',
+            boxShadow: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'none' : '0 4px 14px rgba(139,94,60,0.3)',
+          }}>
+            {placing ? 'PLACING...' : 'PLACE ORDER'}
+          </button>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {

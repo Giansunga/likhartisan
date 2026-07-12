@@ -55,6 +55,16 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successEmail, setSuccessEmail] = useState('');
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     if (open) {
       setView(initialView || 'signin');
@@ -66,11 +76,13 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
 
-      // Auto-focus first input after render
+      // Auto-focus first input after render (skip on mobile to avoid keyboard jumping)
       requestAnimationFrame(() => {
-        const modal = document.querySelector('[data-auth-modal]');
-        const firstInput = modal?.querySelector('input') as HTMLInputElement | null;
-        firstInput?.focus();
+        if (window.innerWidth > 768) {
+          const modal = document.querySelector('[data-auth-modal]');
+          const firstInput = modal?.querySelector('input') as HTMLInputElement | null;
+          firstInput?.focus();
+        }
       });
 
       // Escape key handler
@@ -165,15 +177,17 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(10, 6, 3, 0.72)',
         backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '16px',
+        display: 'flex', 
+        alignItems: isMobile ? 'flex-end' : 'center', 
+        justifyContent: 'center',
+        padding: isMobile ? '0' : '16px',
       }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1,    y: 0 }}
-        exit={{   opacity: 0, scale: 0.96, y: 12 }}
+        initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96, y: 12 }}
+        animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
+        exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
         data-auth-modal
@@ -181,10 +195,11 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
           display: 'flex',
           width: '100%', maxWidth: '820px',
           background: '#fff',
-          borderRadius: '20px',
+          borderRadius: isMobile ? '24px 24px 0 0' : '20px',
           overflow: 'hidden',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+          boxShadow: '0 -10px 40px rgba(0,0,0,0.15)',
           position: 'relative',
+          maxHeight: isMobile ? '90vh' : 'auto',
         }}
       >
         {/* ── LEFT: Pottery image ── */}

@@ -29,7 +29,17 @@ export default function GalleryPage() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
   const [designModalOpen, setDesignModalOpen] = useState(false);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
   const { user } = useAuth();
   const loggedIn = !!user;
 
@@ -196,34 +206,57 @@ export default function GalleryPage() {
                 </svg>
                 <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              {loggedIn && (
-              <button
-                onClick={() => setShowFavorites(!showFavorites)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
-                  border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
-                  borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
-                  color: showFavorites ? '#fff' : '#666', fontSize: '0.88rem', fontWeight: 600,
-                  cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill={showFavorites ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-                Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
-              </button>
+              {isMobile ? (
+                <button
+                  onClick={() => setFilterModalOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px',
+                    border: '1.5px solid #E8E0D8', borderRadius: '10px', background: '#fff',
+                    color: 'var(--text-dark)', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+                    <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+                    <line x1="1" y1="14" x2="7" y2="14" />
+                    <line x1="9" y1="8" x2="15" y2="8" />
+                    <line x1="17" y1="16" x2="23" y2="16" />
+                  </svg>
+                  Filters
+                </button>
+              ) : (
+                <>
+                  {loggedIn && (
+                  <button
+                    onClick={() => setShowFavorites(!showFavorites)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
+                      border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
+                      borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
+                      color: showFavorites ? '#fff' : '#666', fontSize: '0.88rem', fontWeight: 600,
+                      cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill={showFavorites ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
+                  </button>
+                  )}
+                  <div className="sort-select-wrapper">
+                    <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
+                      <option value="popularity">Popularity</option>
+                      <option value="price-asc">Price: Low to High</option>
+                      <option value="price-desc">Price: High to Low</option>
+                      <option value="name-asc">Name: A-Z</option>
+                    </select>
+                    <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
+                </>
               )}
-              <div className="sort-select-wrapper">
-                <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
-                  <option value="popularity">Popularity</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="name-asc">Name: A-Z</option>
-                </select>
-                <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </div>
             </div>
           </div>
         </div>
@@ -379,6 +412,58 @@ export default function GalleryPage() {
             </div>
             <button type="submit" className="btn-form-submit">SUBMIT CUSTOM ORDER REQUEST</button>
           </form>
+        </div>
+      </div>
+      {/* Filter Bottom Sheet (Mobile) */}
+      <div className={`modal-overlay ${filterModalOpen && isMobile ? 'active' : ''}`} onClick={() => setFilterModalOpen(false)}>
+        <div className="modal-box" style={{ 
+          position: 'absolute', bottom: 0, top: 'auto', left: 0, right: 0, margin: 0, maxWidth: '100%',
+          borderRadius: '24px 24px 0 0', transform: filterModalOpen ? 'translateY(0)' : 'translateY(100%)', 
+          transition: 'transform 0.3s ease-out' 
+        }} onClick={e => e.stopPropagation()}>
+          <div style={{ width: '40px', height: '4px', background: '#E8E0D8', borderRadius: '2px', margin: '0 auto 20px' }} />
+          <h3 className="modal-title" style={{ textAlign: 'left', marginBottom: '20px', fontSize: '1.4rem' }}>Sort & Filter</h3>
+          
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label style={{ fontWeight: 600 }}>Sort By</label>
+            <div className="sort-select-wrapper" style={{ width: '100%', maxWidth: 'none', background: '#f9f8f6' }}>
+              <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
+                <option value="popularity">Popularity</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="name-asc">Name: A-Z</option>
+              </select>
+              <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+
+          {loggedIn && (
+            <div className="form-group" style={{ marginBottom: '30px' }}>
+              <label style={{ fontWeight: 600 }}>Filters</label>
+              <button
+                onClick={() => setShowFavorites(!showFavorites)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', width: '100%',
+                  border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
+                  borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
+                  color: showFavorites ? '#fff' : '#666', fontSize: '1rem', fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.2s',
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill={showFavorites ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Show Only Favorites {favorites.length > 0 && <span>({favorites.length})</span>}
+              </button>
+            </div>
+          )}
+          
+          <button onClick={() => setFilterModalOpen(false)} style={{
+            width: '100%', background: 'var(--primary-color)', color: '#fff', 
+            padding: '16px', borderRadius: '12px', fontWeight: 600, fontSize: '1rem', border: 'none'
+          }}>View {filteredProducts.length} Results</button>
         </div>
       </div>
     </div>

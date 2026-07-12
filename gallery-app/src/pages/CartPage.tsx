@@ -324,22 +324,22 @@ export default function CartPage() {
                         gap: isMobile ? '10px' : '16px',
                         borderBottom: '1px solid var(--bg-secondary)'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
                           {/* Checkbox */}
                           <input type="checkbox" checked={selected.has(`${item.productId}\v${item.variationId || ''}`)}
                             onChange={() => toggleProduct(item.productId, item.variationId)}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)', flexShrink: 0 }} />
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)', flexShrink: 0, marginTop: '4px' }} />
 
                           {/* Product Image */}
                           <Link to={`/product/${item.productId}`} style={{ flexShrink: 0 }}>
                             <img src={item.image} alt={item.productName}
-                              style={{ width: isMobile ? '70px' : '90px', height: isMobile ? '70px' : '90px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
+                              style={{ width: isMobile ? '80px' : '90px', height: isMobile ? '80px' : '90px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
                           </Link>
 
                           {/* Product Info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none' }}>
-                              <p style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.92rem', marginBottom: '4px', lineHeight: 1.4 }}>
+                              <p style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.92rem', marginBottom: '4px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                 {item.productName}
                               </p>
                             </Link>
@@ -347,6 +347,13 @@ export default function CartPage() {
                               <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</p>
                             )}
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
+                            
+                            {isMobile && (
+                              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-color)', marginTop: '4px' }}>
+                                {fmt(item.price)}
+                              </div>
+                            )}
+
                             {(() => {
                               const stock = getStock(item);
                               if (stock === 0) return <p style={{ fontSize: '0.78rem', color: '#d32f2f', fontWeight: 600, marginTop: 4 }}>Out of Stock</p>;
@@ -356,47 +363,49 @@ export default function CartPage() {
                           </div>
                         </div>
 
-                        {/* Right side: price, qty, subtotal, delete */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                          {/* Unit Price */}
-                          <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
-                          </div>
+                        {/* Right/Bottom side: price (desktop), qty, subtotal (desktop), delete */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-end', gap: '12px', flexShrink: 0, paddingLeft: isMobile ? '30px' : '0' }}>
+                          {!isMobile && (
+                            <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
+                              <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
+                            </div>
+                          )}
 
                           {/* Quantity Controls */}
                           <div style={{
-                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '10px',
-                            flexShrink: 0, overflow: 'hidden'
+                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '8px',
+                            flexShrink: 0, overflow: 'hidden', height: isMobile ? '28px' : '32px'
                           }}>
                             <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
-                              width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
+                              width: isMobile ? '28px' : '32px', height: '100%', border: 'none', background: 'var(--bg-secondary)',
                               cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s'
-                            }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>−</button>
-                            <span style={{ width: '40px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)', lineHeight: '32px' }}>
+                              alignItems: 'center', justifyContent: 'center'
+                            }}>−</button>
+                            <span style={{ width: isMobile ? '36px' : '40px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)' }}>
                               {item.qty}
                             </span>
                             <button onClick={() => handleQty(item.productId, item.variationId, 1)}
                               disabled={getStock(item) >= 0 && item.qty >= getStock(item)}
                               style={{
-                              width: '32px', height: '32px', border: 'none', background: 'var(--bg-secondary)',
+                              width: isMobile ? '28px' : '32px', height: '100%', border: 'none', background: 'var(--bg-secondary)',
                               cursor: getStock(item) >= 0 && item.qty >= getStock(item) ? 'not-allowed' : 'pointer',
                               fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
+                              alignItems: 'center', justifyContent: 'center',
                               opacity: getStock(item) >= 0 && item.qty >= getStock(item) ? 0.4 : 1,
-                            }} onMouseEnter={e => { if (!(getStock(item) >= 0 && item.qty >= getStock(item))) e.currentTarget.style.background = 'var(--bg-tertiary)'; }} onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-secondary)'}>+</button>
+                            }}>+</button>
                           </div>
 
-                          {/* Subtotal */}
-                          <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
-                          </div>
+                          {!isMobile && (
+                            <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
+                              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
+                            </div>
+                          )}
 
                           {/* Delete */}
                           <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
                             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0, transition: 'color 0.15s'
-                          }} onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e => e.currentTarget.style.color = 'var(--text-light)'}>
+                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0
+                          }}>
                             X
                           </button>
                         </div>
@@ -467,7 +476,7 @@ export default function CartPage() {
               </div>
 
               {/* Checkout Button */}
-              {(() => {
+              {!isMobile && (() => {
                 const anyOutOfStock = selectedItems.some(i => getStock(i) === 0);
                 return (
                   <button onClick={() => !anyOutOfStock && navigate('/checkout', { state: { deliveryOption } })} style={{
@@ -503,6 +512,34 @@ export default function CartPage() {
           </div>
         )}
       </div>
+
+      {/* Sticky Mobile Checkout Bar */}
+      {isMobile && items.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 40,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Total</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</div>
+          </div>
+          {(() => {
+            const anyOutOfStock = selectedItems.some(i => getStock(i) === 0);
+            return (
+              <button onClick={() => !anyOutOfStock && navigate('/checkout', { state: { deliveryOption } })} style={{
+                background: selectedItems.length > 0 && !anyOutOfStock ? 'var(--accent-color)' : 'var(--bg-tertiary)',
+                color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px',
+                fontWeight: 700, fontSize: '0.95rem', cursor: selectedItems.length > 0 && !anyOutOfStock ? 'pointer' : 'not-allowed',
+                boxShadow: selectedItems.length > 0 && !anyOutOfStock ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
+              }}>
+                {anyOutOfStock ? 'Invalid Items' : `Checkout (${itemCount})`}
+              </button>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

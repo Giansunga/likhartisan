@@ -63,6 +63,16 @@ export default function ProductDetailPage() {
     return { avg: total / allReviews.length, count: allReviews.length };
   }, [allReviews]);
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const [favorites] = useState<string[]>(() => loadFavorites());
 
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
@@ -426,20 +436,22 @@ export default function ProductDetailPage() {
                 );
               })()}
 
-              <div className="product-viewer-actions">
-                {(() => {
-                  const stock = selectedVariation?.stock ?? product?.stock ?? 0;
-                  const isOutOfStock = stock === 0;
-                  const needsVariation = variations.length > 0 && !selectedVariation;
-                  return (
-                    <>
-                      <button className="btn-product-buy" onClick={handleBuy} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Buy Now</button>
-                      <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
-                      <button className="btn-product-design" onClick={handleAddToCart} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Add to Cart</button>
-                    </>
-                  );
-                })()}
-              </div>
+              {!isMobile && (
+                <div className="product-viewer-actions">
+                  {(() => {
+                    const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+                    const isOutOfStock = stock === 0;
+                    const needsVariation = variations.length > 0 && !selectedVariation;
+                    return (
+                      <>
+                        <button className="btn-product-buy" onClick={handleBuy} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Buy Now</button>
+                        <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
+                        <button className="btn-product-design" onClick={handleAddToCart} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Add to Cart</button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </div>
 
@@ -609,6 +621,31 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      {isMobile && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
+          display: 'flex', gap: '10px', zIndex: 30,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
+          {(() => {
+            const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+            const isOutOfStock = stock === 0;
+            const needsVariation = variations.length > 0 && !selectedVariation;
+            const disabled = isOutOfStock || needsVariation;
+            return (
+              <>
+                <button onClick={handleAskClick} style={{ flex: '0 0 44px', height: '44px', borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                </button>
+                <button onClick={handleAddToCart} disabled={disabled} style={{ flex: 1, height: '44px', borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
+                <button onClick={handleBuy} disabled={disabled} style={{ flex: 1, height: '44px', borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

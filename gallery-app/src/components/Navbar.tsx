@@ -12,7 +12,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisanDashboard = location.pathname.startsWith('/artisan-dashboard');
-  const [mobileOpen, setMobileOpen] = useState(false);
+
   const [authOpen, setAuthOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -334,15 +334,7 @@ export default function Navbar() {
       ) : (
         <div className="max-w-[var(--container-width)] mx-auto h-full flex items-center justify-between" style={{ padding: isMobile ? '0 12px' : '0 24px' }}>
           {/* Mobile: hamburger left, logo center-left. Desktop: logo left */}
-          {isMobile && (
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle Navigation"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.6rem', color: '#3D2B1F', padding: '8px', flexShrink: 0 }}
-            >
-              {mobileOpen ? '×' : '\u2261'}
-            </button>
-          )}
+
 
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
             <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
@@ -472,41 +464,7 @@ export default function Navbar() {
         document.body
       )}
 
-      {/* Mobile Menu */}
-      {mobileOpen && isMobile && (
-        <div className="bg-white shadow-[var(--shadow-md)] absolute left-0 w-full overflow-y-auto" style={{ top: 'var(--nav-height)', maxHeight: 'calc(100vh - var(--nav-height))' }}>
-          {links.map(link => (
-            <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)}
-              className={`block text-center py-3.5 border-b border-cream-secondary text-[0.95rem] font-semibold ${
-                location.pathname === link.to ? 'text-accent' : 'text-brown-dark'
-              }`}>
-              {link.label}
-            </Link>
-          ))}
-          {loggedIn && (
-            <>
-              <div className="border-t border-cream-secondary mt-2 pt-2">
-                <Link to="/dashboard?tab=account" onClick={() => setMobileOpen(false)} className="block text-center py-3.5 border-b border-cream-secondary text-[0.95rem] font-semibold text-brown-dark">My Account</Link>
-                <Link to="/dashboard?tab=purchases" onClick={() => setMobileOpen(false)} className="block text-center py-3.5 border-b border-cream-secondary text-[0.95rem] font-semibold text-brown-dark">My Purchase</Link>
-                {userEmail && SHOP_EMAILS.includes(userEmail) && (
-                  <Link to="/artisan-dashboard" onClick={() => setMobileOpen(false)} className="block text-center py-3.5 border-b border-cream-secondary text-[0.95rem] font-semibold text-accent">Shop Dashboard</Link>
-                )}
-                <button onClick={() => { setMobileOpen(false); handleLogout(); }} className="block w-full text-center py-3.5 text-[0.95rem] font-semibold text-brown-dark bg-transparent border-none cursor-pointer">
-                  Sign Out
-                </button>
-              </div>
-            </>
-          )}
-          {!loggedIn && (
-            <div className="border-t border-cream-secondary mt-2 pt-2 pb-4 px-4">
-              <button onClick={() => { setMobileOpen(false); setAuthOpen(true); }}
-                className="w-full bg-primary text-white font-semibold py-3 rounded-[10px] text-[0.95rem]">
-                SIGN IN
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+
     </nav>
   );
 }
