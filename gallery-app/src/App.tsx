@@ -17,6 +17,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import LikhAIDock from './components/LikhAIDock';
 import AdminLayout from './components/admin/AdminLayout';
 
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<SignUpPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="update-password" element={<UpdatePasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="freeform" element={<FreeformPage />} />
             <Route path="artisan-dashboard" element={<ArtisanDashboardPage />} />
