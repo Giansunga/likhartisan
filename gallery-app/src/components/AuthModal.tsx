@@ -226,7 +226,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
         <div style={{
           flex: 1,
           display: 'flex', flexDirection: 'column',
-          padding: '40px 44px',
+          padding: isMobile ? '32px 24px' : '40px 44px',
           background: '#FAF8F5',
           overflowY: 'auto',
         }}>

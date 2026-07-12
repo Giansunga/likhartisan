@@ -855,6 +855,23 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                
+                {/* Horizontal Mobile Filter Tabs (Shopee Style) */}
+                <div className="shopee-tabs-container">
+                  <div className="dashboard-tabs shopee-style-tabs">
+                    {ORDER_TABS.map(tab => (
+                      <button 
+                        key={tab.key}
+                        className={`dashboard-tab ${activeTab === tab.key ? 'active' : ''}`}
+                        onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
+                        style={{ flex: '1 0 auto', textAlign: 'center', padding: '12px 16px' }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Orders */}
                 <div className="purchase-orders-list">
                   {loadingOrders ? (
