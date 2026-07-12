@@ -79,6 +79,7 @@ export default function UpdatePasswordPage() {
     setSuccess(true);
     setTimeout(() => {
       navigate('/');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' })), 100);
     }, 3000);
   }
 
@@ -126,7 +127,8 @@ export default function UpdatePasswordPage() {
               Your password has been changed successfully.<br/>You will be redirected shortly.
             </p>
             <button onClick={() => {
-              navigate('/signin');
+              navigate('/');
+              setTimeout(() => window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' })), 100);
             }} style={{ ...S.btn, background: '#16A34A' }} onMouseEnter={e => (e.currentTarget.style.background = '#15803D')} onMouseLeave={e => (e.currentTarget.style.background = '#16A34A')}>
               Go to Login
             </button>
@@ -202,7 +204,8 @@ export default function UpdatePasswordPage() {
 
             <p className="text-center text-brown-medium text-[0.85rem] mt-8 pt-6 border-t border-cream-secondary">
               <button type="button" onClick={() => {
-                navigate('/signin');
+                navigate('/');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' })), 100);
               }} className="text-primary hover:text-accent font-semibold transition-colors bg-transparent border-none cursor-pointer p-0" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'inherit', fontSize: 'inherit' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 Back to Login

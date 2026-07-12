@@ -101,8 +101,6 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       return () => {
         document.removeEventListener('keydown', handleEscape);
         document.removeEventListener('keydown', handleTab);
-        document.documentElement.style.overflow = '';
-        document.body.style.overflow = '';
       };
     } else {
       document.documentElement.style.overflow = '';
