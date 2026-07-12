@@ -2076,3 +2076,52 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ── Mobile Bottom Navigation ─────────────────────────────────── */
+.bottom-nav {
+  display: none;
+}
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #fff;
+    border-top: 1px solid #E8E0D8;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 3px;
+    text-decoration: none;
+    color: var(--text-light, #888);
+    font-size: 0.65rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    padding: 8px 0;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-item--active {
+    color: var(--accent-color, #823E0B);
+    font-weight: 700;
+  }
+}
+.layout-main {
+  padding-bottom: 0;
+}
+@media (max-width: 768px) {
+  .layout-main {
+    padding-bottom: 72px;
+  }
+}
