@@ -498,9 +498,9 @@ export default function CheckoutPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
             {/* Shipping Address */}
-            <div style={{ background: '#2A2A2A', borderRadius: '12px', padding: '20px' }}>
+            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E8E0D8', padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1E1E1E', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
                   </svg>
@@ -518,21 +518,21 @@ export default function CheckoutPage() {
                   </>}
                 </button>
               </div>
-              <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', marginBottom: '14px' }} />
+              <div style={{ height: '1px', background: '#E8E0D8', marginBottom: '14px' }} />
 
               {editAddress ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
                     <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                      placeholder="Full Name" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', background: '#3A3A3A', color: '#fff' }} />
+                      placeholder="Full Name" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem' }} />
                     <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                      placeholder="Phone Number" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', background: '#3A3A3A', color: '#fff' }} />
+                      placeholder="Phone Number" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem' }} />
                   </div>
                   <input value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })}
                     placeholder="#0 Street, Barangay, Municipality, Province"
-                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', boxSizing: 'border-box', background: '#3A3A3A', color: '#fff' }} />
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', boxSizing: 'border-box' }} />
                   <button onClick={saveAddress} disabled={saving} style={{
-                    alignSelf: 'flex-end', padding: '8px 20px', background: saving ? '#666' : 'var(--primary-color)', color: '#fff',
+                    alignSelf: 'flex-end', padding: '8px 20px', background: saving ? '#D4C8BB' : 'var(--primary-color)', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                   }}>{saving ? 'Saving...' : 'Save Address'}</button>
                 </div>
@@ -542,7 +542,7 @@ export default function CheckoutPage() {
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                   </svg>
                   <div>
-                    <div style={{ fontSize: '0.9rem', color: '#fff', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-dark)', marginBottom: '2px' }}>
                       <span style={{ fontWeight: 600 }}>{userName || 'No name set'}</span>
                       <span style={{ color: '#999', margin: '0 6px' }}>·</span>
                       <span>{userPhone || 'No phone set'}</span>
