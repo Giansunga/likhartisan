@@ -529,7 +529,7 @@ export default function CheckoutPage() {
                   }}>{saving ? 'Saving...' : 'Save Address'}</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '16px' }}>
                   <div style={{ display: 'flex', gap: '20px' }}>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Name</div>
