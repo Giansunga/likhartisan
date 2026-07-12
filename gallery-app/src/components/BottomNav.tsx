@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Grid3X3, Brush, User, LogIn } from 'lucide-react';
+import { Home, Grid3X3, Store, User, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function BottomNav() {
@@ -21,7 +21,7 @@ export default function BottomNav() {
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
     { name: 'Gallery', path: '/gallery', icon: Grid3X3 },
-    { name: 'Design', path: '/freeform', icon: Brush },
+    { name: 'Shops', path: '/shops', icon: Store },
     {
       name: 'Profile',
       path: user ? '/dashboard' : '',
