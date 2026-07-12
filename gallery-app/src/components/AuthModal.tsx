@@ -401,33 +401,36 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
             {/* ════ FORGOT PASSWORD ════ */}
             {view === 'forgot' && (
-              <motion.div key="forgot" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
+              <motion.div key="forgot" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}
+                style={showSuccess ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : {}}
+              >
                 {showSuccess ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div style={{ textAlign: 'center' }}>
                     <div style={{
-                      width: '56px', height: '56px', borderRadius: '50%',
+                      width: '64px', height: '64px', borderRadius: '50%',
                       background: '#F0FDF4', border: '2px solid #BBF7D0',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      margin: '0 auto 16px',
+                      margin: '0 auto 24px',
+                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.1)'
                     }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" style={{ width: '28px', height: '28px' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: '28px', height: '28px', marginLeft: '-2px' }}>
                         <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
                       </svg>
                     </div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1E1E1E', marginBottom: '8px' }}>Check your email</h2>
-                    <p style={{ fontSize: '0.88rem', color: '#666', marginBottom: '24px', lineHeight: 1.5 }}>
+                    <h2 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', fontFamily: 'var(--font-serif, Georgia, serif)', letterSpacing: '-0.02em' }}>Check your email</h2>
+                    <p style={{ fontSize: '0.92rem', color: '#7A6558', marginBottom: '32px', lineHeight: 1.6 }}>
                       We've sent a password reset link to<br />
-                      <strong style={{ color: '#1E1E1E' }}>{successEmail}</strong>
+                      <strong style={{ color: '#3D2B1F', fontWeight: 700, fontSize: '0.98rem' }}>{successEmail}</strong>
                     </p>
                     <button
                       onClick={onClose}
-                      style={S.btn}
+                      style={{ ...S.btn, padding: '14px', fontSize: '0.9rem', letterSpacing: '0.1em' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
                       onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
                     >
-                      Got it
+                      GOT IT
                     </button>
-                    <p style={{ fontSize: '0.78rem', color: '#999', marginTop: '16px' }}>
+                    <p style={{ fontSize: '0.82rem', color: '#A89688', marginTop: '24px', fontWeight: 500 }}>
                       Didn't receive it? Check your spam folder
                     </p>
                   </div>
