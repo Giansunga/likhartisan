@@ -101,15 +101,13 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       return () => {
         document.removeEventListener('keydown', handleEscape);
         document.removeEventListener('keydown', handleTab);
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
       };
     } else {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
     }
-    return () => {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    };
   }, [open, initialView, onClose]);
 
   async function handleSignIn(e: React.FormEvent) {
