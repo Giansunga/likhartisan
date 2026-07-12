@@ -14,37 +14,26 @@ export default function UpdatePasswordPage() {
   const [tokenError, setTokenError] = useState('');
 
   useEffect(() => {
-    let gotEvent = false;
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' && session) {
-        gotEvent = true;
         setTokenReady(true);
       }
     });
 
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token')) {
-      const timer = setTimeout(() => {
-        if (!gotEvent) {
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-              setTokenReady(true);
-            } else {
-              setTokenError('Reset link has expired or is invalid. Please request a new one.');
-            }
-          });
+    const timer = setTimeout(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setTokenReady(true);
+        } else {
+          setTokenError('Reset link has expired or is invalid. Please request a new one.');
         }
-      }, 2000);
+      });
+    }, 3000);
 
-      return () => {
-        subscription.unsubscribe();
-        clearTimeout(timer);
-      };
-    } else {
-      setTokenError('Invalid or missing reset link. Please request a new one.');
-      return () => subscription.unsubscribe();
-    }
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
