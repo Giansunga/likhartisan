@@ -484,16 +484,20 @@ export default function LikhAIDock() {
 
         @media (max-width: 480px) {
           .likhai-dock-window {
-            width: calc(100vw - 16px);
-            height: calc(100vh - 16px);
-            bottom: 8px;
-            right: 8px;
-            border-radius: 12px 12px 0 0;
+            width: 100vw;
+            height: 100vh;
+            max-height: 100vh;
+            bottom: 0;
+            right: 0;
+            border-radius: 0;
           }
           .likhai-dock-launcher {
-            bottom: 14px;
-            right: 14px;
+            bottom: calc(env(safe-area-inset-bottom) + 130px);
+            right: 16px;
             padding: 5px 10px 5px 5px;
+          }
+          .likhai-dock-input-area {
+            padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
           }
         }
       `}</style>

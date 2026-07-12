@@ -939,39 +939,19 @@ export default function DashboardPage() {
                             key={order.id}
                             ref={el => { orderCardRefs.current[order.id] = el; }}
                             onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                            style={{ cursor: 'pointer', marginBottom: '16px', scrollMarginTop: '100px' }}
+                            style={{ cursor: 'pointer', scrollMarginTop: '100px' }}
                           >
                           {/* ── Header ── */}
-                          <div className="order-card-header" style={{ marginBottom: isExpanded ? '8px' : undefined }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="1.8" style={{ width: 16, height: 16, flexShrink: 0 }}>
-                                  <path d="M4 10h16l-1 10H5L4 10z" />
-                                  <path d="M8 10V7a4 4 0 018 0v3" />
-                                </svg>
-                                <span className="order-shop-name">{order.shop}</span>
-                              </div>
-                              <div style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)', paddingLeft: '24px' }}>
-                                Order #{shortId}
-                                <span style={{ margin: '0 6px', color: '#ccc' }}>|</span>
-                                Placed on {placedDate}
-                              </div>
+                          <div className="order-card-header">
+                            <div className="order-shop-name">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="1.8" style={{ width: 16, height: 16, flexShrink: 0 }}>
+                                <path d="M4 10h16l-1 10H5L4 10z" />
+                                <path d="M8 10V7a4 4 0 018 0v3" />
+                              </svg>
+                              {order.shop}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.color, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
-                                {s.label}
-                              </span>
-                              <div
-                                style={{
-                                  width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                  transition: 'transform 0.25s ease',
-                                }}
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
-                              </div>
+                            <div className="order-status-badge">
+                              {s.label}
                             </div>
                           </div>
 
@@ -980,51 +960,58 @@ export default function DashboardPage() {
                             <div className="order-product-row" key={idx}>
                               <img src={item.image} alt={item.productName} className="order-product-img" />
                               <div className="order-product-info">
-                                <h5 style={{ fontFamily: 'var(--font-sans)' }}>{item.productName}</h5>
-                                {(item.dimensions || item.variation) && <p style={{ fontFamily: 'var(--font-sans)', color: '#888', fontSize: '0.78rem' }}>{displayVariation(item.dimensions || item.variation || '')}</p>}
-                                <p style={{ fontFamily: 'var(--font-sans)', color: '#888', fontSize: '0.78rem' }}>Qty: {item.qty}</p>
-                              </div>
-                              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#C1570D', flexShrink: 0, fontFamily: 'var(--font-sans)', textAlign: 'right' }}>
-                                {'\u20B1'}{(item.price * item.qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                <div className="order-product-title-row">
+                                  <h5>{item.productName}</h5>
+                                  <span className="order-product-qty">x{item.qty}</span>
+                                </div>
+                                {(item.dimensions || item.variation) && <div className="order-product-variation">{displayVariation(item.dimensions || item.variation || '')}</div>}
+                                <div className="order-product-price-row">
+                                  <span className="order-product-price-old">{'\u20B1'}{(item.price * 1.2).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  <span className="order-product-price">{'\u20B1'}{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
                               </div>
                             </div>
                           ))}
 
-                          {/* ── Footer: Total + Actions ── */}
-                          <div className="order-card-footer">
-                            <div style={{ flex: 1 }}>
-                              <div className="order-total" style={{ fontFamily: 'var(--font-sans)', textAlign: 'right', marginBottom: '10px' }}>
-                                Order Total: <span style={{ color: '#C1570D', fontWeight: 700, fontSize: '1.05rem' }}>{'\u20B1'}{order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                                <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Contact Seller</button>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  {isToPay && (
-                                    <>
-                                      <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handlePayNow(order); }}>Pay Now</button>
-                                      <button className="order-action-btn" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={e => { e.stopPropagation(); handleCancelOrder(order.id); }}>Cancel</button>
-                                    </>
-                                  )}
-                                  {isToReceive && (
-                                    <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setConfirmOrderId(order.id); }}>Order Received</button>
-                                  )}
-                                  {isToReceive && (
-                                    <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Return/Refund</button>
-                                  )}
-                                  {isCompleted && order.items.map((item, idx) => {
-                                    const hasReview = userReviews[item.productId];
-                                    return hasReview ? (
-                                      <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handleEditReview(order, idx); }}>Edit Review</button>
-                                    ) : (
-                                      <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setRateOrder(order); setRateItemIndex(idx); setRateSubmitted(false); }}>Rate</button>
-                                    );
-                                  })}
-                                  {isCompleted && (
-                                    <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/gallery'); }}>Buy Again</button>
-                                  )}
-                                </div>
-                              </div>
+                          {/* ── Order Total ── */}
+                          <div className="order-shopee-total">
+                            Total {order.items.length} item{order.items.length !== 1 ? 's' : ''}: <span>{'\u20B1'}{order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          </div>
+
+                          {/* ── Delivery Status Banner ── */}
+                          {(!isToPay && !isCancelled) && (
+                            <div className="order-shopee-status-banner">
+                              <span>{isCompleted ? 'Delivered on ' + placedDate : isToReceive ? 'Package is on the way' : isToShip ? 'Preparing your order' : 'Processing'}</span>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                             </div>
+                          )}
+
+                          {/* ── Footer Actions ── */}
+                          <div className="order-card-footer" onClick={e => e.stopPropagation()}>
+                            <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Contact Seller</button>
+                            {isToPay && (
+                              <>
+                                <button className="order-action-btn" onClick={e => { e.stopPropagation(); handleCancelOrder(order.id); }}>Cancel</button>
+                                <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handlePayNow(order); }}>Pay Now</button>
+                              </>
+                            )}
+                            {isToReceive && (
+                              <>
+                                <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Return/Refund</button>
+                                <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setConfirmOrderId(order.id); }}>Order Received</button>
+                              </>
+                            )}
+                            {isCompleted && order.items.map((item, idx) => {
+                              const hasReview = userReviews[item.productId];
+                              return hasReview ? (
+                                <button key={idx} className="order-action-btn" onClick={e => { e.stopPropagation(); handleEditReview(order, idx); }}>Edit Review</button>
+                              ) : (
+                                <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setRateOrder(order); setRateItemIndex(idx); setRateSubmitted(false); }}>Rate</button>
+                              );
+                            })}
+                            {isCompleted && (
+                              <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/gallery'); }}>Buy Again</button>
+                            )}
                           </div>
 
                           {/* ── Expanded Tracking Section ── */}
