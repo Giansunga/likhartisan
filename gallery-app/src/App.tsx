@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -59,9 +59,29 @@ function PageLoader() {
   );
 }
 
+function AuthRedirectInterceptor() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(window.location.search);
+
+    const hasTokens =
+      (hash && (hash.includes('access_token') || hash.includes('code='))) ||
+      (params.has('code') && params.has('state'));
+
+    if (hasTokens && window.location.pathname === '/') {
+      window.location.replace('/update-password' + window.location.hash + window.location.search);
+    }
+  }, [location]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthRedirectInterceptor />
       <LikhAIDock />
       <Suspense fallback={<PageLoader />}>
         <Routes>
