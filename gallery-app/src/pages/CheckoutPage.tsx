@@ -529,13 +529,20 @@ export default function CheckoutPage() {
                   }}>{saving ? 'Saving...' : 'Save Address'}</button>
                 </div>
               ) : (
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)' }}>{userName || 'No name set'}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{userPhone || 'No phone set'}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{userAddress || 'No address set'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Name</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-dark)' }}>{userName || 'No name set'}</div>
                   </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Phone</div>
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{userPhone || 'No phone set'}</div>
                   </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Address</div>
+                    <div style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{userAddress || 'No address set'}</div>
+                  </div>
+                </div>
                 )}
             </div>
 
