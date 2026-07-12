@@ -423,11 +423,11 @@ export default function GalleryPage() {
       {/* Filter Bottom Sheet (Mobile) */}
       <div className={`modal-overlay ${filterModalOpen && isMobile ? 'active' : ''}`} onClick={() => setFilterModalOpen(false)}>
         <div className="modal-box" style={{ 
-          position: 'absolute', bottom: 0, top: 'auto', left: 0, right: 0, margin: 0, maxWidth: '100%',
-          borderRadius: '24px 24px 0 0', transform: filterModalOpen ? 'translateY(0)' : 'translateY(100%)', 
-          transition: 'transform 0.3s ease-out' 
+          width: '90%', maxWidth: '420px', maxHeight: '85vh', overflowY: 'auto',
+          borderRadius: '20px', padding: '28px 24px',
+          transform: filterModalOpen ? 'translateY(0)' : 'translateY(20px)', 
+          transition: 'transform 0.3s ease-out, opacity 0.3s ease-out' 
         }} onClick={e => e.stopPropagation()}>
-          <div style={{ width: '40px', height: '4px', background: '#E8E0D8', borderRadius: '2px', margin: '0 auto 20px' }} />
           <h3 className="modal-title" style={{ textAlign: 'left', marginBottom: '20px', fontSize: '1.4rem' }}>Sort & Filter</h3>
           
           <div className="form-group" style={{ marginBottom: '24px' }}>

@@ -457,11 +457,12 @@ export default function ProductDetailPage() {
 
           {/* Full-width Shop Section */}
           <div style={{
-            marginTop: '40px', marginBottom: '40px', padding: '18px 28px',
+            marginTop: isMobile ? '24px' : '40px', marginBottom: isMobile ? '24px' : '40px', padding: isMobile ? '16px' : '18px 28px',
             background: '#fff', borderRadius: '16px', border: '1px solid #eee',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
+            display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? '16px' : '24px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', width: isMobile ? '100%' : undefined }}>
               <div style={{
                 width: '72px', height: '72px', borderRadius: '50%', overflow: 'hidden',
                 flexShrink: 0, border: '3px solid var(--primary-color)',
@@ -475,14 +476,15 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              <div>
+              <div style={{ flex: isMobile ? '1' : undefined, minWidth: isMobile ? 0 : undefined }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                   <button onClick={handleChatNow}
                     style={{
                       padding: '8px 20px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
                       border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
-                      display: 'flex', alignItems: 'center', gap: '6px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      flex: isMobile ? 1 : undefined,
                     }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
                       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
@@ -492,7 +494,8 @@ export default function ProductDetailPage() {
                   <Link to={`/shop/${product.shopId}`} style={{
                     padding: '8px 20px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
                     border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
-                    display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none',
+                    flex: isMobile ? 1 : undefined,
                   }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
                       <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -505,7 +508,8 @@ export default function ProductDetailPage() {
             </div>
 
             <div style={{
-              display: 'flex', gap: '24px', alignItems: 'center',
+              display: 'flex', gap: isMobile ? '32px' : '24px', alignItems: 'center',
+              justifyContent: isMobile ? 'center' : undefined, paddingTop: isMobile ? '4px' : undefined,
             }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '4px' }}>Products</div>
