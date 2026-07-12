@@ -41,6 +41,14 @@ export default function LikhAIDock() {
   }, [open]);
 
   useEffect(() => {
+    if (open && window.innerWidth <= 768) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [open]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
@@ -482,6 +490,12 @@ export default function LikhAIDock() {
           cursor: default;
         }
 
+        @media (max-width: 768px) {
+          .likhai-dock-launcher {
+            bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+            right: 16px;
+          }
+        }
         @media (max-width: 480px) {
           .likhai-dock-window {
             width: 100vw;
@@ -492,8 +506,6 @@ export default function LikhAIDock() {
             border-radius: 0;
           }
           .likhai-dock-launcher {
-            bottom: calc(env(safe-area-inset-bottom) + 130px);
-            right: 16px;
             padding: 5px 10px 5px 5px;
           }
           .likhai-dock-input-area {

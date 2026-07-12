@@ -228,93 +228,89 @@ export default function ShopPage() {
       {/* 1. BANNER + PROFILE SECTION */}
       <div style={{ background: 'var(--primary-color)' }}>
         {/* Banner Image - Full Width */}
-        <div style={{ width: '100%', height: '360px', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: isMobile ? '260px' : '360px', overflow: 'hidden', position: 'relative' }}>
           <img
             src={shop.banner || '/images/vases_collection.png'}
             alt={shop.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
+          {isMobile && (
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0))', pointerEvents: 'none' }} />
+          )}
         </div>
         
         {/* Profile Card - Overlapping Banner (constrained to container) */}
         <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', position: 'relative' }}>
-          <div style={{ 
-            position: 'absolute', 
-            bottom: '0', 
-            left: '0',
-            right: '0',
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '28px',
-            padding: '0 24px 28px 0'
-          }}>
-            {/* Profile Photo */}
-            <div style={{
-              width: '180px',
-              height: '180px',
-              borderRadius: '50%',
-              border: '5px solid #fff',
-              overflow: 'hidden',
-              background: '#E8E0D8',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-              flexShrink: 0,
-              marginTop: '60px'
-            }}>
-              {shop.image ? (
-                <img src={shop.image} alt={shop.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: 48, height: 48 }}>
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path d="M8 5l2-3h4l2 3" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-              )}
-            </div>
+          {isMobile ? (
+            /* ===== MOBILE: horizontal, left-aligned, floating over cover ===== */
+            <div style={{ color: '#fff', padding: '0 16px 16px', textAlign: 'left', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 1 }}>
+              {/* Logo + name/tagline row */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '14px' }}>
+                {/* Logo */}
+                <div style={{
+                  width: '96px',
+                  height: '96px',
+                  borderRadius: '50%',
+                  border: '4px solid #fff',
+                  overflow: 'hidden',
+                  background: '#E8E0D8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                  flexShrink: 0,
+                  marginTop: 0
+                }}>
+                  {shop.image ? (
+                    <img src={shop.image} alt={shop.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: 40, height: 40 }}>
+                      <rect x="3" y="5" width="18" height="16" rx="2" />
+                      <path d="M8 5l2-3h4l2 3" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                  )}
+                </div>
 
-            {/* Shop Info */}
-            <div style={{ color: '#fff', paddingTop: '20px' }}>
-              {/* Verified Badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                <span style={{ fontSize: '0.85rem', opacity: 0.9 }}>Verified Shop</span>
+                {/* Name + verified badge inline, tagline beneath */}
+                <div style={{ flex: 1, minWidth: 0, paddingBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, fontFamily: 'var(--font-serif)', lineHeight: 1.15 }}>{shop.name}</h1>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                      <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.82rem', lineHeight: 1.4, opacity: 0.85 }}>
+                    {shop.description || 'Timeless pottery pieces inspired by Filipino heritage. Handcrafted with passion, made to last for generations'}
+                  </p>
+                </div>
               </div>
 
-              {/* Shop Name */}
-              <h1 style={{ margin: '0 0 8px', fontSize: '2rem', fontWeight: 700, fontFamily: 'var(--font-serif)' }}>{shop.name}</h1>
-              
-              {/* Location */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '14px', height: '14px', opacity: 0.8 }}>
+              {/* Address line */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '14px' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '14px', height: '14px', opacity: 0.8, flexShrink: 0, marginTop: '2px' }}>
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                   <circle cx="12" cy="10" r="3"/>
                 </svg>
-                <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{info.address}</span>
+                <span style={{ fontSize: '0.85rem', opacity: 0.8, lineHeight: 1.4 }}>{info.address}</span>
               </div>
 
-              {/* Description */}
-              <p style={{ margin: '0 0 20px', fontSize: '0.92rem', lineHeight: 1.6, opacity: 0.9, maxWidth: '500px' }}>
-                {shop.description || 'Timeless pottery pieces inspired by Filipino heritage. Handcrafted with passion, made to last for generations'}
-              </p>
-
               {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button onClick={handleFollow} style={{ 
-                  padding: '12px 32px', 
-                  borderRadius: '8px', 
-                  border: 'none', 
-                  background: following ? '#fff' : 'var(--accent-color)', 
-                  color: following ? 'var(--accent-color)' : '#fff', 
-                  fontWeight: 600, 
-                  fontSize: '0.9rem', 
+              <div style={{ display: 'flex', flexDirection: 'row', gap: '12px', marginTop: '16px' }}>
+                <button onClick={handleFollow} style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: following ? '#fff' : 'var(--accent-color)',
+                  color: following ? 'var(--accent-color)' : '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '8px'
                 }}>
                   <svg viewBox="0 0 24 24" fill={following ? 'var(--accent-color)' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
@@ -322,55 +318,170 @@ export default function ShopPage() {
                   </svg>
                   {following ? 'Following' : 'Follow'}
                 </button>
-                <button onClick={handleMessageShop} style={{ 
-                  padding: '12px 32px', 
-                  borderRadius: '8px', 
-                  border: '2px solid #fff', 
-                  background: 'transparent', 
-                  color: '#fff', 
-                  fontWeight: 600, 
-                  fontSize: '0.9rem', 
+                <button onClick={handleMessageShop} style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '2px solid #fff',
+                  background: 'transparent',
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '8px'
                 }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
-                  Message Shop
+                  Message
                 </button>
               </div>
             </div>
-          </div>
+          ) : (
+            /* ===== DESKTOP (unchanged) ===== */
+            <div style={{ 
+              position: 'absolute', 
+              bottom: '0', 
+              left: '0',
+              right: '0',
+              display: 'flex', 
+              flexDirection: 'row',
+              alignItems: 'center', 
+              gap: '28px',
+              padding: '0 24px 28px 0',
+              textAlign: 'left'
+            }}>
+              {/* Profile Photo */}
+              <div style={{
+                width: '180px',
+                height: '180px',
+                borderRadius: '50%',
+                border: '5px solid #fff',
+                overflow: 'hidden',
+                background: '#E8E0D8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                flexShrink: 0,
+                marginTop: '60px'
+              }}>
+                {shop.image ? (
+                  <img src={shop.image} alt={shop.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: 48, height: 48 }}>
+                    <rect x="3" y="5" width="18" height="16" rx="2" />
+                    <path d="M8 5l2-3h4l2 3" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                )}
+              </div>
+
+              {/* Shop Info */}
+              <div style={{ color: '#fff', paddingTop: '20px', width: 'auto' }}>
+                {/* Verified Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', marginBottom: '8px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  <span style={{ fontSize: '0.85rem', opacity: 0.9 }}>Verified Shop</span>
+                </div>
+
+                {/* Shop Name */}
+                <h1 style={{ margin: '0 0 8px', fontSize: '2rem', fontWeight: 700, fontFamily: 'var(--font-serif)' }}>{shop.name}</h1>
+                
+                {/* Location */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', marginBottom: '12px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ width: '14px', height: '14px', opacity: 0.8 }}>
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>{info.address}</span>
+                </div>
+
+                {/* Description */}
+                <p style={{ margin: '0 0 20px', fontSize: '0.92rem', lineHeight: 1.6, opacity: 0.9, maxWidth: '500px' }}>
+                  {shop.description || 'Timeless pottery pieces inspired by Filipino heritage. Handcrafted with passion, made to last for generations'}
+                </p>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'row', gap: '12px', alignItems: 'center', width: 'auto' }}>
+                  <button onClick={handleFollow} style={{ 
+                    padding: '12px 32px', 
+                    borderRadius: '8px', 
+                    border: 'none', 
+                    background: following ? '#fff' : 'var(--accent-color)', 
+                    color: following ? 'var(--accent-color)' : '#fff', 
+                    fontWeight: 600, 
+                    fontSize: '0.9rem', 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: 'auto'
+                  }}>
+                    <svg viewBox="0 0 24 24" fill={following ? 'var(--accent-color)' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    {following ? 'Following' : 'Follow'}
+                  </button>
+                  <button onClick={handleMessageShop} style={{ 
+                    padding: '12px 32px', 
+                    borderRadius: '8px', 
+                    border: '2px solid #fff', 
+                    background: 'transparent', 
+                    color: '#fff', 
+                    fontWeight: 600, 
+                    fontSize: '0.9rem', 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: 'auto'
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Message Shop
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 3. STATS ROW */}
       <div style={{ background: '#fff', borderBottom: '1px solid #E8E0D8' }}>
-        <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: isMobile ? '16px 12px' : '28px 24px', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '20px' }}>
+        <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: isMobile ? '16px 8px' : '28px 24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: isMobile ? '8px' : '20px' }}>
           {/* Products */}
           <div style={{ textAlign: 'center', borderRight: '1px solid #E8E0D8' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{shopProducts.length}</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginTop: '4px' }}>Products</div>
+            <div style={{ fontSize: isMobile ? '1.05rem' : '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{shopProducts.length}</div>
+            <div style={{ fontSize: isMobile ? '0.62rem' : '0.82rem', color: 'var(--text-light)', marginTop: isMobile ? '2px' : '4px' }}>Products</div>
           </div>
           
           {/* Followers */}
           <div style={{ textAlign: 'center', borderRight: '1px solid #E8E0D8' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{followerCount}+</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginTop: '4px' }}>Followers</div>
+            <div style={{ fontSize: isMobile ? '1.05rem' : '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{followerCount}</div>
+            <div style={{ fontSize: isMobile ? '0.62rem' : '0.82rem', color: 'var(--text-light)', marginTop: isMobile ? '2px' : '4px' }}>Followers</div>
           </div>
           
           {/* Years in Business */}
           <div style={{ textAlign: 'center', borderRight: '1px solid #E8E0D8' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{info.years}+</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginTop: '4px' }}>Years in Business</div>
+            <div style={{ fontSize: isMobile ? '1.05rem' : '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>{info.years}</div>
+            <div style={{ fontSize: isMobile ? '0.62rem' : '0.82rem', color: 'var(--text-light)', marginTop: isMobile ? '2px' : '4px' }}>Years in Business</div>
           </div>
           
           {/* Handcrafted */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>100%</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginTop: '4px' }}>Handcrafted</div>
+            <div style={{ fontSize: isMobile ? '1.05rem' : '1.4rem', fontWeight: 700, color: 'var(--primary-color)', fontFamily: 'var(--font-serif)', lineHeight: 1 }}>100%</div>
+            <div style={{ fontSize: isMobile ? '0.62rem' : '0.82rem', color: 'var(--text-light)', marginTop: isMobile ? '2px' : '4px' }}>Handcrafted</div>
           </div>
         </div>
       </div>

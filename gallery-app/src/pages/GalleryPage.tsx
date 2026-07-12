@@ -155,17 +155,23 @@ export default function GalleryPage() {
   return (
     <div>
       {/* Banner */}
-      <header className="gallery-header-banner">
+      <header
+        className="gallery-header-banner"
+        style={isMobile ? { height: 'auto', minHeight: '240px', paddingTop: 'calc(var(--nav-height) + 28px)', paddingBottom: '28px' } : undefined}
+      >
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.png)' }} />
         <div className="gallery-banner-overlay" />
-        <div className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full">
+        <div
+          className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
+          style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
+        >
           <div className="gallery-banner-content">
-            <div className="breadcrumbs">
+            <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
               <Link to="/">Home</Link>
               <span className="separator">/</span>
               <span className="current">Gallery</span>
             </div>
-            <h1 className="gallery-title">Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.</h1>
+            <h1 className="gallery-title" style={isMobile ? { margin: 0, maxWidth: '34ch' } : undefined}>Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.</h1>
           </div>
         </div>
       </header>

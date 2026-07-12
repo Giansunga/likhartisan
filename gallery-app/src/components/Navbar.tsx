@@ -18,6 +18,7 @@ export default function Navbar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string; isReal?: boolean }[]>([]);
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -106,7 +107,9 @@ export default function Navbar() {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
         setShowProfileDropdown(false);
       }
-      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(t) &&
+          !(notifPanelRef.current && notifPanelRef.current.contains(t))) {
         setShowNotifications(false);
       }
     }
@@ -239,14 +242,16 @@ export default function Navbar() {
   const defaultNotifType = { bg: 'rgba(193,87,13,0.12)', color: 'var(--accent-color)', icon: 'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0' };
 
   const notifDropdown = (
-    <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 10px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 110px)', zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div ref={notifPanelRef} style={isMobile
+      ? { position: 'fixed', top: 'calc(var(--nav-height) + 8px)', left: '12px', right: '12px', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', maxWidth: 'none', maxHeight: 'calc(100dvh - var(--nav-height) - 90px)', zIndex: 2000, overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+      : { position: 'absolute', right: 0, top: 'calc(100% + 10px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 110px)', zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
           Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
         <button onClick={() => { setShowNotifications(false); if (!SHOP_EMAILS.includes(userEmail || '')) navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
       </div>
-      <div style={{ maxHeight: '360px', overflowY: 'auto', paddingBottom: '6px' }}>
+      <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
         {notifications.length === 0 ? (
           <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-light)' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
@@ -310,7 +315,7 @@ export default function Navbar() {
                   </span>
                 )}
               </button>
-              {showNotifications && notifDropdown}
+              {showNotifications && (isMobile ? createPortal(notifDropdown, document.body) : notifDropdown)}
             </div>
             <div ref={profileDropdownRef} className="relative">
               <button onClick={() => setShowProfileDropdown(!showProfileDropdown)} className="flex items-center gap-2 cursor-pointer" style={{ background: 'none', border: 'none' }}>
@@ -381,7 +386,7 @@ export default function Navbar() {
                       </span>
                     )}
                   </button>
-                  {showNotifications && notifDropdown}
+                  {showNotifications && (isMobile ? createPortal(notifDropdown, document.body) : notifDropdown)}
                 </div>
 
                 <Link to="/chat" aria-label="Chat" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>

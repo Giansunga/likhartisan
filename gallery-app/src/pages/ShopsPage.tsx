@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 interface Shop {
   id: string;
@@ -15,6 +16,7 @@ interface Shop {
 
 export default function ShopsPage() {
   const [shops, setShops] = useState<Shop[]>([]);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   useEffect(() => {
     async function fetchShops() {
@@ -26,18 +28,27 @@ export default function ShopsPage() {
 
   return (
     <div>
-      <header className="gallery-header-banner">
+      <header
+        className="gallery-header-banner"
+        style={isMobile ? { height: 'auto', minHeight: '240px', paddingTop: 'calc(var(--nav-height) + 28px)', paddingBottom: '28px' } : undefined}
+      >
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/shops-hero.PNG)' }} />
         <div className="gallery-banner-overlay" />
-        <div className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full">
+        <div
+          className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
+          style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
+        >
           <div className="gallery-banner-content">
-            <div className="breadcrumbs">
+            <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
               <Link to="/">Home</Link>
               <span className="separator">/</span>
               <span className="current">Shops</span>
             </div>
-            <h1 className="gallery-title">Explore Our Shops</h1>
-            <p className="text-[1.2rem] text-white/85 mt-4 max-w-[600px] leading-[1.6]">
+            <h1 className="gallery-title" style={isMobile ? { margin: 0 } : undefined}>Explore Our Shops</h1>
+            <p
+              className="text-[1.2rem] text-white/85 mt-4 max-w-[600px] leading-[1.6]"
+              style={isMobile ? { marginTop: '18px', maxWidth: '34ch' } : undefined}
+            >
               Discover the local pottery shops of Santo Tomas and their incredible creations.
             </p>
           </div>
@@ -82,6 +93,7 @@ export default function ShopsPage() {
       </section>
 
       {/* Can't Find What You're Looking For? Banner */}
+      {!isMobile && (
       <section style={{ padding: '20px 24px 40px' }}>
         <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', borderRadius: '16px', overflow: 'hidden' }}>
           <img
@@ -91,6 +103,7 @@ export default function ShopsPage() {
           />
         </div>
       </section>
+      )}
     </div>
   );
 }

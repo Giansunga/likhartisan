@@ -45,7 +45,6 @@ const ORDER_TABS = [
   { key: 'to-receive', label: 'To Receive' },
   { key: 'completed', label: 'Completed' },
   { key: 'return-refund', label: 'Return Refund' },
-  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const SIDEBAR_ITEMS = [
@@ -539,10 +538,11 @@ export default function DashboardPage() {
     <div className="dashboard-page" style={{ minHeight: '100vh' }}>
       <div className="dashboard-wrapper" style={{ paddingTop: '12px', paddingBottom: '60px' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="dashboard-layout" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '240px 1fr', gap: isMobile ? '16px' : '30px', alignItems: 'flex-start' }}>
+          <div className="dashboard-layout" style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '240px minmax(0, 1fr)', gap: isMobile ? '16px' : '30px', alignItems: 'flex-start' }}>
 
-            {/* Sidebar */}
-            <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: isMobile ? '16px' : '28px 20px', position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 12px)' }}>
+            {/* Sidebar (hidden on mobile) */}
+            {!isMobile && (
+            <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: '28px 20px', position: 'sticky', top: 'calc(var(--nav-height) + 12px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
                   {profileImage ? (
@@ -617,6 +617,7 @@ export default function DashboardPage() {
                 ))}
               </nav>
             </aside>
+            )}
 
             {/* Main Content */}
             {activePanel === 'account' ? (
@@ -855,6 +856,35 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                {/* Mobile-only status tabs (sidebar hidden on mobile) */}
+                {isMobile && (
+                  <div style={{ display: 'flex', gap: '4px', padding: '4px 0 14px', marginBottom: '4px' }}>
+                    {ORDER_TABS.map(tab => (
+                      <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
+                        style={{
+                          flex: '1 1 0',
+                          minWidth: 0,
+                          height: '40px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: activeTab === tab.key ? '1.5px solid var(--accent-color)' : '1.5px solid #E8E0D8',
+                          background: activeTab === tab.key ? 'var(--accent-color)' : '#fff',
+                          color: activeTab === tab.key ? '#fff' : '#666',
+                          borderRadius: '999px',
+                          padding: '0 4px',
+                          fontSize: '0.62rem',
+                          fontWeight: activeTab === tab.key ? 600 : 500,
+                          fontFamily: 'var(--font-sans)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          lineHeight: 1.1,
+                        }}>
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* Orders */}
                 <div className="purchase-orders-list">
                   {loadingOrders ? (
@@ -956,11 +986,18 @@ export default function DashboardPage() {
                                 <span style={{ margin: '0 6px', color: '#ccc' }}>|</span>
                                 Placed on {placedDate}
                               </div>
+                              {isMobile && (
+                                <span style={{ display: 'inline-flex', alignSelf: 'flex-start', marginTop: '6px', marginLeft: '24px', padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
+                                  {s.label}
+                                </span>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.color, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
-                                {s.label}
-                              </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', alignSelf: isMobile ? 'flex-start' : 'center' }}>
+                              {!isMobile && (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.color, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
+                                  {s.label}
+                                </span>
+                              )}
                               <div
                                 style={{
                                   width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -996,33 +1033,31 @@ export default function DashboardPage() {
                               <div className="order-total" style={{ fontFamily: 'var(--font-sans)', textAlign: 'right', marginBottom: '10px' }}>
                                 Order Total: <span style={{ color: '#C1570D', fontWeight: 700, fontSize: '1.05rem' }}>{'\u20B1'}{order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                               </div>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                                <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Contact Seller</button>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  {isToPay && (
-                                    <>
-                                      <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handlePayNow(order); }}>Pay Now</button>
-                                      <button className="order-action-btn" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={e => { e.stopPropagation(); handleCancelOrder(order.id); }}>Cancel</button>
-                                    </>
-                                  )}
-                                  {isToReceive && (
-                                    <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setConfirmOrderId(order.id); }}>Order Received</button>
-                                  )}
-                                  {isToReceive && (
-                                    <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Return/Refund</button>
-                                  )}
-                                  {isCompleted && order.items.map((item, idx) => {
-                                    const hasReview = userReviews[item.productId];
-                                    return hasReview ? (
-                                      <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handleEditReview(order, idx); }}>Edit Review</button>
-                                    ) : (
-                                      <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setRateOrder(order); setRateItemIndex(idx); setRateSubmitted(false); }}>Rate</button>
-                                    );
-                                  })}
-                                  {isCompleted && (
-                                    <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/gallery'); }}>Buy Again</button>
-                                  )}
-                                </div>
+                              <div className="order-actions">
+                                <button className="order-action-btn order-contact-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Contact Seller</button>
+                                {isToPay && (
+                                  <>
+                                    <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handlePayNow(order); }}>Pay Now</button>
+                                    <button className="order-action-btn" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={e => { e.stopPropagation(); handleCancelOrder(order.id); }}>Cancel</button>
+                                  </>
+                                )}
+                                {isToReceive && (
+                                  <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setConfirmOrderId(order.id); }}>Order Received</button>
+                                )}
+                                {isToReceive && (
+                                  <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Return/Refund</button>
+                                )}
+                                {isCompleted && order.items.map((item, idx) => {
+                                  const hasReview = userReviews[item.productId];
+                                  return hasReview ? (
+                                    <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handleEditReview(order, idx); }}>Edit Review</button>
+                                  ) : (
+                                    <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setRateOrder(order); setRateItemIndex(idx); setRateSubmitted(false); }}>Rate</button>
+                                  );
+                                })}
+                                {isCompleted && (
+                                  <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/gallery'); }}>Buy Again</button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1036,7 +1071,8 @@ export default function DashboardPage() {
                           }}>
                             <div style={{ borderTop: '1px solid #E8E0D8', marginTop: '14px', paddingTop: '20px' }} onClick={e => e.stopPropagation()}>
 
-                              {/* ── Horizontal Stepper ── */}
+                              {/* ── Horizontal Stepper (hidden on mobile) ── */}
+                              {!isMobile && (
                               <div style={{ position: 'relative', marginBottom: '20px', padding: '0 8px' }}>
                                 {/* Background track */}
                                 <div style={{ position: 'absolute', top: '14px', left: '8px', right: '8px', height: '3px', background: '#E8E0D8', borderRadius: '2px', zIndex: 0 }} />
@@ -1083,11 +1119,12 @@ export default function DashboardPage() {
                                         </span>
                                       </div>
                                     );
-                                  })}
-                                </div>
-                              </div>
+                                   })}
+                                 </div>
+                               </div>
+                              )}
 
-                              {/* ── Current Status Pill ── */}
+                               {/* ── Current Status Pill ── */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', padding: '10px 14px', background: '#FFF7F0', border: '1px solid #F5D9C0', borderRadius: '10px' }}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="2" style={{ width: 16, height: 16, flexShrink: 0 }}>
                                   <rect x="2" y="7" width="15" height="13" rx="2"/><path d="M17 11h3l2 2v5h-5v-7z"/><circle cx="6.5" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/>

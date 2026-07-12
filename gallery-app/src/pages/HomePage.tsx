@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const FreeformViewer = lazy(() => import('../components/freeform/FreeformViewer'));
 
@@ -19,6 +20,7 @@ interface HomeArtisan {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [counted, setCounted] = useState(false);
   const { user, loading } = useAuth();
   const authChecked = !loading;
@@ -322,8 +324,9 @@ export default function HomePage() {
               </p>
               <div className="flex gap-4 mb-10">
                 <button
-                  onClick={goToFreeform}
-                  className="flex items-center gap-2.5 bg-[#823E0B] text-white font-semibold text-[0.95rem] py-3.5 px-8 rounded-[10px] shadow-[0_2px_10px_rgba(130,62,11,0.25)] hover:bg-[#6B3209] hover:shadow-[0_4px_16px_rgba(130,62,11,0.35)] transition-all cursor-pointer"
+                  onClick={isMobile ? undefined : goToFreeform}
+                  disabled={isMobile}
+                  className={`flex items-center gap-2.5 text-white font-semibold text-[0.95rem] py-3.5 px-8 rounded-[10px] transition-all ${isMobile ? 'bg-[#B9A79A] cursor-not-allowed opacity-70' : 'bg-[#823E0B] shadow-[0_2px_10px_rgba(130,62,11,0.25)] hover:bg-[#6B3209] hover:shadow-[0_4px_16px_rgba(130,62,11,0.35)] cursor-pointer'}`}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
                     <path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" />
@@ -340,6 +343,11 @@ export default function HomePage() {
                   Learn More
                 </button>
               </div>
+              {isMobile && (
+                <p className="text-[0.8rem] text-[#8A7A6E] font-medium -mt-7 mb-10 text-center">
+                  Available for Desktop Only
+                </p>
+              )}
               <div className="flex gap-6 flex-wrap">
                 {[
                   { icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', label: 'Real-time 3D Preview' },
@@ -423,9 +431,10 @@ export default function HomePage() {
                   </div>
 
                   <button
-                    onClick={goToFreeform}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-[0.82rem] font-semibold transition-all hover:scale-[1.02] cursor-pointer flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg, #823E0B, #A05219)', boxShadow: '0 4px 16px rgba(130,62,11,0.3)' }}
+                    onClick={isMobile ? undefined : goToFreeform}
+                    disabled={isMobile}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-[0.82rem] font-semibold transition-all flex-shrink-0 ${isMobile ? 'cursor-not-allowed opacity-70' : 'hover:scale-[1.02] cursor-pointer'}`}
+                    style={isMobile ? { background: '#B9A79A' } : { background: 'linear-gradient(135deg, #823E0B, #A05219)', boxShadow: '0 4px 16px rgba(130,62,11,0.3)' }}
                   >
                     Try it live
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px' }}>
@@ -510,9 +519,9 @@ export default function HomePage() {
                 className="relative h-[275px] rounded-[15px] overflow-hidden shadow-[var(--shadow-md)] group hover:-translate-y-1 hover:shadow-[var(--shadow-lg)] transition-all duration-[0.6s]">
                 <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-black/70 z-[2] transition-all group-hover:from-black/[0.05] group-hover:to-black/85" />
                 <img src={e.img} alt="" className="w-full h-full object-cover transition-all duration-[0.6s] group-hover:scale-105" />
-                <div className="absolute bottom-[30px] right-10 flex items-center gap-5 z-[5] text-white">
-                  <h3 className="text-3xl font-semibold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">{e.title}</h3>
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-all group-hover:scale-110">
+                <div className={`absolute z-[5] text-white flex items-center ${isMobile ? 'bottom-5 left-5 right-5 gap-3' : 'bottom-[30px] right-10 gap-5'}`}>
+                  <h3 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-semibold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]`}>{e.title}</h3>
+                  <div className={`${isMobile ? 'w-9 h-9' : 'w-12 h-12'} rounded-full flex items-center justify-center text-white transition-all group-hover:scale-110 flex-shrink-0`}>
                     <svg viewBox="0 0 51 38" fill="none" className="w-8 h-6 stroke-current stroke-[4px] transition-all group-hover:translate-x-1.5">
                       <path d="M0 19H45M45 19L30 4M45 19L30 34" strokeLinecap="round" />
                     </svg>
@@ -580,19 +589,19 @@ export default function HomePage() {
       {/* ── SUPPORT LOCAL BANNER ── */}
       <section style={{ padding: '0 0 60px', background: 'var(--bg-primary)' }}>
         <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', borderRadius: '16px', overflow: 'hidden', background: '#FAF5EF', minHeight: '220px' }}>
-            <div style={{ flex: '0 0 40%', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', aspectRatio: isMobile ? '1 / 1' : undefined, borderRadius: '16px', overflow: 'hidden', background: '#FAF5EF', minHeight: isMobile ? undefined : '220px' }}>
+            <div style={{ flex: isMobile ? '0 0 50%' : '0 0 40%', position: 'relative', overflow: 'hidden' }}>
               <img src="/images/pottery-collage.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-            <div style={{ flex: 1, padding: '40px 48px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '12px' }}>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
+            <div style={{ flex: 1, padding: isMobile ? '20px' : '40px 48px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '12px' }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: isMobile ? '1.3rem' : '1.8rem', fontWeight: 700, margin: 0, lineHeight: 1.3 }}>
                 <span style={{ color: 'var(--accent-color)' }}>Support Local.</span>{' '}
                 <span style={{ color: '#333' }}>Preserve Tradition</span>
               </h2>
-              <p style={{ fontSize: '0.95rem', color: '#666', lineHeight: 1.6, margin: 0, fontFamily: 'var(--font-sans)' }}>
+              <p style={{ fontSize: isMobile ? '0.85rem' : '0.95rem', color: '#666', lineHeight: 1.6, margin: 0, fontFamily: 'var(--font-sans)', maxWidth: isMobile ? '34ch' : undefined }}>
                 Every purchase helps our local artisans continue their craft and pass it to the future generation.
               </p>
-              <Link to="/shops" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px', padding: '10px 28px', background: 'var(--primary-color)', color: '#fff', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'var(--font-sans)', textDecoration: 'none', alignSelf: 'flex-start', transition: 'opacity 0.15s' }}
+              <Link to="/shops" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: isMobile ? '-12px' : '8px', padding: isMobile ? '8px 20px' : '10px 28px', background: 'var(--primary-color)', color: '#fff', borderRadius: '8px', fontSize: isMobile ? '0.82rem' : '0.9rem', fontWeight: 600, fontFamily: 'var(--font-sans)', textDecoration: 'none', alignSelf: isMobile ? 'center' : 'flex-start', transition: 'opacity 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
@@ -608,7 +617,7 @@ export default function HomePage() {
 
       {/* ── CTA SECTION (hidden for logged-in users) ── */}
       {authChecked && !user && (
-        <section className="relative py-[120px] bg-black text-center overflow-hidden">
+        <section className="relative py-[120px] max-md:py-16 bg-black text-center overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center blur-[2px] brightness-[0.4] scale-105"
             style={{ backgroundImage: 'url(/images/vases_collection.png)' }} />
           <div className="relative z-[5] max-w-[900px] mx-auto px-6 text-cream-secondary flex flex-col items-center gap-5">

@@ -79,6 +79,13 @@ export default function ChatPage() {
   useEffect(() => { init(); }, [user]);
 
   useEffect(() => {
+    if (!isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobile]);
+
+  useEffect(() => {
     if (selectedConv) {
       fetchMessages(selectedConv.id);
       fetchShop(selectedConv.shop_id);

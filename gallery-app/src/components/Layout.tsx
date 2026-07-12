@@ -32,6 +32,7 @@ export default function Layout() {
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisan = location.pathname.startsWith('/artisan-dashboard');
   const isFreeform = location.pathname === '/freeform';
+  const isChat = location.pathname === '/chat';
   const hideNavPadding = isAdmin || isArtisan || isFreeform;
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function Layout() {
           Skip to content
         </a>
         <Navbar />
-        <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} layout-main`}>
+        <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} layout-main${isChat ? ' layout-main--chat' : ''}`}>
           <Outlet />
         </main>
         {!isFreeform && <Footer />}

@@ -6,10 +6,7 @@ export default function BottomNav() {
   const location = useLocation();
   const { user } = useAuth();
 
-  if (
-    location.pathname.startsWith('/artisan-dashboard') ||
-    location.pathname.startsWith('/chat')
-  ) {
+  if (location.pathname.startsWith('/artisan-dashboard')) {
     return null;
   }
 
