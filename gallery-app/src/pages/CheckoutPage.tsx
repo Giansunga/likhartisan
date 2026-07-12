@@ -529,15 +529,7 @@ export default function CheckoutPage() {
                   }}>{saving ? 'Saving...' : 'Save Address'}</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{
-                    width: '48px', height: '48px', borderRadius: '50%', background: '#D9D9D9',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.5" style={{ width: '24px', height: '24px' }}>
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                    </svg>
-                  </div>
+                <div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)' }}>{userName || 'No name set'}</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{userPhone || 'No phone set'}</div>
