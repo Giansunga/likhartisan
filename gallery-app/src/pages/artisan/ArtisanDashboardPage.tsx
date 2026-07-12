@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component, type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
@@ -67,6 +67,7 @@ interface Product {
 }
 
 export default function ArtisanDashboardPage() {
+  const navigate = useNavigate();
   const [activePanel, setActivePanel] = useState<Panel>('overview');
   const [products, setProducts] = useState<Product[]>([]);
   const [productPrices, setProductPrices] = useState<Record<string, number>>({});
@@ -280,7 +281,7 @@ export default function ArtisanDashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--text-light)', fontSize: '0.95rem' }}>Loading shop data...</div>
           ) : (
             <PanelErrorBoundary resetKey={activePanel}>
-              {activePanel === 'overview'  && <OverviewPanel products={products} productPrices={productPrices} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} setActivePanel={setActivePanel} />}
+              {activePanel === 'overview'  && <OverviewPanel products={products} productPrices={productPrices} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} setActivePanel={setActivePanel} navigate={navigate} />}
               {activePanel === 'listings'  && <ListingsPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} loadingProducts={loadingProducts} />}
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
@@ -295,8 +296,44 @@ export default function ArtisanDashboardPage() {
   );
 }
 
-function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrders, setLoadingOrders, setActivePanel }: { products: Product[]; productPrices: Record<string, number>; shopId: string | null; shopName?: string; loadingOrders: boolean; setLoadingOrders: (v: boolean) => void; setActivePanel: (v: Panel) => void }) {
+function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrders, setLoadingOrders, setActivePanel, navigate }: { products: Product[]; productPrices: Record<string, number>; shopId: string | null; shopName?: string; loadingOrders: boolean; setLoadingOrders: (v: boolean) => void; setActivePanel: (v: Panel) => void; navigate: (path: string) => void }) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>(() => {
+    const n = new Date();
+    return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: n };
+  });
+  const [rangeLabel, setRangeLabel] = useState('This Month');
+
+  const DATE_PRESETS = [
+    { key: 'week', label: 'This Week' },
+    { key: 'month', label: 'This Month' },
+    { key: '3month', label: 'Last 3 Months' },
+    { key: 'year', label: 'This Year' },
+    { key: 'all', label: 'All Time' },
+  ];
+
+  function toInputDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function applyPreset(key: string) {
+    const n = new Date();
+    const startOfToday = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    let start: Date;
+    switch (key) {
+      case 'week': start = new Date(startOfToday); start.setDate(start.getDate() - 6); break;
+      case 'month': start = new Date(n.getFullYear(), n.getMonth(), 1); break;
+      case '3month': start = new Date(n.getFullYear(), n.getMonth() - 2, 1); break;
+      case 'year': start = new Date(n.getFullYear(), 0, 1); break;
+      default: start = new Date(2000, 0, 1); break; // all time
+    }
+    const label = DATE_PRESETS.find(p => p.key === key)?.label || 'Custom';
+    setDateRange({ start, end: n });
+    setRangeLabel(label);
+  }
 
   useEffect(() => {
     if (!shopId) { setLoadingOrders(false); return; }
@@ -342,27 +379,34 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
 
   const safeProducts = Array.isArray(products) ? products : [];
   const safeOrders = Array.isArray(orders) ? orders : [];
-  const paidOrders = safeOrders.filter(o => o && (o.status === 'paid' || o.status === 'completed'));
+  const rStart = dateRange.start.getTime();
+  const rEnd = dateRange.end.getTime() + (24 * 60 * 60 * 1000 - 1); // include end day
+  const inRange = (o: any) => {
+    try {
+      const t = new Date(o.created_at).getTime();
+      return t >= rStart && t <= rEnd;
+    } catch { return false; }
+  };
+  const paidOrders = safeOrders.filter(o => o && (o.status === 'paid' || o.status === 'completed') && inRange(o));
   const totalRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
   const totalOrders = paidOrders.length;
   const totalViews = safeProducts.reduce((sum, p) => sum + (Number(p?.views) || 0), 0);
   const now = new Date();
-  const thisMonth = paidOrders.filter(o => {
+
+  // Period-over-period comparison: prior window of equal length immediately before the range.
+  const rangeDays = Math.max(1, Math.round((rEnd - rStart) / (24 * 60 * 60 * 1000)));
+  const prevEnd = rStart - 1;
+  const prevStart = prevEnd - rangeDays * 24 * 60 * 60 * 1000;
+  const inPrev = (o: any) => {
     try {
-      const d = new Date(o.created_at);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      const t = new Date(o.created_at).getTime();
+      return t >= prevStart && t <= prevEnd;
     } catch { return false; }
-  });
-  const monthlyRevenue = thisMonth.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonthOrders = paidOrders.filter(o => {
-    try {
-      const d = new Date(o.created_at);
-      return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear();
-    } catch { return false; }
-  });
-  const prevMonthRevenue = prevMonthOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-  const revenueChange = prevMonthRevenue > 0 ? ((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1) : '0';
+  };
+  const prevPaid = safeOrders.filter((o: any) => o && (o.status === 'paid' || o.status === 'completed') && inPrev(o));
+  const prevRevenue = prevPaid.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const revenueChange = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : '0';
+
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyData = monthNames.map((name, i) => {
     const monthOrders = paidOrders.filter(o => {
@@ -385,20 +429,20 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
 
   const statCards = [
     {
-      label: 'Total Revenue', value: `₱${totalRevenue.toLocaleString()}`,
-      sub: 'All time', icon: <Wallet size={20} />, color: '#823E0B',
+      label: `Revenue (${rangeLabel})`, value: `₱${totalRevenue.toLocaleString()}`,
+      sub: 'Selected period', icon: <Wallet size={20} />, color: '#823E0B',
       bg: '#FDF5EE', trend: null,
     },
     {
-      label: 'This Month', value: `₱${monthlyRevenue.toLocaleString()}`,
-      sub: `vs last month`, icon: Number(revenueChange) >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />,
+      label: `vs Previous Period`, value: `${Number(revenueChange) >= 0 ? '+' : ''}${revenueChange}%`,
+      sub: `prev ${rangeDays}d`, icon: Number(revenueChange) >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />,
       color: Number(revenueChange) >= 0 ? '#2E7D32' : '#C62828',
       bg: Number(revenueChange) >= 0 ? '#F0FDF4' : '#FEF2F2',
       trend: `${Number(revenueChange) >= 0 ? '+' : ''}${revenueChange}%`,
       trendPositive: Number(revenueChange) >= 0,
     },
     {
-      label: 'Total Orders', value: String(totalOrders),
+      label: 'Orders (period)', value: String(totalOrders),
       sub: 'Paid orders', icon: <ShoppingCart size={20} />, color: '#1565C0',
       bg: '#EFF6FF', trend: null,
     },
@@ -411,6 +455,31 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
 
   return (
     <div>
+      {/* DATE RANGE PICKER */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '24px', background: '#fff', border: '1px solid #EDE8E2', borderRadius: '16px', padding: '16px 20px', boxShadow: '0 2px 8px rgba(130,62,11,0.06)' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {DATE_PRESETS.map(p => (
+            <button key={p.key} onClick={() => applyPreset(p.key)}
+              style={{
+                padding: '7px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                border: rangeLabel === p.label ? '1.5px solid #823E0B' : '1px solid #EDE8E2',
+                background: rangeLabel === p.label ? '#823E0B' : '#fff',
+                color: rangeLabel === p.label ? '#fff' : '#A89688',
+                transition: 'all 0.15s',
+              }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+          <input type="date" value={toInputDate(dateRange.start)} max={toInputDate(dateRange.end)} onChange={e => { const v = e.target.value ? new Date(e.target.value) : dateRange.start; setDateRange(pr => ({ ...pr, start: v })); setRangeLabel('Custom'); }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #EDE8E2', fontSize: '0.78rem', fontFamily: 'inherit', color: '#3D2B1F' }} />
+          <span style={{ color: '#A89688', fontSize: '0.78rem' }}>to</span>
+          <input type="date" value={toInputDate(dateRange.end)} min={toInputDate(dateRange.start)} onChange={e => { const v = e.target.value ? new Date(e.target.value) : dateRange.end; setDateRange(pr => ({ ...pr, end: v })); setRangeLabel('Custom'); }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #EDE8E2', fontSize: '0.78rem', fontFamily: 'inherit', color: '#3D2B1F' }} />
+        </div>
+      </div>
+
       {/* STAT CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '18px', marginBottom: '28px' }}>
         {statCards.map((stat, i) => (
@@ -459,7 +528,11 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '2px' }}>Monthly Revenue</h3>
-            <p style={{ fontSize: '0.8rem', color: '#A89688' }}>{now.getFullYear()} overview</p>
+            <p style={{ fontSize: '0.8rem', color: '#A89688' }}>
+              {rangeLabel === 'This Year' || rangeLabel === 'All Time'
+                ? `${now.getFullYear()} overview`
+                : `${toInputDate(dateRange.start)} — ${toInputDate(dateRange.end)}`}
+            </p>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px', paddingBottom: '28px', position: 'relative' }}>
@@ -508,9 +581,15 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
             </button>
           </div>
           {topProducts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#A89688' }}>
-              <ShoppingBag size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ fontSize: '0.85rem' }}>No paid orders yet.</p>
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <ShoppingBag size={26} color="#823E0B" />
+              </div>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-dark)', fontWeight: 600, marginBottom: '4px' }}>No sales yet</p>
+              <p style={{ fontSize: '0.82rem', color: '#A89688', marginBottom: '16px' }}>Your top products will appear here once you start selling.</p>
+              <button onClick={() => setActivePanel('listings')} style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, background: '#823E0B', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                Manage Listings
+              </button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -572,9 +651,15 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
             </button>
           </div>
           {products.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#A89688' }}>
-              <Package size={32} style={{ opacity: 0.3, marginBottom: '8px' }} />
-              <p style={{ fontSize: '0.85rem' }}>No listings yet.</p>
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <Package size={26} color="#823E0B" />
+              </div>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-dark)', fontWeight: 600, marginBottom: '4px' }}>No listings yet</p>
+              <p style={{ fontSize: '0.82rem', color: '#A89688', marginBottom: '16px' }}>Showcase your crafts to thousands of buyers.</p>
+              <button onClick={() => navigate('/admin')} style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, background: '#823E0B', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                Add Your First Product
+              </button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1304,7 +1389,15 @@ return (
                     </tr>
                   ))
               ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: '48px 18px', textAlign: 'center', color: 'var(--text-light)' }}>No orders found.</td></tr>
+              <tr><td colSpan={6} style={{ padding: '48px 18px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                    <ShoppingBag size={26} color="#823E0B" />
+                  </div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-dark)', fontWeight: 600, marginBottom: '4px' }}>No orders found</p>
+                  <p style={{ fontSize: '0.82rem', color: '#A89688' }}>Try adjusting your filters or date range.</p>
+                </div>
+              </td></tr>
             ) : filtered.map((order) => (
               <tr key={`${order.id}-${order.item_name}`} style={{ borderBottom: '1px solid #f5f0eb' }}>
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.82rem' }}>{order.id.slice(0, 8).toUpperCase()}</td>

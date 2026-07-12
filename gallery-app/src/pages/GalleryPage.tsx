@@ -19,6 +19,7 @@ const categories = [
 export default function GalleryPage() {
   const [searchParams] = useSearchParams();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
@@ -49,58 +50,64 @@ export default function GalleryPage() {
 
   useEffect(() => {
     async function fetchProducts() {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Gallery fetch error:', error);
-        return;
-      }
+        if (error) {
+          console.error('Gallery fetch error:', error);
+          return;
+        }
 
-      if (data) {
-        const products = data.map((p: any) => mapSupabaseProduct(p));
-        setAllProducts(products);
+        if (data) {
+          const products = data.map((p: any) => mapSupabaseProduct(p));
+          setAllProducts(products);
 
-        const productIds = products.map(p => p.id);
-        if (productIds.length > 0) {
-          const { data: varData } = await supabase
-            .from('product_variations')
-            .select('product_id, price')
-            .in('product_id', productIds)
-            .not('price', 'is', null);
+          const productIds = products.map(p => p.id);
+          if (productIds.length > 0) {
+            const { data: varData } = await supabase
+              .from('product_variations')
+              .select('product_id, price')
+              .in('product_id', productIds)
+              .not('price', 'is', null);
 
-          if (varData) {
-            const prices: Record<string, number> = {};
-            for (const v of varData) {
-              const price = Number(v.price);
-              if (price > 0 && (!prices[v.product_id] || price < prices[v.product_id])) {
-                prices[v.product_id] = price;
+            if (varData) {
+              const prices: Record<string, number> = {};
+              for (const v of varData) {
+                const price = Number(v.price);
+                if (price > 0 && (!prices[v.product_id] || price < prices[v.product_id])) {
+                  prices[v.product_id] = price;
+                }
               }
+              setVariantPrices(prices);
             }
-            setVariantPrices(prices);
-          }
 
-          const { data: revData } = await supabase
-            .from('product_reviews')
-            .select('product_id, rating')
-            .in('product_id', productIds);
+            const { data: revData } = await supabase
+              .from('product_reviews')
+              .select('product_id, rating')
+              .in('product_id', productIds);
 
-          if (revData) {
-            const ratings: Record<string, { total: number; count: number }> = {};
-            for (const r of revData) {
-              if (!ratings[r.product_id]) ratings[r.product_id] = { total: 0, count: 0 };
-              ratings[r.product_id].total += r.rating;
-              ratings[r.product_id].count += 1;
+            if (revData) {
+              const ratings: Record<string, { total: number; count: number }> = {};
+              for (const r of revData) {
+                if (!ratings[r.product_id]) ratings[r.product_id] = { total: 0, count: 0 };
+                ratings[r.product_id].total += r.rating;
+                ratings[r.product_id].count += 1;
+              }
+              const avgRatings: Record<string, { avg: number; count: number }> = {};
+              for (const [pid, data] of Object.entries(ratings)) {
+                avgRatings[pid] = { avg: data.total / data.count, count: data.count };
+              }
+              setProductRatings(avgRatings);
             }
-            const avgRatings: Record<string, { avg: number; count: number }> = {};
-            for (const [pid, data] of Object.entries(ratings)) {
-              avgRatings[pid] = { avg: data.total / data.count, count: data.count };
-            }
-            setProductRatings(avgRatings);
           }
         }
+      } catch (e) {
+        console.error('Gallery fetch error:', e);
+      } finally {
+        setLoadingProducts(false);
       }
     }
     fetchProducts();
@@ -224,9 +231,23 @@ export default function GalleryPage() {
       {/* Product Grid */}
       <section style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          {products.length === 0 ? (
+          {loadingProducts ? (
+            /* Shimmer skeleton grid */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} style={{ border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden', background: '#fff' }}>
+                  <div className="shimmer-skeleton" style={{ height: '220px', width: '100%', borderRadius: 0 }} />
+                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className="shimmer-skeleton" style={{ height: '16px', width: '70%', borderRadius: '4px' }} />
+                    <div className="shimmer-skeleton" style={{ height: '14px', width: '45%', borderRadius: '4px' }} />
+                    <div className="shimmer-skeleton" style={{ height: '20px', width: '35%', borderRadius: '4px' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
             <div className="gallery-empty-state">
-              <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" style={{ width: 64, height: 64 }}>
+              <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.3" style={{ width: 64, height: 64, opacity: 0.6 }}>
                 <path d="M8 3h8l1 4 3 3v8a3 3 0 01-3 3H7a3 3 0 01-3-3v-8l3-3 1-4z" />
                 <path d="M8 7h8M9 21c1.5-2 4.5-2 6 0M9 11c1.5 1 4.5 1 6 0" />
               </svg>

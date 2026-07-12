@@ -97,6 +97,8 @@ export default function DashboardPage() {
   const [address, setAddress] = useState('');
   const [username, setUsername] = useState('Customer Name');
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [saved, setSaved] = useState(false);
   const [profileImage, setProfileImage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -239,17 +241,18 @@ export default function DashboardPage() {
   }
 
   async function loadOrders() {
-    if (!user) return;
+    if (!user) { setLoadingOrders(false); return; }
 
-    const { data } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (!data) return;
+      if (!data) return;
 
-    const mapped: DashboardOrder[] = data.map((o: any) => {
+      const mapped: DashboardOrder[] = data.map((o: any) => {
       const paymentStatus = o.status || 'pending';
       const deliveryStatus = o.delivery_status || 'pending';
       let status: DashboardOrder['status'] = 'to-ship';
@@ -295,6 +298,11 @@ export default function DashboardPage() {
     });
 
     setOrders(mapped);
+    } catch (e) {
+      console.error('Load orders error:', e);
+    } finally {
+      setLoadingOrders(false);
+    }
   }
 
   async function loadUserReviews() {
@@ -325,6 +333,8 @@ export default function DashboardPage() {
       if (data) setNotifications(data);
     } catch (e) {
       console.error('Load notifications error:', e);
+    } finally {
+      setLoadingNotifications(false);
     }
   }
 
@@ -737,7 +747,18 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <div style={{ padding: '0' }}>
-                  {notifications.length === 0 ? (
+                  {loadingNotifications ? (
+                    /* Notification skeleton rows */
+                    [1, 2, 3, 4].map(i => (
+                      <div key={i} style={{ display: 'flex', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #F0EBE4' }}>
+                        <div className="shimmer-skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div className="shimmer-skeleton" style={{ height: '13px', width: '70%', borderRadius: '4px' }} />
+                          <div className="shimmer-skeleton" style={{ height: '11px', width: '40%', borderRadius: '4px' }} />
+                        </div>
+                      </div>
+                    ))
+                  ) : notifications.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-light)' }}>
                       <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: 40, height: 40, opacity: 0.5 }}>
@@ -836,13 +857,29 @@ export default function DashboardPage() {
               <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* Orders */}
                 <div className="purchase-orders-list">
-                  {filteredOrders.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ width: 56, height: 56, margin: '0 auto 16px', opacity: 0.4 }}>
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M3 9h18M9 21V9" strokeLinecap="round" />
-                      </svg>
-                      <p style={{ fontFamily: 'var(--font-sans)' }}>No orders yet. <Link to="/gallery" style={{ color: 'var(--accent-color)', fontWeight: 600 }}>Browse products</Link></p>
+                  {loadingOrders ? (
+                    /* Order skeleton cards */
+                    [1, 2, 3].map(i => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', border: '1px solid #EDE8E2', borderRadius: '12px', background: '#fff' }}>
+                        <div className="shimmer-skeleton" style={{ width: '64px', height: '64px', borderRadius: '10px', flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div className="shimmer-skeleton" style={{ height: '14px', width: '60%', borderRadius: '4px' }} />
+                          <div className="shimmer-skeleton" style={{ height: '12px', width: '40%', borderRadius: '4px' }} />
+                        </div>
+                        <div className="shimmer-skeleton" style={{ height: '26px', width: '90px', borderRadius: '8px' }} />
+                      </div>
+                    ))
+                  ) : filteredOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '64px 20px' }}>
+                      <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.3" style={{ width: 38, height: 38, opacity: 0.6 }}>
+                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                          <path d="M3.3 7 12 12l8.7-5M12 22V12" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '6px' }}>No orders yet</h3>
+                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '20px' }}>When you buy crafts, they'll show up here.</p>
+                      <Link to="/gallery" style={{ display: 'inline-block', padding: '10px 22px', borderRadius: '8px', background: 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>Browse Products</Link>
                     </div>
                   ) : (
                     filteredOrders.map(order => {
