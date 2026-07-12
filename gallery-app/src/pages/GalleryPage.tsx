@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 const PAGE_SIZE = 24;
 
 const categories = [
+  { name: 'All Crafts', bg: '/images/pottery-collage.png' },
   { name: 'Vases', bg: '/images/vases_collection.png' },
   { name: 'Planters', bg: '/images/planters_collection.png' },
   { name: 'Jars', bg: '/images/jars_collection.png' },
@@ -165,8 +166,8 @@ export default function GalleryPage() {
           <div className="category-zoom-grid">
             {categories.map(cat => (
               <div key={cat.name}
-                onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name)}
-                className={`category-zoom-card ${activeCategory === cat.name ? 'active' : ''}`}>
+                onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
+                className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
                 <div className="zoom-card-bg" style={{ backgroundImage: `url(${cat.bg})` }} />
                 <div className="zoom-card-overlay" />
                 <div className="zoom-card-content">
