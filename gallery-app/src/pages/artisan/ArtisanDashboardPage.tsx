@@ -170,7 +170,7 @@ export default function ArtisanDashboardPage() {
     { panel: 'messages', label: 'Messages',      icon: <MessageSquare size={18} /> },
     { panel: 'listings', label: 'My Listings',   icon: <Package size={18} /> },
     { panel: 'requests', label: 'Requests',      icon: <Inbox size={18} /> },
-    { panel: 'settings', label: 'Shop Profile',  icon: <Store size={18} /> },
+    { panel: 'settings', label: 'Store',  icon: <Store size={18} /> },
     { panel: 'vault',    label: 'Design Vault',  icon: <Layers size={18} /> },
   ];
 
@@ -2048,13 +2048,13 @@ function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData:
             </div>
           </div>
         </div>
-      ) : (
-          <>
-            <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
-              {message}
-            </div>
-          </>
-        )}
+      ) : null}
+
+      {message && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
+          {message}
+        </div>
+      )}
 
       <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', overflow: 'hidden' }}>
 
