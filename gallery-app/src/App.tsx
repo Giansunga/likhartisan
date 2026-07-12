@@ -64,14 +64,13 @@ function AuthRedirectInterceptor() {
 
   useEffect(() => {
     const hash = window.location.hash;
-    const params = new URLSearchParams(window.location.search);
 
-    const hasTokens =
-      (hash && (hash.includes('access_token') || hash.includes('code='))) ||
-      (params.has('code') && params.has('state'));
+    // Only intercept access_token in hash — this is specific to Supabase
+    // password recovery. Do NOT check code/state as Google OAuth also uses those.
+    const hasRecoveryToken = hash && hash.includes('access_token') && hash.includes('type=recovery');
 
-    if (hasTokens && window.location.pathname === '/') {
-      window.location.replace('/update-password' + window.location.hash + window.location.search);
+    if (hasRecoveryToken && window.location.pathname === '/') {
+      window.location.replace('/update-password' + window.location.hash);
     }
   }, [location]);
 

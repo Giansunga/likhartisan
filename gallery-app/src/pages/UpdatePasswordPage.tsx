@@ -73,6 +73,9 @@ export default function UpdatePasswordPage() {
       return;
     }
 
+    // Sign out after password update so user isn't left logged in
+    await supabase.auth.signOut();
+
     setSuccess(true);
     setTimeout(() => {
       navigate('/');
