@@ -52,6 +52,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
   const [error, setError]         = useState('');
   const [showPw, setShowPw]       = useState(false);
   const [showPw2, setShowPw2]     = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successEmail, setSuccessEmail] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -59,6 +61,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       setError('');
       setShowPw(false);
       setShowPw2(false);
+      setShowSuccess(false);
+      setSuccessEmail('');
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
 
@@ -138,9 +142,12 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
     setError('');
     const form = e.target as HTMLFormElement;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
     if (err) { setError(err.message); return; }
-    onClose();
+    setSuccessEmail(email);
+    setShowSuccess(true);
   }
 
   async function handleGoogleSignIn() {
@@ -397,38 +404,71 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
             {/* ════ FORGOT PASSWORD ════ */}
             {view === 'forgot' && (
               <motion.div key="forgot" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
-                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '8px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
-                  Forgot Password
-                </h1>
-                <p style={{ fontSize: '0.85rem', color: '#7A6558', marginBottom: '24px' }}>
-                  Enter your email and we'll send you a reset link.
-                </p>
-
-                <form onSubmit={handleForgotPassword}>
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={S.label}>E-mail Address</label>
-                    <input
-                      type="email" name="email" required placeholder="e.g., name@example.com"
-                      style={S.input}
-                      onFocus={e => (e.currentTarget.style.borderColor = '#823E0B')}
-                      onBlur={e  => (e.currentTarget.style.borderColor = '#DDD5CC')}
-                    />
+                {showSuccess ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{
+                      width: '56px', height: '56px', borderRadius: '50%',
+                      background: '#F0FDF4', border: '2px solid #BBF7D0',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" style={{ width: '28px', height: '28px' }}>
+                        <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                      </svg>
+                    </div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1E1E1E', marginBottom: '8px' }}>Check your email</h2>
+                    <p style={{ fontSize: '0.88rem', color: '#666', marginBottom: '24px', lineHeight: 1.5 }}>
+                      We've sent a password reset link to<br />
+                      <strong style={{ color: '#1E1E1E' }}>{successEmail}</strong>
+                    </p>
+                    <button
+                      onClick={onClose}
+                      style={S.btn}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
+                    >
+                      Got it
+                    </button>
+                    <p style={{ fontSize: '0.78rem', color: '#999', marginTop: '16px' }}>
+                      Didn't receive it? Check your spam folder
+                    </p>
                   </div>
-                  <button
-                    type="submit" style={S.btn}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
-                  >
-                    Send Reset Link
-                  </button>
-                </form>
+                ) : (
+                  <>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '8px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+                      Forgot Password
+                    </h1>
+                    <p style={{ fontSize: '0.85rem', color: '#7A6558', marginBottom: '24px' }}>
+                      Enter your email and we'll send you a reset link.
+                    </p>
 
-                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '16px' }}>
-                  Remember your password?{' '}
-                  <button type="button" onClick={() => setView('signin')} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
-                    Log in
-                  </button>
-                </p>
+                    <form onSubmit={handleForgotPassword}>
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={S.label}>E-mail Address</label>
+                        <input
+                          type="email" name="email" required placeholder="e.g., name@example.com"
+                          style={S.input}
+                          onFocus={e => (e.currentTarget.style.borderColor = '#823E0B')}
+                          onBlur={e  => (e.currentTarget.style.borderColor = '#DDD5CC')}
+                        />
+                      </div>
+                      <button
+                        type="submit" style={S.btn}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
+                      >
+                        Send Reset Link
+                      </button>
+                    </form>
+
+                    <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '16px' }}>
+                      Remember your password?{' '}
+                      <button type="button" onClick={() => setView('signin')} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
+                        Log in
+                      </button>
+                    </p>
+                  </>
+                )}
               </motion.div>
             )}
 

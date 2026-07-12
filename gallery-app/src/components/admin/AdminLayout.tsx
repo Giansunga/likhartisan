@@ -3,18 +3,14 @@ import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  LayoutDashboard, Package, Users, Store, Box, Sun,
-  LogOut, Home,
-} from 'lucide-react';
 
 const sidebarLinks = [
-  { to: '/admin',           label: 'Dashboard',         icon: <LayoutDashboard size={18} />, exact: true },
-  { to: '/admin/products',  label: 'Products',          icon: <Package size={18} /> },
-  { to: '/admin/artisans',  label: 'Artisans',          icon: <Users size={18} /> },
-  { to: '/admin/shops/create', label: 'Register Shop',  icon: <Store size={18} /> },
-  { to: '/admin/models',    label: '3D Models',         icon: <Box size={18} /> },
-  { to: '/admin/theme',     label: 'Theme Customizer',  icon: <Sun size={18} /> },
+  { to: '/admin',           label: 'Dashboard',         exact: true },
+  { to: '/admin/products',  label: 'Products' },
+  { to: '/admin/artisans',  label: 'Artisans' },
+  { to: '/admin/shops/create', label: 'Register Shop' },
+  { to: '/admin/models',    label: '3D Models' },
+  { to: '/admin/theme',     label: 'Theme Customizer' },
 ];
 
 export default function AdminLayout() {
@@ -116,7 +112,7 @@ export default function AdminLayout() {
                   to={link.to}
                   end={link.exact}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '11px',
+                    display: 'flex', alignItems: 'center',
                     padding: '10px 14px',
                     border: 'none', textDecoration: 'none',
                     background: active ? 'var(--primary-color)' : 'transparent',
@@ -129,7 +125,6 @@ export default function AdminLayout() {
                   onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = '#FDF5EE'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--primary-color)'; }}}
                   onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = '#6B5D52'; }}}
                 >
-                  <span style={{ opacity: active ? 1 : 0.7, display: 'flex' }}>{link.icon}</span>
                   {link.label}
                 </NavLink>
               );
@@ -141,7 +136,7 @@ export default function AdminLayout() {
             <Link
               to="/"
               style={{
-                display: 'flex', alignItems: 'center', gap: '11px',
+                display: 'flex', alignItems: 'center',
                 padding: '10px 14px', border: 'none', textDecoration: 'none',
                 background: 'transparent', color: '#6B5D52',
                 fontFamily: 'var(--font-sans)', fontSize: '0.875rem', fontWeight: 500,
@@ -151,13 +146,12 @@ export default function AdminLayout() {
               onMouseEnter={e => { (e.currentTarget).style.background = '#FDF5EE'; }}
               onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}
             >
-              <Home size={17} />
               Back to Store
             </Link>
             <button
               onClick={async () => { await supabase.auth.signOut(); window.location.href = '/'; }}
               style={{
-                display: 'flex', alignItems: 'center', gap: '11px',
+                display: 'flex', alignItems: 'center',
                 padding: '10px 14px', border: 'none', background: 'transparent',
                 color: '#C0392B',
                 fontFamily: 'var(--font-sans)', fontSize: '0.875rem', fontWeight: 500,
@@ -167,7 +161,6 @@ export default function AdminLayout() {
               onMouseEnter={e => { (e.currentTarget).style.background = '#FEF2F2'; }}
               onMouseLeave={e => { (e.currentTarget).style.background = 'transparent'; }}
             >
-              <LogOut size={17} />
               Sign Out
             </button>
           </div>

@@ -9,8 +9,7 @@ import DesignMessageCard from '../../components/chat/DesignMessageCard';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, ShoppingBag, MessageSquare, Package,
-  Inbox, Store, Layers, Settings, LogOut,
-  TrendingUp, TrendingDown, Eye, ShoppingCart, Wallet,
+  Inbox, Store, Layers, LogOut,
   ArrowUpRight
 } from 'lucide-react';
 
@@ -79,7 +78,6 @@ export default function ArtisanDashboardPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [loadingShop] = useState(true);
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -231,7 +229,7 @@ export default function ArtisanDashboardPage() {
           {/* Bottom pinned items */}
           <div style={{ padding: '12px 12px', borderTop: '1px solid #F0EBE4', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {[
-              { label: 'Settings', icon: <Settings size={17} /> },
+              { label: 'Back to Store', icon: <Store size={17} /> },
               { label: 'Logout',   icon: <LogOut size={17} />, danger: true },
             ].map(({ label, icon, danger }) => (
               <button
@@ -240,8 +238,8 @@ export default function ArtisanDashboardPage() {
                   if (label === 'Logout') {
                     supabase.auth.signOut();
                     window.location.href = '/';
-                  } else if (label === 'Settings') {
-                    setActivePanel('settings');
+                  } else if (label === 'Back to Store') {
+                    window.location.href = '/';
                   }
                 }}
                 style={{
@@ -287,7 +285,7 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'requests'  && <RequestsPanel />}
               {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
               {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} />}
-              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} loadingShop={loadingShop} />}
+              {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} />}
             </PanelErrorBoundary>
           )}
         </main>
@@ -430,12 +428,12 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
   const statCards = [
     {
       label: `Revenue (${rangeLabel})`, value: `₱${totalRevenue.toLocaleString()}`,
-      sub: 'Selected period', icon: <Wallet size={20} />, color: '#823E0B',
+      sub: 'Selected period', color: '#823E0B',
       bg: '#FDF5EE', trend: null,
     },
     {
       label: `vs Previous Period`, value: `${Number(revenueChange) >= 0 ? '+' : ''}${revenueChange}%`,
-      sub: `prev ${rangeDays}d`, icon: Number(revenueChange) >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />,
+      sub: `prev ${rangeDays}d`,
       color: Number(revenueChange) >= 0 ? '#2E7D32' : '#C62828',
       bg: Number(revenueChange) >= 0 ? '#F0FDF4' : '#FEF2F2',
       trend: `${Number(revenueChange) >= 0 ? '+' : ''}${revenueChange}%`,
@@ -443,12 +441,12 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     },
     {
       label: 'Orders (period)', value: String(totalOrders),
-      sub: 'Paid orders', icon: <ShoppingCart size={20} />, color: '#1565C0',
+      sub: 'Paid orders', color: '#1565C0',
       bg: '#EFF6FF', trend: null,
     },
     {
       label: 'Total Views', value: totalViews.toLocaleString(),
-      sub: 'Across all products', icon: <Eye size={20} />, color: '#6A1B9A',
+      sub: 'Across all products', color: '#6A1B9A',
       bg: '#F5F0FF', trend: null,
     },
   ];
@@ -498,9 +496,6 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', letterSpacing: '0.03em', textTransform: 'uppercase' }}>{stat.label}</div>
-              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: stat.color }}>
-                {stat.icon}
-              </div>
             </div>
             <div style={{ fontSize: '1.9rem', fontWeight: 700, color: 'var(--text-dark)', fontFamily: 'var(--font-serif)', marginBottom: '6px', lineHeight: 1 }}>
               {stat.value}
@@ -1963,7 +1958,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
     </div>
   );
 }
-function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData: any; onShopUpdated: (d: any) => void; loadingShop: boolean }) {
+function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopUpdated: (d: any) => void }) {
   const [name, setName] = useState(shopData?.name || '');
   const [description, setDescription] = useState(shopData?.description || '');
   const [about, setAbout] = useState(shopData?.about || '');
@@ -2033,28 +2028,11 @@ function ShopSettingsPanel({ shopData, onShopUpdated, loadingShop }: { shopData:
         <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Update your shop's profile information, cover photo, and branding.</p>
       </div>
 
-      {loadingShop ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ width: '100%', height: '260px', borderRadius: '12px', overflow: 'hidden', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
-          <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', padding: '32px' }}>
-            <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', marginBottom: '28px' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {[1,2,3,4,5].map(i => (
-                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ height: '14px', width: '30%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '4px' }} />
-                  <div style={{ height: '44px', width: '100%', background: 'linear-gradient(90deg, #F0EBE4 25%, #F7F3EE 50%, #F0EBE4 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', borderRadius: '8px' }} />
-                </div>
-              ))}
-            </div>
-          </div>
+      {message && (
+        <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
+          {message}
         </div>
-      ) : (
-          <>
-            <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: message.startsWith('Error') ? '#FEE2E2' : '#DCFCE7', color: message.startsWith('Error') ? '#991B1B' : '#166534', fontSize: '0.9rem', fontWeight: 500 }}>
-              {message}
-            </div>
-          </>
-        )}
+      )}
 
       <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', overflow: 'hidden' }}>
 

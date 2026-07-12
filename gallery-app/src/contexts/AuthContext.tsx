@@ -1,6 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
+// Catch PASSWORD_RECOVERY before React even mounts, avoiding race conditions
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    if (window.location.pathname !== '/update-password') {
+      window.location.href = '/update-password';
+    }
+  }
+});
+
 interface AuthContextType {
   session: any | null;
   user: any | null;
@@ -30,8 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
       setSession(sess);
+      if (event === 'PASSWORD_RECOVERY') {
+        if (window.location.pathname !== '/update-password') {
+          window.location.href = '/update-password';
+        }
+      }
     });
 
     return () => {
