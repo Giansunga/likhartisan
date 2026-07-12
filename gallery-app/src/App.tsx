@@ -46,7 +46,7 @@ const isRecoveryRedirect =
   hash.includes('type=recovery');
 
 if (isRecoveryRedirect) {
-  window.location.replace('/update-password' + hash);
+  window.history.replaceState(null, '', '/update-password' + hash);
 }
 
 function PageLoader() {
