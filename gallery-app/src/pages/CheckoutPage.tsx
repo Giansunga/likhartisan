@@ -498,9 +498,9 @@ export default function CheckoutPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
             {/* Shipping Address */}
-            <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E8E0D8', padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1E1E1E', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <div style={{ background: '#2A2A2A', borderRadius: '12px', padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
                   </svg>
@@ -508,41 +508,46 @@ export default function CheckoutPage() {
                 </h3>
                 <button onClick={() => setEditAddress(!editAddress)} style={{
                   background: 'none', border: 'none', color: 'var(--primary-color)', fontWeight: 600,
-                  fontSize: '0.85rem', cursor: 'pointer',
-                }}>{editAddress ? 'Cancel' : 'Edit'}</button>
+                  fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                }}>
+                  {editAddress ? 'Cancel' : <>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Edit
+                  </>}
+                </button>
               </div>
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', marginBottom: '14px' }} />
 
               {editAddress ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
                     <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                      placeholder="Full Name" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem' }} />
+                      placeholder="Full Name" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', background: '#3A3A3A', color: '#fff' }} />
                     <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                      placeholder="Phone Number" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem' }} />
+                      placeholder="Phone Number" style={{ flex: 1, padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', background: '#3A3A3A', color: '#fff' }} />
                   </div>
                   <input value={editForm.address} onChange={e => setEditForm({ ...editForm, address: e.target.value })}
                     placeholder="#0 Street, Barangay, Municipality, Province"
-                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid rgba(255,255,255,0.15)', borderRadius: '8px', fontSize: '0.88rem', boxSizing: 'border-box', background: '#3A3A3A', color: '#fff' }} />
                   <button onClick={saveAddress} disabled={saving} style={{
-                    alignSelf: 'flex-end', padding: '8px 20px', background: saving ? '#D4C8BB' : 'var(--primary-color)', color: '#fff',
+                    alignSelf: 'flex-end', padding: '8px 20px', background: saving ? '#666' : 'var(--primary-color)', color: '#fff',
                     border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                   }}>{saving ? 'Saving...' : 'Save Address'}</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Name</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-dark)' }}>{userName || 'No name set'}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Phone</div>
-                      <div style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{userPhone || 'No phone set'}</div>
-                    </div>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.5" style={{ width: '20px', height: '20px', flexShrink: 0, marginTop: '2px' }}>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Address</div>
-                    <div style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{userAddress || 'No address set'}</div>
+                    <div style={{ fontSize: '0.9rem', color: '#fff', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 600 }}>{userName || 'No name set'}</span>
+                      <span style={{ color: '#999', margin: '0 6px' }}>·</span>
+                      <span>{userPhone || 'No phone set'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#999' }}>{userAddress || 'No address set'}</div>
                   </div>
                 </div>
                 )}
