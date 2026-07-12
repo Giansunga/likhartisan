@@ -886,7 +886,6 @@ export default function DashboardPage() {
                       const s = STATUS_LABELS[order.status] || { label: order.status, color: '#888', bg: '#f5f5f5' };
                       const isExpanded = expandedOrderId === order.id;
                       const orderDate = new Date(order.date);
-                      const shortId = order.id.replace(/-/g, '').slice(0, 8).toUpperCase();
                       const placedDate = orderDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
                       const isToPay = order.status === 'to-pay';
