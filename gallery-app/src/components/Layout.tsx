@@ -2,7 +2,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useEffect, Component, type ReactNode } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import MobileBottomNav from './MobileBottomNav';
 
 class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -67,11 +66,10 @@ export default function Layout() {
           Skip to content
         </a>
         <Navbar />
-        <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} pb-[60px] md:pb-0`}>
+        <main id="main-content" className={hideNavPadding ? '' : 'pt-16 md:pt-20'}>
           <Outlet />
         </main>
         {!isFreeform && <Footer />}
-        <MobileBottomNav />
       </div>
     </LayoutErrorBoundary>
   );
