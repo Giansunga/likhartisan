@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -38,6 +38,17 @@ const ThemeCustomizer = lazy(() => import('./pages/admin/ThemeCustomizer'));
 const ArtisanManagePage = lazy(() => import('./pages/admin/ArtisanManagePage'));
 const ModelManagePage = lazy(() => import('./pages/admin/ModelManagePage'));
 
+// Synchronous check BEFORE React mounts — prevents homepage flash
+const hash = window.location.hash;
+const isRecoveryRedirect =
+  window.location.pathname === '/' &&
+  hash.includes('access_token') &&
+  hash.includes('type=recovery');
+
+if (isRecoveryRedirect) {
+  window.location.replace('/update-password' + hash);
+}
+
 function PageLoader() {
   return (
     <div style={{
@@ -59,31 +70,12 @@ function PageLoader() {
   );
 }
 
-function AuthRedirectInterceptor() {
-  const location = useLocation();
-
-  useEffect(() => {
-    const hash = window.location.hash;
-
-    // Only intercept access_token in hash — this is specific to Supabase
-    // password recovery. Do NOT check code/state as Google OAuth also uses those.
-    const hasRecoveryToken = hash && hash.includes('access_token') && hash.includes('type=recovery');
-
-    if (hasRecoveryToken && window.location.pathname === '/') {
-      window.location.replace('/update-password' + window.location.hash);
-    }
-  }, [location]);
-
-  return null;
-}
-
 function AppShell() {
   const location = useLocation();
   const isUpdatePassword = location.pathname === '/update-password';
 
   return (
     <>
-      <AuthRedirectInterceptor />
       {!isUpdatePassword && <LikhAIDock />}
       <Suspense fallback={<PageLoader />}>
         <Routes>
