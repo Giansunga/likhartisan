@@ -14,19 +14,37 @@ export default function UpdatePasswordPage() {
   const [tokenError, setTokenError] = useState('');
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash || !hash.includes('access_token')) {
-      setTokenError('Invalid or missing reset link. Please request a new one.');
-      return;
-    }
+    let gotEvent = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        gotEvent = true;
         setTokenReady(true);
-      } else {
-        setTokenError('Reset link has expired or is invalid. Please request a new one.');
       }
     });
+
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      const timer = setTimeout(() => {
+        if (!gotEvent) {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+              setTokenReady(true);
+            } else {
+              setTokenError('Reset link has expired or is invalid. Please request a new one.');
+            }
+          });
+        }
+      }, 2000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
+    } else {
+      setTokenError('Invalid or missing reset link. Please request a new one.');
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,6 +122,7 @@ export default function UpdatePasswordPage() {
         ) : !tokenError ? (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ width: '32px', height: '32px', border: '3px solid #E8E0D8', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+            <p style={{ fontSize: '0.82rem', color: '#999', marginTop: '12px' }}>Verifying your reset link...</p>
             <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : null}
