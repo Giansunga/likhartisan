@@ -77,11 +77,14 @@ function AuthRedirectInterceptor() {
   return null;
 }
 
-export default function App() {
+function AppShell() {
+  const location = useLocation();
+  const isUpdatePassword = location.pathname === '/update-password';
+
   return (
-    <BrowserRouter>
+    <>
       <AuthRedirectInterceptor />
-      <LikhAIDock />
+      {!isUpdatePassword && <LikhAIDock />}
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route element={<Layout />}>
@@ -101,11 +104,11 @@ export default function App() {
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<SignUpPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="update-password" element={<UpdatePasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="freeform" element={<FreeformPage />} />
             <Route path="artisan-dashboard" element={<ArtisanDashboardPage />} />
           </Route>
+          <Route path="update-password" element={<UpdatePasswordPage />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="products" element={<ProductListPage />} />
@@ -120,6 +123,14 @@ export default function App() {
           </Route>
         </Routes>
       </Suspense>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
       <SpeedInsights />
     </BrowserRouter>
   );
