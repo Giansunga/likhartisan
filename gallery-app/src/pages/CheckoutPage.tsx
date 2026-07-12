@@ -530,7 +530,7 @@ export default function CheckoutPage() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', gap: '60px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: '2px', fontWeight: 500 }}>Name</div>
                       <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-dark)' }}>{userName || 'No name set'}</div>
