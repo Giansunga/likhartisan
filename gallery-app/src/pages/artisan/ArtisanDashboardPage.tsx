@@ -378,7 +378,6 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     );
   }
 
-  const safeProducts = Array.isArray(products) ? products : [];
   const safeOrders = Array.isArray(orders) ? orders : [];
   const rStart = dateRange.start.getTime();
   const rEnd = dateRange.end.getTime() + (24 * 60 * 60 * 1000 - 1); // include end day
@@ -392,7 +391,6 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
   const totalRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
   const totalShipping = paidOrders.reduce((sum, o) => sum + (Number(o.shipping_fee) || 0), 0);
   const totalOrders = paidOrders.length;
-  const totalViews = safeProducts.reduce((sum, p) => sum + (Number(p?.views) || 0), 0);
   const now = new Date();
 
   // Period-over-period comparison: prior window of equal length immediately before the range.
@@ -462,8 +460,8 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
       bg: '#EFF6FF', trend: null,
     },
     {
-      label: 'Total Views', value: totalViews.toLocaleString(),
-      sub: 'Across all products', color: '#6A1B9A',
+      label: 'Shipping Revenue', value: `₱${totalShipping.toLocaleString()}`,
+      sub: 'From courier deliveries', color: '#6A1B9A',
       bg: '#F5F0FF', trend: null,
     },
   ];
