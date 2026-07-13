@@ -1,7 +1,6 @@
 {
-  "installCommand": "cd gallery-app && npm install",
-  "buildCommand": "cd gallery-app && npm run build",
-  "outputDirectory": "gallery-app/dist",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
