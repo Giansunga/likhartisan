@@ -73,11 +73,6 @@ function PageLoader() {
 function AppShell() {
   const location = useLocation();
   const isUpdatePassword = location.pathname === '/update-password';
-<<<<<<< HEAD
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const hideDockMobile = isMobile && (location.pathname.startsWith('/product/') || location.pathname === '/checkout' || location.pathname === '/cart');
-=======
->>>>>>> parent of 6ea7277 (feat: hide LikhAI on product/checkout mobile, inline checkout total, smaller place order btn)
 
   return (
     <>
