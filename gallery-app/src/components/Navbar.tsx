@@ -119,53 +119,98 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!isArtisanDashboard || !userEmail || !SHOP_EMAILS.includes(userEmail)) return;
-    async function fetchNotifications() {
-      const notifs: { id: string; type: string; text: string; time: string; read: boolean; isReal?: boolean }[] = [];
-      const userId = user?.id;
-      if (!userId) return;
+    let cancelled = false;
+    let shopId: string | null = null;
+
+    async function init() {
       const { data: shop } = await supabase.from('shops').select('id').eq('email', userEmail).maybeSingle();
-      if (!shop) return;
-      const { data: orders } = await supabase.from('orders').select('id, user_name, total, created_at, status').order('created_at', { ascending: false }).limit(10);
-      if (orders) {
-        orders.filter((o: any) => {
-          const items = o.items || [];
-          return items.some((i: any) => i.shop_id === shop.id);
-        }).forEach((o: any) => {
-          notifs.push({
-            id: o.id, type: 'order', isReal: false,
-            text: `New order from ${o.user_name || 'Customer'} — ₱${(o.total || 0).toLocaleString()}`,
-            time: o.created_at, read: o.status !== 'pending',
-          });
-        });
-      }
-      const { data: convs } = await supabase.from('conversations').select('id, buyer_id, last_message, last_message_at, buyer_unread').eq('shop_id', shop.id).order('last_message_at', { ascending: false }).limit(10);
-      if (convs) {
-        convs.filter((c: any) => (c.buyer_unread || 0) > 0).forEach((c: any) => {
-          notifs.push({
-            id: c.id, type: 'message', isReal: false,
-            text: c.last_message || 'New message',
-            time: c.last_message_at, read: false,
-          });
-        });
-      }
-      notifs.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-      setNotifications(notifs.slice(0, 10));
-    }
+      if (cancelled || !shop) return;
+      shopId = shop.id;
 
-    fetchNotifications();
+      async function fetchNotifications() {
+        const userId = user?.id;
+        if (!userId) return;
 
-    const shopId = user?.id ? `shop:${user.id}` : undefined;
-    if (shopId) {
-      const channel = supabase
-        .channel(`orders:${shopId}`)
+        // 1) Persisted notifications from the notifications table
+        const { data: persisted } = await supabase
+          .from('notifications')
+          .select('id, type, title, message, product_image, created_at, read, order_id')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        const realNotifs = (persisted || []).map((n: any) => ({
+          id: n.id, type: n.type || 'notification', isReal: true,
+          text: n.title ? `${n.title}: ${n.message || ''}` : n.message || 'New notification',
+          title: n.title || '', message: n.message || '',
+          product_image: n.product_image || '',
+          time: n.created_at, read: !!n.read,
+          order_id: n.order_id || '',
+        }));
+
+        // 2) Synthetic order + conversation notifications
+        const synthetic: { id: string; type: string; text: string; time: string; read: boolean; isReal?: boolean }[] = [];
+        const { data: orders } = await supabase.from('orders').select('id, user_name, total, created_at, status, items').order('created_at', { ascending: false }).limit(10);
+        if (orders) {
+          orders.filter((o: any) => {
+            const items = o.items || [];
+            return items.some((i: any) => i.shop_id === shopId);
+          }).forEach((o: any) => {
+            synthetic.push({
+              id: `order-${o.id}`, type: 'order', isReal: false,
+              text: `New order from ${o.user_name || 'Customer'} — ₱${(o.total || 0).toLocaleString()}`,
+              time: o.created_at, read: o.status !== 'pending',
+            });
+          });
+        }
+        const { data: convs } = await supabase.from('conversations').select('id, buyer_id, last_message, last_message_at, buyer_unread').eq('shop_id', shopId!).order('last_message_at', { ascending: false }).limit(10);
+        if (convs) {
+          convs.filter((c: any) => (c.buyer_unread || 0) > 0).forEach((c: any) => {
+            synthetic.push({
+              id: `conv-${c.id}`, type: 'message', isReal: false,
+              text: c.last_message || 'New message',
+              time: c.last_message_at, read: false,
+            });
+          });
+        }
+
+        // 3) Merge: persisted first, then synthetic, deduplicate, sort, cap at 10
+        const seen = new Set<string>();
+        const merged = [...realNotifs, ...synthetic].filter(n => {
+          if (seen.has(n.id)) return false;
+          seen.add(n.id);
+          return true;
+        });
+        merged.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+        setNotifications(merged.slice(0, 10));
+      }
+
+      fetchNotifications();
+
+      const orderChannel = supabase
+        .channel(`orders:artisan`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchNotifications)
         .subscribe();
+      const convChannel = supabase
+        .channel(`conversations:artisan`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, fetchNotifications)
+        .subscribe();
       const poll = setInterval(fetchNotifications, 30000);
-      return () => {
-        supabase.removeChannel(channel);
+
+      cleanupFns.push(() => {
+        supabase.removeChannel(orderChannel);
+        supabase.removeChannel(convChannel);
         clearInterval(poll);
-      };
+      });
     }
+
+    const cleanupFns: (() => void)[] = [];
+    init();
+
+    return () => {
+      cancelled = true;
+      cleanupFns.forEach(fn => fn());
+    };
   }, [isArtisanDashboard, userEmail, user?.id]);
 
   useEffect(() => {
@@ -249,7 +294,7 @@ export default function Navbar() {
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
           Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
-        <button onClick={() => { setShowNotifications(false); if (!SHOP_EMAILS.includes(userEmail || '')) navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+        <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '')) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
       </div>
       <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
         {notifications.length === 0 ? (
@@ -267,7 +312,7 @@ export default function Navbar() {
             const href = (n as any).order_id ? `/dashboard?tab=purchases` : null;
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
-            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); if (href) navigate(href); else navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); } }}
+            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); if (href) navigate(href); else navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); if (isArtisanDashboard) navigate('/artisan-dashboard'); } }}
               style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #F5F0EB', display: 'flex', gap: '12px', alignItems: 'flex-start', background: n.read ? 'transparent' : '#FDF8F4', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
               onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
