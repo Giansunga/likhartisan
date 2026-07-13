@@ -1425,23 +1425,23 @@ return (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                     {order.delivery_status === 'pending' && (
                       <>
-                        <button onClick={() => updateDeliveryStatus(order.id, 'preparing')}
-                          style={{ padding: '5px 12px', border: '1.5px solid var(--primary-color)', borderRadius: '6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'preparing'); }}
+                          style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
                       </>
                     )}
                     {order.delivery_status === 'preparing' && (
                       <>
-                        <button onClick={() => updateDeliveryStatus(order.id, 'shipped')}
-                          style={{ padding: '5px 12px', border: '1.5px solid #6A1B9A', borderRadius: '6px', background: '#6A1B9A', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
+                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'shipped'); }}
+                          style={{ padding: '5px 12px', border: '1.5px solid #ED6C02', borderRadius: '6px', background: '#ED6C02', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
                       </>
                     )}
                     {order.delivery_status === 'shipped' && (
-                      <button onClick={() => updateDeliveryStatus(order.id, 'delivered')}
+                      <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'delivered'); }}
                         style={{ padding: '5px 12px', border: '1.5px solid #2E7D32', borderRadius: '6px', background: '#2E7D32', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Mark Delivered</button>
                     )}
                     {order.delivery_status === 'delivered' && (
-                      <button onClick={() => updateDeliveryStatus(order.id, 'completed')}
-                        style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Complete</button>
+                      <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'completed'); }}
+                        style={{ padding: '5px 12px', border: '1.5px solid #1B5E20', borderRadius: '6px', background: '#1B5E20', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Complete</button>
                     )}
                     {order.delivery_status === 'completed' && (
                       <span style={{ padding: '5px 12px', fontSize: '0.75rem', fontWeight: 600, color: '#2E7D32' }}>Completed</span>
