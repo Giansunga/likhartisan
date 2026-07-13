@@ -73,6 +73,13 @@ export default function Navbar() {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   }
 
+  async function markAllRead() {
+    const userId = user?.id;
+    if (!userId) return;
+    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }
+
   useEffect(() => {
     setUserEmail(user?.email ?? null);
     setUserAvatar(user?.user_metadata?.avatar_url || '');
@@ -294,7 +301,12 @@ export default function Navbar() {
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
           Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
-        <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '')) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {unreadNotifications > 0 && (
+            <button onClick={markAllRead} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
+          )}
+          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '')) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+        </div>
       </div>
       <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
         {notifications.length === 0 ? (
