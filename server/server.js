@@ -75,7 +75,16 @@ const proxyLimiter = rateLimit({
 });
 
 app.use(helmet());
-app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+// Reflect the requesting Origin for local/dev access (localhost + LAN IPs like
+// 192.168.x.x). Restricts to dev origins so we never open up arbitrary sites.
+const devOrigins = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+app.use(cors({
+  origin: (reqOrigin, cb) => {
+    if (!reqOrigin || devOrigins.test(reqOrigin) || reqOrigin === FRONTEND_URL) cb(null, true);
+    else cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(apiLimiter);
 app.use(express.json({
   limit: '50kb',

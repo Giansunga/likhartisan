@@ -2264,6 +2264,7 @@ async function createBuyerNotification(orderId: string, status: string) {
 }
 
 function NotificationsPanel({ userId }: { userId: string }) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -2303,6 +2304,22 @@ function NotificationsPanel({ userId }: { userId: string }) {
   }
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const orderUnread = notifications.filter(n => !n.read && n.order_id).length;
+  const messageUnread = notifications.filter(n => !n.read && n.type === 'message').length;
+  const systemUnread = notifications.filter(n => !n.read && !n.order_id && n.type !== 'message').length;
+  const [filter, setFilter] = useState<'all' | 'orders' | 'messages' | 'system'>('all');
+  const filtered = notifications.filter(n =>
+    filter === 'all' ? true :
+    filter === 'orders' ? !!n.order_id :
+    filter === 'messages' ? n.type === 'message' :
+    !n.order_id && n.type !== 'message'
+  );
+  const filterTabs = [
+    { key: 'all', label: 'All', count: unreadCount },
+    { key: 'orders', label: 'Orders', count: orderUnread },
+    { key: 'messages', label: 'Messages', count: messageUnread },
+    { key: 'system', label: 'System', count: systemUnread },
+  ] as const;
   const timeAgo = (iso: string) => {
     const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (s < 60) return 'just now';
@@ -2336,6 +2353,20 @@ function NotificationsPanel({ userId }: { userId: string }) {
           </button>
         )}
       </div>
+
+      {/* Horizontal filter tabs */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', borderBottom: '1px solid #EDE8E2' }}>
+        {filterTabs.map(t => (
+          <button key={t.key} onClick={() => setFilter(t.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.88rem', fontWeight: filter === t.key ? 700 : 500, color: filter === t.key ? 'var(--primary-color)' : 'var(--text-light)', borderBottom: `2px solid ${filter === t.key ? 'var(--accent-color)' : 'transparent'}`, marginBottom: '-1px', transition: 'color 0.15s' }}>
+            {t.label}
+            {t.count > 0 && (
+              <span style={{ minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: filter === t.key ? 'var(--accent-color)' : '#E0A06A', color: '#fff', fontSize: '0.66rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', overflow: 'hidden' }}>
         {loading ? (
           [1, 2, 3, 4].map(i => (
@@ -2356,10 +2387,11 @@ function NotificationsPanel({ userId }: { userId: string }) {
             <p style={{ fontSize: '0.85rem' }}>You'll be notified about order updates and messages.</p>
           </div>
         ) : (
-          notifications.map(n => {
+          filtered.map(n => {
             const tc = typeConfig[n.type] || { bg: '#F5F5F5', color: '#666' };
             return (
-              <div key={n.id} style={{ display: 'flex', gap: '14px', padding: '16px 20px', borderBottom: '1px solid #F0EBE4', background: n.read ? 'transparent' : '#FDF8F4', transition: 'background 0.15s', alignItems: 'flex-start' }}
+              <div key={n.id} onClick={() => { markRead(n.id); if (n.order_id) navigate(`/artisan-dashboard?panel=orders&orderId=${n.order_id}`); }}
+                style={{ display: 'flex', gap: '14px', padding: '16px 20px', borderBottom: '1px solid #F0EBE4', background: n.read ? 'transparent' : '#FDF8F4', transition: 'background 0.15s', alignItems: 'flex-start', cursor: n.order_id ? 'pointer' : 'default' }}
                 onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
                 onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -2371,9 +2403,9 @@ function NotificationsPanel({ userId }: { userId: string }) {
                     {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                  <span style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}</span>
+                  <span style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}{n.order_id ? '  ·  View order →' : ''}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                   {!n.read && (
                     <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>Read</button>
                   )}
