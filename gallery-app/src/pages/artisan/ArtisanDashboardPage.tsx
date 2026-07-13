@@ -1439,10 +1439,6 @@ return (
                   <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)' }}>{selectedOrder.user_name || '—'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#8C7B6E', width: '60px', flexShrink: 0 }}>Email</span>
-                  <span style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{selectedOrder.buyer_email || '—'}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
                   <span style={{ fontSize: '0.82rem', color: '#8C7B6E', width: '60px', flexShrink: 0 }}>Phone</span>
                   <span style={{ fontSize: '0.88rem', color: 'var(--text-dark)' }}>{selectedOrder.user_phone || '—'}</span>
                 </div>
