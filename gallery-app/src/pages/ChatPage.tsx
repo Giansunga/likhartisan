@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { fmt, formatTime } from '../lib/utils';
+import { API_BASE } from '../lib/api';
 import DesignMessageCard from '../components/chat/DesignMessageCard';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
@@ -299,18 +300,26 @@ export default function ChatPage() {
         setMessages(prev => [...prev, data]);
         await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
-        // Create real notification for shop owner
+        // Create real notification for shop owner via backend API to bypass RLS
         try {
           const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
           if (shop?.owner_id) {
             const meta = user?.user_metadata || {};
             const buyerName = meta.name || user?.email || 'Buyer';
-            await supabase.from('notifications').insert({
-              user_id: shop.owner_id,
-              type: 'message',
-              title: 'New Message',
-              message: `${buyerName}: ${(text || '📷 Image').substring(0, 80)}`,
-              product_image: '',
+            const { data: { session } } = await supabase.auth.getSession();
+            await fetch(`${API_BASE}/api/notifications`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
+              },
+              body: JSON.stringify({
+                user_id: shop.owner_id,
+                type: 'message',
+                title: 'New Message',
+                message: `${buyerName}: ${(text || '📷 Image').substring(0, 80)}`,
+                product_image: '',
+              })
             });
           }
         } catch (e) { console.error('Failed to create message notification:', e); }

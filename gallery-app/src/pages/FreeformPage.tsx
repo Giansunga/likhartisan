@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../lib/api';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
@@ -391,18 +392,26 @@ export default function FreeformPage() {
         .from('conversations')
         .update({ last_message: payload, last_message_at: new Date().toISOString(), artisan_unread: 1 })
         .eq('id', convId);
-      // Create real notification for shop owner
+      // Create real notification for shop owner via backend API to bypass RLS
       try {
         const { data: shopOwner } = await supabase.from('shops').select('owner_id').eq('id', shop.id).single();
         if (shopOwner?.owner_id) {
           const meta = user?.user_metadata || {};
           const buyerName = meta.name || user?.email || 'Buyer';
-          await supabase.from('notifications').insert({
-            user_id: shopOwner.owner_id,
-            type: 'message',
-            title: 'Design Inquiry',
-            message: `${buyerName}: ${payload.substring(0, 80)}`,
-            product_image: '',
+          const { data: { session } } = await supabase.auth.getSession();
+          await fetch(`${API_BASE}/api/notifications`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
+            },
+            body: JSON.stringify({
+              user_id: shopOwner.owner_id,
+              type: 'message',
+              title: 'Design Inquiry',
+              message: `${buyerName}: ${payload.substring(0, 80)}`,
+              product_image: '',
+            })
           });
         }
       } catch (e) { console.error('Failed to create message notification:', e); }

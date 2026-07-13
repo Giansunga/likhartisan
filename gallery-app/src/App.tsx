@@ -75,7 +75,7 @@ function AppShell() {
   const location = useLocation();
   const isUpdatePassword = location.pathname === '/update-password';
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const hideDockMobile = isMobile && (location.pathname.startsWith('/product/') || location.pathname === '/checkout');
+  const hideDockMobile = isMobile && (location.pathname.startsWith('/product/') || location.pathname === '/checkout' || location.pathname === '/cart');
 
   return (
     <>

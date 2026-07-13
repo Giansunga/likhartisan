@@ -456,9 +456,10 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
       // Decrement stock for each item (non-blocking)
       (async () => {
         try {
-          const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', order.id).single();
+          const { data: fullOrder } = await supabase.from('orders').select('items, user_name').eq('id', order.id).single();
           if (!fullOrder?.items) return;
           await decrementStockForItems(fullOrder.items);
+          await createOrderNotifications(order.id, fullOrder.items, fullOrder.user_name);
         } catch (e) { console.error('[stock] Decrement failed:', e.message); }
       })();
 
@@ -635,9 +636,10 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
             // Decrement stock (non-blocking)
             (async () => {
               try {
-                const { data: fullOrder } = await supabase.from('orders').select('items').eq('id', existingOrders[0].id).single();
+                const { data: fullOrder } = await supabase.from('orders').select('items, user_name').eq('id', existingOrders[0].id).single();
                 if (!fullOrder?.items) return;
                 await decrementStockForItems(fullOrder.items);
+                await createOrderNotifications(existingOrders[0].id, fullOrder.items, fullOrder.user_name);
               } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
             })();
           }
@@ -672,7 +674,7 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
       const shippingFee = parseFloat(meta.verifiedShippingFee) || 0;
       const total = subtotal + shippingFee;
 
-      const { error: insertError } = await supabase.from('orders').insert({
+      const { data: newOrder, error: insertError } = await supabase.from('orders').insert({
         user_id: meta.userId || '',
         user_name: meta.userName || '',
         user_phone: meta.userPhone || '',
@@ -688,7 +690,7 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         payment_reference: referenceNumber,
         checkout_session_id: sessionId,
         lalamove_quote_id: meta.lalamoveQuoteId || null,
-      });
+      }).select().single();
 
       if (insertError) {
         console.error('Error creating order from webhook:', insertError.message);
@@ -698,6 +700,9 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         (async () => {
           try {
             await decrementStockForItems(mappedItems);
+            if (newOrder) {
+              await createOrderNotifications(newOrder.id, mappedItems, meta.userName || '');
+            }
           } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
         })();
       }
@@ -780,6 +785,26 @@ async function verifyAuth(req, res) {
 //     zeroed variation-less stock on every sale.
 // No custom migrations required: only standard select/update + the existing
 // decrement_stock rpc are used.
+async function createOrderNotifications(orderId, items, buyerName) {
+  try {
+    const shopIds = [...new Set(items.map(i => i.shop_id).filter(Boolean))];
+    for (const shopId of shopIds) {
+      const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', shopId).single();
+      if (shop?.owner_id) {
+        await supabase.from('notifications').insert({
+          user_id: shop.owner_id,
+          type: 'order',
+          title: 'New Order Received',
+          message: `${buyerName || 'A buyer'} placed an order (ID: ${orderId.substring(0, 8)})`,
+          order_id: orderId,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Failed to create order notifications:', e.message);
+  }
+}
+
 async function decrementStockForItems(items) {
   if (!items || items.length === 0) return;
 
