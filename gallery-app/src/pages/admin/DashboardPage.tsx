@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
-import {
-  ShoppingCart, Wallet, Package, Store, Eye,
-} from 'lucide-react';
 
 interface DashboardStats {
   totalOrders: number;
@@ -125,27 +122,27 @@ export default function DashboardPage() {
   const statCards = [
     {
       label: 'Total Orders', value: String(stats.totalOrders),
-      sub: `${stats.pendingOrders} pending`, icon: <ShoppingCart size={20} />, color: '#1565C0',
+      sub: 'All time', color: '#1565C0',
       bg: '#EFF6FF', trend: null,
     },
     {
       label: 'Revenue', value: `₱${stats.revenue.toLocaleString()}`,
-      sub: 'All time', icon: <Wallet size={20} />, color: '#823E0B',
+      sub: 'All time', color: '#823E0B',
       bg: '#FDF5EE', trend: null,
     },
     {
       label: 'Total Products', value: String(stats.totalProducts),
-      sub: 'Active listings', icon: <Package size={20} />, color: '#2E7D32',
+      sub: 'Active listings', color: '#2E7D32',
       bg: '#F0FDF4', trend: null,
     },
     {
       label: 'Active Shops', value: String(stats.activeShops),
-      sub: 'Registered', icon: <Store size={20} />, color: '#6A1B9A',
+      sub: 'Registered', color: '#6A1B9A',
       bg: '#F5F0FF', trend: null,
     },
     {
       label: 'Total Views', value: stats.totalViews.toLocaleString(),
-      sub: 'Across all products', icon: <Eye size={20} />, color: '#C1570D',
+      sub: 'Across all products', color: '#C1570D',
       bg: '#FFF3E0', trend: null,
     },
   ];
@@ -189,9 +186,6 @@ export default function DashboardPage() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', letterSpacing: '0.03em', textTransform: 'uppercase' }}>{stat.label}</div>
-              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: stat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: stat.color }}>
-                {stat.icon}
-              </div>
             </div>
             <div style={{ fontSize: '1.9rem', fontWeight: 700, color: 'var(--text-dark)', fontFamily: 'var(--font-serif)', marginBottom: '6px', lineHeight: 1 }}>
               {stat.value}
