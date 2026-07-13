@@ -280,7 +280,22 @@ export default function Navbar() {
             const href = (n as any).order_id ? `/dashboard?tab=purchases` : null;
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
-            <button key={n.id} onClick={() => { if (n.isReal) { markNotificationRead(n.id); setShowNotifications(false); if (href) navigate(href); else navigate('/dashboard?tab=notifications'); } else { setShowNotifications(false); if (isArtisanDashboard) navigate('/artisan-dashboard'); } }}
+              <button key={n.id} onClick={() => { 
+                if (n.isReal) { 
+                  markNotificationRead(n.id); 
+                  setShowNotifications(false); 
+                  if ((n as any).order_id && SHOP_EMAILS.includes(userEmail || '')) {
+                    navigate(`/artisan-dashboard?panel=orders&orderId=${(n as any).order_id}`);
+                  } else if (href) {
+                    navigate(href);
+                  } else {
+                    navigate('/dashboard?tab=notifications');
+                  }
+                } else { 
+                  setShowNotifications(false); 
+                  if (isArtisanDashboard) navigate('/artisan-dashboard'); 
+                } 
+              }}
               style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #F5F0EB', display: 'flex', gap: '12px', alignItems: 'flex-start', background: n.read ? 'transparent' : '#FDF8F4', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
               onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>

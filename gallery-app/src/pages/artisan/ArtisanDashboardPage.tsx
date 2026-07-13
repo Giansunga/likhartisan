@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component, type ReactNode } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
@@ -68,6 +68,7 @@ interface Product {
 
 export default function ArtisanDashboardPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activePanel, setActivePanel] = useState<Panel>('overview');
   const [products, setProducts] = useState<Product[]>([]);
   const [productPrices, setProductPrices] = useState<Record<string, number>>({});
@@ -80,6 +81,14 @@ export default function ArtisanDashboardPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    const panel = searchParams.get('panel');
+    const orderId = searchParams.get('orderId');
+    if (panel === 'orders' && orderId) {
+      setActivePanel('orders');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -1213,8 +1222,22 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
   const [sortOrder, setSortOrder] = useState('newest');
   const [updateError, setUpdateError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
+
+  useEffect(() => {
+    const orderId = searchParams.get('orderId');
+    if (orderId && orders.length > 0) {
+      const match = orders.find((o) => o.id === orderId);
+      if (match) {
+        setSelectedOrder(match);
+        const params = new URLSearchParams(searchParams);
+        params.delete('orderId');
+        setSearchParams(params, { replace: true });
+      }
+    }
+  }, [orders, searchParams]);
 
   async function fetchOrders() {
     setLoadingOrders(true);
