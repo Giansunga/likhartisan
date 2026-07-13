@@ -4,7 +4,7 @@ import { addToCart } from '../data/store';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Product, ProductVariation, ProductReview } from '../types';
+import type { Product, ProductVariation, ProductReview, CartItem } from '../types';
 import type { ReactElement } from 'react';
 import { loadFavorites, saveFavorites, mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
 import RecommendationsSection from '../components/RecommendationsSection';
@@ -271,7 +271,7 @@ export default function ProductDetailPage() {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
-    addToCart({
+    const singleItem: CartItem = {
       productId: product.id,
       productName: product.name,
       price: displayPrice,
@@ -281,8 +281,8 @@ export default function ProductDetailPage() {
       qty: 1,
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
-    });
-    navigate('/checkout');
+    };
+    navigate('/checkout', { state: { buyNowItem: singleItem } });
   };
 
   const handleChatNow = async () => {

@@ -83,8 +83,10 @@ export default function CheckoutSuccessPage() {
         // Success — payment confirmed and order updated
         if (res.ok && result.success) {
           finishedRef.current = true;
-          // Only now: clear cart and the saved session id (both storages).
-          clearCart();
+          // Buy Now keeps the real cart intact; only clear it for a normal cart checkout.
+          const isBuyNow = sessionStorage.getItem('lk_buy_now') === '1';
+          if (!isBuyNow) clearCart();
+          sessionStorage.removeItem('lk_buy_now');
           localStorage.removeItem('likhartisan_checkout_session_id');
           sessionStorage.removeItem('likhartisan_checkout_session_id');
           setStatus('success');

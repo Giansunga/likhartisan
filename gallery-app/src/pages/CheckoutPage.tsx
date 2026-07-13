@@ -9,6 +9,7 @@ import { fmt } from '../lib/utils';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { API_BASE } from '../lib/api';
+import type { CartItem } from '../types';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
 
 // Lalamove vehicle tiers (smallest to largest) for PH market — dimensions in cm, weight in kg
@@ -56,7 +57,9 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 768px)');
-  const items = getCart();
+  // Buy Now passes a single item via location.state; otherwise use the full cart.
+  const buyNowItem = (location.state as any)?.buyNowItem as CartItem | undefined;
+  const items = buyNowItem ? [buyNowItem] : getCart();
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
@@ -478,6 +481,8 @@ export default function CheckoutPage() {
       // The cart is cleared on success in CheckoutSuccessPage.tsx instead.
       localStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
       sessionStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
+      // Flag a Buy Now so CheckoutSuccessPage won't wipe the real cart.
+      if (buyNowItem) sessionStorage.setItem('lk_buy_now', '1');
       window.location.href = data.checkoutUrl;
     } catch (error) {
       console.error('Checkout error:', error);
