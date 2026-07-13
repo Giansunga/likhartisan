@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import HomePage from './pages/HomePage';
 import GalleryPage from './pages/GalleryPage';
 import ProductDetailPage from './pages/ProductDetailPage';
@@ -73,10 +74,17 @@ function PageLoader() {
 function AppShell() {
   const location = useLocation();
   const isUpdatePassword = location.pathname === '/update-password';
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
+  // Hide dock on mobile for product, checkout, and cart pages
+  const isProductPage = location.pathname.startsWith('/product/');
+  const isCheckoutPage = location.pathname === '/checkout';
+  const isCartPage = location.pathname === '/cart';
+  const shouldHideDock = isMobile && (isProductPage || isCheckoutPage || isCartPage);
 
   return (
     <>
-      {!isUpdatePassword && <LikhAIDock />}
+      {!isUpdatePassword && !shouldHideDock && <LikhAIDock />}
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route element={<Layout />}>
