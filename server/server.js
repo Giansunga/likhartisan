@@ -789,10 +789,19 @@ async function createOrderNotifications(orderId, items, buyerName) {
   try {
     const shopIds = [...new Set(items.map(i => i.shop_id).filter(Boolean))];
     for (const shopId of shopIds) {
-      const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', shopId).single();
-      if (shop?.owner_id) {
+      const { data: shop } = await supabase.from('shops').select('owner_id, email').eq('id', shopId).single();
+      let ownerId = shop?.owner_id;
+      // Fallback: look up owner by shop email if owner_id is not set
+      if (!ownerId && shop?.email) {
+        const { data: authUser } = await supabase.auth.admin.getUserByEmail(shop.email);
+        ownerId = authUser?.user?.id;
+        if (ownerId) {
+          await supabase.from('shops').update({ owner_id: ownerId }).eq('id', shopId);
+        }
+      }
+      if (ownerId) {
         await supabase.from('notifications').insert({
-          user_id: shop.owner_id,
+          user_id: ownerId,
           type: 'order',
           title: 'New Order Received',
           message: `${buyerName || 'A buyer'} placed an order (ID: ${orderId.substring(0, 8)})`,
