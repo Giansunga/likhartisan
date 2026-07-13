@@ -389,7 +389,8 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     } catch { return false; }
   };
   const paidOrders = safeOrders.filter(o => o && (o.status === 'paid' || o.status === 'completed') && inRange(o));
-  const totalRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const totalRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
+  const totalShipping = paidOrders.reduce((sum, o) => sum + (Number(o.shipping_fee) || 0), 0);
   const totalOrders = paidOrders.length;
   const totalViews = safeProducts.reduce((sum, p) => sum + (Number(p?.views) || 0), 0);
   const now = new Date();
@@ -405,19 +406,32 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     } catch { return false; }
   };
   const prevPaid = safeOrders.filter((o: any) => o && (o.status === 'paid' || o.status === 'completed') && inPrev(o));
-  const prevRevenue = prevPaid.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const prevRevenue = prevPaid.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0);
   const revenueChange = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : '0';
 
+  // Build monthly data dynamically based on selected date range
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthlyData = monthNames.map((name, i) => {
+  const rangeStartMonth = dateRange.start.getMonth();
+  const rangeStartYear = dateRange.start.getFullYear();
+  const rangeEndMonth = dateRange.end.getMonth();
+  const rangeEndYear = dateRange.end.getFullYear();
+  const spanYears = rangeStartYear !== rangeEndYear;
+
+  const monthlyData: { name: string; revenue: number }[] = [];
+  let iterYear = rangeStartYear;
+  let iterMonth = rangeStartMonth;
+  while (iterYear < rangeEndYear || (iterYear === rangeEndYear && iterMonth <= rangeEndMonth)) {
+    const label = spanYears ? `${monthNames[iterMonth]} ${iterYear}` : monthNames[iterMonth];
     const monthOrders = paidOrders.filter(o => {
       try {
         const d = new Date(o.created_at);
-        return d.getMonth() === i && d.getFullYear() === now.getFullYear();
+        return d.getMonth() === iterMonth && d.getFullYear() === iterYear;
       } catch { return false; }
     });
-    return { name, revenue: monthOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0) };
-  });
+    monthlyData.push({ name: label, revenue: monthOrders.reduce((sum, o) => sum + (Number(o.subtotal) || 0), 0) });
+    iterMonth++;
+    if (iterMonth > 11) { iterMonth = 0; iterYear++; }
+  }
   const maxRevenue = Math.max(...monthlyData.map(m => m.revenue), 1);
   const productRevenue: Record<string, number> = {};
   paidOrders.forEach(o => {
@@ -536,7 +550,10 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px', paddingBottom: '28px', position: 'relative' }}>
           {monthlyData.map((m, i) => {
             const barH = Math.max((m.revenue / maxRevenue) * 150, m.revenue > 0 ? 8 : 3);
-            const isCurrentMonth = i === now.getMonth();
+            // For multi-year ranges, parse month+year from label; otherwise use index
+            const isCurrentMonth = spanYears
+              ? m.name === `${monthNames[now.getMonth()]} ${now.getFullYear()}`
+              : i + rangeStartMonth === now.getMonth() && rangeStartYear === now.getFullYear();
             return (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%', justifyContent: 'flex-end' }}>
                 {m.revenue > 0 && (
@@ -692,6 +709,66 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
           )}
         </motion.div>
       </div>
+
+      {/* RECENT ORDERS */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56, duration: 0.4 }}
+        style={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(130,62,11,0.06)', marginTop: '20px' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>Recent Orders</h3>
+          <button onClick={() => setActivePanel('orders')} style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            View All <ArrowUpRight size={13} />
+          </button>
+        </div>
+        {safeOrders.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+              <ShoppingBag size={26} color="#823E0B" />
+            </div>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-dark)', fontWeight: 600, marginBottom: '4px' }}>No orders yet</p>
+            <p style={{ fontSize: '0.82rem', color: '#A89688' }}>Orders will appear here once customers start buying.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {safeOrders.slice(0, 5).map((order) => {
+              const statusStyles: Record<string, { bg: string; color: string }> = {
+                pending: { bg: '#FFF3E0', color: '#E65100' }, preparing: { bg: '#E3F2FD', color: '#1565C0' },
+                shipped: { bg: '#F3E5F5', color: '#6A1B9A' }, delivered: { bg: '#E8F5E9', color: '#2E7D32' },
+                completed: { bg: '#E8F5E9', color: '#1B5E20' }, cancelled: { bg: '#FFEBEE', color: '#C62828' },
+              };
+              const s = statusStyles[order.delivery_status] || statusStyles.pending;
+              return (
+                <motion.div
+                  key={order.id}
+                  whileHover={{ x: 4, background: '#FDF5EE' }}
+                  onClick={() => setActivePanel('orders')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#FAFAF9', borderRadius: '10px', border: '1px solid #F0EBE4', transition: 'all 0.15s', cursor: 'pointer' }}
+                >
+                  <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#E8E0D8', border: '1px solid #EDE8E2' }}>
+                    {order.item_image
+                      ? <img src={order.item_image} alt={order.item_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={18} style={{ color: '#B8A89A' }} /></div>
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.item_name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#A89688', marginTop: '1px' }}>#{order.id.slice(0, 8).toUpperCase()} · {order.user_name || 'Customer'}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '0.875rem' }}>₱{(order.item_price * order.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span style={{
+                      fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'capitalize',
+                      padding: '2px 7px', borderRadius: '999px',
+                      background: s.bg, color: s.color,
+                    }}>{order.delivery_status}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }
@@ -1227,6 +1304,9 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
               payment_status: paymentStatus === 'pending' ? 'Pending' : paymentStatus === 'paid' || paymentStatus === 'completed' ? 'Paid' : paymentStatus === 'refunded' ? 'Refunded' : 'Cancelled',
               delivery_status: order.delivery_status || 'pending',
               total: order.total,
+              shipping_fee: order.shipping_fee || 0,
+              subtotal: order.subtotal || 0,
+              delivery_option: order.delivery_option || 'pickup',
               created_at: order.created_at,
               user_name: order.user_name || '',
               user_phone: order.user_phone || '',
@@ -1461,6 +1541,12 @@ return (
                 </div>
                 <div style={{ fontWeight: 700, color: 'var(--accent-color)', fontSize: '1rem' }}>{'\u20B1'}{(selectedOrder.item_price * selectedOrder.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
               </div>
+              {(selectedOrder.shipping_fee > 0 || selectedOrder.delivery_option === 'courier') && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #E8E0D8' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#8C7B6E' }}>Shipping Fee{selectedOrder.delivery_option === 'pickup' ? ' (Pickup)' : ''}</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)' }}>{'\u20B1'}{(selectedOrder.shipping_fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
             </div>
 
             {/* Status Row */}
