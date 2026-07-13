@@ -605,6 +605,8 @@ function verifyPayMongoSignature(req) {
 
 // PayMongo Webhook
 app.post('/api/webhooks/paymongo', async (req, res) => {
+  let logId = null;
+  let eventId = null;
   try {
     // Verify signature
     if (!verifyPayMongoSignature(req)) {
@@ -615,7 +617,45 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
     // real event type + payload live under .attributes (.type / .data).
     const eventResource = req.body.data;
     const eventType = eventResource?.attributes?.type;
-    console.log('Webhook received (verified):', eventType);
+    eventId = eventResource?.id || `unknown_${Date.now()}`; // Unique event ID for idempotency
+
+    // AUDIT LOG: Log raw payload BEFORE processing (even if it fails)
+    const { data: logEntry, error: logError } = await supabase
+      .from('webhook_logs')
+      .insert({
+        event_id: eventId,
+        event_type: eventType,
+        payload: req.body,
+        processed: false,
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      console.error('[WEBHOOK] Failed to create audit log:', logError.message);
+    } else {
+      logId = logEntry.id;
+      console.log(`[WEBHOOK] Logged event ${eventId} (log_id=${logId})`);
+    }
+
+    // IDEMPOTENCY CHECK: Skip if already processed
+    const { data: existingLog } = await supabase
+      .from('webhook_logs')
+      .select('processed, error_message')
+      .eq('event_id', eventId)
+      .neq('id', logId) // Ignore the entry we just created
+      .limit(1);
+
+    if (existingLog) {
+      if (existingLog.processed) {
+        console.log(`[WEBHOOK] Event ${eventId} already processed — skipping (idempotency)`);
+        return res.sendStatus(200);
+      } else {
+        console.warn(`[WEBHOOK] Event ${eventId} is logged but not yet marked processed — re-processing`);
+      }
+    }
+
+    console.log('[WEBHOOK] Received (verified):', eventType);
 
     if (eventType === 'checkout_session.payment.paid') {
       const session = eventResource.attributes.data;
@@ -715,16 +755,26 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
           } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
         })();
       }
-    }
+          }
 
-    res.sendStatus(200);
-  } catch (error) {
-    console.error('Webhook error:', error);
-    res.sendStatus(200); // Always return 200 to PayMongo
-  }
-});
+          // Mark webhook as successfully processed
+          if (logId) {
+            await supabase.from('webhook_logs').update({ processed: true }).eq('id', logId);
+            console.log(`[WEBHOOK] Marked event ${eventId} as processed`);
+          }
 
-// Create notification for buyer
+          res.sendStatus(200);
+        } catch (error) {
+          console.error('[WEBHOOK] Error processing event:', error);
+          // Log error to audit trail if we have a logId
+          if (logId) {
+            await supabase.from('webhook_logs').update({ processed: true, error_message: error.message }).eq('id', logId);
+          }
+          res.sendStatus(200); // Always return 200 to PayMongo to prevent retries
+        }
+      });
+
+      // Create notification for buyer
 app.post('/api/notifications', async (req, res) => {
   try {
     const authUserId = await verifyAuth(req, res);
