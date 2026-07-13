@@ -155,7 +155,7 @@ export default function Navbar() {
           order_id: n.order_id || '',
         }));
 
-        // 2) Synthetic order + conversation notifications
+        // 2) Synthetic order notifications (derived from live order status)
         const synthetic: { id: string; type: string; text: string; time: string; read: boolean; isReal?: boolean }[] = [];
         const { data: orders } = await supabase.from('orders').select('id, user_name, total, created_at, status, items').order('created_at', { ascending: false }).limit(10);
         if (orders) {
@@ -167,16 +167,6 @@ export default function Navbar() {
               id: `order-${o.id}`, type: 'order', isReal: false,
               text: `New order from ${o.user_name || 'Customer'} — ₱${(o.total || 0).toLocaleString()}`,
               time: o.created_at, read: o.status !== 'pending',
-            });
-          });
-        }
-        const { data: convs } = await supabase.from('conversations').select('id, buyer_id, last_message, last_message_at, buyer_unread').eq('shop_id', shopId!).order('last_message_at', { ascending: false }).limit(10);
-        if (convs) {
-          convs.filter((c: any) => (c.buyer_unread || 0) > 0).forEach((c: any) => {
-            synthetic.push({
-              id: `conv-${c.id}`, type: 'message', isReal: false,
-              text: c.last_message || 'New message',
-              time: c.last_message_at, read: false,
             });
           });
         }
@@ -198,15 +188,15 @@ export default function Navbar() {
         .channel(`orders:artisan`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchNotifications)
         .subscribe();
-      const convChannel = supabase
-        .channel(`conversations:artisan`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, fetchNotifications)
+      const notifChannel = supabase
+        .channel(`notifications:artisan:${user?.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, fetchNotifications)
         .subscribe();
       const poll = setInterval(fetchNotifications, 30000);
 
       cleanupFns.push(() => {
         supabase.removeChannel(orderChannel);
-        supabase.removeChannel(convChannel);
+        supabase.removeChannel(notifChannel);
         clearInterval(poll);
       });
     }

@@ -299,6 +299,21 @@ export default function ChatPage() {
         setMessages(prev => [...prev, data]);
         await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+        // Create real notification for shop owner
+        try {
+          const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
+          if (shop?.owner_id) {
+            const meta = user?.user_metadata || {};
+            const buyerName = meta.name || user?.email || 'Buyer';
+            await supabase.from('notifications').insert({
+              user_id: shop.owner_id,
+              type: 'message',
+              title: 'New Message',
+              message: `${buyerName}: ${(text || '📷 Image').substring(0, 80)}`,
+              product_image: '',
+            });
+          }
+        } catch (e) { console.error('Failed to create message notification:', e); }
       }
     } finally {
       removeImage();

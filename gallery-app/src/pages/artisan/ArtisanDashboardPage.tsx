@@ -2293,6 +2293,7 @@ function NotificationsPanel({ userId }: { userId: string }) {
     delivered: { bg: '#E8F5E9', color: '#2E7D32' },
     completed: { bg: '#FFF3E0', color: '#C1570D' },
     cancelled: { bg: '#FFEBEE', color: '#D32F2F' },
+    message: { bg: '#F5F5F5', color: '#616161' },
   };
 
   return (

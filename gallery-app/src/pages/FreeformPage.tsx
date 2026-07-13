@@ -391,6 +391,21 @@ export default function FreeformPage() {
         .from('conversations')
         .update({ last_message: payload, last_message_at: new Date().toISOString(), artisan_unread: 1 })
         .eq('id', convId);
+      // Create real notification for shop owner
+      try {
+        const { data: shopOwner } = await supabase.from('shops').select('owner_id').eq('id', shop.id).single();
+        if (shopOwner?.owner_id) {
+          const meta = user?.user_metadata || {};
+          const buyerName = meta.name || user?.email || 'Buyer';
+          await supabase.from('notifications').insert({
+            user_id: shopOwner.owner_id,
+            type: 'message',
+            title: 'Design Inquiry',
+            message: `${buyerName}: ${payload.substring(0, 80)}`,
+            product_image: '',
+          });
+        }
+      } catch (e) { console.error('Failed to create message notification:', e); }
     }
 
     setSubmitting(false);
