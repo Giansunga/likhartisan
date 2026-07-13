@@ -99,7 +99,7 @@ app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
-    const { items, shippingFee, userName, userPhone, userAddress, deliveryOption, userId, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
+    const { items, shippingFee, userName, userPhone, userAddress, userEmail, deliveryOption, userId, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
@@ -305,6 +305,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
               userName: userName || '',
               userPhone: userPhone || '',
               userAddress: userAddress || '',
+              userEmail: userEmail || '',
               deliveryOption: deliveryOption || '',
               lalamoveQuoteId: (lalamoveQuoteId || '').toString(),
               items: JSON.stringify(verifiedItems),
@@ -499,6 +500,7 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
         user_name: meta.userName || '',
         user_phone: meta.userPhone || '',
         user_address: meta.userAddress || '',
+        buyer_email: meta.userEmail || '',
         items: mappedItems,
         subtotal,
         shipping_fee: shippingFee,
@@ -675,6 +677,7 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
         user_name: meta.userName || '',
         user_phone: meta.userPhone || '',
         user_address: meta.userAddress || '',
+        buyer_email: meta.userEmail || '',
         items: mappedItems,
         subtotal,
         shipping_fee: shippingFee,

@@ -414,6 +414,7 @@ export default function CheckoutPage() {
           userName,
           userPhone,
           userAddress,
+          userEmail: user?.email || '',
           deliveryOption,
           userId,
           lalamoveQuoteId: lalamoveQuote?.quotationId || null,
@@ -441,6 +442,7 @@ export default function CheckoutPage() {
         user_name: userName,
         user_phone: userPhone,
         user_address: userAddress,
+        buyer_email: user?.email || '',
         items: items.map(i => ({
           product_id: i.productId,
           product_name: i.productName,
