@@ -75,13 +75,16 @@ const proxyLimiter = rateLimit({
 });
 
 app.use(helmet());
-// Reflect the requesting Origin for local/dev access (localhost + LAN IPs like
-// 192.168.x.x). Restricts to dev origins so we never open up arbitrary sites.
+// CORS: Allow dev origins (localhost) + production frontend (Vercel) + configured FRONTEND_URL
 const devOrigins = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+const vercelDomains = [/^https:\/\/likhartisan\.vercel\.app$/, /^https:\/\/likhartisan-[a-z0-9-]+\.vercel\.app$/];
 app.use(cors({
   origin: (reqOrigin, cb) => {
-    if (!reqOrigin || devOrigins.test(reqOrigin) || reqOrigin === FRONTEND_URL) cb(null, true);
-    else cb(new Error('Not allowed by CORS'));
+    if (!reqOrigin || devOrigins.test(reqOrigin) || reqOrigin === FRONTEND_URL || vercelDomains.some(r => r.test(reqOrigin))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
 }));
