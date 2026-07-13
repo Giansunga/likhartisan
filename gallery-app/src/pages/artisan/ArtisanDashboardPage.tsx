@@ -10,8 +10,9 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard, ShoppingBag, MessageSquare, Package,
   Inbox, Store, Layers, LogOut,
-  ArrowUpRight
+  ArrowUpRight, Bell
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -41,7 +42,7 @@ class PanelErrorBoundary extends Component<{ children: ReactNode; resetKey: stri
   }
 }
 
-type Panel = 'overview' | 'listings' | 'vault' | 'requests' | 'orders' | 'messages' | 'settings';
+type Panel = 'overview' | 'listings' | 'vault' | 'requests' | 'orders' | 'messages' | 'settings' | 'notifications';
 
 import { SHOP_EMAILS } from '../../lib/constants';
 import { formatTime } from '../../lib/utils';
@@ -170,6 +171,7 @@ export default function ArtisanDashboardPage() {
     { panel: 'requests', label: 'Requests',      icon: <Inbox size={18} /> },
     { panel: 'settings', label: 'Shop Profile',  icon: <Store size={18} /> },
     { panel: 'vault',    label: 'Design Vault',  icon: <Layers size={18} /> },
+    { panel: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
   ];
 
   const hour = new Date().getHours();
@@ -286,6 +288,7 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
               {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} />}
               {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} />}
+              {activePanel === 'notifications' && <NotificationsPanel userId={user?.id || ''} />}
             </PanelErrorBoundary>
           )}
         </main>
@@ -1251,47 +1254,11 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
     if (error) { setUpdateError('Failed: ' + error.message); return; }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : newStatus === 'cancelled' ? { status: 'cancelled' } : {}) } : o));
 
-    // Create notification for buyer
-    try {
-      const { data: order } = await supabase.from('orders').select('user_id, items, id').eq('id', orderId).single();
-      if (order && order.user_id) {
-        const firstItem = (order.items || [])[0] || {};
-        const productImage = firstItem.image || '';
-        const notifications: Record<string, { title: string; message: string }> = {
-          preparing: { title: 'Order is Being Prepared', message: `Your order #${orderId.slice(-6)} is being prepared by the seller.` },
-          shipped: { title: 'Shipped Out', message: `Your order #${orderId.slice(-6)} has been shipped out by the seller.` },
-          delivered: { title: 'Received Order?', message: `Your order #${orderId.slice(-6)} has been delivered. Please confirm receipt.` },
-          completed: { title: 'Your Order is Completed', message: `Your order #${orderId.slice(-6)} has been completed. Thank you!` },
-          cancelled: { title: 'Order Cancelled', message: `Your order #${orderId.slice(-6)} has been cancelled by the seller.` },
-        };
-        const notif = notifications[newStatus];
-        if (!notif) return;
-        const PAYMONGO_API_URL = API_BASE;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        const { data: authData } = await supabase.auth.getSession();
-        const token = authData.session?.access_token;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${PAYMONGO_API_URL}/api/notifications`, {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({
-            user_id: order.user_id,
-            type: newStatus,
-            title: notif.title,
-            message: notif.message,
-            order_id: orderId,
-            product_image: productImage,
-          }),
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          setUpdateError(`Notification failed: ${text || res.status}`);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to create notification:', e);
-    }
+    // Create notification for buyer (non-blocking, toast on failure)
+    createBuyerNotification(orderId, newStatus).catch(err => {
+      console.error('Failed to create notification:', err);
+      toast.error('Order updated but notification failed to send');
+    });
   }
 
   const deliveryBadge = (status: string) => {
@@ -2111,8 +2078,161 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
           <button onClick={handleSave} disabled={saving} style={{ padding: '14px 36px', borderRadius: '10px', border: 'none', background: saving ? '#ccc' : 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.95rem', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
-</div>
+        </div>
+      </div>
     </div>
-  </div>
+  );
+}
+
+async function createBuyerNotification(orderId: string, status: string) {
+  const { data: order } = await supabase.from('orders').select('user_id, items, id').eq('id', orderId).single();
+  if (!order || !order.user_id) return;
+  const firstItem = (order.items || [])[0] || {};
+  const productImage = firstItem.image || '';
+  const notifications: Record<string, { title: string; message: string }> = {
+    preparing: { title: 'Order is Being Prepared', message: `Your order #${orderId.slice(-6)} is being prepared by the seller.` },
+    shipped: { title: 'Shipped Out', message: `Your order #${orderId.slice(-6)} has been shipped out by the seller.` },
+    delivered: { title: 'Received Order?', message: `Your order #${orderId.slice(-6)} has been delivered. Please confirm receipt.` },
+    completed: { title: 'Your Order is Completed', message: `Your order #${orderId.slice(-6)} has been completed. Thank you!` },
+    cancelled: { title: 'Order Cancelled', message: `Your order #${orderId.slice(-6)} has been cancelled by the seller.` },
+  };
+  const notif = notifications[status];
+  if (!notif) return;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const { data: authData } = await supabase.auth.getSession();
+  const token = authData.session?.access_token;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/notifications`, {
+    method: 'POST', headers, credentials: 'include',
+    body: JSON.stringify({ user_id: order.user_id, type: status, title: notif.title, message: notif.message, order_id: orderId, product_image: productImage }),
+  });
+  if (!res.ok) throw new Error(`Notification failed: ${res.status}`);
+}
+
+function NotificationsPanel({ userId }: { userId: string }) {
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) { setLoading(false); return; }
+    let cancelled = false;
+    async function fetchNotifications() {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (!cancelled && data) setNotifications(data);
+      if (!cancelled) setLoading(false);
+    }
+    fetchNotifications();
+    const channel = supabase
+      .channel(`artisan-notifs:${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, fetchNotifications)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [userId]);
+
+  async function markRead(id: string) {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  }
+
+  async function markAllRead() {
+    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }
+
+  async function deleteNotif(id: string) {
+    await supabase.from('notifications').delete().eq('id', id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const timeAgo = (iso: string) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24); return `${d}d ago`;
+  };
+  const typeConfig: Record<string, { bg: string; color: string }> = {
+    preparing: { bg: '#E3F2FD', color: '#1565C0' },
+    shipped: { bg: '#F3E5F5', color: '#6A1B9A' },
+    delivered: { bg: '#E8F5E9', color: '#2E7D32' },
+    completed: { bg: '#FFF3E0', color: '#C1570D' },
+    cancelled: { bg: '#FFEBEE', color: '#D32F2F' },
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Notifications</h1>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
+            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} style={{ padding: '8px 16px', border: '1.5px solid var(--primary-color)', borderRadius: '8px', background: 'transparent', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-color)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--primary-color)'; }}>
+            Mark All as Read
+          </button>
+        )}
+      </div>
+      <div style={{ background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', overflow: 'hidden' }}>
+        {loading ? (
+          [1, 2, 3, 4].map(i => (
+            <div key={i} style={{ display: 'flex', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #F0EBE4' }}>
+              <div className="shimmer-skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="shimmer-skeleton" style={{ height: '13px', width: '70%', borderRadius: '4px' }} />
+                <div className="shimmer-skeleton" style={{ height: '11px', width: '40%', borderRadius: '4px' }} />
+              </div>
+            </div>
+          ))
+        ) : notifications.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Bell size={28} color="var(--primary-color)" strokeWidth={1.5} />
+            </div>
+            <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>No notifications yet</p>
+            <p style={{ fontSize: '0.85rem' }}>You'll be notified about order updates and messages.</p>
+          </div>
+        ) : (
+          notifications.map(n => {
+            const tc = typeConfig[n.type] || { bg: '#F5F5F5', color: '#666' };
+            return (
+              <div key={n.id} style={{ display: 'flex', gap: '14px', padding: '16px 20px', borderBottom: '1px solid #F0EBE4', background: n.read ? 'transparent' : '#FDF8F4', transition: 'background 0.15s', alignItems: 'flex-start' }}
+                onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
+                onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Bell size={18} color={tc.color} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: n.read ? 500 : 700, color: 'var(--text-dark)' }}>{n.title}</span>
+                    {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
+                  <span style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {!n.read && (
+                    <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>Read</button>
+                  )}
+                  <button onClick={() => deleteNotif(n.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', padding: '4px', borderRadius: '4px', transition: 'color 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#d32f2f')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#aaa')}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }

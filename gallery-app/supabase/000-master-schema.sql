@@ -171,12 +171,13 @@ CREATE INDEX IF NOT EXISTS idx_designs_user_id ON designs(user_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
   title TEXT NOT NULL,
-  body TEXT DEFAULT '',
-  type TEXT DEFAULT 'info',
+  message TEXT NOT NULL,
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  product_image TEXT DEFAULT '',
   read BOOLEAN DEFAULT false,
-  data JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
