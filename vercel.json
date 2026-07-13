@@ -1,6 +1,7 @@
 {
   "buildCommand": "cd gallery-app && npm install && npm run build",
   "outputDirectory": "gallery-app/dist",
+  "framework": "vite",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

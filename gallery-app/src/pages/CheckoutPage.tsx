@@ -846,14 +846,14 @@ export default function CheckoutPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 40,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)' }}>Total:</span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</span>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Total</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</div>
           </div>
           <button onClick={handlePlaceOrder} disabled={placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote)} style={{
             background: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? '#D4C8BB' : 'linear-gradient(135deg, #8B5E3C, #A0522D)',
-            color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '8px',
-            fontWeight: 700, fontSize: '0.82rem', cursor: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'not-allowed' : 'pointer',
+            color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px',
+            fontWeight: 700, fontSize: '0.95rem', cursor: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'not-allowed' : 'pointer',
             boxShadow: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'none' : '0 4px 14px rgba(139,94,60,0.3)',
           }}>
             {placing ? 'PLACING...' : 'PLACE ORDER'}

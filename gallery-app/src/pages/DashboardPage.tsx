@@ -125,9 +125,54 @@ export default function DashboardPage() {
   const orderCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { user } = useAuth();
 
+  // Map raw Supabase order to DashboardOrder format (for realtime updates)
+  const mapOrderToDashboard = (o: any): DashboardOrder => {
+    const paymentStatus = o.status || 'pending';
+    const deliveryStatus = o.delivery_status || 'pending';
+    let status: DashboardOrder['status'] = 'to-ship';
+    if (o.status === 'completed' || deliveryStatus === 'completed') {
+      status = 'completed';
+    } else if (o.status === 'cancelled') {
+      status = 'cancelled';
+    } else if (paymentStatus === 'refunded') {
+      status = 'return-refund';
+    } else if (paymentStatus === 'pending') {
+      status = 'to-pay';
+    } else if (deliveryStatus === 'delivered') {
+      status = 'to-receive';
+    } else {
+      status = 'to-ship';
+    }
+
+    const items: OrderItem[] = (o.items || []).map((i: any) => ({
+      productId: i.product_id || i.productId || '',
+      productName: i.product_name || i.productName || '',
+      image: i.image || '',
+      qty: i.qty || 1,
+      price: i.price || 0,
+      shop_name: i.shop_name || o.user_name || 'LikhArtisan Shop',
+      dimensions: i.dimensions || '',
+      variation: i.variation || '',
+    }));
+
+    const shop = items[0]?.shop_name || 'LikhArtisan Shop';
+
+    return {
+      id: o.id,
+      items,
+      total: o.total,
+      status,
+      shop,
+      date: o.created_at,
+      checkoutSessionId: o.checkout_session_id || undefined,
+      deliveryStatus,
+    };
+  };
+
   useEffect(() => {
     return () => { if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current); };
   }, []);
+
   useEffect(() => {
     loadProfile();
     loadOrders();
@@ -136,8 +181,29 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Realtime: listen for order updates (buyer sees their own orders)
   useEffect(() => {
-    const tab = searchParams.get('tab');
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`buyer-orders:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+        (payload) => setOrders(prev => [mapOrderToDashboard(payload.new), ...prev])
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+        (payload) => setOrders(prev => prev.map(o => o.id === payload.new.id ? mapOrderToDashboard(payload.new) : o))
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+      }, [user, mapOrderToDashboard]);
+
+      useEffect(() => {
+        const tab = searchParams.get('tab');
     const status = searchParams.get('status');
     const orderId = searchParams.get('order');
     if (tab === 'purchases') {

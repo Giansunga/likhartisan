@@ -1226,6 +1226,36 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
 
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
 
+  // Realtime: listen for new/updated orders for this shop
+  useEffect(() => {
+    if (!shopId || !shopName) return;
+
+    const channel = supabase
+      .channel(`shop-orders:${shopId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          const items = Array.isArray(payload.new.items) ? payload.new.items : [];
+          if (items.some((i: any) => i.shop_id === shopId || i.shop_name === shopName)) {
+            setOrders(prev => [payload.new, ...prev]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [shopId, shopName]);
+
   useEffect(() => {
     const orderId = searchParams.get('orderId');
     if (orderId && orders.length > 0) {
