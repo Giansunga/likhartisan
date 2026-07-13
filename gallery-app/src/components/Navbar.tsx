@@ -126,19 +126,13 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!isArtisanDashboard || !userEmail || !SHOP_EMAILS.includes(userEmail)) return;
-    let cancelled = false;
-    let shopId: string | null = null;
 
     async function init() {
-      const { data: shop } = await supabase.from('shops').select('id').eq('email', userEmail).maybeSingle();
-      if (cancelled || !shop) return;
-      shopId = shop.id;
-
       async function fetchNotifications() {
         const userId = user?.id;
         if (!userId) return;
 
-        // 1) Persisted notifications from the notifications table
+        // Persisted notifications from the notifications table
         const { data: persisted } = await supabase
           .from('notifications')
           .select('id, type, title, message, product_image, created_at, read, order_id')
@@ -155,39 +149,13 @@ export default function Navbar() {
           order_id: n.order_id || '',
         }));
 
-        // 2) Synthetic order notifications (derived from live order status)
-        const synthetic: { id: string; type: string; text: string; time: string; read: boolean; isReal?: boolean }[] = [];
-        const { data: orders } = await supabase.from('orders').select('id, user_name, total, created_at, status, items').order('created_at', { ascending: false }).limit(10);
-        if (orders) {
-          orders.filter((o: any) => {
-            const items = o.items || [];
-            return items.some((i: any) => i.shop_id === shopId);
-          }).forEach((o: any) => {
-            synthetic.push({
-              id: `order-${o.id}`, type: 'order', isReal: false,
-              text: `New order from ${o.user_name || 'Customer'} — ₱${(o.total || 0).toLocaleString()}`,
-              time: o.created_at, read: o.status !== 'pending',
-            });
-          });
-        }
-
-        // 3) Merge: persisted first, then synthetic, deduplicate, sort, cap at 10
-        const seen = new Set<string>();
-        const merged = [...realNotifs, ...synthetic].filter(n => {
-          if (seen.has(n.id)) return false;
-          seen.add(n.id);
-          return true;
-        });
-        merged.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-        setNotifications(merged.slice(0, 10));
+        // Sort by time, cap at 10
+        realNotifs.sort((a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime());
+        setNotifications(realNotifs.slice(0, 10));
       }
 
       fetchNotifications();
 
-      const orderChannel = supabase
-        .channel(`orders:artisan`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchNotifications)
-        .subscribe();
       const notifChannel = supabase
         .channel(`notifications:artisan:${user?.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, fetchNotifications)
@@ -195,7 +163,6 @@ export default function Navbar() {
       const poll = setInterval(fetchNotifications, 30000);
 
       cleanupFns.push(() => {
-        supabase.removeChannel(orderChannel);
         supabase.removeChannel(notifChannel);
         clearInterval(poll);
       });
@@ -205,7 +172,6 @@ export default function Navbar() {
     init();
 
     return () => {
-      cancelled = true;
       cleanupFns.forEach(fn => fn());
     };
   }, [isArtisanDashboard, userEmail, user?.id]);
