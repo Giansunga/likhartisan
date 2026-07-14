@@ -726,23 +726,26 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
       const shippingFee = parseFloat(meta.verifiedShippingFee) || 0;
       const total = subtotal + shippingFee;
 
-      const { data: newOrder, error: insertError } = await supabase.from('orders').insert({
-        user_id: meta.userId || '',
-        user_name: meta.userName || '',
-        user_phone: meta.userPhone || '',
-        user_address: meta.userAddress || '',
-        buyer_email: meta.userEmail || '',
-        items: mappedItems,
-        subtotal,
-        shipping_fee: shippingFee,
-        total,
-        delivery_option: meta.deliveryOption || 'pickup',
-        delivery_status: 'pending',
-        status: 'paid',
-        payment_reference: referenceNumber,
-        checkout_session_id: sessionId,
-        lalamove_quote_id: meta.lalamoveQuoteId || null,
-      }).select().single();
+      const firstItem = mappedItems[0];
+      
+            const { data: newOrder, error: insertError } = await supabase.from('orders').insert({
+              user_id: meta.userId || '',
+              user_name: meta.userName || '',
+              user_phone: meta.userPhone || '',
+              user_address: meta.userAddress || '',
+              buyer_email: meta.userEmail || '',
+              shop_id: firstItem?.shop_id || null,
+              items: mappedItems,
+              subtotal,
+              shipping_fee: shippingFee,
+              total,
+              delivery_option: meta.deliveryOption || 'pickup',
+              delivery_status: 'pending',
+              status: 'paid',
+              payment_reference: referenceNumber,
+              checkout_session_id: sessionId,
+              lalamove_quote_id: meta.lalamoveQuoteId || null,
+            }).select().single();
 
       if (insertError) {
         console.error('Error creating order from webhook:', insertError.message);

@@ -149,18 +149,22 @@ export default function ChatPage() {
     }
   }, [selectedConv]);
 
-  // Real-time: subscribe to conversation updates (for sidebar last message)
-  useEffect(() => {
-    if (!userId) return;
-    const channel = supabase
-      .channel('conversations-list')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, (payload) => {
-        const updated = payload.new as Conversation;
-        setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at } : c));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+  // Real-time: subscribe to conversation updates (for sidebar last message) AND new conversations
+    useEffect(() => {
+      if (!userId) return;
+      const channel = supabase
+        .channel('conversations-list')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
+          const newConv = payload.new as Conversation;
+          setConversations(prev => [newConv, ...prev]);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
+          const updated = payload.new as Conversation;
+          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at } : c));
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }, [userId]);
 
   useEffect(() => {
     const container = document.querySelector('.chat-messages-area');

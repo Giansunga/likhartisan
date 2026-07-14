@@ -1231,25 +1231,22 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
     if (!shopId || !shopName) return;
 
     const channel = supabase
-      .channel(`shop-orders:${shopId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const items = Array.isArray(payload.new.items) ? payload.new.items : [];
-          if (items.some((i: any) => i.shop_id === shopId || i.shop_name === shopName)) {
-            setOrders(prev => [payload.new, ...prev]);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
-        }
-      )
-      .subscribe();
+          .channel(`shop-orders:${shopId}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
+            (payload) => {
+              setOrders(prev => [payload.new, ...prev]);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
+            (payload) => {
+              setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
+            }
+          )
+          .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -1662,20 +1659,37 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   }, [selectedConv]);
 
   async function init() {
-    try {
-      if (user) setArtisanUserId(user.id);
-      if (shopId) {
-        const { data } = await supabase
-          .from('conversations').select('*').eq('shop_id', shopId)
-          .order('last_message_at', { ascending: false });
-        if (data) setConversations(data);
+      try {
+        if (user) setArtisanUserId(user.id);
+        if (shopId) {
+          const { data } = await supabase
+            .from('conversations').select('*').eq('shop_id', shopId)
+            .order('last_message_at', { ascending: false });
+          if (data) setConversations(data);
+        }
+      } catch (e) {
+        console.error('Messages init error:', e);
+      } finally {
+        setLoadingMessages(false);
       }
-    } catch (e) {
-      console.error('Messages init error:', e);
-    } finally {
-      setLoadingMessages(false);
     }
-  }
+
+    // Realtime: listen for new conversations for this shop
+    useEffect(() => {
+      if (!shopId) return;
+      const channel = supabase
+        .channel(`shop-conversations:${shopId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
+          const newConv = payload.new as any;
+          setConversations(prev => [newConv, ...prev]);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
+          const updated = payload.new as any;
+          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at } : c));
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }, [shopId]);
 
   async function fetchMessages(convId: string) {
     const { data } = await supabase
