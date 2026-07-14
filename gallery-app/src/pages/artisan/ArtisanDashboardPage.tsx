@@ -1314,15 +1314,19 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
 
   async function updateDeliveryStatus(orderId: string, newStatus: string) {
     setUpdateError('');
-    const updates: Record<string, string> = { delivery_status: newStatus };
-    if (newStatus === 'completed') updates.status = 'completed';
-    if (newStatus === 'cancelled') updates.status = 'cancelled';
+    const updates: Record<string, string> = {};
+    if (newStatus === 'cancelled') {
+      updates.status = 'cancelled';
+    } else {
+      updates.delivery_status = newStatus;
+      if (newStatus === 'completed') updates.status = 'completed';
+    }
     const { error } = await supabase
       .from('orders')
       .update(updates)
       .eq('id', orderId);
     if (error) { setUpdateError('Failed: ' + error.message); return; }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : newStatus === 'cancelled' ? { status: 'cancelled' } : {}) } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...(newStatus === 'cancelled' ? { status: 'cancelled' } : { delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) }) } : o));
 
     // Create notification for buyer (non-blocking, toast on failure)
     createBuyerNotification(orderId, newStatus).catch(err => {
