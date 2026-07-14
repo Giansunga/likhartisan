@@ -1830,7 +1830,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
               ))}
             </div>
           ) : filteredConvs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 20px', color: '#A89688' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 20px', color: '#A89688' }}>
               <MessageSquare size={40} style={{ opacity: 0.25, marginBottom: '10px' }} />
               <p style={{ fontSize: '0.85rem' }}>No conversations yet.</p>
             </div>
