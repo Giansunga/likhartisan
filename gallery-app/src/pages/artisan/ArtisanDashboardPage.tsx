@@ -1449,13 +1449,18 @@ return (
                 <td style={{ padding: '14px 18px' }}>{deliveryBadge(order.delivery_status)}</td>
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--accent-color)' }}>{'\u20B1'}{(order.item_price * order.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td style={{ padding: '14px 18px' }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {order.delivery_status === 'pending' && (
-                      <>
-                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'preparing'); }}
-                          style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
-                      </>
-                    )}
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {/* Cancelled orders: show Removed label */}
+                                    {(order.payment_status === 'cancelled' || order.status === 'cancelled') && (
+                                      <span style={{ padding: '5px 12px', fontSize: '0.75rem', fontWeight: 600, color: '#d32f2f', background: '#ffebee', borderRadius: '6px' }}>Removed</span>
+                                    )}
+                                    {/* Active orders: show action buttons based on delivery status */}
+                                    {order.delivery_status === 'pending' && order.payment_status !== 'cancelled' && order.status !== 'cancelled' && (
+                                      <>
+                                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'preparing'); }}
+                                          style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
+                                      </>
+                                    )}
                     {order.delivery_status === 'preparing' && (
                       <>
                         <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'shipped'); }}

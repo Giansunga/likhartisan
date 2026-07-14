@@ -84,3 +84,86 @@ function scrollToBottom() {
 - Consecutive messages from same sender grouped
 - Avatar shown once per group
 - Timestamp shown on first message of group
+
+---
+
+## React Native (Mobile) patterns
+
+### Realtime subscription
+```tsx
+useEffect(() => {
+  const channel = supabase
+    .channel(`chat-${conversationId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },
+      (payload) => {
+        const newMsg = payload.new as any;
+        setMessages((prev) => [...prev, {
+          id: newMsg.id,
+          conversationId: newMsg.conversation_id,
+          senderId: newMsg.sender_id,
+          text: newMsg.text,
+          imageUrl: newMsg.image_url,
+          createdAt: newMsg.created_at,
+        }]);
+      }
+    )
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}, [conversationId]);
+```
+
+### Send message
+```ts
+await supabase.from('messages').insert({
+  conversation_id: conversationId,
+  sender_id: userId,
+  text: messageText,
+});
+// Update conversation last message
+await supabase
+  .from('conversations')
+  .update({ last_message: messageText, last_message_at: new Date().toISOString() })
+  .eq('id', conversationId);
+```
+
+### Auto-scroll with FlatList
+```tsx
+const flatListRef = useRef<FlatList>(null);
+
+<FlatList
+  ref={flatListRef}
+  data={messages}
+  keyExtractor={(item) => item.id}
+  renderItem={renderMessage}
+  onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+/>
+
+// Scroll on new message
+useEffect(() => {
+  flatListRef.current?.scrollToEnd();
+}, [messages.length]);
+```
+
+### Message bubble
+```tsx
+const isMe = item.senderId === userId;
+<View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+  <Text style={[styles.text, isMe ? styles.myText : styles.theirText]}>
+    {item.text}
+  </Text>
+</View>
+```
+
+### Typing indicator (via Presence)
+```ts
+const channel = supabase.channel(`typing-${conversationId}`);
+
+channel.on('presence', { event: 'sync' }, () => {
+  const state = channel.presenceState();
+  setTypingUsers(Object.values(state).flat());
+});
+
+await channel.track({ userId, typing: true });
+```
