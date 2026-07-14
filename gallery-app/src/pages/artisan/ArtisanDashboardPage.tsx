@@ -1651,12 +1651,15 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   }, [selectedConv?.id]);
 
   // When a conversation is opened, mark it read for the artisan.
-  useEffect(() => {
-    if (selectedConv && selectedConv.artisan_unread > 0) {
-      setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, artisan_unread: 0 } : c));
-      supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
-    }
-  }, [selectedConv]);
+    useEffect(() => {
+      async function markAsRead() {
+        if (selectedConv && selectedConv.artisan_unread > 0) {
+          setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, artisan_unread: 0 } : c));
+          await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
+        }
+      }
+      markAsRead();
+    }, [selectedConv?.id, selectedConv?.artisan_unread]);
 
   async function init() {
         try {
