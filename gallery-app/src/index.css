@@ -1863,7 +1863,7 @@ body {
 .shop-about-section { margin: 20px 16px; padding: 18px; border: 1px solid rgba(130,62,11,0.08); border-radius: var(--radius-md); }
 .shop-about-section h4 { font-size: 0.88rem; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
 .shop-about-section p { font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
-.chat-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 40px; }
+.chat-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; text-align: center; padding: 40px; }
 .chat-empty-state svg { width: 80px; height: 80px; color: var(--text-light); opacity: 0.3; margin-bottom: 20px; }
 .chat-empty-state h3 { font-family: var(--font-serif); font-size: 1.5rem; color: var(--primary-color); margin-bottom: 8px; }
 .chat-empty-state p { font-size: 0.9rem; color: var(--text-light); max-width: 300px; }
