@@ -1356,7 +1356,8 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
 
   const filtered = orders
     .filter(o => {
-      if (filterStatus !== 'all' && o.delivery_status !== filterStatus) return false;
+      if (filterStatus === 'cancelled' && o.status !== 'cancelled') return false;
+      if (filterStatus !== 'all' && filterStatus !== 'cancelled' && o.delivery_status !== filterStatus) return false;
       if (search && !o.item_name.toLowerCase().includes(search.toLowerCase()) && !o.id.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
@@ -1383,15 +1384,16 @@ return (
           <input type="text" placeholder="Search order..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ width: '100%', padding: '10px 14px 10px 38px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', boxSizing: 'border-box' }} />
         </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', cursor: 'pointer' }}>
-          <option value="all">Filter Order Status</option>
-          <option value="pending">Pending</option>
-          <option value="preparing">Preparing</option>
-          <option value="shipped">Shipped</option>
-          <option value="delivered">Delivered</option>
-          <option value="completed">Completed</option>
-        </select>
+<select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+        style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', cursor: 'pointer' }}>
+  <option value="all">Filter Order Status</option>
+  <option value="pending">Pending</option>
+  <option value="preparing">Preparing</option>
+  <option value="shipped">Shipped</option>
+  <option value="delivered">Delivered</option>
+  <option value="completed">Completed</option>
+  <option value="cancelled">Cancelled</option>
+</select>
         <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}
           style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', cursor: 'pointer' }}>
           <option value="newest">Sort (Newest)</option>
@@ -1456,7 +1458,7 @@ return (
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     {/* Cancelled orders: show Remove Order button */}
                                     {(order.payment_status === 'Cancelled' || order.status === 'cancelled') && (
-                                      <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'cancelled'); }}
+                                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Are you sure you want to remove this order? This action cannot be undone.')) { updateDeliveryStatus(order.id, 'cancelled'); } }}
                                         style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: '#d32f2f', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Remove Order</button>
                                     )}
                                     {/* Active orders: show action buttons based on delivery status */}
