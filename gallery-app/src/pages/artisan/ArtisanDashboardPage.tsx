@@ -1659,20 +1659,31 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   }, [selectedConv]);
 
   async function init() {
-      try {
-        if (user) setArtisanUserId(user.id);
-        if (shopId) {
-          const { data } = await supabase
-            .from('conversations').select('*').eq('shop_id', shopId)
-            .order('last_message_at', { ascending: false });
-          if (data) setConversations(data);
+        try {
+          if (user) setArtisanUserId(user.id);
+          if (shopId) {
+            const { data } = await supabase
+              .from('conversations').select('*, buyer_id').eq('shop_id', shopId)
+              .order('last_message_at', { ascending: false });
+            if (data) {
+              // Enrich conversations with fresh buyer names from user_metadata
+              const enriched = await Promise.all(data.map(async (c: any) => {
+                if (c.buyer_name && c.buyer_name !== 'Buyer') return c;
+                // Fetch fresh name from auth.users via RPC or fallback
+                const { data: userData } = await supabase.auth.admin.getUserById(c.buyer_id);
+                const userMeta = userData?.user?.user_metadata || {};
+                const freshName = userMeta.name || userData?.user?.email || 'Buyer';
+                return { ...c, buyer_name: freshName };
+              }));
+              setConversations(enriched);
+            }
+          }
+        } catch (e) {
+          console.error('Messages init error:', e);
+        } finally {
+          setLoadingMessages(false);
         }
-      } catch (e) {
-        console.error('Messages init error:', e);
-      } finally {
-        setLoadingMessages(false);
       }
-    }
 
     // Realtime: listen for new conversations for this shop
     useEffect(() => {
