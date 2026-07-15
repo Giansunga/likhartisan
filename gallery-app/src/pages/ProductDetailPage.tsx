@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Product, ProductVariation, ProductReview, CartItem } from '../types';
 import type { ReactElement } from 'react';
-import { loadFavorites, saveFavorites, mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
+import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
 import RecommendationsSection from '../components/RecommendationsSection';
 
 function renderStars(rating: number, size = 14): ReactElement[] {
@@ -72,10 +72,6 @@ export default function ProductDetailPage() {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
-
-  const [favorites] = useState<string[]>(() => loadFavorites());
-
-  useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
   const displayPrice = selectedVariation?.price ?? product?.price ?? 0;
 
@@ -394,6 +390,14 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
+              <div className="product-viewer-price" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '16px' }}>
+                {variations.length > 0 ? (
+                  selectedVariation ? fmt(displayPrice) : 'Select a variation'
+                ) : (
+                  fmt(displayPrice)
+                )}
+              </div>
+
               <div className="product-viewer-attributes">
                 {selectedVariation && selectedVariation.height && selectedVariation.height !== 'N/A' && (
                   <div className="attr-item"><span className="attr-label">Height:</span> <span className="attr-val">{selectedVariation.height}</span></div>
@@ -406,14 +410,6 @@ export default function ProductDetailPage() {
                 )}
                 <div className="attr-item"><span className="attr-label">Material:</span> <span className="attr-val">{product.materials || 'Terracotta Clay'}</span></div>
                 <div className="attr-item"><span className="attr-label">Technique:</span> <span className="attr-val">{product.technique || 'Handcrafted & Kiln-Fired'}</span></div>
-              </div>
-
-              <div className="product-viewer-price" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '16px' }}>
-                {variations.length > 0 ? (
-                  selectedVariation ? fmt(displayPrice) : 'Select a variation'
-                ) : (
-                  fmt(displayPrice)
-                )}
               </div>
 
               {(() => {
@@ -456,65 +452,66 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Full-width Shop Section */}
-          <div style={{
+          <div className="product-shop-section" style={{
             marginTop: '40px', marginBottom: '40px', padding: '18px 28px',
             background: '#fff', borderRadius: '16px', border: '1px solid #eee',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{
-                width: '72px', height: '72px', borderRadius: '50%', overflow: 'hidden',
-                flexShrink: 0, border: '3px solid var(--primary-color)',
-              }}>
-                {shopImage ? (
-                  <img src={shopImage} alt={product.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ width: '100%', height: '100%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.4rem' }}>
-                    {(product.shopName || 'S').charAt(0)}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                  <button onClick={handleChatNow}
-                    style={{
-                      padding: '8px 20px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
-                      border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                    }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
-                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                    </svg>
-                    Chat Now
-                  </button>
-                  <Link to={`/shop/${product.shopId}`} style={{
-                    padding: '8px 20px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
-                    border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
-                    display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none',
-                  }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
-                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                    View Shop
-                  </Link>
+            {/* Avatar */}
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden',
+              flexShrink: 0, border: '3px solid var(--primary-color)',
+            }}>
+              {shopImage ? (
+                <img src={shopImage} alt={product.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.4rem' }}>
+                  {(product.shopName || 'S').charAt(0)}
                 </div>
+              )}
+            </div>
+
+            {/* Shop Name + Buttons (stacked vertically) */}
+            <div className="product-shop-name" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
+              <div className="product-shop-buttons" style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleChatNow}
+                  style={{
+                    padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                    border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
+                    display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+                  }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                  </svg>
+                  Chat Now
+                </button>
+                <Link to={`/shop/${product.shopId}`} style={{
+                  padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                  border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
+                  display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', whiteSpace: 'nowrap',
+                }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                  View Shop
+                </Link>
               </div>
             </div>
 
-            <div style={{
-              display: 'flex', gap: '24px', alignItems: 'center',
-            }}>
+            {/* Spacer */}
+            <div style={{ flex: 1 }}></div>
+
+            {/* Products + Ratings */}
+            <div className="product-shop-stats" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '4px' }}>Products</div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
               </div>
-              <div style={{ width: '1px', height: '40px', background: '#E8E0D8' }} />
+              <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }}></div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '4px' }}>Ratings</div>
-                <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 18)}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
+                <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
               </div>
             </div>
           </div>
@@ -625,12 +622,7 @@ export default function ProductDetailPage() {
       </div>
 
       {isMobile && (
-        <div style={{
-          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
-          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
-          display: 'flex', gap: '10px', zIndex: 30,
-          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
-        }}>
+        <div className="mobile-action-bar">
           {(() => {
             const stock = selectedVariation?.stock ?? product?.stock ?? 0;
             const isOutOfStock = stock === 0;
@@ -638,11 +630,11 @@ export default function ProductDetailPage() {
             const disabled = isOutOfStock || needsVariation;
             return (
               <>
-                <button onClick={handleAskClick} style={{ flex: '0 0 44px', height: '44px', borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 22, height: 22 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                <button onClick={handleAskClick} className="btn-chat" style={{ borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                 </button>
-                <button onClick={handleAddToCart} disabled={disabled} style={{ flex: 1, height: '44px', borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
-                <button onClick={handleBuy} disabled={disabled} style={{ flex: 1, height: '44px', borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
+                <button onClick={handleAddToCart} disabled={disabled} className="btn-cart" style={{ borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
+                <button onClick={handleBuy} disabled={disabled} className="btn-buy" style={{ borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
               </>
             );
           })()}
