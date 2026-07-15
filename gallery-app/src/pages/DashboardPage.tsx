@@ -45,6 +45,7 @@ const ORDER_TABS = [
   { key: 'to-receive', label: 'To Receive' },
   { key: 'completed', label: 'Completed' },
   { key: 'return-refund', label: 'Return Refund' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const SIDEBAR_ITEMS = [
