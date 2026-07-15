@@ -1457,8 +1457,12 @@ return (
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--accent-color)' }}>{'\u20B1'}{(order.item_price * order.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td style={{ padding: '14px 18px' }}>
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                    {/* Cancelled orders: show Cancel Order button */}
-                                    {(order.payment_status === 'Cancelled' || order.status === 'cancelled') && (
+                                    {/* Cancelled + delivery cancelled: show red Completed label */}
+                                    {order.delivery_status === 'cancelled' && (
+                                      <span style={{ padding: '5px 12px', fontSize: '0.75rem', fontWeight: 600, color: '#d32f2f', background: '#ffebee', borderRadius: '6px' }}>Completed</span>
+                                    )}
+                                    {/* Payment cancelled but delivery not yet cancelled: show Cancel Order button */}
+                                    {order.delivery_status !== 'cancelled' && (order.payment_status === 'Cancelled' || order.status === 'cancelled') && (
                                       <button onClick={(e) => { e.stopPropagation(); if (confirm('Are you sure you want to cancel this order? This will cancel both payment and delivery status.')) { updateDeliveryStatus(order.id, 'cancelled'); } }}
                                         style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: '#d32f2f', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel Order</button>
                                     )}
