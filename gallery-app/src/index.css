@@ -1794,6 +1794,9 @@ body {
   border: 2.5px solid #fff;
   z-index: 1;
 }
+.chat-header-offline-dot {
+  background: #BDBDBD;
+}
 .chat-header-info-block {
   min-width: 0;
 }

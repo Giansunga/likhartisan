@@ -74,6 +74,9 @@ export default function ChatPage() {
   const [remoteTyping, setRemoteTyping] = useState(false);
   const remoteTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [shopActiveMap, setShopActiveMap] = useState<Record<string, number>>({});
+  const [lastSeenMap, setLastSeenMap] = useState<Record<string, string>>({});
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user } = useAuth();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,6 +140,34 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(ch); typingChannelRef.current = null; };
   }, [selectedConv?.id]);
 
+  // Listen for artisan activity heartbeat on shop-specific channel
+  useEffect(() => {
+    if (!selectedConv) return;
+    const ch = supabase
+      .channel(`presence:${selectedConv.shop_id}`)
+      .on('broadcast', { event: 'heartbeat' }, () => {
+        setShopActiveMap(prev => ({ ...prev, [selectedConv.shop_id]: Date.now() }));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [selectedConv?.shop_id]);
+
+  // Send buyer heartbeat for artisan-side detection (every 90s while on chat page)
+  useEffect(() => {
+    if (!userId) return;
+    const buyerChannel = supabase.channel(`presence-buyer:${userId}`);
+    buyerChannel.subscribe();
+    const send = () => {
+      buyerChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
+    };
+    send();
+    heartbeatTimerRef.current = setInterval(send, 90000);
+    return () => {
+      if (heartbeatTimerRef.current) { clearInterval(heartbeatTimerRef.current); heartbeatTimerRef.current = null; }
+      supabase.removeChannel(buyerChannel);
+    };
+  }, [userId]);
+
   function broadcastTyping() {
     typingChannelRef.current?.send({ type: 'broadcast', event: 'typing' });
   }
@@ -192,8 +223,10 @@ export default function ChatPage() {
     if (data) {
       setShops(data);
       const map: Record<string, string> = {};
-      data.forEach((s: any) => { if (s.image) map[s.id] = s.image; });
+      const seenMap: Record<string, string> = {};
+      data.forEach((s: any) => { if (s.image) map[s.id] = s.image; if (s.last_seen_at) seenMap[s.id] = s.last_seen_at; });
       setShopImageMap(prev => ({ ...prev, ...map }));
+      setLastSeenMap(prev => ({ ...prev, ...seenMap }));
     }
   }
 
@@ -202,6 +235,7 @@ export default function ChatPage() {
     if (data) {
       setSelectedShop(data);
       if (data.image) setShopImageMap(prev => ({ ...prev, [shopId]: data.image }));
+      if (data.last_seen_at) setLastSeenMap(prev => ({ ...prev, [shopId]: data.last_seen_at }));
     }
   }
 
@@ -225,11 +259,13 @@ export default function ChatPage() {
       setConversations(data);
       const shopIds = [...new Set(data.map((c: any) => c.shop_id).filter(Boolean))];
       if (shopIds.length > 0) {
-        const { data: shopData } = await supabase.from('shops').select('id, image').in('id', shopIds);
+        const { data: shopData } = await supabase.from('shops').select('id, image, last_seen_at').in('id', shopIds);
         if (shopData) {
           const map: Record<string, string> = {};
-          shopData.forEach((s: any) => { if (s.image) map[s.id] = s.image; });
+          const seenMap: Record<string, string> = {};
+          shopData.forEach((s: any) => { if (s.image) map[s.id] = s.image; if (s.last_seen_at) seenMap[s.id] = s.last_seen_at; });
           setShopImageMap(prev => ({ ...prev, ...map }));
+          setLastSeenMap(prev => ({ ...prev, ...seenMap }));
         }
       }
     }
@@ -345,6 +381,25 @@ export default function ChatPage() {
   const filteredShops = shops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase()) || s.description?.toLowerCase().includes(shopSearch.toLowerCase()));
   const filteredConvs = conversations.filter(c => c.shop_name?.toLowerCase().includes(convSearch.toLowerCase()));
 
+  function getShopActiveStatus(shopId: string): { active: boolean; text: string } {
+    const lastHeartbeat = shopActiveMap[shopId];
+    if (lastHeartbeat && Date.now() - lastHeartbeat < 180000) {
+      return { active: true, text: 'Active Now' };
+    }
+    const lastSeen = lastSeenMap[shopId];
+    if (lastSeen) {
+      const mins = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+      if (mins > 0 && mins <= 1440) {
+        if (mins < 2) return { active: false, text: 'Active 1m ago' };
+        if (mins < 60) return { active: false, text: `Active ${mins}m ago` };
+        const hrs = Math.floor(mins / 60);
+        if (hrs === 1) return { active: false, text: 'Active 1h ago' };
+        if (hrs <= 24) return { active: false, text: `Active ${hrs}h ago` };
+      }
+    }
+    return { active: false, text: '' };
+  }
+
   if (loading) {
       return <div className="chat-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: 'var(--text-light)' }}>Loading...</div></div>;
   }
@@ -407,7 +462,9 @@ export default function ChatPage() {
                   >
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <ShopAvatar shopId={conv.shop_id} shopName={conv.shop_name} image={shopImageMap[conv.shop_id]} size={48} />
-                      <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '12px', height: '12px', borderRadius: '50%', background: '#2E7D32', border: '2.5px solid var(--bg-primary)' }}></div>
+                      {(() => { const as = getShopActiveStatus(conv.shop_id); return (
+                        <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '12px', height: '12px', borderRadius: '50%', background: as.active ? '#2E7D32' : '#BDBDBD', border: '2.5px solid var(--bg-primary)' }}></div>
+                      ); })()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
@@ -452,15 +509,19 @@ export default function ChatPage() {
                     )}
                     <div className="chat-header-avatar-wrap">
                       <ShopAvatar shopId={selectedConv.shop_id} shopName={selectedConv.shop_name} image={shopImageMap[selectedConv.shop_id]} size={44} />
-                      <span className="chat-header-online-dot"></span>
+                      {(() => { const as = getShopActiveStatus(selectedConv.shop_id); return (
+                        <span className={as.active ? 'chat-header-online-dot' : 'chat-header-online-dot chat-header-offline-dot'}></span>
+                      ); })()}
                     </div>
                     <div className="chat-header-info-block">
                       <h3 className="chat-header-shop-name">{selectedConv.shop_name}</h3>
                       <div className="chat-header-status-row">
-                        <span className="chat-header-active-now">
-                          <span className="chat-header-status-dot-green"></span>
-                          Active Now
-                        </span>
+                        {(() => { const as = getShopActiveStatus(selectedConv.shop_id); return (
+                          <span className="chat-header-active-now" style={{ color: as.active ? '#2E7D32' : 'inherit' }}>
+                            <span className={as.active ? 'chat-header-status-dot-green' : ''} style={{ width: as.active ? undefined : '0', display: as.active ? undefined : 'none' }}></span>
+                            {as.text || ''}
+                          </span>
+                        ); })()}
                         <span className="chat-header-sep">&bull;</span>
                         <span className="chat-header-response-text">Replies within 30 mins</span>
                       </div>
@@ -684,9 +745,13 @@ export default function ChatPage() {
 
                 <div style={{ textAlign: 'center', padding: '36px 20px 0' }}>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>{selectedShop.name}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.78rem', color: '#2E7D32', fontWeight: 500, marginBottom: '16px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2E7D32', display: 'inline-block' }}></span>
-                    Active Artisan
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 500, marginBottom: '16px', color: (() => { const as = getShopActiveStatus(selectedConv.shop_id); return as.active ? '#2E7D32' : '#999'; })() }}>
+                    {(() => { const as = getShopActiveStatus(selectedConv.shop_id); return (
+                      as.text ? <>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: as.active ? '#2E7D32' : '#BDBDBD', display: 'inline-block' }}></span>
+                        {as.text}
+                      </> : null
+                    ); })()}
                   </div>
                 </div>
 
@@ -757,7 +822,9 @@ export default function ChatPage() {
                       <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-dark)', marginBottom: '2px' }}>{shop.name}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', lineHeight: 1.4 }}>{shop.description || 'Traditional pottery shop'}</div>
                     </div>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2E7D32', flexShrink: 0 }}></div>
+                    {(() => { const as = getShopActiveStatus(shop.id); return (
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: as.active ? '#2E7D32' : '#BDBDBD', flexShrink: 0 }}></div>
+                    ); })()}
                   </div>
                 ))
               )}

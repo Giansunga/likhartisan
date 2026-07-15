@@ -1666,7 +1666,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [uploading, setUploading] = useState(false);
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
+  const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, number>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const artisanHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user } = useAuth();
 
   useEffect(() => { init(); }, [shopId]);
@@ -1712,6 +1714,37 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
+
+  // Artisan heartbeat broadcast + listen for buyer heartbeat + update last_seen_at
+  useEffect(() => {
+    if (!shopId) return;
+    // Send artisan heartbeat every 60s
+    const artisanChannel = supabase.channel(`presence:${shopId}`);
+    artisanChannel.subscribe();
+    const send = () => {
+      artisanChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
+    };
+    send();
+    artisanHeartbeatRef.current = setInterval(send, 60000);
+    // Also update last_seen_at in DB
+    supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shopId);
+    return () => {
+      if (artisanHeartbeatRef.current) { clearInterval(artisanHeartbeatRef.current); artisanHeartbeatRef.current = null; }
+      supabase.removeChannel(artisanChannel);
+    };
+  }, [shopId]);
+
+  // Listen for buyer heartbeat on the active conversation
+  useEffect(() => {
+    if (!selectedConv?.buyer_id) return;
+    const ch = supabase
+      .channel(`presence-buyer:${selectedConv.buyer_id}`)
+      .on('broadcast', { event: 'heartbeat' }, () => {
+        setBuyerActiveMap(prev => ({ ...prev, [selectedConv.buyer_id]: Date.now() }));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [selectedConv?.buyer_id]);
 
   // When a conversation is opened, mark it read for the artisan.
     useEffect(() => {
@@ -1797,6 +1830,8 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
         setMessages(prev => [...prev, data]);
         await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+        // Update shop last_seen_at for buyer-side active status
+        if (shopId) await supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shopId);
       }
     } finally {
       if (imagePreview) URL.revokeObjectURL(imagePreview);
@@ -1821,6 +1856,15 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
     await supabase.from('conversations').delete().eq('id', convId);
     setConversations(prev => prev.filter(c => c.id !== convId));
     if (selectedConv?.id === convId) { setSelectedConv(null); setMessages([]); }
+  }
+
+
+  function getBuyerActiveStatus(buyerId: string): { active: boolean; text: string } {
+    const lastHeartbeat = buyerActiveMap[buyerId];
+    if (lastHeartbeat && Date.now() - lastHeartbeat < 360000) {
+      return { active: true, text: 'Active Now' };
+    }
+    return { active: false, text: '' };
   }
 
 
@@ -1976,7 +2020,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || 'Buyer'}</div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', fontWeight: 500 }}>Active now</div>
+                {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
+                  <div style={{ fontSize: '0.72rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
+                ); })()}
               </div>
             </div>
 
