@@ -1219,6 +1219,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
   const [orders, setOrders] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterTime, setFilterTime] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
   const [updateError, setUpdateError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -1375,6 +1376,21 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
       if (filterStatus === 'cancelled' && o.status !== 'cancelled') return false;
       if (filterStatus !== 'all' && filterStatus !== 'cancelled' && o.delivery_status !== filterStatus) return false;
       if (search && !o.item_name.toLowerCase().includes(search.toLowerCase()) && !o.id.toLowerCase().includes(search.toLowerCase())) return false;
+      if (filterTime !== 'all') {
+        const orderDate = new Date(o.created_at);
+        const now = new Date();
+        if (filterTime === 'today') {
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          if (orderDate < today) return false;
+        } else if (filterTime === 'week') {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (orderDate < weekAgo) return false;
+        } else if (filterTime === 'month') {
+          if (orderDate.getMonth() !== now.getMonth() || orderDate.getFullYear() !== now.getFullYear()) return false;
+        } else if (filterTime === 'year') {
+          if (orderDate.getFullYear() !== now.getFullYear()) return false;
+        }
+      }
       return true;
     })
     .sort((a, b) => sortOrder === 'newest' ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime() : new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -1410,6 +1426,14 @@ return (
   <option value="completed">Completed</option>
   <option value="cancelled">Cancelled</option>
 </select>
+        <select value={filterTime} onChange={e => setFilterTime(e.target.value)}
+          style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', cursor: 'pointer' }}>
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+        </select>
         <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}
           style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.88rem', outline: 'none', background: '#fff', color: 'var(--text-dark)', cursor: 'pointer' }}>
           <option value="newest">Sort (Newest)</option>
