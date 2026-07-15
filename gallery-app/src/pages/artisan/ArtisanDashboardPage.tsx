@@ -1317,6 +1317,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
     const updates: Record<string, string> = {};
     if (newStatus === 'cancelled') {
       updates.status = 'cancelled';
+      updates.delivery_status = 'cancelled';
     } else {
       updates.delivery_status = newStatus;
       if (newStatus === 'completed') updates.status = 'completed';
@@ -1326,7 +1327,7 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
       .update(updates)
       .eq('id', orderId);
     if (error) { setUpdateError('Failed: ' + error.message); return; }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...(newStatus === 'cancelled' ? { status: 'cancelled' } : { delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) }) } : o));
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...(newStatus === 'cancelled' ? { status: 'cancelled', delivery_status: 'cancelled' } : { delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) }) } : o));
 
     // Create notification for buyer (non-blocking, toast on failure)
     createBuyerNotification(orderId, newStatus).catch(err => {
@@ -1456,10 +1457,10 @@ return (
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--accent-color)' }}>{'\u20B1'}{(order.item_price * order.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td style={{ padding: '14px 18px' }}>
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                    {/* Cancelled orders: show Remove Order button */}
+                                    {/* Cancelled orders: show Cancel Order button */}
                                     {(order.payment_status === 'Cancelled' || order.status === 'cancelled') && (
-                                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Are you sure you want to remove this order? This action cannot be undone.')) { updateDeliveryStatus(order.id, 'cancelled'); } }}
-                                        style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: '#d32f2f', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Remove Order</button>
+                                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Are you sure you want to cancel this order? This will cancel both payment and delivery status.')) { updateDeliveryStatus(order.id, 'cancelled'); } }}
+                                        style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: '#d32f2f', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel Order</button>
                                     )}
                                     {/* Active orders: show action buttons based on delivery status */}
                                     {order.delivery_status === 'pending' && order.payment_status !== 'Cancelled' && order.status !== 'cancelled' && (
@@ -1582,8 +1583,8 @@ return (
               <button onClick={() => setSelectedOrder(null)}
                 style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Close</button>
               {(selectedOrder.payment_status === 'Cancelled' || selectedOrder.status === 'cancelled') && (
-                <button onClick={() => { if (confirm('Are you sure you want to remove this order? This action cannot be undone.')) { updateDeliveryStatus(selectedOrder.id, 'cancelled'); setSelectedOrder(null); } }}
-                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#d32f2f', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Remove Order</button>
+                <button onClick={() => { if (confirm('Are you sure you want to cancel this order? This will cancel both payment and delivery status.')) { updateDeliveryStatus(selectedOrder.id, 'cancelled'); setSelectedOrder(null); } }}
+                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#d32f2f', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel Order</button>
               )}
               {selectedOrder.delivery_status === 'pending' && selectedOrder.payment_status !== 'Cancelled' && selectedOrder.status !== 'cancelled' && (
                 <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'preparing'); setSelectedOrder(null); }}
