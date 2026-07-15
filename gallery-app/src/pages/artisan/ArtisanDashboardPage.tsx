@@ -1224,6 +1224,21 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  function formatRelativeTime(dateStr: string) {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
 
   // Realtime: listen for new/updated orders for this shop
@@ -1412,6 +1427,7 @@ return (
               <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment</th>
               <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery</th>
               <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Amount</th>
+              <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Time</th>
               <th style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
             </tr>
           </thead>
@@ -1424,11 +1440,12 @@ return (
                       <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '20px' }}></div></td>
                       <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '20px' }}></div></td>
                       <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '20px', width: '80px', borderRadius: '4px' }}></div></td>
+                      <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton" style={{ height: '16px', width: '50px', borderRadius: '4px' }}></div></td>
                       <td style={{ padding: '14px 18px' }}><div className="shimmer-skeleton-warm" style={{ height: '30px', width: '100px', borderRadius: '6px' }}></div></td>
                     </tr>
                   ))
               ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: '48px 18px' }}>
+              <tr><td colSpan={7} style={{ padding: '48px 18px' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                     <ShoppingBag size={26} color="#823E0B" />
@@ -1455,6 +1472,7 @@ return (
                 <td style={{ padding: '14px 18px' }}>{paymentBadge(order.payment_status)}</td>
                 <td style={{ padding: '14px 18px' }}>{deliveryBadge(order.delivery_status)}</td>
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--accent-color)' }}>{'\u20B1'}{(order.item_price * order.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td style={{ padding: '14px 18px', fontSize: '0.78rem', color: 'var(--text-light)' }}>{formatRelativeTime(order.created_at)}</td>
                 <td style={{ padding: '14px 18px' }}>
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     {/* Cancelled + delivery cancelled: show red Completed label */}
