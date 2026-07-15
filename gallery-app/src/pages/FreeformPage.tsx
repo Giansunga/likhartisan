@@ -182,24 +182,6 @@ export default function FreeformPage() {
     cameraRef.current = camera;
   }
 
-  function handleRotate() {
-    const c = controlsRef.current;
-    if (!c) return;
-    c.autoRotate = !c.autoRotate;
-    c.autoRotateSpeed = 4;
-    c.update?.();
-  }
-
-  function handleZoomIn() {
-    const cam = cameraRef.current;
-    const c = controlsRef.current;
-    if (!cam || !c) return;
-    const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
-    cam.position.addScaledVector(dir, 0.85);
-    c.update?.();
-  }
-
   function handleResetView() {
     const cam = cameraRef.current;
     const c = controlsRef.current;
