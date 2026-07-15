@@ -529,14 +529,13 @@ export default function FreeformPage() {
             {[
               { icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5', label: 'Drag to rotate' },
               { icon: 'M12 5v14M5 12l7 7 7-7', label: 'Scroll to zoom' },
-              { icon: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7', label: 'Right click to pan' },
             ].map((item, i) => (
               <div key={i} className="freeform-instruction-item">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" style={{ width: '14px', height: '14px' }}>
                   <path d={item.icon} />
                 </svg>
                 <span className="freeform-instruction-text">{item.label}</span>
-                {i < 2 && <span className="freeform-instruction-dot">&#8226;</span>}
+                {i < 1 && <span className="freeform-instruction-dot">&#8226;</span>}
               </div>
             ))}
           </div>
@@ -553,8 +552,6 @@ export default function FreeformPage() {
 
           <div className="freeform-toolbar">
             {[
-              { icon: 'M23 4v6h-6M1 20v-6h6', label: 'Rotate', action: handleRotate },
-              { icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7', label: 'Zoom', action: handleZoomIn },
               { icon: 'M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', label: 'Reset View', action: handleResetView },
               { icon: isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3', label: 'Fullscreen', action: handleToggleFullscreen },
               { icon: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a5 5 0 100-10 5 5 0 000 10z', label: 'Screenshot', action: handleScreenshot },
