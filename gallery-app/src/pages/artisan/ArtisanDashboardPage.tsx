@@ -1581,7 +1581,11 @@ return (
             <div style={{ padding: '16px 28px 24px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button onClick={() => setSelectedOrder(null)}
                 style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Close</button>
-              {selectedOrder.delivery_status === 'pending' && (
+              {(selectedOrder.payment_status === 'Cancelled' || selectedOrder.status === 'cancelled') && (
+                <button onClick={() => { if (confirm('Are you sure you want to remove this order? This action cannot be undone.')) { updateDeliveryStatus(selectedOrder.id, 'cancelled'); setSelectedOrder(null); } }}
+                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#d32f2f', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Remove Order</button>
+              )}
+              {selectedOrder.delivery_status === 'pending' && selectedOrder.payment_status !== 'Cancelled' && selectedOrder.status !== 'cancelled' && (
                 <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'preparing'); setSelectedOrder(null); }}
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Confirm Order</button>
               )}
