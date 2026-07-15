@@ -925,31 +925,26 @@ export default function DashboardPage() {
               <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                 {/* Mobile-only status tabs (sidebar hidden on mobile) */}
                 {isMobile && (
-                  <div style={{ display: 'flex', gap: '4px', padding: '4px 0 14px', marginBottom: '4px' }}>
-                    {ORDER_TABS.map(tab => (
-                      <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
-                        style={{
-                          flex: '1 1 0',
-                          minWidth: 0,
-                          height: '40px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: activeTab === tab.key ? '1.5px solid var(--accent-color)' : '1.5px solid #E8E0D8',
-                          background: activeTab === tab.key ? 'var(--accent-color)' : '#fff',
-                          color: activeTab === tab.key ? '#fff' : '#666',
-                          borderRadius: '999px',
-                          padding: '0 4px',
-                          fontSize: '0.62rem',
-                          fontWeight: activeTab === tab.key ? 600 : 500,
-                          fontFamily: 'var(--font-sans)',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          lineHeight: 1.1,
-                        }}>
-                        {tab.label}
-                      </button>
-                    ))}
+                  <div style={{
+                    display: 'flex', overflowX: 'auto', gap: '8px', minWidth: 0, padding: '4px 0 14px', marginBottom: '4px',
+                    scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
+                  }}>
+                    {ORDER_TABS.map(tab => {
+                      const isActive = activeTab === tab.key;
+                      return (
+                        <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
+                          style={{
+                            flexShrink: 0, padding: '10px 16px', borderRadius: '24px', fontSize: '0.82rem',
+                            fontWeight: isActive ? 600 : 500, fontFamily: 'var(--font-sans)',
+                            border: `1.5px solid ${isActive ? 'var(--accent-color)' : '#E8E0D8'}`,
+                            background: isActive ? 'var(--accent-color)' : '#fff',
+                            color: isActive ? '#fff' : '#666',
+                            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+                          }}>
+                          {tab.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {/* Orders */}
@@ -1047,17 +1042,17 @@ export default function DashboardPage() {
                                   <path d="M8 10V7a4 4 0 018 0v3" />
                                 </svg>
                                 <span className="order-shop-name">{order.shop}</span>
+                                {isMobile && (
+                                  <span style={{ padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
+                                    {s.label}
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)', paddingLeft: '24px' }}>
                                 Order #{shortId}
                                 <span style={{ margin: '0 6px', color: '#ccc' }}>|</span>
                                 Placed on {placedDate}
                               </div>
-                              {isMobile && (
-                                <span style={{ display: 'inline-flex', alignSelf: 'flex-start', marginTop: '6px', marginLeft: '24px', padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
-                                  {s.label}
-                                </span>
-                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', alignSelf: isMobile ? 'flex-start' : 'center' }}>
                               {!isMobile && (

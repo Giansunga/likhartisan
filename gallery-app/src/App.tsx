@@ -80,7 +80,9 @@ function AppShell() {
   const isProductPage = location.pathname.startsWith('/product/');
   const isCheckoutPage = location.pathname === '/checkout';
   const isCartPage = location.pathname === '/cart';
-  const shouldHideDock = isMobile && (isProductPage || isCheckoutPage || isCartPage);
+  const isChatPage = location.pathname === '/chat';
+  const isDashboardPage = location.pathname === '/dashboard';
+  const shouldHideDock = isMobile && (isProductPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage);
 
   return (
     <>

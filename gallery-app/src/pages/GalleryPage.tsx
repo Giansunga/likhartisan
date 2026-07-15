@@ -157,7 +157,7 @@ export default function GalleryPage() {
       {/* Banner */}
       <header
         className="gallery-header-banner"
-        style={isMobile ? { height: 'auto', minHeight: '240px', paddingTop: 'calc(var(--nav-height) + 28px)', paddingBottom: '28px' } : undefined}
+        style={isMobile ? { height: 'auto', minHeight: '180px', paddingTop: 'calc(var(--nav-height) + 12px)', paddingBottom: '20px' } : undefined}
       >
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.png)' }} />
         <div className="gallery-banner-overlay" />
@@ -176,22 +176,60 @@ export default function GalleryPage() {
         </div>
       </header>
 
-      {/* Category Zoom Grid */}
+      {/* Category Filter */}
       <section className="py-[30px] bg-[var(--bg-primary)] border-b border-cream-secondary">
-        <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="category-zoom-grid">
-            {categories.map(cat => (
-              <div key={cat.name}
-                onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
-                className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
-                <div className="zoom-card-bg" style={{ backgroundImage: `url(${cat.bg})` }} />
-                <div className="zoom-card-overlay" />
-                <div className="zoom-card-content">
-                  <span className="zoom-card-name">{cat.name}</span>
+        <div className="max-w-[var(--container-width)] mx-auto px-6" style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}>
+          {isMobile ? (
+            <div style={{
+              display: 'flex', overflowX: 'auto', gap: '10px', padding: '4px 0',
+              scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
+            }}>
+              <button
+                onClick={() => setActiveCategory(null)}
+                style={{
+                  flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
+                  fontWeight: 600, border: `1.5px solid ${activeCategory === null ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
+                  background: activeCategory === null ? 'var(--primary-color)' : 'var(--white)',
+                  color: activeCategory === null ? 'var(--white)' : 'var(--text-dark)',
+                  cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                All Crafts
+              </button>
+              {categories.filter(c => c.name !== 'All Crafts').map(cat => {
+                const isActive = activeCategory === cat.name;
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
+                    style={{
+                      flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
+                      fontWeight: 600, border: `1.5px solid ${isActive ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
+                      background: isActive ? 'var(--primary-color)' : 'var(--white)',
+                      color: isActive ? 'var(--white)' : 'var(--text-dark)',
+                      cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="category-zoom-grid">
+              {categories.map(cat => (
+                <div key={cat.name}
+                  onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
+                  className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
+                  <div className="zoom-card-bg" style={{ backgroundImage: `url(${cat.bg})` }} />
+                  <div className="zoom-card-overlay" />
+                  <div className="zoom-card-content">
+                    <span className="zoom-card-name">{cat.name}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -273,14 +311,14 @@ export default function GalleryPage() {
         <div className="max-w-[var(--container-width)] mx-auto px-6">
           {loadingProducts ? (
             /* Shimmer skeleton grid */
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-              {Array.from({ length: 12 }).map((_, i) => (
+            <div style={isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+              {Array.from({ length: isMobile ? 6 : 12 }).map((_, i) => (
                 <div key={i} style={{ border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden', background: '#fff' }}>
-                  <div className="shimmer-skeleton" style={{ height: '220px', width: '100%', borderRadius: 0 }} />
-                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div className="shimmer-skeleton" style={{ height: isMobile ? '140px' : '220px', width: '100%', borderRadius: 0 }} />
+                  <div style={{ padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div className="shimmer-skeleton" style={{ height: '16px', width: '70%', borderRadius: '4px' }} />
                     <div className="shimmer-skeleton" style={{ height: '14px', width: '45%', borderRadius: '4px' }} />
-                    <div className="shimmer-skeleton" style={{ height: '20px', width: '35%', borderRadius: '4px' }} />
+                    <div className="shimmer-skeleton" style={{ height: isMobile ? '18px' : '20px', width: '35%', borderRadius: '4px' }} />
                   </div>
                 </div>
               ))}
@@ -423,7 +461,8 @@ export default function GalleryPage() {
       {/* Filter Bottom Sheet (Mobile) */}
       <div className={`modal-overlay ${filterModalOpen && isMobile ? 'active' : ''}`} onClick={() => setFilterModalOpen(false)}>
         <div className="modal-box" style={{ 
-          position: 'absolute', bottom: 0, top: 'auto', left: 0, right: 0, margin: 0, maxWidth: '100%',
+          position: 'absolute', bottom: 0, top: 'auto', left: 0, right: 0, margin: 0, maxWidth: '100%', width: '100%',
+          padding: '24px 16px',
           borderRadius: '24px 24px 0 0', transform: filterModalOpen ? 'translateY(0)' : 'translateY(100%)', 
           transition: 'transform 0.3s ease-out' 
         }} onClick={e => e.stopPropagation()}>

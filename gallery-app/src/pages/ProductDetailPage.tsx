@@ -451,69 +451,119 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Full-width Shop Section */}
+          {/* Shop Section */}
           <div className="product-shop-section" style={{
-            marginTop: '40px', marginBottom: '40px', padding: '18px 28px',
+            marginTop: '40px', marginBottom: '40px', padding: isMobile ? '18px 16px' : '18px 28px',
             background: '#fff', borderRadius: '16px', border: '1px solid #eee',
+            display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? '16px' : '0',
           }}>
-            {/* Avatar */}
+            {/* Avatar + Name + Desktop Buttons */}
             <div style={{
-              width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden',
-              flexShrink: 0, border: '3px solid var(--primary-color)',
+              display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '16px',
+              justifyContent: isMobile ? 'space-between' : 'flex-start',
+              flex: isMobile ? 1 : undefined,
             }}>
-              {shopImage ? (
-                <img src={shopImage} alt={product.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.4rem' }}>
-                  {(product.shopName || 'S').charAt(0)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: isMobile ? '56px' : '64px', height: isMobile ? '56px' : '64px', borderRadius: '50%', overflow: 'hidden',
+                  flexShrink: 0, border: '3px solid var(--primary-color)',
+                }}>
+                  {shopImage ? (
+                    <img src={shopImage} alt={product.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: isMobile ? '1.2rem' : '1.4rem' }}>
+                      {(product.shopName || 'S').charAt(0)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="product-shop-name" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: isMobile ? 1 : undefined }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
+                  {isMobile && (
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-dark)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span>{shopProductCount}</span>
+                        <span style={{ fontSize: '0.62rem', color: 'var(--text-light)', fontWeight: 500 }}>Products</span>
+                      </div>
+                      <div style={{ width: '1px', height: '24px', background: '#E8E0D8' }} />
+                      <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
+                        <span style={{ fontSize: '0.62rem', color: 'var(--text-light)', fontWeight: 500 }}>Ratings</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="product-shop-buttons" style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={handleChatNow}
+                    style={{
+                      padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                      border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
+                      display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+                    }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                    Chat Now
+                  </button>
+                  <Link to={`/shop/${product.shopId}`} style={{
+                    padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                    border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
+                    display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', whiteSpace: 'nowrap',
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    View Shop
+                  </Link>
+                </div>
+              </div>
+
+              {/* Desktop: Stats column */}
+              {!isMobile && (
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
+                  </div>
+                  <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
+                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Shop Name + Buttons (stacked vertically) */}
-            <div className="product-shop-name" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
-              <div className="product-shop-buttons" style={{ display: 'flex', gap: '8px' }}>
+            {/* Mobile: Chat + View Shop buttons row */}
+            {isMobile && (
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                 <button onClick={handleChatNow}
                   style={{
-                    padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                    flex: 1, padding: '10px 14px', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
                     border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
-                    display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                   Chat Now
                 </button>
                 <Link to={`/shop/${product.shopId}`} style={{
-                  padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                  flex: 1, padding: '10px 14px', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
                   border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
-                  display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none',
                 }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
                     <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                     <polyline points="9 22 9 12 15 12 15 22" />
                   </svg>
                   View Shop
                 </Link>
               </div>
-            </div>
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }}></div>
-
-            {/* Products + Ratings */}
-            <div className="product-shop-stats" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
-              </div>
-              <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }}></div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
-                <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Product Reviews Section */}

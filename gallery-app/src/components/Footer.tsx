@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const QUICK_LINKS_LEFT = [
   { label: 'Home', to: '/' },
@@ -19,8 +20,13 @@ export default function Footer() {
   const location = useLocation();
   const { user } = useAuth();
   const loggedIn = !!user;
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/artisan-dashboard')) {
+    return null;
+  }
+
+  if (isMobile) {
     return null;
   }
 
