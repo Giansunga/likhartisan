@@ -367,19 +367,12 @@ export default function GalleryPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                       <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>
                       {productRatings[p.id] && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                          <div style={{ display: 'flex', gap: '1px' }}>
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <svg key={star} width="11" height="11" viewBox="0 0 24 24"
-                                fill={star <= Math.round(productRatings[p.id].avg) ? '#F59E0B' : 'none'}
-                                stroke={star <= Math.round(productRatings[p.id].avg) ? '#F59E0B' : '#D1D5DB'}
-                                strokeWidth="1.5">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                              </svg>
-                            ))}
-                          </div>
-                          <span style={{ fontSize: '0.7rem', color: '#999' }}>({productRatings[p.id].count})</span>
-                        </div>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.7rem', color: '#999' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                          {productRatings[p.id].avg.toFixed(1)} ({productRatings[p.id].count})
+                        </span>
                       )}
                     </div>
                     <div className="product-card-artisan-line">
