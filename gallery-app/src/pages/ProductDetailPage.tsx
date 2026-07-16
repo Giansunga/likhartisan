@@ -537,33 +537,6 @@ export default function ProductDetailPage() {
               )}
             </div>
 
-            {/* Mobile: Chat + View Shop buttons row */}
-            {isMobile && (
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                <button onClick={handleChatNow}
-                  style={{
-                    flex: 1, padding: '10px 14px', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
-                    border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
-                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                  </svg>
-                  Chat Now
-                </button>
-                <Link to={`/shop/${product.shopId}`} style={{
-                  flex: 1, padding: '10px 14px', borderRadius: '10px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
-                  border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none',
-                }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
-                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  View Shop
-                </Link>
-              </div>
-            )}
           </div>
 
           {/* Product Reviews Section */}
