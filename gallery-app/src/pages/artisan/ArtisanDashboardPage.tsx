@@ -90,6 +90,24 @@ export default function ArtisanDashboardPage() {
     }
   }, [searchParams]);
 
+  // ── Artisan heartbeat: broadcasts online status as soon as dashboard mounts ──
+  const artisanHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!artisanShopId) return;
+    const artisanChannel = supabase.channel(`presence:${artisanShopId}`);
+    artisanChannel.subscribe();
+    const send = () => {
+      artisanChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
+    };
+    send();
+    artisanHeartbeatRef.current = setInterval(send, 60000);
+    supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', artisanShopId);
+    return () => {
+      if (artisanHeartbeatRef.current) { clearInterval(artisanHeartbeatRef.current); artisanHeartbeatRef.current = null; }
+      supabase.removeChannel(artisanChannel);
+    };
+  }, [artisanShopId]);
+
   useEffect(() => {
     if (authLoading) return;
     let cancelled = false;
@@ -1668,7 +1686,6 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [convSearch, setConvSearch] = useState('');
   const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, number>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const artisanHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user } = useAuth();
 
   useEffect(() => { init(); }, [shopId]);
@@ -1714,25 +1731,6 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
-
-  // Artisan heartbeat broadcast + listen for buyer heartbeat + update last_seen_at
-  useEffect(() => {
-    if (!shopId) return;
-    // Send artisan heartbeat every 60s
-    const artisanChannel = supabase.channel(`presence:${shopId}`);
-    artisanChannel.subscribe();
-    const send = () => {
-      artisanChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
-    };
-    send();
-    artisanHeartbeatRef.current = setInterval(send, 60000);
-    // Also update last_seen_at in DB
-    supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shopId);
-    return () => {
-      if (artisanHeartbeatRef.current) { clearInterval(artisanHeartbeatRef.current); artisanHeartbeatRef.current = null; }
-      supabase.removeChannel(artisanChannel);
-    };
-  }, [shopId]);
 
   // Listen for buyer heartbeat on the active conversation
   useEffect(() => {
