@@ -74,9 +74,8 @@ export default function ChatPage() {
   const [remoteTyping, setRemoteTyping] = useState(false);
   const remoteTypingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
-  const [shopActiveMap, setShopActiveMap] = useState<Record<string, number>>({});
+  const [shopPresenceMap, setShopPresenceMap] = useState<Record<string, boolean>>({});
   const [lastSeenMap, setLastSeenMap] = useState<Record<string, string>>({});
-  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user } = useAuth();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,17 +139,18 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(ch); typingChannelRef.current = null; };
   }, [selectedConv?.id]);
 
-  // Listen for artisan activity heartbeats on ALL conversation shops
+  // Listen for artisan presence on ALL conversation shops
   useEffect(() => {
     if (conversations.length === 0) return;
     const shopIds = [...new Set(conversations.map(c => c.shop_id).filter(Boolean))];
-    const channels = shopIds.map(sid =>
-      supabase.channel(`presence:${sid}`)
-        .on('broadcast', { event: 'heartbeat' }, () => {
-          setShopActiveMap(prev => ({ ...prev, [sid]: Date.now() }));
-        })
-        .subscribe()
-    );
+    const channels = shopIds.map(sid => {
+      const ch = supabase.channel(`shop:${sid}`);
+      ch.on('presence', { event: 'sync' }, () => {
+        const state = ch.presenceState();
+        setShopPresenceMap(prev => ({ ...prev, [sid]: Object.keys(state).length > 0 }));
+      }).subscribe();
+      return ch;
+    });
     return () => channels.forEach(ch => supabase.removeChannel(ch));
   }, [conversations.map(c => c.shop_id).join(',')]);
 
@@ -172,20 +172,18 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [conversations.map(c => c.shop_id).join(',')]);
 
-  // Send buyer heartbeat for artisan-side detection (every 90s while on chat page)
+  // Track buyer presence (auto-detects join/leave)
   useEffect(() => {
     if (!userId) return;
-    const buyerChannel = supabase.channel(`presence-buyer:${userId}`);
-    buyerChannel.subscribe();
-    const send = () => {
-      buyerChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
-    };
-    send();
-    heartbeatTimerRef.current = setInterval(send, 90000);
-    return () => {
-      if (heartbeatTimerRef.current) { clearInterval(heartbeatTimerRef.current); heartbeatTimerRef.current = null; }
-      supabase.removeChannel(buyerChannel);
-    };
+    const buyerChannel = supabase.channel('buyers-online', {
+      config: { presence: { key: userId } }
+    });
+    buyerChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await buyerChannel.track({ user_id: userId, online_at: new Date().toISOString() });
+      }
+    });
+    return () => { supabase.removeChannel(buyerChannel); };
   }, [userId]);
 
   function broadcastTyping() {
@@ -402,8 +400,7 @@ export default function ChatPage() {
   const filteredConvs = conversations.filter(c => c.shop_name?.toLowerCase().includes(convSearch.toLowerCase()));
 
   function getShopActiveStatus(shopId: string): { active: boolean; text: string } {
-    const lastHeartbeat = shopActiveMap[shopId];
-    if (lastHeartbeat && Date.now() - lastHeartbeat < 180000) {
+    if (shopPresenceMap[shopId]) {
       return { active: true, text: 'Active Now' };
     }
     const lastSeen = lastSeenMap[shopId];

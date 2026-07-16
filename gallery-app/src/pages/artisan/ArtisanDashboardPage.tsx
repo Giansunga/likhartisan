@@ -90,22 +90,20 @@ export default function ArtisanDashboardPage() {
     }
   }, [searchParams]);
 
-  // ── Artisan heartbeat: broadcasts online status as soon as dashboard mounts ──
-  const artisanHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ── Track artisan presence on their shop channel ──
   useEffect(() => {
     if (!artisanShopId) return;
-    const artisanChannel = supabase.channel(`presence:${artisanShopId}`);
-    artisanChannel.subscribe();
-    const send = () => {
-      artisanChannel.send({ type: 'broadcast', event: 'heartbeat', ts: Date.now() });
-    };
-    send();
-    artisanHeartbeatRef.current = setInterval(send, 60000);
+    const artisanChannel = supabase.channel(`shop:${artisanShopId}`, {
+      config: { presence: { key: artisanShopId } }
+    });
+    artisanChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await artisanChannel.track({ shop_id: artisanShopId, online_at: new Date().toISOString() });
+      }
+    });
+    // Still update last_seen_at on mount for fallback
     supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', artisanShopId);
-    return () => {
-      if (artisanHeartbeatRef.current) { clearInterval(artisanHeartbeatRef.current); artisanHeartbeatRef.current = null; }
-      supabase.removeChannel(artisanChannel);
-    };
+    return () => { supabase.removeChannel(artisanChannel); };
   }, [artisanShopId]);
 
   useEffect(() => {
@@ -1684,7 +1682,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [uploading, setUploading] = useState(false);
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
-  const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, number>>({});
+  const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -1732,17 +1730,22 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
 
-  // Listen for buyer heartbeat on the active conversation
+  // Listen for buyer presence (all buyers in a shared channel)
   useEffect(() => {
-    if (!selectedConv?.buyer_id) return;
-    const ch = supabase
-      .channel(`presence-buyer:${selectedConv.buyer_id}`)
-      .on('broadcast', { event: 'heartbeat' }, () => {
-        setBuyerActiveMap(prev => ({ ...prev, [selectedConv.buyer_id]: Date.now() }));
+    const buyersChannel = supabase.channel('buyers-online')
+      .on('presence', { event: 'sync' }, () => {
+        const state = buyersChannel.presenceState();
+        const activeMap: Record<string, boolean> = {};
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.user_id) activeMap[p.user_id] = true;
+          });
+        });
+        setBuyerActiveMap(activeMap);
       })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [selectedConv?.buyer_id]);
+    return () => { supabase.removeChannel(buyersChannel); };
+  }, []);
 
   // When a conversation is opened, mark it read for the artisan.
     useEffect(() => {
@@ -1858,8 +1861,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
 
 
   function getBuyerActiveStatus(buyerId: string): { active: boolean; text: string } {
-    const lastHeartbeat = buyerActiveMap[buyerId];
-    if (lastHeartbeat && Date.now() - lastHeartbeat < 360000) {
+    if (buyerActiveMap[buyerId]) {
       return { active: true, text: 'Active Now' };
     }
     return { active: false, text: '' };
