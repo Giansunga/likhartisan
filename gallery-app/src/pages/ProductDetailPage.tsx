@@ -521,21 +521,22 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* Desktop: Stats column */}
-              {!isMobile && (
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
-                  </div>
-                  <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }} />
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
-                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Desktop: Stats column — pushed to far right */}
+            {!isMobile && (
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
+                </div>
+                <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
+                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
+                </div>
+              </div>
+            )}
 
           </div>
 
@@ -645,7 +646,12 @@ export default function ProductDetailPage() {
       </div>
 
       {isMobile && (
-        <div className="mobile-action-bar">
+        <div className="mobile-action-bar" style={{
+          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
+          display: 'flex', alignItems: 'center', gap: '10px', zIndex: 40,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
+        }}>
           {(() => {
             const stock = selectedVariation?.stock ?? product?.stock ?? 0;
             const isOutOfStock = stock === 0;
