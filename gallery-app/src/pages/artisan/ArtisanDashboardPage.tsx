@@ -13,6 +13,7 @@ import {
   ArrowUpRight, Bell
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -570,38 +571,26 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px', paddingBottom: '28px', position: 'relative' }}>
-          {monthlyData.map((m, i) => {
-            const barH = Math.max((m.revenue / maxRevenue) * 150, m.revenue > 0 ? 8 : 3);
-            // For multi-year ranges, parse month+year from label; otherwise use index
-            const isCurrentMonth = spanYears
-              ? m.name === `${monthNames[now.getMonth()]} ${now.getFullYear()}`
-              : i + rangeStartMonth === now.getMonth() && rangeStartYear === now.getFullYear();
-            return (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', height: '100%', justifyContent: 'flex-end' }}>
-                {m.revenue > 0 && (
-                  <span style={{ fontSize: '0.65rem', color: isCurrentMonth ? 'var(--primary-color)' : '#A89688', fontWeight: 600, marginBottom: '4px' }}>
-                    ₱{(m.revenue / 1000).toFixed(1)}k
-                  </span>
-                )}
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: barH }}
-                  transition={{ delay: 0.4 + i * 0.04, duration: 0.5, ease: 'easeOut' }}
-                  style={{
-                    width: '100%', maxWidth: '44px',
-                    background: isCurrentMonth
-                      ? 'linear-gradient(180deg, #A0501A 0%, #823E0B 100%)'
-                      : '#E8E0D8',
-                    borderRadius: '6px 6px 3px 3px',
-                    boxShadow: isCurrentMonth ? '0 2px 8px rgba(130,62,11,0.3)' : 'none',
-                  }}
-                />
-                <span style={{ fontSize: '0.7rem', color: isCurrentMonth ? 'var(--primary-color)' : '#A89688', position: 'absolute', bottom: '-22px', fontWeight: isCurrentMonth ? 700 : 400 }}>{m.name}</span>
-              </div>
-            );
-          })}
-        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={monthlyData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EDE8E2" />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#A89688' }} tickLine={false} axisLine={{ stroke: '#EDE8E2' }} />
+            <YAxis tick={{ fontSize: 12, fill: '#A89688' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`} />
+            <Tooltip
+              contentStyle={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+              formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']}
+              labelStyle={{ color: '#3D2B1F', fontWeight: 600 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="#823E0B"
+              strokeWidth={2.5}
+              dot={{ r: 4, fill: '#823E0B', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: '#A0501A', stroke: '#fff', strokeWidth: 2 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* TOP PRODUCTS + RECENT LISTINGS */}
