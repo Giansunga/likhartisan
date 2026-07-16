@@ -539,8 +539,6 @@ export default function ChatPage() {
                             {as.text || ''}
                           </span>
                         ); })()}
-                        <span className="chat-header-sep">&bull;</span>
-                        <span className="chat-header-response-text">Replies within 30 mins</span>
                       </div>
                     </div>
                   </div>

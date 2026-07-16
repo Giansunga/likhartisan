@@ -1959,6 +1959,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
                       ? <img src={conv.buyer_avatar} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
                       : <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(conv.buyer_name || 'B').charAt(0)}</div>
                     }
+                    {(() => { const bs = getBuyerActiveStatus(conv.buyer_id); return (
+                      <span className={bs.active ? 'chat-header-online-dot' : 'chat-header-online-dot chat-header-offline-dot'}></span>
+                    ); })()}
                   </div>
 
                   {/* Name + preview */}
@@ -2017,6 +2020,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
                   ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
                   : <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
                 }
+                {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
+                  <span className={bs.active ? 'chat-header-online-dot' : 'chat-header-online-dot chat-header-offline-dot'}></span>
+                ); })()}
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || 'Buyer'}</div>
