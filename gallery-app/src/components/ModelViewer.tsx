@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -11,6 +11,14 @@ function FittedScene({ url, onCenter }: { url: string; onCenter: (c: THREE.Vecto
   const boxRef = useRef(new THREE.Box3());
   const sizeRef = useRef(new THREE.Vector3());
   const centerRef = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.computeVertexNormals();
+      }
+    });
+  }, [scene]);
 
   useFrame(() => {
     if (groupRef.current && !fitted) {
