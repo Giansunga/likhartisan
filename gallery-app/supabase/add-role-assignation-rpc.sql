@@ -29,7 +29,9 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.list_users_with_roles() TO anon, authenticated;
 
--- RPC B: demote a seller -> remove shop_owner role AND delete their shop
+-- RPC B: demote a seller -> remove shop_owner role AND delete their shop(s)
+-- Deletes the shop by ownership OR by matching email, so it works even when the
+-- user_roles row has a NULL shop_id or the shop's owner_id was not set to the user.
 CREATE OR REPLACE FUNCTION public.remove_shop_owner(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -37,15 +39,16 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_shop_id uuid;
+  v_email text;
 BEGIN
-  DELETE FROM public.user_roles
-  WHERE user_id = p_user_id AND role = 'shop_owner'
-  RETURNING shop_id INTO v_shop_id;
+  SELECT email INTO v_email FROM auth.users WHERE id = p_user_id;
 
-  IF v_shop_id IS NOT NULL THEN
-    DELETE FROM public.shops WHERE id = v_shop_id AND owner_id = p_user_id;
-  END IF;
+  DELETE FROM public.user_roles
+  WHERE user_id = p_user_id AND role = 'shop_owner';
+
+  DELETE FROM public.shops
+  WHERE owner_id = p_user_id
+     OR (v_email IS NOT NULL AND email = v_email);
 END;
 $$;
 

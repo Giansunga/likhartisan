@@ -176,9 +176,7 @@ export default function RoleAssignationPage() {
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {isSuper ? (
-                        <span className="text-xs text-brown-medium font-medium">Super Admin</span>
-                      ) : isOwner ? (
+                      {isOwner ? (
                         <button
                           onClick={() => demote(u)}
                           disabled={busy}
@@ -186,7 +184,7 @@ export default function RoleAssignationPage() {
                         >
                           {busy ? 'Working...' : 'Demote'}
                         </button>
-                      ) : (
+                      ) : isSuper ? null : (
                         <button
                           onClick={() => promote(u)}
                           disabled={busy}
