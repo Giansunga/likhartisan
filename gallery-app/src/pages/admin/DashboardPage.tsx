@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
   totalOrders: number;
@@ -215,21 +216,26 @@ export default function DashboardPage() {
         }}
       >
         <h3 style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: '20px', fontSize: '1rem', fontFamily: 'var(--font-serif)' }}>Monthly Revenue</h3>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px', padding: '0 4px' }}>
-          {stats.monthlyRevenue.map((m) => {
-            const maxRev = Math.max(...stats.monthlyRevenue.map(x => x.revenue), 1);
-            const height = (m.revenue / maxRev) * 140;
-            return (
-              <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.7rem', color: '#A89688', fontWeight: 500 }}>
-                  {m.revenue > 0 ? `₱${(m.revenue / 1000).toFixed(m.revenue >= 1000 ? 1 : 0)}k` : ''}
-                </span>
-                <div style={{ width: '100%', height: `${Math.max(height, 2)}px`, background: 'linear-gradient(180deg, #A0501A 0%, #823E0B 100%)', borderRadius: '6px 6px 2px 2px', transition: 'height 0.5s ease', minHeight: '2px' }} />
-                <span style={{ fontSize: '0.7rem', color: '#A89688' }}>{m.month}</span>
-              </div>
-            );
-          })}
-        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={stats.monthlyRevenue} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EDE8E2" />
+            <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#A89688' }} tickLine={false} axisLine={{ stroke: '#EDE8E2' }} />
+            <YAxis tick={{ fontSize: 12, fill: '#A89688' }} tickLine={false} axisLine={false} tickFormatter={(v: any) => `₱${(Number(v) / 1000).toFixed(0)}k`} />
+            <Tooltip
+              contentStyle={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+              formatter={(value: any) => [`₱${Number(value).toLocaleString()}`, 'Revenue']}
+              labelStyle={{ color: '#3D2B1F', fontWeight: 600 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="revenue"
+              stroke="#823E0B"
+              strokeWidth={2.5}
+              dot={{ r: 4, fill: '#823E0B', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: '#A0501A', stroke: '#fff', strokeWidth: 2 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </motion.div>
 
       {/* BOTTOM GRID */}
