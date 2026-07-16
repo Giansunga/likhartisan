@@ -659,11 +659,11 @@ export default function ProductDetailPage() {
             const disabled = isOutOfStock || needsVariation;
             return (
               <>
-                <button onClick={handleAskClick} className="btn-chat" style={{ borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button onClick={handleAskClick} className="btn-chat" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                 </button>
-                <button onClick={handleAddToCart} disabled={disabled} className="btn-cart" style={{ borderRadius: '8px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
-                <button onClick={handleBuy} disabled={disabled} className="btn-buy" style={{ borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
+                <button onClick={handleAddToCart} disabled={disabled} className="btn-cart" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
+                <button onClick={handleBuy} disabled={disabled} className="btn-buy" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
               </>
             );
           })()}
