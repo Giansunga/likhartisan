@@ -1,6 +1,6 @@
 import { Suspense, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF, ContactShadows } from '@react-three/drei';
+import { OrbitControls, useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
 function FittedScene({ url, onCenter }: { url: string; onCenter: (c: THREE.Vector3) => void }) {
@@ -50,17 +50,17 @@ export default function ModelViewer({ url }: { url: string }) {
     <div style={{ width: '100%', height: '100%', minHeight: '400px', borderRadius: '12px', overflow: 'hidden', background: '#f5f0eb' }}>
       <Canvas
         camera={{ position: [3, 2, 5], fov: 45 }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.3 }}
         style={{ width: '100%', height: '100%' }}
       >
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
         <directionalLight position={[-5, 5, -5]} intensity={0.8} />
         <directionalLight position={[0, -2, 5]} intensity={0.4} />
+        <Environment preset="city" />
 
         <Suspense fallback={null}>
           <FittedScene url={url} onCenter={setTarget} />
-          <ContactShadows position={[0, -0.5, 0]} opacity={0.2} scale={5} blur={2} />
         </Suspense>
 
         <OrbitControls
