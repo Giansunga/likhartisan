@@ -107,6 +107,12 @@ export default function DashboardPage() {
   const [editingAddress, setEditingAddress] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<string | null>(null);
   const [rateOrder, setRateOrder] = useState<DashboardOrder | null>(null);
   const [rateItemIndex, setRateItemIndex] = useState(0);
@@ -280,6 +286,44 @@ export default function DashboardPage() {
     setEditingAddress(false);
     if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
     savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleChangePassword() {
+    setPasswordError('');
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('All fields are required');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: currentPassword,
+      });
+      if (signInError) {
+        setPasswordError('Current password is incorrect');
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setShowPasswordModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password updated successfully');
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to update password');
+    } finally {
+      setPasswordLoading(false);
+    }
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -738,7 +782,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
 
-                    <button style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', marginTop: '16px', fontFamily: 'var(--font-sans)' }}>
+                    <button onClick={() => setShowPasswordModal(true)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', marginTop: '16px', fontFamily: 'var(--font-sans)' }}>
                       Create New Password
                     </button>
 
@@ -1387,6 +1431,42 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }} onClick={() => setShowPasswordModal(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '28px 24px', width: '90%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--primary-color)', marginBottom: '20px', textAlign: 'center' }}>Create New Password</h3>
+
+            {passwordError && <div style={{ background: '#fdecea', color: '#d32f2f', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', marginBottom: '16px' }}>{passwordError}</div>}
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>Current Password</label>
+              <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>New Password</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>Confirm New Password</label>
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowPasswordModal(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleChangePassword} disabled={passwordLoading} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, cursor: passwordLoading ? 'not-allowed' : 'pointer', opacity: passwordLoading ? 0.7 : 1 }}>
+                {passwordLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
           </div>
         </div>
       )}
