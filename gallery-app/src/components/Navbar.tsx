@@ -94,9 +94,9 @@ export default function Navbar() {
         if (shopData?.image) setShopImage(shopData.image);
       });
     } else if (user) {
-      // Check user_roles for shop_owner role
-      supabase.from('user_roles').select('role').eq('user_id', user.id).single().then(({ data }) => {
-        if (data?.role === 'shop_owner') {
+      // Check user_roles for shop_owner role (user may have multiple rows, so don't use .single())
+      supabase.from('user_roles').select('role').eq('user_id', user.id).then(({ data }) => {
+        if (data && data.some(r => r.role === 'shop_owner')) {
           setHasShopRole(true);
           const name = user.user_metadata?.name || user.email || 'Shop';
           setShopDisplayName(name);

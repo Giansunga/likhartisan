@@ -117,18 +117,18 @@ export default function ArtisanDashboardPage() {
         const email = user?.email || '';
         const isShopEmail = SHOP_EMAILS.includes(email);
 
-        // Check user_roles for shop_owner role
+        // Check user_roles for shop_owner role (user may have multiple rows, so don't use .single())
         let hasShopOwnerRole = false;
         let shopOwnerShopId: string | null = null;
         if (user) {
-          const { data: roleData } = await supabase
+          const { data: roleRows } = await supabase
             .from('user_roles')
             .select('role, shop_id')
-            .eq('user_id', user.id)
-            .single();
-          if (roleData && roleData.role === 'shop_owner') {
+            .eq('user_id', user.id);
+          const shopOwnerRow = (roleRows || []).find(r => r.role === 'shop_owner');
+          if (shopOwnerRow) {
             hasShopOwnerRole = true;
-            shopOwnerShopId = roleData.shop_id;
+            shopOwnerShopId = shopOwnerRow.shop_id;
           }
         }
 
