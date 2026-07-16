@@ -113,12 +113,56 @@ export default function ArtisanDashboardPage() {
     async function checkArtisanAccess() {
       try {
         if (cancelled) return;
-        if (user && SHOP_EMAILS.includes(user.email || '')) {
-          const { data: shopResult } = await supabase
-            .from('shops')
-            .select('*')
-            .eq('email', user.email)
+
+        const email = user?.email || '';
+        const isShopEmail = SHOP_EMAILS.includes(email);
+
+        // Check user_roles for shop_owner role
+        let hasShopOwnerRole = false;
+        let shopOwnerShopId: string | null = null;
+        if (user) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role, shop_id')
+            .eq('user_id', user.id)
             .single();
+          if (roleData && roleData.role === 'shop_owner') {
+            hasShopOwnerRole = true;
+            shopOwnerShopId = roleData.shop_id;
+          }
+        }
+
+        if (user && (isShopEmail || hasShopOwnerRole)) {
+          // Find the shop: first by email match, then by shop_owner role's shop_id
+          let shopResult = null;
+
+          if (isShopEmail) {
+            const { data } = await supabase
+              .from('shops')
+              .select('*')
+              .eq('email', email)
+              .single();
+            shopResult = data;
+          }
+
+          if (!shopResult && shopOwnerShopId) {
+            const { data } = await supabase
+              .from('shops')
+              .select('*')
+              .eq('id', shopOwnerShopId)
+              .single();
+            shopResult = data;
+          }
+
+          if (!shopResult && isShopEmail) {
+            // Fallback: find shop by owner_id
+            const { data } = await supabase
+              .from('shops')
+              .select('*')
+              .eq('owner_id', user.id)
+              .single();
+            shopResult = data;
+          }
 
           if (cancelled) return;
 
@@ -456,7 +500,6 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     iterMonth++;
     if (iterMonth > 11) { iterMonth = 0; iterYear++; }
   }
-  const maxRevenue = Math.max(...monthlyData.map(m => m.revenue), 1);
   const productRevenue: Record<string, number> = {};
   paidOrders.forEach(o => {
     (Array.isArray(o.items) ? o.items : []).forEach((item: any) => {
@@ -578,7 +621,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
             <YAxis tick={{ fontSize: 12, fill: '#A89688' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`} />
             <Tooltip
               contentStyle={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Revenue']}
+              formatter={(value: any) => [`₱${Number(value).toLocaleString()}`, 'Revenue']}
               labelStyle={{ color: '#3D2B1F', fontWeight: 600 }}
             />
             <Line

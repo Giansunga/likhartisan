@@ -28,6 +28,7 @@ export default function Navbar() {
   const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [cartCount, setCartCount] = useState(getCartCount());
+  const [hasShopRole, setHasShopRole] = useState(false);
   const { user } = useAuth();
   const loggedIn = !!user;
 
@@ -83,17 +84,30 @@ export default function Navbar() {
   useEffect(() => {
     setUserEmail(user?.email ?? null);
     setUserAvatar(user?.user_metadata?.avatar_url || '');
+    setHasShopRole(false);
     if (user?.email && SHOP_EMAILS.includes(user.email)) {
       const name = user.user_metadata?.name || user.email;
       setShopDisplayName(name);
       setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
+      setHasShopRole(true);
       supabase.from('shops').select('image').eq('email', user.email).single().then(({ data: shopData }) => {
         if (shopData?.image) setShopImage(shopData.image);
       });
+    } else if (user) {
+      // Check user_roles for shop_owner role
+      supabase.from('user_roles').select('role').eq('user_id', user.id).single().then(({ data }) => {
+        if (data?.role === 'shop_owner') {
+          setHasShopRole(true);
+          const name = user.user_metadata?.name || user.email || 'Shop';
+          setShopDisplayName(name);
+          setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
+        }
+      });
+      setShopImage('');
+      fetchBuyerNotifications();
     } else {
       setShopImage('');
-      if (user) fetchBuyerNotifications();
-      else setNotifications([]);
+      setNotifications([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -448,7 +462,7 @@ export default function Navbar() {
                     </button>
                     {showProfileDropdown && (
                       <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 100, padding: '6px 0' }}>
-                        {userEmail && SHOP_EMAILS.includes(userEmail) && (
+                        {(userEmail && (SHOP_EMAILS.includes(userEmail) || hasShopRole)) && (
                           <Link to="/artisan-dashboard" onClick={() => setShowProfileDropdown(false)} className="block w-full text-left px-4 py-2.5 text-[0.9rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Shop Dashboard</Link>
                         )}
                         <Link to="/dashboard?tab=account" onClick={() => setShowProfileDropdown(false)} className="block w-full text-left px-4 py-2.5 text-[0.9rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">My Account</Link>
@@ -470,7 +484,7 @@ export default function Navbar() {
                       )}
                     </div>
                     <div className="absolute top-full right-0 mt-2.5 bg-white rounded-[10px] shadow-[var(--shadow-lg)] w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all translate-y-2 group-hover:translate-y-0 border border-black/5 py-2 z-50">
-                      {userEmail && SHOP_EMAILS.includes(userEmail) && (
+                      {(userEmail && (SHOP_EMAILS.includes(userEmail) || hasShopRole)) && (
                         <Link to="/artisan-dashboard" className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Shop Dashboard</Link>
                       )}
                       <Link to="/dashboard?tab=account" className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">My Account</Link>
