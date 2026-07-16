@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ShopCreatePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [form, setForm] = useState({
-    name: '', ownerName: '', email: '', phone: '', location: '', description: '',
+    name: '', ownerName: '', email: '', location: '', description: '',
   });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -20,22 +22,54 @@ export default function ShopCreatePage() {
     setLoading(true);
     setError('');
 
-    const { error: insertError } = await supabase
+    // 1. Resolve owner email -> existing auth.users.id
+    const { data: ownerId, error: lookupError } = await supabase
+      .rpc('get_user_id_by_email', { target_email: form.email });
+
+    if (lookupError) {
+      setLoading(false);
+      setError(lookupError.message);
+      return;
+    }
+
+    if (!ownerId) {
+      setLoading(false);
+      setError('No registered user with that email. The shop owner must already have a LikhArtisan account.');
+      return;
+    }
+
+    // 2. Insert shop with valid columns only + capture the new id
+    const { data: shop, error: insertError } = await supabase
       .from('shops')
       .insert({
         name: form.name,
         owner_name: form.ownerName,
         email: form.email,
-        phone: form.phone || null,
         location: form.location || null,
         description: form.description || null,
-        status: 'active',
+        owner_id: ownerId,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      setLoading(false);
+      setError(insertError.message);
+      return;
+    }
+
+    // 3. Auto-assign the shop_owner role so the owner gets dashboard access
+    const { error: roleError } = await supabase
+      .rpc('assign_shop_owner', {
+        p_user_id: ownerId,
+        p_shop_id: shop.id,
+        p_assigned_by: user?.id ?? null,
       });
 
     setLoading(false);
 
-    if (insertError) {
-      setError(insertError.message);
+    if (roleError) {
+      setError(roleError.message);
       return;
     }
 
@@ -80,11 +114,6 @@ export default function ShopCreatePage() {
               <div>
                 <label className="block text-sm font-medium text-brown-dark mb-1">Email *</label>
                 <input name="email" type="email" value={form.email} onChange={handleChange} required
-                  className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-brown-dark mb-1">Phone</label>
-                <input name="phone" type="tel" value={form.phone} onChange={handleChange}
                   className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
               </div>
               <div className="md:col-span-2">

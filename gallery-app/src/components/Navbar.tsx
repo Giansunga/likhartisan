@@ -139,7 +139,7 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!isArtisanDashboard || !userEmail || !SHOP_EMAILS.includes(userEmail)) return;
+    if (!isArtisanDashboard || !userEmail || (!SHOP_EMAILS.includes(userEmail) && !hasShopRole)) return;
 
     async function init() {
       async function fetchNotifications() {
@@ -191,7 +191,7 @@ export default function Navbar() {
   }, [isArtisanDashboard, userEmail, user?.id]);
 
   useEffect(() => {
-    if (!loggedIn || isArtisanDashboard || !userEmail || SHOP_EMAILS.includes(userEmail)) return;
+    if (!loggedIn || isArtisanDashboard || !userEmail || SHOP_EMAILS.includes(userEmail) || hasShopRole) return;
     const userId = user?.id;
     if (!userId) return;
 
@@ -217,7 +217,7 @@ export default function Navbar() {
 
   function handleAuthChange(email?: string) {
     const userEmailStr = email || userEmail || '';
-    if (SHOP_EMAILS.includes(userEmailStr)) {
+    if (SHOP_EMAILS.includes(userEmailStr) || hasShopRole) {
       navigate('/artisan-dashboard');
     } else {
       window.location.reload();
@@ -275,7 +275,7 @@ export default function Navbar() {
           {unreadNotifications > 0 && (
             <button onClick={markAllRead} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
           )}
-          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '')) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
         </div>
       </div>
       <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
@@ -298,7 +298,7 @@ export default function Navbar() {
                 if (n.isReal) { 
                   markNotificationRead(n.id); 
                   setShowNotifications(false); 
-                  if ((n as any).order_id && SHOP_EMAILS.includes(userEmail || '')) {
+                  if ((n as any).order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
                     navigate(`/artisan-dashboard?panel=orders&orderId=${(n as any).order_id}`);
                   } else if (href) {
                     navigate(href);
