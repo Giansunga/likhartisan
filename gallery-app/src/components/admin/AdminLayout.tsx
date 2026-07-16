@@ -8,7 +8,7 @@ const sidebarLinks = [
   { to: '/admin',           label: 'Dashboard',         exact: true },
   { to: '/admin/products',  label: 'Products' },
   { to: '/admin/artisans',  label: 'Artisans' },
-  { to: '/admin/shops/create', label: 'Register Shop' },
+  { to: '/admin/roles', label: 'Role Assignation' },
   { to: '/admin/models',    label: '3D Models' },
   { to: '/admin/theme',     label: 'Theme Customizer' },
 ];

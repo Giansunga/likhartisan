@@ -34,7 +34,7 @@ const ArtisanDashboardPage = lazy(() => import('./pages/artisan/ArtisanDashboard
 const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const ProductListPage = lazy(() => import('./pages/admin/ProductListPage'));
 const ProductCreatePage = lazy(() => import('./pages/admin/ProductCreatePage'));
-const ShopCreatePage = lazy(() => import('./pages/admin/ShopCreatePage'));
+const RoleAssignationPage = lazy(() => import('./pages/admin/RoleAssignationPage'));
 const ThemeCustomizer = lazy(() => import('./pages/admin/ThemeCustomizer'));
 const ArtisanManagePage = lazy(() => import('./pages/admin/ArtisanManagePage'));
 const ModelManagePage = lazy(() => import('./pages/admin/ModelManagePage'));
@@ -115,7 +115,7 @@ function AppShell() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="products" element={<ProductListPage />} />
             <Route path="products/create" element={<ProductCreatePage />} />
-            <Route path="shops/create" element={<ShopCreatePage />} />
+            <Route path="roles" element={<RoleAssignationPage />} />
             <Route path="theme" element={<ThemeCustomizer />} />
             <Route path="artisans" element={<ArtisanManagePage />} />
             <Route path="models" element={<ModelManagePage />} />
