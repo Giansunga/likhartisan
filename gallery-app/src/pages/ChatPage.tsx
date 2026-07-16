@@ -140,17 +140,37 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(ch); typingChannelRef.current = null; };
   }, [selectedConv?.id]);
 
-  // Listen for artisan activity heartbeat on shop-specific channel
+  // Listen for artisan activity heartbeats on ALL conversation shops
   useEffect(() => {
-    if (!selectedConv) return;
-    const ch = supabase
-      .channel(`presence:${selectedConv.shop_id}`)
-      .on('broadcast', { event: 'heartbeat' }, () => {
-        setShopActiveMap(prev => ({ ...prev, [selectedConv.shop_id]: Date.now() }));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [selectedConv?.shop_id]);
+    if (conversations.length === 0) return;
+    const shopIds = [...new Set(conversations.map(c => c.shop_id).filter(Boolean))];
+    const channels = shopIds.map(sid =>
+      supabase.channel(`presence:${sid}`)
+        .on('broadcast', { event: 'heartbeat' }, () => {
+          setShopActiveMap(prev => ({ ...prev, [sid]: Date.now() }));
+        })
+        .subscribe()
+    );
+    return () => channels.forEach(ch => supabase.removeChannel(ch));
+  }, [conversations.map(c => c.shop_id).join(',')]);
+
+  // Poll shops.last_seen_at every 60s for all conversation shops (fallback when broadcast hasn't arrived yet)
+  useEffect(() => {
+    if (conversations.length === 0) return;
+    const shopIds = [...new Set(conversations.map(c => c.shop_id).filter(Boolean))];
+    if (shopIds.length === 0) return;
+    const poll = async () => {
+      const { data } = await supabase.from('shops').select('id, last_seen_at').in('id', shopIds);
+      if (data) {
+        const seenMap: Record<string, string> = {};
+        data.forEach((s: any) => { if (s.last_seen_at) seenMap[s.id] = s.last_seen_at; });
+        setLastSeenMap(prev => ({ ...prev, ...seenMap }));
+      }
+    };
+    poll();
+    const interval = setInterval(poll, 60000);
+    return () => clearInterval(interval);
+  }, [conversations.map(c => c.shop_id).join(',')]);
 
   // Send buyer heartbeat for artisan-side detection (every 90s while on chat page)
   useEffect(() => {
