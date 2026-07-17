@@ -131,6 +131,7 @@ export default function ProductListPage() {
     setSaving(false);
     if (error) { toast.error('Failed to save: ' + error.message); return; }
 
+    const keptIds: string[] = [];
     for (const v of variations) {
       if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) continue;
       if (v.id) {
@@ -140,23 +141,24 @@ export default function ProductListPage() {
           opening_diameter: v.openingDiameter.trim() || 'N/A',
           price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
         }).eq('id', v.id);
+        keptIds.push(v.id);
       } else {
-        await supabase.from('product_variations').insert({
+        const { data: inserted } = await supabase.from('product_variations').insert({
           product_id: editing.id,
           dimensions: v.dimensions.trim() || 'N/A',
           height: v.height.trim() || 'N/A',
           opening_diameter: v.openingDiameter.trim() || 'N/A',
           price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
           sort_order: variations.indexOf(v),
-        });
+        }).select('id').single();
+        if (inserted?.id) keptIds.push(inserted.id);
       }
     }
 
-    const existingIds = variations.filter(v => v.id).map(v => v.id);
-    if (existingIds.length > 0) {
+    if (keptIds.length > 0) {
       await supabase.from('product_variations').delete()
         .eq('product_id', editing.id)
-        .not('id', 'in', `(${existingIds.join(',')})`);
+        .not('id', 'in', `(${keptIds.join(',')})`);
     } else {
       await supabase.from('product_variations').delete().eq('product_id', editing.id);
     }
