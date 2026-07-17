@@ -24,6 +24,7 @@ interface Conversation {
   shop_name: string;
   buyer_id: string;
   buyer_unread: number;
+  artisan_unread: number;
   last_message: string;
   last_message_at: string;
   created_at: string;
