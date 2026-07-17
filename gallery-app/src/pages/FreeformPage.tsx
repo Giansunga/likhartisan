@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
+import { FALLBACK_BUYER_NAME } from '../lib/constants';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
@@ -346,7 +347,7 @@ export default function FreeformPage() {
           buyer_id: user.id,
           shop_id: shop.id,
           shop_name: shop.name,
-          buyer_name: meta.name || user.email || 'Buyer',
+          buyer_name: meta.name || user.email || FALLBACK_BUYER_NAME,
           buyer_avatar: meta.avatar_url || '',
           last_message: payload,
           last_message_at: new Date().toISOString(),
@@ -379,7 +380,7 @@ export default function FreeformPage() {
         const { data: shopOwner } = await supabase.from('shops').select('owner_id').eq('id', shop.id).single();
         if (shopOwner?.owner_id) {
           const meta = user?.user_metadata || {};
-          const buyerName = meta.name || user?.email || 'Buyer';
+          const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
           const { data: { session } } = await supabase.auth.getSession();
           await fetch(`${API_BASE}/api/notifications`, {
             method: 'POST',

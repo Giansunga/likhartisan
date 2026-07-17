@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { fmt, formatTime } from '../lib/utils';
 import { API_BASE } from '../lib/api';
+import { FALLBACK_BUYER_NAME } from '../lib/constants';
 import DesignMessageCard from '../components/chat/DesignMessageCard';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
@@ -307,7 +308,7 @@ export default function ChatPage() {
     if (!uid) { toast.error('Please sign in to start a conversation.'); return; }
 
     const meta = user?.user_metadata || {};
-    const buyerName = meta.name || user?.email || 'Buyer';
+    const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
     const buyerAvatar = meta.avatar_url || '';
 
     const existing = conversations.find(c => c.shop_id === shop.id);
@@ -376,7 +377,7 @@ export default function ChatPage() {
           const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
           if (shop?.owner_id) {
             const meta = user?.user_metadata || {};
-            const buyerName = meta.name || user?.email || 'Buyer';
+            const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
             const { data: { session } } = await supabase.auth.getSession();
             await fetch(`${API_BASE}/api/notifications`, {
               method: 'POST',

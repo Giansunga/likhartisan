@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
 import { API_BASE } from '../../lib/api';
+import { FALLBACK_BUYER_NAME } from '../../lib/constants';
 import DesignMessageCard from '../../components/chat/DesignMessageCard';
 import { motion } from 'framer-motion';
 import {
@@ -1801,7 +1802,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
               .order('last_message_at', { ascending: false });
             if (data) {
               // Enrich conversations with buyer names — try orders table for email fallback
-              const buyerIds = [...new Set(data.filter((c: any) => !c.buyer_name || c.buyer_name === 'Buyer').map((c: any) => c.buyer_id).filter(Boolean))];
+              const buyerIds = [...new Set(data.filter((c: any) => !c.buyer_name || c.buyer_name === FALLBACK_BUYER_NAME).map((c: any) => c.buyer_id).filter(Boolean))];
               const emailMap: Record<string, string> = {};
               if (buyerIds.length > 0) {
                 const { data: orderRows } = await supabase.from('orders').select('buyer_email, buyer_id').in('buyer_id', buyerIds).limit(1);
@@ -1810,8 +1811,8 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                 }
               }
               const enriched = data.map((c: any) => {
-                if (c.buyer_name && c.buyer_name !== 'Buyer') return c;
-                const fallback = emailMap[c.buyer_id] || 'Buyer';
+                if (c.buyer_name && c.buyer_name !== FALLBACK_BUYER_NAME) return c;
+                const fallback = emailMap[c.buyer_id] || FALLBACK_BUYER_NAME;
                 return { ...c, buyer_name: fallback };
               });
               setConversations(enriched);
@@ -2009,7 +2010,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                   {/* Name + preview */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.buyer_name || 'Buyer'}</span>
+                       <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.buyer_name || FALLBACK_BUYER_NAME}</span>
                       <span style={{ fontSize: '0.68rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#A89688', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '20px' }}>
@@ -2067,7 +2068,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                 ); })()}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || 'Buyer'}</div>
+                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || FALLBACK_BUYER_NAME}</div>
                 {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
                   <div style={{ fontSize: '0.72rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
                 ); })()}
@@ -2082,7 +2083,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                     ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px' }} />
                     : <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.5rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
                   }
-                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', color: 'var(--primary-color)', marginBottom: '4px' }}>Chat with {selectedConv.buyer_name || 'Buyer'}</h3>
+                   <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', color: 'var(--primary-color)', marginBottom: '4px' }}>Chat with {selectedConv.buyer_name || FALLBACK_BUYER_NAME}</h3>
                   <p style={{ fontSize: '0.85rem', color: '#A89688' }}>Send a message to start the conversation.</p>
                 </div>
               )}
@@ -2241,7 +2242,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
               ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '76px', height: '76px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px', border: '3px solid #EDE8E2' }} />
               : <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.8rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
             }
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '4px', textAlign: 'center' }}>{selectedConv.buyer_name || 'Buyer'}</div>
+             <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '4px', textAlign: 'center' }}>{selectedConv.buyer_name || FALLBACK_BUYER_NAME}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: getBuyerActiveStatus(selectedConv.buyer_id).active ? '#2E7D32' : '#8C7B6E', fontWeight: 500, marginBottom: '24px', justifyContent: 'center' }}>
               <span className={getBuyerActiveStatus(selectedConv.buyer_id).active ? 'chat-header-online-dot' : 'chat-header-online-dot chat-header-offline-dot'}></span>
               {getBuyerActiveStatus(selectedConv.buyer_id).text || 'Offline'}
