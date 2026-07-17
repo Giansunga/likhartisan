@@ -107,6 +107,24 @@ export default function ArtisanDashboardPage() {
     return () => { supabase.removeChannel(artisanChannel); };
   }, [artisanShopId]);
 
+  // ── Listen for buyer presence (persists across panel switches) ──
+  const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const buyersChannel = supabase.channel('buyers-online')
+      .on('presence', { event: 'sync' }, () => {
+        const state = buyersChannel.presenceState();
+        const activeMap: Record<string, boolean> = {};
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.user_id) activeMap[p.user_id] = true;
+          });
+        });
+        setBuyerActiveMap(activeMap);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(buyersChannel); };
+  }, []);
+
   useEffect(() => {
     if (authLoading) return;
     let cancelled = false;
@@ -356,7 +374,7 @@ export default function ArtisanDashboardPage() {
               {activePanel === 'vault'     && <VaultPanel products={products} productPrices={productPrices} onProductsUpdated={setProducts} />}
               {activePanel === 'requests'  && <RequestsPanel />}
               {activePanel === 'orders'    && <OrdersPanel key={ordersKey} shopId={artisanShopId} shopName={shopData?.name} loadingOrders={loadingOrders} setLoadingOrders={setLoadingOrders} />}
-              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} />}
+              {activePanel === 'messages'  && <MessagesPanel shopId={artisanShopId} loadingMessages={loadingMessages} setLoadingMessages={setLoadingMessages} buyerActiveMap={buyerActiveMap} />}
               {activePanel === 'settings'  && <ShopSettingsPanel shopData={shopData} onShopUpdated={setShopData} />}
               {activePanel === 'notifications' && <NotificationsPanel userId={user?.id || ''} />}
             </PanelErrorBoundary>
@@ -399,7 +417,8 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
       case 'month': start = new Date(n.getFullYear(), n.getMonth(), 1); break;
       case '3month': start = new Date(n.getFullYear(), n.getMonth() - 2, 1); break;
       case 'year': start = new Date(n.getFullYear(), 0, 1); break;
-      default: start = new Date(2000, 0, 1); break; // all time
+      case 'all': start = new Date(new Date().getFullYear(), 0, 1); break;
+      default: start = new Date(2000, 0, 1); break;
     }
     const label = DATE_PRESETS.find(p => p.key === key)?.label || 'Custom';
     setDateRange({ start, end: n });
@@ -1704,7 +1723,7 @@ return (
   );
 }
 
-function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId: string | null; loadingMessages: boolean; setLoadingMessages: (v: boolean) => void }) {
+function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiveMap }: { shopId: string | null; loadingMessages: boolean; setLoadingMessages: (v: boolean) => void; buyerActiveMap: Record<string, boolean> }) {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -1714,7 +1733,6 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
   const [uploading, setUploading] = useState(false);
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
-  const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -1752,32 +1770,15 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
           if (prev.some((m: any) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
-        // Incoming (buyer) message → increment this artisan's unread counter.
+        // Conversation is actively viewed — keep artisan_unread at 0 in DB
         if (artisanUserId && newMsg.sender_id !== artisanUserId) {
-          await supabase.from('conversations').update({ artisan_unread: (selectedConv.artisan_unread || 0) + 1 }).eq('id', selectedConv.id);
+          await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
         }
         setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedConv?.id]);
-
-  // Listen for buyer presence (all buyers in a shared channel)
-  useEffect(() => {
-    const buyersChannel = supabase.channel('buyers-online')
-      .on('presence', { event: 'sync' }, () => {
-        const state = buyersChannel.presenceState();
-        const activeMap: Record<string, boolean> = {};
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((p: any) => {
-            if (p.user_id) activeMap[p.user_id] = true;
-          });
-        });
-        setBuyerActiveMap(activeMap);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(buyersChannel); };
-  }, []);
 
   // When a conversation is opened, mark it read for the artisan.
     useEffect(() => {
@@ -1798,15 +1799,20 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
               .from('conversations').select('*, buyer_id').eq('shop_id', shopId)
               .order('last_message_at', { ascending: false });
             if (data) {
-              // Enrich conversations with fresh buyer names from user_metadata
-              const enriched = await Promise.all(data.map(async (c: any) => {
+              // Enrich conversations with buyer names — try orders table for email fallback
+              const buyerIds = [...new Set(data.filter((c: any) => !c.buyer_name || c.buyer_name === 'Buyer').map((c: any) => c.buyer_id).filter(Boolean))];
+              const emailMap: Record<string, string> = {};
+              if (buyerIds.length > 0) {
+                const { data: orderRows } = await supabase.from('orders').select('buyer_email, buyer_id').in('buyer_id', buyerIds).limit(1);
+                if (orderRows) {
+                  orderRows.forEach((o: any) => { if (o.buyer_email && o.buyer_id) emailMap[o.buyer_id] = o.buyer_email; });
+                }
+              }
+              const enriched = data.map((c: any) => {
                 if (c.buyer_name && c.buyer_name !== 'Buyer') return c;
-                // Fetch fresh name from auth.users via RPC or fallback
-                const { data: userData } = await supabase.auth.admin.getUserById(c.buyer_id);
-                const userMeta = userData?.user?.user_metadata || {};
-                const freshName = userMeta.name || userData?.user?.email || 'Buyer';
-                return { ...c, buyer_name: freshName };
-              }));
+                const fallback = emailMap[c.buyer_id] || 'Buyer';
+                return { ...c, buyer_name: fallback };
+              });
               setConversations(enriched);
             }
           }

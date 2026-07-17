@@ -112,9 +112,9 @@ export default function ChatPage() {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
-        // Incoming (seller) message → increment this buyer's unread counter.
+        // Conversation is actively viewed — keep buyer_unread at 0 in DB
         if (newMsg.sender_id !== userId) {
-          await supabase.from('conversations').update({ buyer_unread: (selectedConv.buyer_unread || 0) + 1 }).eq('id', selectedConv.id);
+          await supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
         }
         // Update conversation sidebar
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
