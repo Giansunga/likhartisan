@@ -1785,7 +1785,8 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
       async function markAsRead() {
         if (selectedConv && selectedConv.artisan_unread > 0) {
           setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, artisan_unread: 0 } : c));
-          await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
+          const { error } = await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id).select();
+          if (error) console.error('Failed to mark artisan conversation read:', error);
         }
       }
       markAsRead();
@@ -1837,7 +1838,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
           const updated = payload.new as any;
-          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at } : c));
+          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at, artisan_unread: updated.artisan_unread, buyer_unread: updated.buyer_unread } : c));
         })
         .subscribe();
       return () => { supabase.removeChannel(channel); };
@@ -1870,8 +1871,8 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
         .select().single();
       if (data) {
         setMessages(prev => [...prev, data]);
-        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
-        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString(), buyer_unread: (selectedConv.buyer_unread || 0) + 1 }).eq('id', selectedConv.id);
+        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString(), buyer_unread: (selectedConv.buyer_unread || 0) + 1 } : c));
         // Update shop last_seen_at for buyer-side active status
         if (shopId) await supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shopId);
       }

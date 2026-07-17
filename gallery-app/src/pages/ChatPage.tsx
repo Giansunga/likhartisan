@@ -194,7 +194,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (selectedConv && selectedConv.buyer_unread > 0) {
       setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, buyer_unread: 0 } : c));
-      supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
+      supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id).then(({ error }) => {
+        if (error) console.error('Failed to mark buyer conversation read:', error);
+      });
     }
   }, [selectedConv]);
 
@@ -212,7 +214,7 @@ export default function ChatPage() {
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
           const updated = payload.new as Conversation;
-          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at } : c));
+          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at, buyer_unread: updated.buyer_unread } : c));
         })
         .subscribe();
       return () => { supabase.removeChannel(channel); };
@@ -366,8 +368,8 @@ export default function ChatPage() {
         .select().single();
       if (data) {
         setMessages(prev => [...prev, data]);
-        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString() }).eq('id', selectedConv.id);
-        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString() } : c));
+        await supabase.from('conversations').update({ last_message: text || '📷 Image', last_message_at: new Date().toISOString(), artisan_unread: (selectedConv.artisan_unread || 0) + 1 }).eq('id', selectedConv.id);
+        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString(), artisan_unread: (selectedConv.artisan_unread || 0) + 1 } : c));
         // Create real notification for shop owner via backend API to bypass RLS
         try {
           const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
