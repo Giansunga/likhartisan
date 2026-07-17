@@ -18,6 +18,9 @@ export default function ProductListPage() {
     materials: '', technique: '',
   });
   const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [glbFile, setGlbFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -82,6 +85,9 @@ export default function ProductListPage() {
       materials: p.materials || '',
       technique: p.technique || '',
     });
+    setImageFile(null);
+    setImagePreview(p.image || '');
+    setGlbFile(null);
     const { data } = await supabase
       .from('product_variations')
       .select('*')
@@ -100,14 +106,27 @@ export default function ProductListPage() {
   async function saveEdit() {
     if (!editing) return;
     setSaving(true);
+
+    const updateData: Record<string, any> = {
+      name: form.name,
+      category: form.category,
+      materials: form.materials,
+      technique: form.technique,
+    };
+
+    if (imageFile) {
+      const uploadedUrl = await uploadFile(imageFile);
+      if (uploadedUrl) updateData.image = uploadedUrl;
+    }
+
+    if (glbFile) {
+      const uploadedUrl = await uploadFile(glbFile);
+      if (uploadedUrl) updateData.model3d = uploadedUrl;
+    }
+
     const { error } = await supabase
       .from('products')
-      .update({
-        name: form.name,
-        category: form.category,
-        materials: form.materials,
-        technique: form.technique,
-      })
+      .update(updateData)
       .eq('id', editing.id);
     setSaving(false);
     if (error) { toast.error('Failed to save: ' + error.message); return; }
@@ -153,6 +172,8 @@ export default function ProductListPage() {
       technique: form.technique,
       stock: newTotalStock,
       inStock: newTotalStock > 0,
+      ...(imageFile && updateData.image ? { image: updateData.image } : {}),
+      ...(glbFile && updateData.model3d ? { model3d: updateData.model3d } : {}),
     } : p));
     setEditing(null);
   }
@@ -167,6 +188,37 @@ export default function ProductListPage() {
 
   function removeVariation(index: number) {
     setVariations(prev => prev.filter((_, i) => i !== index));
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleGlbChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setGlbFile(file);
+    }
+  };
+
+  async function uploadFile(file: File): Promise<string | null> {
+    const ext = file.name.split('.').pop() || 'bin';
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage
+      .from('products')
+      .upload(fileName, file);
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+    const { data: urlData } = supabase.storage
+      .from('products')
+      .getPublicUrl(fileName);
+    return urlData.publicUrl;
   }
 
   return (
@@ -287,6 +339,79 @@ export default function ProductListPage() {
                       onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
                       onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Media Upload */}
+              <div style={{ marginBottom: '28px' }}>
+                <h3 style={{
+                  fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
+                  letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
+                  borderBottom: '1px solid #F0EBE5',
+                }}>Media Upload</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Image</label>
+                    <label style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '24px', border: '2px dashed #D4C8BB', borderRadius: '12px', cursor: 'pointer',
+                      background: '#FAF8F5', transition: 'all 0.15s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.background = 'rgba(130,62,11,0.03)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.background = '#FAF8F5'; }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" strokeWidth="1.5" style={{ width: '32px', height: '32px', marginBottom: '8px' }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                      </svg>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
+                        {imageFile ? imageFile.name : 'Change Image'}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
+                      <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
+                    </label>
+                    {imagePreview && <img src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>3D Model (.glb)</label>
+                    <label style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '24px', border: '2px dashed #D4C8BB', borderRadius: '12px', cursor: 'pointer',
+                      background: '#FAF8F5', transition: 'all 0.15s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.background = 'rgba(130,62,11,0.03)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.background = '#FAF8F5'; }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" strokeWidth="1.5" style={{ width: '32px', height: '32px', marginBottom: '8px' }}>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
+                        {glbFile ? glbFile.name : (editing.model3d ? 'Replace 3D Model' : 'Choose 3D Model')}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
+                      <input type="file" accept=".glb" onChange={handleGlbChange} style={{ display: 'none' }} />
+                    </label>
+                    {glbFile ? (
+                      <div style={{
+                        marginTop: '12px', padding: '10px 14px', background: 'rgba(130,62,11,0.06)',
+                        borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
+                      }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#823E0B" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        <span style={{ fontSize: '0.78rem', color: '#823E0B', fontWeight: 500 }}>{glbFile.name}</span>
+                      </div>
+                    ) : editing.model3d ? (
+                      <div style={{
+                        marginTop: '12px', padding: '10px 14px', background: 'rgba(130,62,11,0.06)',
+                        borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
+                      }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#823E0B" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        <span style={{ fontSize: '0.78rem', color: '#823E0B', fontWeight: 500 }}>Current model attached</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

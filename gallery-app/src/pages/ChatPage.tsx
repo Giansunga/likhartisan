@@ -205,7 +205,10 @@ export default function ChatPage() {
         .channel('conversations-list')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
           const newConv = payload.new as Conversation;
-          setConversations(prev => [newConv, ...prev]);
+          setConversations(prev => {
+            if (prev.some(c => c.id === newConv.id)) return prev;
+            return [newConv, ...prev];
+          });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
           const updated = payload.new as Conversation;
@@ -313,7 +316,14 @@ export default function ChatPage() {
       .select().single();
 
     if (error) { toast.error('Failed: ' + error.message); return; }
-    if (data) { setConversations(prev => [data, ...prev]); setSelectedConv(data); setShowNewChat(false); }
+    if (data) {
+      setConversations(prev => {
+        if (prev.some(c => c.id === data.id)) return prev;
+        return [data, ...prev];
+      });
+      setSelectedConv(data);
+      setShowNewChat(false);
+    }
   }
 
   function pickImage(e: React.ChangeEvent<HTMLInputElement>) {

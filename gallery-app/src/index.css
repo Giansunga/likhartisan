@@ -1077,6 +1077,8 @@ body {
   overflow: hidden;
   position: relative;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .artisan-card-grid:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
@@ -1103,6 +1105,9 @@ body {
 .artisan-details {
   padding: 60px 24px 24px 24px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .artisan-name-grid {
@@ -1130,7 +1135,7 @@ body {
 
 .artisan-stats-grid .stat-count { color: var(--primary-color); font-weight: 600; font-size: 1rem; }
 
-.artisan-actions { display: flex; gap: 12px; align-items: center; }
+.artisan-actions { display: flex; gap: 12px; align-items: center; margin-top: auto; }
 
 .btn-view-shop {
   flex: 1;

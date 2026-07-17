@@ -1824,7 +1824,10 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages }: { shopId
         .channel(`shop-conversations:${shopId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
           const newConv = payload.new as any;
-          setConversations(prev => [newConv, ...prev]);
+          setConversations(prev => {
+            if (prev.some((c: any) => c.id === newConv.id)) return prev;
+            return [newConv, ...prev];
+          });
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
           const updated = payload.new as any;
