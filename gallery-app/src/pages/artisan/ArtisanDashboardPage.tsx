@@ -2242,8 +2242,9 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
               : <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.8rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
             }
             <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '4px', textAlign: 'center' }}>{selectedConv.buyer_name || 'Buyer'}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: '#8C7B6E', fontWeight: 500, marginBottom: '24px', justifyContent: 'center' }}>
-              Active now
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', color: getBuyerActiveStatus(selectedConv.buyer_id).active ? '#2E7D32' : '#8C7B6E', fontWeight: 500, marginBottom: '24px', justifyContent: 'center' }}>
+              <span className={getBuyerActiveStatus(selectedConv.buyer_id).active ? 'chat-header-online-dot' : 'chat-header-online-dot chat-header-offline-dot'}></span>
+              {getBuyerActiveStatus(selectedConv.buyer_id).text || 'Offline'}
             </div>
 
             {/* Conversation info */}
