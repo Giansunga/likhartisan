@@ -23,6 +23,7 @@ export default function RoleAssignationPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [confirmModal, setConfirmModal] = useState<{ user: AppUser; action: 'promote' | 'demote' } | null>(null);
 
   const load = useCallback(async () => {
     setError('');
@@ -41,7 +42,6 @@ export default function RoleAssignationPage() {
   }, [load]);
 
   const promote = async (u: AppUser) => {
-    if (!window.confirm(`Promote ${u.email} to Shop Owner?`)) return;
     setActionId(u.id);
     setError('');
     try {
@@ -82,7 +82,6 @@ export default function RoleAssignationPage() {
   };
 
   const demote = async (u: AppUser) => {
-    if (!window.confirm(`Demote ${u.email} from Shop Owner to Buyer?`)) return;
     setActionId(u.id);
     setError('');
     try {
@@ -180,7 +179,7 @@ export default function RoleAssignationPage() {
                     <td className="px-6 py-4 text-right">
                       {isOwner ? (
                         <button
-                          onClick={() => demote(u)}
+                          onClick={() => setConfirmModal({ user: u, action: 'demote' })}
                           disabled={busy}
                           className="px-4 py-2 rounded-xl text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -188,7 +187,7 @@ export default function RoleAssignationPage() {
                         </button>
                       ) : isSuper ? null : (
                         <button
-                          onClick={() => promote(u)}
+                          onClick={() => setConfirmModal({ user: u, action: 'promote' })}
                           disabled={busy}
                           className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -203,6 +202,53 @@ export default function RoleAssignationPage() {
           </table>
         )}
       </div>
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setConfirmModal(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-2">
+              <h3 className="font-serif text-lg font-bold text-brown-dark">
+                {confirmModal.action === 'promote' ? 'Confirm Promotion' : 'Confirm Demotion'}
+              </h3>
+            </div>
+            <div className="px-6 pb-6">
+              <p className="text-sm text-brown-medium mb-1">
+                {confirmModal.action === 'promote'
+                  ? `Promote ${confirmModal.user.email} to Shop Owner?`
+                  : `Demote ${confirmModal.user.email} from Shop Owner to Buyer?`}
+              </p>
+              <p className="text-xs text-brown-light">
+                {confirmModal.action === 'promote'
+                  ? 'This will create a shop and assign the Shop Owner role.'
+                  : 'This will remove the Shop Owner role and revoke shop access.'}
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold border border-cream-tertiary text-brown-medium hover:bg-cream-secondary/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const { user: u, action } = confirmModal;
+                  setConfirmModal(null);
+                  if (action === 'promote') promote(u);
+                  else demote(u);
+                }}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
+                  confirmModal.action === 'promote'
+                    ? 'bg-primary hover:bg-primary-light'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                {confirmModal.action === 'promote' ? 'Promote' : 'Demote'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
