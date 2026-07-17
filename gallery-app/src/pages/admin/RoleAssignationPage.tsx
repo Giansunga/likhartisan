@@ -41,6 +41,7 @@ export default function RoleAssignationPage() {
   }, [load]);
 
   const promote = async (u: AppUser) => {
+    if (!window.confirm(`Promote ${u.email} to Shop Owner?`)) return;
     setActionId(u.id);
     setError('');
     try {
@@ -81,6 +82,7 @@ export default function RoleAssignationPage() {
   };
 
   const demote = async (u: AppUser) => {
+    if (!window.confirm(`Demote ${u.email} from Shop Owner to Buyer?`)) return;
     setActionId(u.id);
     setError('');
     try {
