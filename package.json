@@ -1,0 +1,7 @@
+{
+  "name": "likhartisan",
+  "private": true,
+  "scripts": {
+    "build": "cd gallery-app && npm install && npm run build"
+  }
+}
