@@ -11,6 +11,7 @@ type AppUser = {
 };
 
 const ROLE_BADGE: Record<string, string> = {
+  founder: 'bg-purple-100 text-purple-800 border-purple-200',
   super_admin: 'bg-amber-100 text-amber-800 border-amber-200',
   shop_owner: 'bg-primary/10 text-primary border-primary/20',
   buyer: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -23,7 +24,8 @@ export default function RoleAssignationPage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [confirmModal, setConfirmModal] = useState<{ user: AppUser; action: 'promote' | 'demote' } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ user: AppUser; action: 'promote' | 'demote' | 'demote_super_admin' } | null>(null);
+  const [currentUserIsFounder, setCurrentUserIsFounder] = useState(false);
 
   const load = useCallback(async () => {
     setError('');
@@ -40,6 +42,14 @@ export default function RoleAssignationPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('user_roles').select('role').eq('user_id', user.id).then(({ data }) => {
+        setCurrentUserIsFounder((data ?? []).some((r: any) => r.role === 'founder'));
+      });
+    }
+  }, [user]);
 
   const promote = async (u: AppUser) => {
     setActionId(u.id);
@@ -97,6 +107,22 @@ export default function RoleAssignationPage() {
     }
   };
 
+  const demoteSuperAdmin = async (u: AppUser) => {
+    setActionId(u.id);
+    setError('');
+    try {
+      const { error: demErr } = await supabase.rpc('remove_super_admin', {
+        p_user_id: u.id,
+      });
+      if (demErr) throw demErr;
+      await load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to demote super admin');
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const filtered = users.filter((u) =>
     (u.email ?? '').toLowerCase().includes(search.toLowerCase())
   );
@@ -144,6 +170,7 @@ export default function RoleAssignationPage() {
             </thead>
             <tbody className="divide-y divide-cream-tertiary">
               {filtered.map((u) => {
+                const isFounder = (u.roles ?? []).some((r) => r.role === 'founder');
                 const isSuper = (u.roles ?? []).some((r) => r.role === 'super_admin');
                 const isOwner = (u.roles ?? []).some((r) => r.role === 'shop_owner');
                 const busy = actionId === u.id;
@@ -177,7 +204,17 @@ export default function RoleAssignationPage() {
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {isOwner ? (
+                      {isFounder ? null : isSuper ? (
+                        currentUserIsFounder ? (
+                          <button
+                            onClick={() => setConfirmModal({ user: u, action: 'demote_super_admin' })}
+                            disabled={busy}
+                            className="px-4 py-2 rounded-xl text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {busy ? 'Working...' : 'Demote'}
+                          </button>
+                        ) : null
+                      ) : isOwner ? (
                         <button
                           onClick={() => setConfirmModal({ user: u, action: 'demote' })}
                           disabled={busy}
@@ -185,7 +222,7 @@ export default function RoleAssignationPage() {
                         >
                           {busy ? 'Working...' : 'Demote'}
                         </button>
-                      ) : isSuper ? null : (
+                      ) : (
                         <button
                           onClick={() => setConfirmModal({ user: u, action: 'promote' })}
                           disabled={busy}
@@ -215,12 +252,16 @@ export default function RoleAssignationPage() {
               <p className="text-sm text-brown-medium mb-1">
                 {confirmModal.action === 'promote'
                   ? `Promote ${confirmModal.user.email} to Shop Owner?`
-                  : `Demote ${confirmModal.user.email} from Shop Owner to Buyer?`}
+                  : confirmModal.action === 'demote_super_admin'
+                    ? `Demote ${confirmModal.user.email} from Super Admin to Buyer?`
+                    : `Demote ${confirmModal.user.email} from Shop Owner to Buyer?`}
               </p>
               <p className="text-xs text-brown-light">
                 {confirmModal.action === 'promote'
                   ? 'This will create a shop and assign the Shop Owner role.'
-                  : 'This will remove the Shop Owner role and revoke shop access.'}
+                  : confirmModal.action === 'demote_super_admin'
+                    ? 'This will remove the Super Admin role permanently.'
+                    : 'This will remove the Shop Owner role and revoke shop access.'}
               </p>
             </div>
             <div className="flex justify-end gap-3 px-6 pb-6">
@@ -235,6 +276,7 @@ export default function RoleAssignationPage() {
                   const { user: u, action } = confirmModal;
                   setConfirmModal(null);
                   if (action === 'promote') promote(u);
+                  else if (action === 'demote_super_admin') demoteSuperAdmin(u);
                   else demote(u);
                 }}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
