@@ -35,7 +35,14 @@ export default function RoleAssignationPage() {
       setLoading(false);
       return;
     }
-    setUsers((data as unknown as AppUser[]) ?? []);
+    const raw = (data as unknown as AppUser[]) ?? [];
+    const deduped = raw.map((u) => ({
+      ...u,
+      roles: u.roles
+        ? Array.from(new Map(u.roles.map((r) => [r.role, r])).values())
+        : [],
+    }));
+    setUsers(deduped);
     setLoading(false);
   }, []);
 
