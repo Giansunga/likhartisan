@@ -227,6 +227,20 @@ export default function DashboardPage() {
     else if (tab === 'account') setActivePanel('account');
   }, [searchParams]);
 
+  // Handle deep-link from navbar notification click (when already on purchases page)
+  useEffect(() => {
+    function handleDeepLink(e: Event) {
+      const { orderId } = (e as CustomEvent).detail;
+      if (orderId) {
+        setActivePanel('purchases');
+        setActiveTab('all');
+        setExpandedOrderId(orderId);
+      }
+    }
+    window.addEventListener('deep-link-order', handleDeepLink);
+    return () => window.removeEventListener('deep-link-order', handleDeepLink);
+  }, []);
+
   // Reset scroll to top on in-page panel switches so a shorter panel
   // doesn't leave the viewport clamped on the footer (matches Layout's
   // scroll-to-top on route change). Skipped for the order deep-link,

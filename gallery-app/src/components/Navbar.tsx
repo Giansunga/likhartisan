@@ -301,6 +301,9 @@ export default function Navbar() {
                   setShowNotifications(false); 
                   if (n.order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
                     navigate(`/artisan-dashboard?panel=orders&orderId=${n.order_id}`);
+                  } else if (n.order_id) {
+                    navigate('/dashboard?tab=purchases');
+                    window.dispatchEvent(new CustomEvent('deep-link-order', { detail: { orderId: n.order_id } }));
                   } else if (href) {
                     navigate(href);
                   } else {
