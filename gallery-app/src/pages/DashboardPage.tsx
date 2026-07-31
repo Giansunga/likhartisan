@@ -915,7 +915,12 @@ export default function DashboardPage() {
                         const status = tc.status;
                         setActivePanel('purchases');
                         if (status !== 'all') setActiveTab(status);
-                        setSearchParams({ tab: 'purchases' });
+                        if (n.order_id) {
+                          setExpandedOrderId(n.order_id);
+                          setSearchParams({ tab: 'purchases', order: n.order_id });
+                        } else {
+                          setSearchParams({ tab: 'purchases' });
+                        }
                       };
                       return (
                         <div key={n.id}

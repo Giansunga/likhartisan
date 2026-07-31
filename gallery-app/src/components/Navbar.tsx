@@ -19,7 +19,7 @@ export default function Navbar() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const notifPanelRef = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string; isReal?: boolean }[]>([]);
+  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string; isReal?: boolean; order_id?: string }[]>([]);
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
@@ -65,6 +65,7 @@ export default function Navbar() {
         time: n.created_at,
         read: !!n.read,
         order_id: n.order_id || '',
+        isReal: true,
       })));
     }
   }
@@ -291,15 +292,15 @@ export default function Navbar() {
           </div>
         ) : (
           notifications.map(n => {
-            const href = (n as any).order_id ? `/dashboard?tab=purchases` : null;
+            const href = n.order_id ? `/dashboard?tab=purchases&order=${n.order_id}` : null;
             const tc = notifTypeConfig[n.type] || defaultNotifType;
             return (
               <button key={n.id} onClick={() => { 
                 if (n.isReal) { 
                   markNotificationRead(n.id); 
                   setShowNotifications(false); 
-                  if ((n as any).order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
-                    navigate(`/artisan-dashboard?panel=orders&orderId=${(n as any).order_id}`);
+                  if (n.order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
+                    navigate(`/artisan-dashboard?panel=orders&orderId=${n.order_id}`);
                   } else if (href) {
                     navigate(href);
                   } else {
