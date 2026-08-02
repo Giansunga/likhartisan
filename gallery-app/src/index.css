@@ -2131,3 +2131,22 @@ body {
     padding-bottom: 72px;
   }
 }
+
+/* ── Customer Reviews Marquee ─────────────────────────────────── */
+@keyframes reviewMarquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-33.3333%, 0, 0);
+  }
+}
+
+.animate-review-marquee {
+  display: flex;
+  gap: 20px;
+  width: max-content;
+  animation: reviewMarquee 28s linear infinite !important;
+  will-change: transform;
+}
+

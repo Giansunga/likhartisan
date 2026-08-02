@@ -29,7 +29,6 @@ export default function HomePage() {
   const artisanTrackRef = useRef<HTMLDivElement>(null);
   const [artisansData, setArtisansData] = useState<HomeArtisan[]>([]);
   const [reviewsData, setReviewsData] = useState<{ id: string; userName: string; rating: number; body: string; productName: string; createdAt: string }[]>([]);
-  const reviewsScrollRef = useRef<HTMLDivElement>(null);
 
   // Sequential video player state
   const [activeIdx, setActiveIdx] = useState(0);
@@ -538,48 +537,47 @@ export default function HomePage() {
         <section style={{ padding: '60px 0 50px', background: 'var(--bg-primary)' }}>
           <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: '0 24px' }}>
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', fontWeight: 700, color: '#333', textAlign: 'center', marginBottom: '40px' }}>
-              What Our <span style={{ color: 'var(--accent-color)' }}>Customers</span> Says
+              What Our <span style={{ color: 'var(--accent-color)' }}>Customers</span> Say
             </h2>
-            <div style={{ position: 'relative' }}>
-              <div ref={reviewsScrollRef} style={{ display: 'flex', gap: '20px', overflowX: 'auto', scrollBehavior: 'smooth', scrollSnapType: 'x mandatory', paddingBottom: '8px', msOverflowStyle: 'none', scrollbarWidth: 'none' } as any}>
-                {reviewsData.map((rev, i) => (
-                  <div key={rev.id || i} style={{ minWidth: '300px', maxWidth: '340px', flex: '0 0 auto', scrollSnapAlign: 'start', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#E8E0D8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary-color)' }}>{rev.userName.charAt(0).toUpperCase()}</span>
+            <div style={{ position: 'relative', overflow: 'hidden' }}>
+              <div
+                style={{
+                  overflowX: 'auto',
+                  scrollBehavior: 'smooth',
+                  paddingBottom: '12px',
+                  paddingTop: '6px',
+                  msOverflowStyle: 'none',
+                  scrollbarWidth: 'none',
+                  WebkitMaskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
+                  maskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
+                } as any}
+              >
+                <div className="animate-review-marquee">
+                  {[...reviewsData, ...reviewsData, ...reviewsData].map((rev, i) => (
+                    <div key={`${rev.id}-${i}`} style={{ minWidth: '300px', maxWidth: '340px', flex: '0 0 auto', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'transform 0.25s ease, box-shadow 0.25s ease' }} className="hover:-translate-y-1 hover:shadow-md">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#E8E0D8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary-color)' }}>{rev.userName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#333', fontFamily: 'var(--font-sans)' }}>{rev.userName}</span>
                       </div>
-                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#333', fontFamily: 'var(--font-sans)' }}>{rev.userName}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--accent-color)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{rev.productName}</span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <svg key={star} width="14" height="14" viewBox="0 0 24 24" fill={star <= rev.rating ? '#F59E0B' : 'none'} stroke={star <= rev.rating ? '#F59E0B' : '#D1D5DB'} strokeWidth="1.5">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                        ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', color: 'var(--accent-color)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{rev.productName}</span>
+                        <div style={{ display: 'flex', gap: '2px' }}>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <svg key={star} width="14" height="14" viewBox="0 0 24 24" fill={star <= rev.rating ? '#F59E0B' : 'none'} stroke={star <= rev.rating ? '#F59E0B' : '#D1D5DB'} strokeWidth="1.5">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <span style={{ position: 'absolute', top: '-4px', left: '-2px', fontSize: '1.8rem', color: 'var(--accent-color)', fontFamily: 'Georgia, serif', lineHeight: 1, opacity: 0.3 }}>"</span>
+                        <p style={{ fontSize: '0.85rem', color: '#666', lineHeight: 1.6, margin: 0, fontFamily: 'var(--font-sans)', paddingTop: '12px' }}>{rev.body}</p>
                       </div>
                     </div>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <span style={{ position: 'absolute', top: '-4px', left: '-2px', fontSize: '1.8rem', color: 'var(--accent-color)', fontFamily: 'Georgia, serif', lineHeight: 1, opacity: 0.3 }}>"</span>
-                      <p style={{ fontSize: '0.85rem', color: '#666', lineHeight: 1.6, margin: 0, fontFamily: 'var(--font-sans)', paddingTop: '12px' }}>{rev.body}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '24px' }}>
-                <button onClick={() => reviewsScrollRef.current?.scrollBy({ left: -320, behavior: 'smooth' })}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E8E0D8', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#FAF5EF')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
-                </button>
-                <button onClick={() => reviewsScrollRef.current?.scrollBy({ left: 320, behavior: 'smooth' })}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #E8E0D8', background: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
-                </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
