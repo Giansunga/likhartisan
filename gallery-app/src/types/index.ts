@@ -8,6 +8,7 @@ export interface Shop {
   about: string;
   image: string;
   banner: string;
+  location: string;
   createdAt: string;
 }
 

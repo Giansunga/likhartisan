@@ -1,6 +1,6 @@
 import { Suspense, useRef, useMemo, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 
@@ -36,10 +36,6 @@ function normalizeParam(value: number, midpoint: number): number {
   return THREE.MathUtils.clamp((value - midpoint) / midpoint, -1, 1);
 }
 
-function controlScale(value: number, midpoint: number, shrink = 0.45, grow = 0.45): number {
-  const normalized = normalizeParam(value, midpoint);
-  return 1 + (normalized < 0 ? normalized * shrink : normalized * grow);
-}
 
 function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnapshot | null {
   const geometry = mesh.geometry;
@@ -97,29 +93,33 @@ function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBou
 }
 
 function getProfileScale(t: number, shapeParams: ShapeParams): number {
-  const bodyScale = controlScale(shapeParams.bodyWidth, 20);
-  const neckScale = controlScale(shapeParams.neckWidth, 15, 0.4, 0.4);
-  const rimScale = controlScale(shapeParams.rimSize, 12, 0.35, 0.55);
+  // How much each control deviates from its default (0 at default, range -1 to +1)
+  const bodyDelta = normalizeParam(shapeParams.bodyWidth, 20);
+  const neckDelta = normalizeParam(shapeParams.neckWidth, 15);
+  const rimDelta = normalizeParam(shapeParams.rimSize, 12);
   const curvature = normalizeParam(shapeParams.curvature, 50);
 
-  const baseWeight = 1 - smoothstep(0.06, 0.24, t);
-  const bodyWeight = smoothstep(0.12, 0.36, t) * (1 - smoothstep(0.56, 0.76, t));
-  const shoulderWeight = smoothstep(0.48, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
-  const neckWeight = smoothstep(0.58, 0.78, t) * (1 - smoothstep(0.84, 0.96, t));
-  const rimWeight = smoothstep(0.82, 1.0, t);
+  // Region influence weights (how much each region affects this height t)
+  const baseInfluence = 1 - smoothstep(0.06, 0.3, t);
+  const bodyInfluence = smoothstep(0.1, 0.35, t) * (1 - smoothstep(0.55, 0.75, t));
+  const shoulderInfluence = smoothstep(0.5, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
+  const neckInfluence = smoothstep(0.6, 0.8, t) * (1 - smoothstep(0.85, 0.96, t));
+  const rimInfluence = smoothstep(0.82, 1.0, t);
+
+  // Each region contributes a scale offset proportional to its control's deviation
+  const strength = 0.45;
+  let scaleOffset = 0;
+  scaleOffset += baseInfluence * bodyDelta * strength * 0.7;
+  scaleOffset += bodyInfluence * bodyDelta * strength;
+  scaleOffset += shoulderInfluence * ((bodyDelta + neckDelta) / 2) * strength;
+  scaleOffset += neckInfluence * neckDelta * strength;
+  scaleOffset += rimInfluence * rimDelta * strength;
+
+  // Curvature adds a belly bulge
   const bellyCurve = Math.sin(t * Math.PI) * 0.16 * curvature;
-  const shoulderCurve = shoulderWeight * -0.08 * curvature;
+  const shoulderCurve = shoulderInfluence * -0.08 * curvature;
 
-  const targetScale =
-    baseWeight * Math.max(0.72, bodyScale * 0.78) +
-    bodyWeight * bodyScale +
-    shoulderWeight * ((bodyScale + neckScale) / 2) +
-    neckWeight * neckScale +
-    rimWeight * rimScale;
-  const weightSum = baseWeight + bodyWeight + shoulderWeight + neckWeight + rimWeight;
-  const blendedScale = weightSum > 0 ? targetScale / weightSum : 1;
-
-  return THREE.MathUtils.clamp(blendedScale + bellyCurve + shoulderCurve, 0.25, 1.8);
+  return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
 }
 
 function Scene({
@@ -291,6 +291,7 @@ function Scene({
   );
 }
 
+
 export default function FreeformViewer({
   modelFile,
   shapeParams,
@@ -340,25 +341,40 @@ export default function FreeformViewer({
         height: preview ? '100%' : '100%',
         minHeight: preview ? 360 : undefined,
         position: 'relative',
-        background: previewBackground,
+        background: preview ? previewBackground : '#F5F0EA',
         overflow: 'hidden',
       }}
     >
+      {!preview && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '8%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '45%',
+            height: '18%',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse at center, rgba(180,168,152,0.35) 0%, rgba(180,168,152,0.12) 40%, transparent 70%)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
       <ModelErrorBoundary fallback={errorFallback}>
         <Canvas
           key={modelFile}
           camera={{ position: [3, 1.5, 5], fov: preview ? 42 : 45 }}
-          gl={{ antialias: true, alpha: !preview, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-          style={{ width: '100%', height: '100%', display: 'block' }}
+          gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+          style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
           dpr={[1, 2]}
         >
-          {!preview && <color attach="background" args={['#F5F0EA']} />}
 
           <ambientLight intensity={preview ? 1 : 0.5} />
-          <directionalLight position={[5, 10, 5]} intensity={preview ? 1.2 : 1.8} color="#FFF5EB" castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+          <directionalLight position={[5, 10, 5]} intensity={preview ? 1.2 : 1.8} color="#FFF5EB" />
           <directionalLight position={[-4, 6, -3]} intensity={0.5} color="#FFE8D0" />
           <directionalLight position={[0, 3, -8]} intensity={0.3} color="#F0E0D0" />
-          <spotLight position={[0, 10, 0]} intensity={1.0} angle={0.35} penumbra={0.8} color="#FFF8F0" castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+          <spotLight position={[0, 10, 0]} intensity={1.0} angle={0.35} penumbra={0.8} color="#FFF8F0" />
           <spotLight position={[-5, 6, 5]} intensity={0.3} angle={0.5} penumbra={1} color="#FFE8D6" />
 
           <Suspense fallback={null}>
@@ -372,21 +388,7 @@ export default function FreeformViewer({
               previewMode={preview}
             />
 
-            {!preview && (
-              <mesh rotation-x={-Math.PI / 2} position={[0, -0.51, 0]} receiveShadow>
-                <circleGeometry args={[2.2, 64]} />
-                <meshStandardMaterial color="#E8DDD0" roughness={0.95} metalness={0} transparent opacity={0.6} />
-              </mesh>
-            )}
 
-            <ContactShadows
-              position={[0, preview ? -0.35 : -0.5, 0]}
-              opacity={preview ? 0.28 : 0.5}
-              scale={preview ? 6 : 10}
-              blur={preview ? 2.5 : 3}
-              far={4}
-              color="#3A2A1F"
-            />
           </Suspense>
 
           <OrbitControls

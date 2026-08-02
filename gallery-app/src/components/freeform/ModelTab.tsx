@@ -12,24 +12,28 @@ interface Model3D {
 
 export default function ModelTab({
   selectedModel,
+  shopId,
   onSelect,
 }: {
   selectedModel: string;
+  shopId: string;
   onSelect: (file: string, name: string, category: string, thumbnail: string) => void;
 }) {
   const [models, setModels] = useState<Model3D[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!shopId) return;
     (async () => {
       const { data } = await supabase
         .from('models_3d')
         .select('*')
+        .eq('shop_id', shopId)
         .order('created_at', { ascending: false });
       if (data) setModels(data);
       setLoading(false);
     })();
-  }, []);
+  }, [shopId]);
 
   return (
     <div>

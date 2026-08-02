@@ -11,6 +11,7 @@ import ShapeTab from '../components/freeform/ShapeTab';
 import MaterialTab from '../components/freeform/MaterialTab';
 import SaveTab from '../components/freeform/SaveTab';
 import ModelThumb from '../components/freeform/ModelThumb';
+import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -57,6 +58,11 @@ export default function FreeformPage() {
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
   const [materialParams, setMaterialParams] = useState(DEFAULT_MATERIAL);
 
+  /* Shop selection (freeform entry) */
+  const [shopSelectOpen, setShopSelectOpen] = useState(false);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+  const [selectedShopName, setSelectedShopName] = useState('');
+
   /* Modals */
   const [showShopModal, setShowShopModal] = useState(false);
   const [shops, setShops] = useState<any[]>([]);
@@ -98,6 +104,8 @@ export default function FreeformPage() {
   function applyDesign(design: {
     model_file: string;
     model_name: string;
+    shop_id?: string;
+    shop_name?: string;
     shape_params: typeof DEFAULT_SHAPE;
     material_params: typeof DEFAULT_MATERIAL;
   }) {
@@ -105,6 +113,10 @@ export default function FreeformPage() {
     setModelName(design.model_name);
     setShapeParams(design.shape_params || DEFAULT_SHAPE);
     setMaterialParams(design.material_params || DEFAULT_MATERIAL);
+    if (design.shop_id) {
+      setSelectedShopId(design.shop_id);
+      setSelectedShopName(design.shop_name || '');
+    }
   }
 
   function canGoTo(index: number) {
@@ -127,7 +139,7 @@ export default function FreeformPage() {
     async function bootstrap() {
       const designId = searchParams.get('design');
 
-      // Load from saved design URL
+      // Load from saved design URL — forces shop context
       if (designId) {
         if (user) {
           const { data } = await supabase
@@ -137,14 +149,24 @@ export default function FreeformPage() {
             .eq('user_id', user.id)
             .maybeSingle();
           if (data) {
-            applyDesign(data);
+            // Fetch shop name if shop_id exists
+            let shopName = '';
+            if (data.shop_id) {
+              const { data: shop } = await supabase
+                .from('shops')
+                .select('name')
+                .eq('id', data.shop_id)
+                .maybeSingle();
+              shopName = shop?.name || '';
+            }
+            applyDesign({ ...data, shop_name: shopName });
             setActiveStep('review');
             return;
           }
         }
       }
 
-      // Load from navigation state (e.g. from homepage preview)
+      // Load from navigation state (e.g. from homepage preview) — requires shop selection
       if (navState?.modelUrl) {
         selectModel(
           navState.modelUrl,
@@ -156,20 +178,12 @@ export default function FreeformPage() {
         if (navState.color) {
           setMaterialParams((prev) => ({ ...prev, color: navState.color! }));
         }
+        setShopSelectOpen(true);
         return;
       }
 
-      // Default: load latest model from Supabase
-      const { data } = await supabase
-        .from('models_3d')
-        .select('file_url, name, category, thumbnail')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (data?.file_url) {
-        selectModel(data.file_url, data.name, data.category, data.thumbnail || '', false);
-      }
+      // Default: open shop selection modal
+      setShopSelectOpen(true);
     }
 
     bootstrap();
@@ -269,6 +283,7 @@ export default function FreeformPage() {
     const { error } = await supabase.from('designs').insert({
       user_id: user.id,
       name: designName.trim(),
+      shop_id: selectedShopId,
       model_name: modelName,
       model_file: selectedModel,
       shape_params: shapeParams,
@@ -471,8 +486,8 @@ export default function FreeformPage() {
 
             <div className="freeform-sidebar-scroll">
               <div className="freeform-tab-section">
-                {activeStep === 'model' && (
-                  <ModelTab selectedModel={selectedModel} onSelect={(f, n, c, t) => selectModel(f, n, c, t)} />
+                {activeStep === 'model' && selectedShopId && (
+                  <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t) => selectModel(f, n, c, t)} />
                 )}
                 {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} />}
@@ -506,7 +521,6 @@ export default function FreeformPage() {
 
         {/* ── CENTER: 3D VIEWER ── */}
         <div ref={viewerRef} className="freeform-viewer-wrap">
-          <div className="freeform-floor-shadow" />
 
           <div className="freeform-instruction-pill">
             {[
@@ -562,7 +576,7 @@ export default function FreeformPage() {
                 </div>
                 <div>
                   <div className="freeform-summary-product-name">{modelName || 'No Model'}</div>
-                  <div className="freeform-summary-product-type">{modelCategory}</div>
+                  <div className="freeform-summary-product-type">{selectedShopName || modelCategory}</div>
                 </div>
               </div>
             </div>
@@ -734,6 +748,17 @@ export default function FreeformPage() {
           </div>
         </div>
       )}
+
+      {/* ── SHOP SELECT MODAL (freeform entry) ── */}
+      <ShopSelectModal
+        open={shopSelectOpen}
+        onSelect={(id, name) => {
+          setSelectedShopId(id);
+          setSelectedShopName(name);
+          setShopSelectOpen(false);
+        }}
+        onClose={() => setShopSelectOpen(false)}
+      />
     </div>
   );
 }

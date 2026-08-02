@@ -7,11 +7,18 @@ interface Model3D {
   category: string;
   file_url: string;
   thumbnail: string;
+  shop_id: string | null;
   created_at: string;
+}
+
+interface ShopOption {
+  id: string;
+  name: string;
 }
 
 export default function ModelManagePage() {
   const [models, setModels] = useState<Model3D[]>([]);
+  const [shops, setShops] = useState<ShopOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -19,6 +26,7 @@ export default function ModelManagePage() {
   const [error, setError] = useState('');
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('Vase');
+  const [formShopId, setFormShopId] = useState('');
   const [glbFile, setGlbFile] = useState<File | null>(null);
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbPreview, setThumbPreview] = useState('');
@@ -27,6 +35,7 @@ export default function ModelManagePage() {
 
   useEffect(() => {
     fetchModels();
+    fetchShops();
   }, []);
 
   async function fetchModels() {
@@ -34,6 +43,11 @@ export default function ModelManagePage() {
     const { data } = await supabase.from('models_3d').select('*').order('created_at', { ascending: false });
     if (data) setModels(data);
     setLoading(false);
+  }
+
+  async function fetchShops() {
+    const { data } = await supabase.from('shops').select('id, name').order('name');
+    if (data) setShops(data);
   }
 
   const filtered = models.filter(m => {
@@ -44,6 +58,7 @@ export default function ModelManagePage() {
   function openCreate() {
     setFormName('');
     setFormCategory('Vase');
+    setFormShopId('');
     setGlbFile(null);
     setThumbFile(null);
     setThumbPreview('');
@@ -83,6 +98,7 @@ export default function ModelManagePage() {
         category: formCategory,
         file_url: fileUrl,
         thumbnail: thumbnailUrl,
+        shop_id: formShopId || null,
       });
       if (insertErr) throw insertErr;
 
@@ -146,6 +162,7 @@ export default function ModelManagePage() {
               <tr className="border-b border-cream-tertiary bg-cream-secondary/50">
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Model</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Category</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Shop</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">File</th>
                 <th className="text-right px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Actions</th>
               </tr>
@@ -170,6 +187,7 @@ export default function ModelManagePage() {
                     </div>
                   </td>
                   <td className="px-5 py-4 text-sm text-brown-dark">{m.category}</td>
+                  <td className="px-5 py-4 text-sm text-brown-dark">{shops.find(s => s.id === m.shop_id)?.name || '—'}</td>
                   <td className="px-5 py-4 text-xs text-brown-light font-mono truncate max-w-[200px]">{m.file_url.split('/').pop()}</td>
                   <td className="px-5 py-4 text-right">
                     <button onClick={() => handleDelete(m.id)}
@@ -214,6 +232,17 @@ export default function ModelManagePage() {
                   <option value="Planter">Planter</option>
                   <option value="Bowl">Bowl</option>
                   <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-brown-dark mb-1">Assign to Shop *</label>
+                <select value={formShopId} onChange={e => setFormShopId(e.target.value)} required
+                  className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent bg-white">
+                  <option value="">Select a shop...</option>
+                  {shops.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
                 </select>
               </div>
 

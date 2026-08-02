@@ -12,6 +12,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisanDashboard = location.pathname.startsWith('/artisan-dashboard');
+  const isFreeform = location.pathname.startsWith('/freeform');
 
   const [authOpen, setAuthOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -383,7 +384,7 @@ export default function Navbar() {
           </div>
         </div>
       ) : (
-        <div className="max-w-[var(--container-width)] mx-auto h-full flex items-center justify-between" style={{ padding: isMobile ? '0 12px' : '0 24px' }}>
+        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} h-full flex items-center justify-between relative`} style={{ padding: isMobile ? '0 16px' : '0 32px' }}>
           {/* Mobile: hamburger left, logo center-left. Desktop: logo left */}
 
 
@@ -393,11 +394,11 @@ export default function Navbar() {
 
           {/* Desktop nav links */}
           {!isMobile && (
-            <ul className="nav-links items-center gap-10 list-none flex" style={{ margin: 0, padding: 0 }}>
+            <ul className="nav-links absolute left-1/2 -translate-x-1/2 items-center list-none flex" style={{ margin: 0, padding: 0, gap: '36px' }}>
               {links.map(link => (
                 <li key={link.to}>
                   <Link to={link.to}
-                    className={`text-[1.125rem] font-semibold relative py-1.5 transition-colors after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-[2px] after:bg-accent after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-accent ${
+                    className={`text-[1rem] font-semibold relative py-1.5 transition-colors after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-[2px] after:bg-accent after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-accent ${
                       location.pathname === link.to ? 'text-accent after:w-full' : 'text-brown-dark'
                     }`}>
                     {link.label}
@@ -408,7 +409,7 @@ export default function Navbar() {
           )}
 
           {/* Action icons */}
-          <div className="flex items-center" style={{ gap: isMobile ? '4px' : '24px' }}>
+          <div className="flex items-center" style={{ gap: isMobile ? '4px' : '20px' }}>
             {loggedIn ? (
               <>
                 <Link to="/cart" aria-label="Shopping cart" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
