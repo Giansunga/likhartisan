@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -18,7 +18,6 @@ interface HomeArtisan {
 }
 
 export default function HomePage() {
-  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [counted, setCounted] = useState(false);
   const { user, loading } = useAuth();

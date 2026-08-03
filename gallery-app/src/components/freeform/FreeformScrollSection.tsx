@@ -217,7 +217,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
                     </div>
                   }>
                     <FreeformViewer
-                      previewMode
+                      preview
                       modelFile={previewModel}
                       shapeParams={scrollShape}
                       materialParams={{ finish: scrollFinish, color: previewColor }}
