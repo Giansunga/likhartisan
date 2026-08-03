@@ -757,7 +757,6 @@ export default function FreeformPage() {
           setSelectedShopName(name);
           setShopSelectOpen(false);
         }}
-        onClose={() => setShopSelectOpen(false)}
       />
     </div>
   );

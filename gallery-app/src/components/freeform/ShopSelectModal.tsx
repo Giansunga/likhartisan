@@ -12,11 +12,9 @@ interface ShopWithModels {
 export default function ShopSelectModal({
   open,
   onSelect,
-  onClose,
 }: {
   open: boolean;
   onSelect: (shopId: string, shopName: string) => void;
-  onClose: () => void;
 }) {
   const [shops, setShops] = useState<ShopWithModels[]>([]);
   const [loading, setLoading] = useState(true);
