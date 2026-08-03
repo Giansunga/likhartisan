@@ -35,9 +35,7 @@ const DEFAULT_MATERIAL = { finish: 'raw_clay', color: '#C4A882' };
 const FINISH_LABELS: Record<string, string> = {
   raw_clay: 'Terracotta',
   matte: 'Matte',
-  ceramic: 'Ceramic',
-  glazed: 'Glazed',
-  metallic: 'Metallic',
+  glazed: 'Glossy',
   acrylic_paint: 'Acrylic Paint',
   water_paint: 'Water Paint',
 };
@@ -433,12 +431,10 @@ export default function FreeformPage() {
 
   const completedSteps = STEPS.filter((_, i) => i < stepIndex).map((s) => s.key);
   const estimatedPrice =
-    materialParams.finish === 'metallic' ? 1850 :
     materialParams.finish === 'acrylic_paint' ? 1350 :
     materialParams.finish === 'water_paint' ? 1300 :
     materialParams.finish === 'glazed' ? 1450 : 1250;
   const estimatedDays =
-    materialParams.finish === 'metallic' ? 10 :
     materialParams.finish === 'acrylic_paint' ? 6 :
     materialParams.finish === 'water_paint' ? 6 :
     materialParams.finish === 'glazed' ? 7 : 5;
