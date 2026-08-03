@@ -6,7 +6,7 @@ interface MaterialParams {
 }
 
 const FINISHES = [
-  { id: 'raw_clay', label: 'Raw Clay', color: '#C4A882' },
+  { id: 'raw_clay', label: 'Terracotta', color: '#C4A882' },
   { id: 'matte', label: 'Matte', color: '#8B7355' },
   { id: 'ceramic', label: 'Ceramic', color: '#E8E0D8' },
   { id: 'glazed', label: 'Glazed', color: '#D4A574' },

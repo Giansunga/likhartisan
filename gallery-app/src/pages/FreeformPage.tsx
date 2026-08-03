@@ -33,7 +33,7 @@ const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, c
 const DEFAULT_MATERIAL = { finish: 'raw_clay', color: '#C4A882' };
 
 const FINISH_LABELS: Record<string, string> = {
-  raw_clay: 'Raw Clay',
+  raw_clay: 'Terracotta',
   matte: 'Matte',
   ceramic: 'Ceramic',
   glazed: 'Glazed',
@@ -80,6 +80,7 @@ export default function FreeformPage() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
+  const shopModalShownRef = useRef(false);
   const { user } = useAuth();
 
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
@@ -180,12 +181,18 @@ export default function FreeformPage() {
         if (navState.color) {
           setMaterialParams((prev) => ({ ...prev, color: navState.color! }));
         }
-        setShopSelectOpen(true);
+        if (!shopModalShownRef.current) {
+          shopModalShownRef.current = true;
+          setShopSelectOpen(true);
+        }
         return;
       }
 
-      // Default: open shop selection modal
-      setShopSelectOpen(true);
+      // Default: open shop selection modal only once per mount
+      if (!shopModalShownRef.current) {
+        shopModalShownRef.current = true;
+        setShopSelectOpen(true);
+      }
     }
 
     bootstrap();
