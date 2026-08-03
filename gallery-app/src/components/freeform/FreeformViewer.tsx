@@ -190,13 +190,13 @@ function Scene({
 
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
-      const distMult = previewMode ? 1.5 : 1.9;
+      const distMult = previewMode ? 2.2 : 1.9;
       const dist = (maxDim / (2 * Math.tan(fov / 2))) * distMult;
       const target = new THREE.Vector3(0, 0, 0);
 
       camera.position.set(
-        target.x + dist * (previewMode ? 0.32 : 0.45),
-        target.y + dist * (previewMode ? 0.06 : 0.22),
+        target.x + dist * (previewMode ? 0.25 : 0.45),
+        target.y + dist * (previewMode ? 0.15 : 0.22),
         target.z + dist
       );
       (camera as THREE.PerspectiveCamera).near = 0.01;
@@ -364,7 +364,7 @@ export default function FreeformViewer({
       <ModelErrorBoundary fallback={errorFallback}>
         <Canvas
           key={modelFile}
-          camera={{ position: [3, 1.5, 5], fov: preview ? 42 : 45 }}
+          camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}
           gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
           style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
           dpr={[1, 2]}
