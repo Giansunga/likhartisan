@@ -77,7 +77,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
   // Fetch a default model for the preview
   useEffect(() => {
     if (!freeformVisible || previewModel) return;
-    supabase.from('models_3d').select('file_url, name, category, thumbnail').limit(1).maybeSingle()
+    supabase.from('models_3d').select('file_url, name, category, thumbnail').eq('status', 'active').limit(1).maybeSingle()
       .then(({ data }) => {
         if (data?.file_url) {
           setPreviewModel(data.file_url);

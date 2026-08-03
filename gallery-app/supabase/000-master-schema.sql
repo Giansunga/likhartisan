@@ -147,8 +147,13 @@ CREATE TABLE IF NOT EXISTS models_3d (
   category TEXT DEFAULT 'Vase',
   file_url TEXT NOT NULL,
   thumbnail TEXT DEFAULT '',
+  shop_id UUID REFERENCES shops(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_models_3d_shop_id ON models_3d(shop_id);
+CREATE INDEX IF NOT EXISTS idx_models_3d_status ON models_3d(status);
 
 -- ── 8. DESIGNS ─────────────────────────────────────────────────────────────
 

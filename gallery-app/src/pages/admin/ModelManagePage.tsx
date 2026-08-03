@@ -8,6 +8,7 @@ interface Model3D {
   file_url: string;
   thumbnail: string;
   shop_id: string | null;
+  status: 'active' | 'archived';
   created_at: string;
 }
 
@@ -21,7 +22,9 @@ export default function ModelManagePage() {
   const [shops, setShops] = useState<ShopOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingModel, setEditingModel] = useState<Model3D | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [formName, setFormName] = useState('');
@@ -51,17 +54,31 @@ export default function ModelManagePage() {
   }
 
   const filtered = models.filter(m => {
+    if (showArchived ? m.status !== 'archived' : m.status === 'archived') return false;
     const q = search.toLowerCase();
     return !q || m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
   });
 
   function openCreate() {
+    setEditingModel(null);
     setFormName('');
     setFormCategory('Vase');
     setFormShopId('');
     setGlbFile(null);
     setThumbFile(null);
     setThumbPreview('');
+    setError('');
+    setShowModal(true);
+  }
+
+  function openEdit(model: Model3D) {
+    setEditingModel(model);
+    setFormName(model.name);
+    setFormCategory(model.category);
+    setFormShopId(model.shop_id || '');
+    setGlbFile(null);
+    setThumbFile(null);
+    setThumbPreview(model.thumbnail || '');
     setError('');
     setShowModal(true);
   }
@@ -84,31 +101,58 @@ export default function ModelManagePage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!glbFile || !formName.trim()) return;
+    if (!formName.trim()) return;
+    if (!editingModel && !glbFile) return;
     setSaving(true);
     setError('');
 
     try {
-      const fileUrl = await uploadFile(glbFile, 'models');
-      let thumbnailUrl = '';
+      let fileUrl = editingModel?.file_url || '';
+      let thumbnailUrl = editingModel?.thumbnail || '';
+
+      if (glbFile) fileUrl = await uploadFile(glbFile, 'models');
       if (thumbFile) thumbnailUrl = await uploadFile(thumbFile, 'models');
 
-      const { error: insertErr } = await supabase.from('models_3d').insert({
-        name: formName.trim(),
-        category: formCategory,
-        file_url: fileUrl,
-        thumbnail: thumbnailUrl,
-        shop_id: formShopId || null,
-      });
-      if (insertErr) throw insertErr;
+      if (editingModel) {
+        const updateData: Record<string, any> = {
+          name: formName.trim(),
+          category: formCategory,
+          shop_id: formShopId || null,
+        };
+        if (glbFile) updateData.file_url = fileUrl;
+        if (thumbFile) updateData.thumbnail = thumbnailUrl;
+
+        const { error: updateErr } = await supabase.from('models_3d').update(updateData).eq('id', editingModel.id);
+        if (updateErr) throw updateErr;
+      } else {
+        const { error: insertErr } = await supabase.from('models_3d').insert({
+          name: formName.trim(),
+          category: formCategory,
+          file_url: fileUrl,
+          thumbnail: thumbnailUrl,
+          shop_id: formShopId || null,
+        });
+        if (insertErr) throw insertErr;
+      }
 
       setShowModal(false);
+      setEditingModel(null);
       fetchModels();
     } catch (err: any) {
       setError(err.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleArchive(id: string) {
+    const model = models.find(m => m.id === id);
+    if (!model) return;
+    const newStatus = model.status === 'archived' ? 'active' : 'archived';
+    const label = newStatus === 'archived' ? 'Archive' : 'Activate';
+    if (!confirm(`${label} "${model.name}"?`)) return;
+    await supabase.from('models_3d').update({ status: newStatus }).eq('id', id);
+    fetchModels();
   }
 
   async function handleDelete(id: string) {
@@ -141,6 +185,19 @@ export default function ModelManagePage() {
           <input type="text" placeholder="Search models..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent bg-white" />
         </div>
+        <button
+          onClick={() => setShowArchived(!showArchived)}
+          className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors flex items-center gap-2 ${
+            showArchived
+              ? 'bg-amber-50 border-amber-200 text-amber-800'
+              : 'bg-white border-cream-tertiary text-brown-medium hover:bg-cream-secondary'
+          }`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+            <path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" />
+          </svg>
+          {showArchived ? 'Hide Archived' : 'Show Archived'}
+        </button>
       </div>
 
       {loading ? (
@@ -163,13 +220,14 @@ export default function ModelManagePage() {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Model</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Category</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Shop</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Status</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">File</th>
                 <th className="text-right px-5 py-3.5 text-xs font-semibold text-brown-medium uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(m => (
-                <tr key={m.id} className="border-b border-cream-tertiary/50 hover:bg-cream-secondary/30 transition-colors">
+                <tr key={m.id} className={`border-b border-cream-tertiary/50 hover:bg-cream-secondary/30 transition-colors ${m.status === 'archived' ? 'opacity-60' : ''}`}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-cream-secondary flex-shrink-0 border border-cream-tertiary">
@@ -188,12 +246,35 @@ export default function ModelManagePage() {
                   </td>
                   <td className="px-5 py-4 text-sm text-brown-dark">{m.category}</td>
                   <td className="px-5 py-4 text-sm text-brown-dark">{shops.find(s => s.id === m.shop_id)?.name || '—'}</td>
+                  <td className="px-5 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      m.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {m.status === 'active' ? 'Active' : 'Archived'}
+                    </span>
+                  </td>
                   <td className="px-5 py-4 text-xs text-brown-light font-mono truncate max-w-[200px]">{m.file_url.split('/').pop()}</td>
                   <td className="px-5 py-4 text-right">
-                    <button onClick={() => handleDelete(m.id)}
-                      className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
-                      Delete
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => openEdit(m)}
+                        className="px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+                        Edit
+                      </button>
+                      <button onClick={() => handleArchive(m.id)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          m.status === 'archived'
+                            ? 'text-green-700 border border-green-200 hover:bg-green-50'
+                            : 'text-amber-700 border border-amber-200 hover:bg-amber-50'
+                        }`}>
+                        {m.status === 'archived' ? 'Activate' : 'Archive'}
+                      </button>
+                      <button onClick={() => handleDelete(m.id)}
+                        className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -206,8 +287,8 @@ export default function ModelManagePage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-cream-tertiary">
-              <h3 className="font-serif text-lg font-bold text-brown-dark">Upload 3D Model</h3>
-              <button onClick={() => setShowModal(false)} className="text-brown-light hover:text-brown-dark transition-colors">
+              <h3 className="font-serif text-lg font-bold text-brown-dark">{editingModel ? 'Edit 3D Model' : 'Upload 3D Model'}</h3>
+              <button onClick={() => { setShowModal(false); setEditingModel(null); }} className="text-brown-light hover:text-brown-dark transition-colors">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
@@ -247,12 +328,16 @@ export default function ModelManagePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-brown-dark mb-2">GLB / GLTF File *</label>
+                <label className="block text-sm font-medium text-brown-dark mb-2">
+                  GLB / GLTF File {editingModel ? '(optional — leave empty to keep current)' : '*'}
+                </label>
                 <input ref={glbInputRef} type="file" accept=".glb,.gltf" onChange={e => setGlbFile(e.target.files?.[0] || null)} className="hidden" />
                 <div onClick={() => glbInputRef.current?.click()}
                   className="w-full p-4 rounded-xl border-2 border-dashed border-cream-tertiary cursor-pointer hover:border-accent transition-colors text-center">
                   {glbFile ? (
                     <p className="text-sm text-brown-dark font-medium">{glbFile.name}</p>
+                  ) : editingModel ? (
+                    <p className="text-sm text-brown-light">Current: {editingModel.file_url.split('/').pop()}</p>
                   ) : (
                     <>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 mx-auto mb-1 text-brown-light">
@@ -281,11 +366,11 @@ export default function ModelManagePage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={!formName.trim() || !glbFile || saving}
+                <button type="submit" disabled={!formName.trim() || (!editingModel && !glbFile) || saving}
                   className="bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  {saving ? 'Uploading...' : 'Upload Model'}
+                  {saving ? 'Saving...' : editingModel ? 'Save Changes' : 'Upload Model'}
                 </button>
-                <button type="button" onClick={() => setShowModal(false)}
+                <button type="button" onClick={() => { setShowModal(false); setEditingModel(null); }}
                   className="px-6 py-2.5 rounded-xl text-sm font-semibold border border-cream-tertiary text-brown-medium hover:bg-cream-secondary transition-colors">
                   Cancel
                 </button>

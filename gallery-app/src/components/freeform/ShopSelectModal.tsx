@@ -33,7 +33,8 @@ export default function ShopSelectModal({
     const { data: modelRows } = await supabase
       .from('models_3d')
       .select('shop_id, thumbnail, shops!inner(id, name, image)')
-      .not('shop_id', 'is', null);
+      .not('shop_id', 'is', null)
+      .eq('status', 'active');
 
     if (!modelRows || modelRows.length === 0) {
       setShops([]);
