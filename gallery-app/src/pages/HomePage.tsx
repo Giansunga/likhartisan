@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-
-const FreeformViewer = lazy(() => import('../components/freeform/FreeformViewer'));
+import FreeformScrollSection from '../components/freeform/FreeformScrollSection';
 
 const VIDEO_PARTS = ['/videos/part1.mp4', '/videos/part2.mp4', '/videos/part3.mp4'];
 
@@ -33,13 +32,6 @@ export default function HomePage() {
   // Sequential video player state
   const [activeIdx, setActiveIdx] = useState(0);
   const vidRef = useRef<HTMLVideoElement>(null);
-
-  // Freeform preview state
-  const [previewModel, setPreviewModel] = useState<string | null>(null);
-  const [previewModelMeta, setPreviewModelMeta] = useState<{ name: string; category: string; thumbnail: string } | null>(null);
-  const freeformSectionRef = useRef<HTMLDivElement>(null);
-  const [freeformVisible, setFreeformVisible] = useState(false);
-  const [previewColor, setPreviewColor] = useState('#C4A882');
 
   const handleEnded = useCallback(() => {
     setActiveIdx(prev => (prev + 1) % VIDEO_PARTS.length);
@@ -119,50 +111,6 @@ export default function HomePage() {
   useEffect(() => {
     if (counted) setStatsVisible(true);
   }, [counted]);
-
-  // Lazy-load freeform 3D model when section enters viewport
-  useEffect(() => {
-    const el = freeformSectionRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setFreeformVisible(true);
-        obs.disconnect();
-      }
-    }, { threshold: 0.1 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  // Fetch a default model for the preview
-  useEffect(() => {
-    if (!freeformVisible || previewModel) return;
-    supabase.from('models_3d').select('file_url, name, category, thumbnail').limit(1).maybeSingle()
-      .then(({ data }) => {
-        if (data?.file_url) {
-          setPreviewModel(data.file_url);
-          setPreviewModelMeta({
-            name: data.name,
-            category: data.category,
-            thumbnail: data.thumbnail || '',
-          });
-        } else {
-          setPreviewModel('');
-        }
-      });
-  }, [freeformVisible, previewModel]);
-
-  function goToFreeform() {
-    navigate('/freeform', {
-      state: {
-        modelUrl: previewModel,
-        modelName: previewModelMeta?.name,
-        modelCategory: previewModelMeta?.category,
-        modelThumbnail: previewModelMeta?.thumbnail,
-        color: previewColor,
-      },
-    });
-  }
 
   const slideArtisan = (dir: number) => {
     const track = artisanTrackRef.current;
@@ -306,147 +254,7 @@ export default function HomePage() {
       </section>
 
       {/* ── FREEFORM POTTERY DESIGNER ── */}
-      <section ref={freeformSectionRef} className="py-20 bg-[var(--bg-secondary)]">
-        <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-
-            {/* Left: Marketing Content */}
-            <div>
-              <h2 className="font-serif text-[2.8rem] leading-[1.15] font-bold text-[#2C1810] mb-5">
-                Design Pottery.<br />
-                <span className="text-[#823E0B]">Your Way.</span><br />
-                In 3D.
-              </h2>
-              <p className="text-[1rem] text-[#6B5B50] leading-[1.7] mb-8 max-w-[460px]">
-                Customize handcrafted pottery in real time using our interactive 3D Freeform Designer.
-                Experiment with variations, dimensions, and decorative details before placing your order.
-              </p>
-              <div className="flex gap-4 mb-10">
-                <button
-                  onClick={isMobile ? undefined : goToFreeform}
-                  disabled={isMobile}
-                  className={`flex items-center gap-2.5 text-white font-semibold text-[0.95rem] py-3.5 px-8 rounded-[10px] transition-all ${isMobile ? 'bg-[#B9A79A] cursor-not-allowed opacity-70' : 'bg-[#823E0B] shadow-[0_2px_10px_rgba(130,62,11,0.25)] hover:bg-[#6B3209] hover:shadow-[0_4px_16px_rgba(130,62,11,0.35)] cursor-pointer'}`}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                    <path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" />
-                  </svg>
-                  Start Designing
-                </button>
-                <button
-                  onClick={goToFreeform}
-                  className="flex items-center gap-2 border-[1.5px] border-[#D4C8BB] text-[#5A4A3E] font-semibold text-[0.95rem] py-3.5 px-8 rounded-[10px] hover:border-[#823E0B] hover:text-[#823E0B] transition-all cursor-pointer bg-transparent"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                    <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
-                  </svg>
-                  Learn More
-                </button>
-              </div>
-              {isMobile && (
-                <p className="text-[0.8rem] text-[#8A7A6E] font-medium -mt-7 mb-10 text-center">
-                  Available for Desktop Only
-                </p>
-              )}
-              <div className="flex gap-6 flex-wrap">
-                {[
-                  { icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', label: 'Real-time 3D Preview' },
-                  { icon: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7', label: 'Easy to Customize' },
-                  { icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8z M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75', label: 'Handmade by Local Artisans' },
-                ].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[rgba(130,62,11,0.08)] flex items-center justify-center flex-shrink-0">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#823E0B" strokeWidth="1.8" style={{ width: '16px', height: '16px' }}>
-                        <path d={f.icon} />
-                      </svg>
-                    </div>
-                    <span className="text-[0.82rem] font-medium text-[#5A4A3E]">{f.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right: Preview Card */}
-            <div
-              className="rounded-[24px] overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.1)] border border-[#E8E0D8]"
-              style={{ background: 'var(--bg-secondary)' }}
-            >
-              <div className="relative" style={{ height: '480px' }}>
-                {/* 3D viewer area */}
-                <div className="absolute inset-x-0 top-0" style={{ height: '392px' }}>
-                  {freeformVisible && previewModel ? (
-                    <Suspense fallback={
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="w-10 h-10 border-2 border-[#D4C8BB] border-t-[#823E0B] rounded-full animate-spin" />
-                          <span className="text-[0.82rem] text-[#8C7B6E]">Loading 3D preview...</span>
-                        </div>
-                      </div>
-                    }>
-                      <FreeformViewer
-                        preview
-                        modelFile={previewModel}
-                        shapeParams={{ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 }}
-                        materialParams={{ finish: 'raw_clay', color: previewColor }}
-                        onMorphDetected={() => {}}
-                      />
-                    </Suspense>
-                  ) : freeformVisible && previewModel === '' ? (
-                    <div className="w-full h-full flex items-center justify-center p-6 text-center">
-                      <p className="text-[0.85rem] text-[#8C7B6E]">Upload a 3D model in admin to enable the live preview.</p>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-10 h-10 border-2 border-[#D4C8BB] border-t-[#823E0B] rounded-full animate-spin" />
-                        <span className="text-[0.82rem] text-[#8C7B6E]">Loading 3D preview...</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom controls */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-4 px-5 py-4"
-                  style={{
-                    height: '88px',
-                    background: 'var(--bg-secondary)',
-                    borderTop: '1px solid #E8E0D8',
-                  }}
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[0.68rem] font-bold text-[#85776A] uppercase tracking-wider mr-1 hidden sm:inline">Color</span>
-                    {['#C4A882', '#8B4513', '#A0522D', '#D2691E', '#228B22', '#4682B4', '#8B0000', '#808080'].map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setPreviewColor(c)}
-                        className="w-7 h-7 rounded-full cursor-pointer transition-all hover:scale-110"
-                        style={{
-                          background: c,
-                          border: previewColor === c ? '2px solid #823E0B' : '2px solid #E8E0D8',
-                          boxShadow: previewColor === c ? '0 0 0 3px rgba(130,62,11,0.15)' : '0 1px 3px rgba(0,0,0,0.08)',
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={isMobile ? undefined : goToFreeform}
-                    disabled={isMobile}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-[0.82rem] font-semibold transition-all flex-shrink-0 ${isMobile ? 'cursor-not-allowed opacity-70' : 'hover:scale-[1.02] cursor-pointer'}`}
-                    style={isMobile ? { background: '#B9A79A' } : { background: 'linear-gradient(135deg, #823E0B, #A05219)', boxShadow: '0 4px 16px rgba(130,62,11,0.3)' }}
-                  >
-                    Try it live
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '13px', height: '13px' }}>
-                      <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+      <FreeformScrollSection isMobile={isMobile} />
 
       {/* ── THOMASIAN ARTISANS CAROUSEL ── */}
       <section className="py-16 bg-[var(--bg-primary)] overflow-hidden">
