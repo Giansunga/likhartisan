@@ -82,7 +82,7 @@ export default function ShopSelectModal({
   if (!open) return null;
 
   return (
-    <div className="shop-select-overlay" onClick={onClose}>
+    <div className="shop-select-overlay">
       <div className="shop-select-modal" onClick={(e) => e.stopPropagation()}>
         <div className="shop-select-header">
           <h3 className="freeform-modal-title">Select a Shop</h3>
