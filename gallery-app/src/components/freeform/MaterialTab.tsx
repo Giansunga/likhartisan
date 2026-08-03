@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface MaterialParams {
   finish: string;
@@ -11,7 +11,17 @@ const FINISHES = [
   { id: 'ceramic', label: 'Ceramic', color: '#E8E0D8' },
   { id: 'glazed', label: 'Glazed', color: '#D4A574' },
   { id: 'metallic', label: 'Metallic', color: '#A0A0A0' },
+  { id: 'acrylic_paint', label: 'Acrylic Paint', color: '#E85D75' },
+  { id: 'water_paint', label: 'Water Paint', color: '#5B9BD5' },
 ];
+
+const SHOP_FINISHES: Record<string, string[]> = {
+  'Princess Michael Pottery': ['raw_clay', 'matte', 'glazed'],
+  "Maria's Pots Jars & General Merchandise": ['raw_clay', 'acrylic_paint'],
+  'Sosima Gomez Pottery': ['raw_clay'],
+  'Regala Pottery': ['raw_clay', 'glazed', 'water_paint'],
+  'Apung Dong Pottery': ['raw_clay'],
+};
 
 const COLORS = [
   '#C4A882', '#A0522D', '#8B4513', '#D2691E', '#CD853F', '#DEB887',
@@ -25,11 +35,28 @@ const COLORS = [
 export default function MaterialTab({
   materialParams,
   onChange,
+  shopName,
 }: {
   materialParams: MaterialParams;
   onChange: (params: MaterialParams) => void;
+  shopName?: string;
 }) {
   const [customColor, setCustomColor] = useState(materialParams.color);
+
+  const availableFinishIds = shopName ? (SHOP_FINISHES[shopName] || null) : null;
+  const availableFinishes = availableFinishIds
+    ? FINISHES.filter((f) => availableFinishIds.includes(f.id))
+    : FINISHES;
+
+  useEffect(() => {
+    if (availableFinishIds && !availableFinishIds.includes(materialParams.finish)) {
+      const first = FINISHES.find((f) => f.id === availableFinishIds[0]);
+      if (first) {
+        onChange({ finish: first.id, color: first.color });
+        setCustomColor(first.color);
+      }
+    }
+  }, [shopName]);
 
   function selectFinish(finish: string) {
     const f = FINISHES.find((x) => x.id === finish);
@@ -50,7 +77,7 @@ export default function MaterialTab({
 
       <h4 className="freeform-tab-subheading">Finish</h4>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
-        {FINISHES.map((f) => (
+        {availableFinishes.map((f) => (
           <button
             key={f.id}
             onClick={() => selectFinish(f.id)}

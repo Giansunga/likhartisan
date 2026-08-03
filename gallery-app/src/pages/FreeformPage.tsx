@@ -38,6 +38,8 @@ const FINISH_LABELS: Record<string, string> = {
   ceramic: 'Ceramic',
   glazed: 'Glazed',
   metallic: 'Metallic',
+  acrylic_paint: 'Acrylic Paint',
+  water_paint: 'Water Paint',
 };
 
 /* ─── Component ─── */
@@ -424,9 +426,15 @@ export default function FreeformPage() {
 
   const completedSteps = STEPS.filter((_, i) => i < stepIndex).map((s) => s.key);
   const estimatedPrice =
-    materialParams.finish === 'metallic' ? 1850 : materialParams.finish === 'glazed' ? 1450 : 1250;
+    materialParams.finish === 'metallic' ? 1850 :
+    materialParams.finish === 'acrylic_paint' ? 1350 :
+    materialParams.finish === 'water_paint' ? 1300 :
+    materialParams.finish === 'glazed' ? 1450 : 1250;
   const estimatedDays =
-    materialParams.finish === 'metallic' ? 10 : materialParams.finish === 'glazed' ? 7 : 5;
+    materialParams.finish === 'metallic' ? 10 :
+    materialParams.finish === 'acrylic_paint' ? 6 :
+    materialParams.finish === 'water_paint' ? 6 :
+    materialParams.finish === 'glazed' ? 7 : 5;
 
   /* ─── Render ─── */
 
@@ -490,7 +498,7 @@ export default function FreeformPage() {
                   <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t) => selectModel(f, n, c, t)} />
                 )}
                 {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
-                {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} />}
+                {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && (
                   <div style={{ textAlign: 'center', padding: '40px 16px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '48px', height: '48px', margin: '0 auto 16px', opacity: 0.5 }}>
