@@ -104,26 +104,29 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
     });
   }
 
-  // Animation Transforms
-  const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+  // Animation Transforms — tuned for smooth 60fps fades
+  // Softer spring for opacity (no overshoot, silky fade)
+  const opacitySpring = { stiffness: 60, damping: 28, restDelta: 0.005 };
+  // Slightly stiffer spring for position (responsive but no jitter)
+  const positionSpring = { stiffness: 70, damping: 26, restDelta: 0.5 };
 
-  const rawIntroOpacity = useTransform(scrollYProgress, [0, 0.1, 0.25], [1, 1, 0]);
-  const introOpacity = useSpring(rawIntroOpacity, springConfig);
+  const rawIntroOpacity = useTransform(scrollYProgress, [0, 0.08, 0.2, 0.28], [1, 1, 0.5, 0]);
+  const introOpacity = useSpring(rawIntroOpacity, opacitySpring);
   
-  const rawIntroY = useTransform(scrollYProgress, [0, 0.1, 0.25], [0, 0, -50]);
-  const introY = useSpring(rawIntroY, springConfig);
+  const rawIntroY = useTransform(scrollYProgress, [0, 0.1, 0.25], [0, 0, -40]);
+  const introY = useSpring(rawIntroY, positionSpring);
   
-  const rawShapeOpacity = useTransform(scrollYProgress, [0.2, 0.3, 0.5, 0.6], [0, 1, 1, 0]);
-  const shapeOpacity = useSpring(rawShapeOpacity, springConfig);
+  const rawShapeOpacity = useTransform(scrollYProgress, [0.18, 0.28, 0.48, 0.58], [0, 1, 1, 0]);
+  const shapeOpacity = useSpring(rawShapeOpacity, opacitySpring);
   
-  const rawShapeY = useTransform(scrollYProgress, [0.2, 0.3, 0.5, 0.6], [50, 0, 0, -50]);
-  const shapeY = useSpring(rawShapeY, springConfig);
+  const rawShapeY = useTransform(scrollYProgress, [0.2, 0.3, 0.5, 0.6], [40, 0, 0, -40]);
+  const shapeY = useSpring(rawShapeY, positionSpring);
   
-  const rawFinishOpacity = useTransform(scrollYProgress, [0.5, 0.6, 0.95], [0, 1, 1]);
-  const finishOpacity = useSpring(rawFinishOpacity, springConfig);
+  const rawFinishOpacity = useTransform(scrollYProgress, [0.48, 0.58, 0.92, 1], [0, 1, 1, 0.8]);
+  const finishOpacity = useSpring(rawFinishOpacity, opacitySpring);
   
-  const rawFinishY = useTransform(scrollYProgress, [0.5, 0.6, 0.95], [50, 0, 0]);
-  const finishY = useSpring(rawFinishY, springConfig);
+  const rawFinishY = useTransform(scrollYProgress, [0.5, 0.6, 0.95], [40, 0, 0]);
+  const finishY = useSpring(rawFinishY, positionSpring);
 
   const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.05, 0.9, 1], [1, 0, 0, 0]);
 
@@ -142,7 +145,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
             
             {/* Slide 1: Intro */}
             <motion.div 
-              style={{ opacity: introOpacity, y: introY }}
+              style={{ opacity: introOpacity, y: introY, willChange: 'opacity, transform' }}
               className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
               <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
@@ -164,7 +167,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
 
             {/* Slide 2: Shape */}
             <motion.div 
-              style={{ opacity: shapeOpacity, y: shapeY }}
+              style={{ opacity: shapeOpacity, y: shapeY, willChange: 'opacity, transform' }}
               className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
               <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
@@ -178,7 +181,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
 
             {/* Slide 3: Finish */}
             <motion.div 
-              style={{ opacity: finishOpacity, y: finishY }}
+              style={{ opacity: finishOpacity, y: finishY, willChange: 'opacity, transform' }}
               className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
               <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">

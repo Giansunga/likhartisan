@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import FreeformScrollSection from '../components/freeform/FreeformScrollSection';
+import UShapeReviewScroller from '../components/UShapeReviewScroller';
 
 const VIDEO_PARTS = ['/videos/part1.mp4', '/videos/part2.mp4', '/videos/part3.mp4'];
 
@@ -341,52 +342,16 @@ export default function HomePage() {
 
       {/* ── REVIEWS SECTION ── */}
       {reviewsData.length > 0 && (
-        <section style={{ padding: '60px 0 50px', background: 'var(--bg-primary)' }}>
+        <section style={{ padding: '60px 0 50px', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+          {/* Title stays within container bounds */}
           <div style={{ maxWidth: 'var(--container-width)', margin: '0 auto', padding: '0 24px' }}>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', fontWeight: 700, color: '#333', textAlign: 'center', marginBottom: '40px' }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', fontWeight: 700, color: '#333', textAlign: 'center', marginBottom: '10px' }}>
               What Our <span style={{ color: 'var(--accent-color)' }}>Customers</span> Say
             </h2>
-            <div style={{ position: 'relative', overflow: 'hidden' }}>
-              <div
-                style={{
-                  overflowX: 'auto',
-                  scrollBehavior: 'smooth',
-                  paddingBottom: '12px',
-                  paddingTop: '6px',
-                  msOverflowStyle: 'none',
-                  scrollbarWidth: 'none',
-                  WebkitMaskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
-                  maskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
-                } as any}
-              >
-                <div className="animate-review-marquee">
-                  {[...reviewsData, ...reviewsData, ...reviewsData].map((rev, i) => (
-                    <div key={`${rev.id}-${i}`} style={{ minWidth: '300px', maxWidth: '340px', flex: '0 0 auto', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'transform 0.25s ease, box-shadow 0.25s ease' }} className="hover:-translate-y-1 hover:shadow-md">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#E8E0D8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary-color)' }}>{rev.userName.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#333', fontFamily: 'var(--font-sans)' }}>{rev.userName}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.82rem', color: 'var(--accent-color)', fontWeight: 500, fontFamily: 'var(--font-sans)' }}>{rev.productName}</span>
-                        <div style={{ display: 'flex', gap: '2px' }}>
-                          {[1, 2, 3, 4, 5].map(star => (
-                            <svg key={star} width="14" height="14" viewBox="0 0 24 24" fill={star <= rev.rating ? '#F59E0B' : 'none'} stroke={star <= rev.rating ? '#F59E0B' : '#D1D5DB'} strokeWidth="1.5">
-                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                            </svg>
-                          ))}
-                        </div>
-                      </div>
-                      <div style={{ position: 'relative', flex: 1 }}>
-                        <span style={{ position: 'absolute', top: '-4px', left: '-2px', fontSize: '1.8rem', color: 'var(--accent-color)', fontFamily: 'Georgia, serif', lineHeight: 1, opacity: 0.3 }}>"</span>
-                        <p style={{ fontSize: '0.85rem', color: '#666', lineHeight: 1.6, margin: 0, fontFamily: 'var(--font-sans)', paddingTop: '12px' }}>{rev.body}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          </div>
+          {/* Scroller spans full viewport width edge-to-edge */}
+          <div className="w-full">
+            <UShapeReviewScroller reviews={reviewsData} />
           </div>
         </section>
       )}
