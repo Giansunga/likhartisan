@@ -3,6 +3,8 @@ import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
+import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
+import { type AttachmentParams } from './attachments';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -122,10 +124,62 @@ function getProfileScale(t: number, shapeParams: ShapeParams): number {
   return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
 }
 
+function AttachmentModel({ attachment, baseScene, materialParams }: { attachment: AttachmentParams; baseScene: THREE.Group; materialParams: MaterialParams }) {
+  const gltf = useLoader(GLTFLoader, attachment.fileUrl);
+  const groupRef = useRef<THREE.Group>(null);
+  const attachmentScene = useMemo(() => {
+    const clone = gltf.scene.clone(true);
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry = child.geometry.clone();
+        child.material = Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone();
+      }
+    });
+    return clone;
+  }, [gltf]);
+  const color = useMemo(() => new THREE.Color(materialParams.color), [materialParams.color]);
+  const finish = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const box = new THREE.Box3().setFromObject(baseScene);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const sideVectors: Record<AttachmentParams['anchorSide'], THREE.Vector3> = {
+      front: new THREE.Vector3(0, 0, 1), back: new THREE.Vector3(0, 0, -1), left: new THREE.Vector3(-1, 0, 0), right: new THREE.Vector3(1, 0, 0), top: new THREE.Vector3(0, 1, 0), bottom: new THREE.Vector3(0, -1, 0),
+    };
+    const vector = sideVectors[attachment.anchorSide] || sideVectors.right;
+    const radialSize = Math.max(size.x, size.z) / 2;
+    groupRef.current.position.set(
+      center.x + vector.x * radialSize,
+      attachment.anchorSide === 'top' ? box.max.y : attachment.anchorSide === 'bottom' ? box.min.y : box.min.y + size.y * attachment.anchorHeight,
+      center.z + vector.z * radialSize,
+    );
+    groupRef.current.rotation.set(0, Math.atan2(vector.x, vector.z) + THREE.MathUtils.degToRad(attachment.rotation), 0);
+    const modelScale = Math.max(size.x, size.y, size.z) / 22;
+    groupRef.current.scale.setScalar(modelScale * attachment.scale);
+    groupRef.current.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => {
+        if (!(material instanceof THREE.MeshStandardMaterial)) return;
+        material.color.copy(color);
+        material.roughness = finish.roughness;
+        material.metalness = finish.metalness;
+      });
+    });
+  });
+
+  return <group ref={groupRef}><primitive object={attachmentScene} /></group>;
+}
+
 function Scene({
   modelFile,
   shapeParams,
   materialParams,
+  decorationParams = DEFAULT_DECORATION,
+  attachmentParams = [],
   onMorphDetected,
   onControlsReady,
   previewMode = false,
@@ -133,6 +187,8 @@ function Scene({
   modelFile: string;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
+  decorationParams?: DecorationParams;
+  attachmentParams?: AttachmentParams[];
   onMorphDetected: (has: boolean) => void;
   onControlsReady?: (controls: any, camera: THREE.Camera) => void;
   previewMode?: boolean;
@@ -170,6 +226,16 @@ function Scene({
 
   const materialColor = useMemo(() => new THREE.Color(materialParams.color), [materialParams.color]);
   const finishProps = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
+  const decorTexture = useMemo(() => {
+    if (!decorationParams.patternId) return null;
+    const patternColor = decorationParams.effect === 'engraved'
+      ? new THREE.Color(decorationParams.color).multiplyScalar(0.55).getStyle()
+      : decorationParams.color;
+    const texture = new THREE.TextureLoader().load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(createPatternSvg(decorationParams.patternId, patternColor, decorationParams.placement))}`);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    return texture;
+  }, [decorationParams.color, decorationParams.effect, decorationParams.patternId, decorationParams.placement]);
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -274,12 +340,66 @@ function Scene({
       }
 
       if (mesh.material) {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach((mat) => {
+        if (!(mat instanceof THREE.MeshStandardMaterial)) return;
         mat.color.copy(materialColor);
-        mat.map = null;
+        if ('decorOriginalSide' in mat.userData && mat.side !== mat.userData.decorOriginalSide) {
+          mat.side = mat.userData.decorOriginalSide as THREE.Side;
+          mat.needsUpdate = true;
+        }
+        if (mat.map) {
+          mat.map = null;
+          mat.needsUpdate = true;
+        }
         mat.roughness = finishProps.roughness;
         mat.metalness = finishProps.metalness;
-        mat.needsUpdate = true;
+
+        // Project patterns from cylindrical object space rather than the model's UVs.
+        // Uploaded pottery models often have inconsistent UV unwraps, which turns a
+        // horizontal band into the diagonal streak shown in the editor.
+        if (!mat.userData.decorShaderConfigured) {
+          mat.onBeforeCompile = (shader) => {
+            shader.uniforms.decorMap = { value: null };
+            shader.uniforms.decorEnabled = { value: 0 };
+            shader.uniforms.decorRepeat = { value: 4 };
+            shader.uniforms.decorMinY = { value: 0 };
+            shader.uniforms.decorHeight = { value: 1 };
+            shader.uniforms.decorEngraved = { value: 0 };
+            shader.vertexShader = `varying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\n${shader.vertexShader}`.replace(
+              '#include <begin_vertex>',
+              '#include <begin_vertex>\n  decorWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n  decorWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );'
+            );
+            shader.fragmentShader = `varying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\nuniform sampler2D decorMap;\nuniform float decorEnabled;\nuniform float decorRepeat;\nuniform float decorMinY;\nuniform float decorHeight;\nuniform float decorEngraved;\n${shader.fragmentShader}`.replace(
+              '#include <color_fragment>',
+              `#include <color_fragment>
+              vec2 decorRadialDirection = normalize( decorWorldPosition.xz );
+              float decorOutwardness = dot( normalize( decorWorldNormal.xz ), decorRadialDirection );
+              float decorV = clamp( 1.0 - ( decorWorldPosition.y - decorMinY ) / max( decorHeight, 0.0001 ), 0.0, 1.0 );
+              if ( decorEnabled > 0.5 && decorOutwardness > 0.12 && decorV >= 0.03 ) {
+                float decorU = atan( decorWorldPosition.z, decorWorldPosition.x ) / 6.28318530718 + 0.5;
+                vec4 decorSample = texture2D( decorMap, vec2( fract( decorU * decorRepeat ), decorV ) );
+                vec3 decorColor = decorSample.rgb;
+                if ( decorEngraved > 0.5 ) decorColor = mix( diffuseColor.rgb * 0.42, decorColor, 0.18 );
+                diffuseColor.rgb = mix( diffuseColor.rgb, decorColor, decorSample.a );
+              }`
+            );
+            mat.userData.decorShader = shader;
+          };
+          mat.userData.decorShaderConfigured = true;
+          mat.needsUpdate = true;
+        }
+
+        if (mat.userData.decorShader) {
+          const shader = mat.userData.decorShader;
+          shader.uniforms.decorMap.value = decorTexture;
+          shader.uniforms.decorEnabled.value = decorTexture ? 1 : 0;
+          shader.uniforms.decorRepeat.value = 4 / decorationParams.scale;
+          shader.uniforms.decorMinY.value = minY;
+          shader.uniforms.decorHeight.value = rangeY;
+          shader.uniforms.decorEngraved.value = decorationParams.effect === 'engraved' ? 1 : 0;
+        }
+        });
       }
     });
   });
@@ -287,6 +407,7 @@ function Scene({
   return (
     <group ref={groupRef}>
       <primitive object={scene} />
+      {attachmentParams.map((attachment) => <AttachmentModel key={attachment.id} attachment={attachment} baseScene={scene} materialParams={materialParams} />)}
     </group>
   );
 }
@@ -296,6 +417,8 @@ export default function FreeformViewer({
   modelFile,
   shapeParams,
   materialParams,
+  decorationParams = DEFAULT_DECORATION,
+  attachmentParams = [],
   onMorphDetected,
   onControlsReady,
   preview = false,
@@ -303,6 +426,8 @@ export default function FreeformViewer({
   modelFile: string;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
+  decorationParams?: DecorationParams;
+  attachmentParams?: AttachmentParams[];
   onMorphDetected: (has: boolean) => void;
   onControlsReady?: (controls: any, camera: THREE.Camera) => void;
   preview?: boolean;
@@ -383,6 +508,8 @@ export default function FreeformViewer({
               modelFile={modelFile}
               shapeParams={shapeParams}
               materialParams={materialParams}
+              decorationParams={decorationParams}
+              attachmentParams={attachmentParams}
               onMorphDetected={onMorphDetected}
               onControlsReady={preview ? undefined : onControlsReady}
               previewMode={preview}

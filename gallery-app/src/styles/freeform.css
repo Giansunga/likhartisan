@@ -221,6 +221,32 @@
   border-radius: 3px;
 }
 
+/* Decor tab */
+.decor-tab { padding: 2px 0 16px; }
+.decor-help { font-size: 0.78rem; line-height: 1.45; color: var(--text-muted); margin: -4px 0 16px; }
+.decor-category-nav { display: flex; align-items: center; gap: 4px; margin: 0 -2px 10px; }
+.decor-category-tabs { display: flex; flex: 1; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding: 1px 0 7px; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--primary-color) transparent; }
+.decor-category-tabs::-webkit-scrollbar { height: 4px; }
+.decor-category-tabs::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 999px; }
+.decor-category-tabs::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 999px; }
+.decor-category-tabs button { border: 1px solid var(--bg-tertiary); border-radius: 999px; background: #fff; color: var(--text-muted); cursor: pointer; font: inherit; font-size: 0.7rem; font-weight: 600; padding: 6px 9px; white-space: nowrap; }
+.decor-category-tabs button.active { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+.decor-pattern-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.decor-pattern-card { border: 1.5px solid var(--bg-tertiary); border-radius: 10px; background: #fff; color: var(--text-dark); font: inherit; font-size: 0.71rem; font-weight: 600; cursor: pointer; padding: 7px; text-align: left; transition: border-color .2s, box-shadow .2s; }
+.decor-pattern-card:hover, .decor-pattern-card.selected { border-color: var(--primary-color); box-shadow: 0 2px 8px rgba(130, 62, 11, .12); }
+.decor-pattern-preview { display: block; height: 36px; margin-bottom: 5px; background-position: center; background-repeat: repeat-x; background-size: auto 116px; }
+.decor-field-label { display: flex; justify-content: space-between; align-items: center; color: var(--text-dark); font-size: 0.76rem; font-weight: 650; margin: 14px 0 7px; }
+.decor-field-label span { color: var(--primary-color); font-variant-numeric: tabular-nums; }
+.decor-segmented { display: flex; border: 1px solid var(--bg-tertiary); border-radius: 9px; overflow: hidden; }
+.decor-segmented button { flex: 1; border: 0; border-right: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-muted); padding: 8px 4px; font: inherit; font-size: 0.71rem; text-transform: capitalize; cursor: pointer; }
+.decor-segmented button:last-child { border-right: 0; }
+.decor-segmented button.active { background: var(--primary-color); color: #fff; font-weight: 650; }
+.decor-range { width: 100%; accent-color: var(--primary-color); cursor: pointer; }
+.decor-option-row { display: flex; align-items: center; justify-content: space-between; }
+.decor-option-row .decor-field-label { margin-bottom: 7px; }
+.decor-color-input { width: 34px; height: 28px; padding: 2px; border: 1px solid var(--bg-tertiary); border-radius: 7px; background: #fff; cursor: pointer; }
+.decor-remove { width: 100%; border: 0; background: transparent; color: #A13E2B; font: inherit; font-size: 0.75rem; font-weight: 600; padding: 14px 4px 2px; cursor: pointer; }
+
 .freeform-sidebar-actions {
   flex-shrink: 0;
   margin-top: auto;
@@ -1095,3 +1121,19 @@
   color: var(--primary-color);
   font-weight: 600;
 }
+
+/* 3D attachment library */
+.attachment-tab { border-top: 1px solid var(--bg-tertiary); margin-top: 20px; padding-top: 20px; }
+.attachment-empty { padding: 14px 0; font-size: .8rem; color: var(--text-muted); }
+.attachment-filter { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+.attachment-filter::-webkit-scrollbar { display: none; }
+.attachment-filter button { flex: 0 0 auto; border: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-muted); border-radius: 999px; padding: 6px 10px; font-size: .72rem; font-weight: 600; cursor: pointer; }
+.attachment-filter button.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+.attachment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.attachment-card { display: grid; grid-template-columns: 38px 1fr; grid-template-rows: auto auto; text-align: left; gap: 1px 8px; align-items: center; min-height: 58px; padding: 7px; border: 1px solid var(--bg-tertiary); border-radius: 10px; background: #fff; cursor: pointer; color: var(--text-dark); font-size: .75rem; font-weight: 700; }
+.attachment-card.selected { border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
+.attachment-card img, .attachment-placeholder { grid-row: 1 / span 2; width: 38px; height: 38px; object-fit: cover; border-radius: 7px; background: var(--bg-tertiary); display: grid; place-items: center; color: var(--primary-color); font-size: .65rem; }
+.attachment-card small { color: var(--text-muted); font-size: .65rem; font-weight: 500; }
+.attachment-selected-list { margin-top: 14px; }
+.attachment-selected { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--bg-tertiary); font-size: .78rem; color: var(--text-dark); }
+.attachment-selected button { border: 0; background: transparent; color: #b33a27; font-size: .72rem; cursor: pointer; }

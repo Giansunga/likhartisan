@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent, useSpring } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import type { DecorationParams } from './decor';
 
 const FreeformViewer = lazy(() => import('./FreeformViewer'));
 
@@ -27,12 +28,20 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
   // Dynamic shape params
   const [scrollShape, setScrollShape] = useState({ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 });
   const [scrollFinish, setScrollFinish] = useState('raw_clay');
+  const [scrollDecoration, setScrollDecoration] = useState<DecorationParams>({
+    patternId: '',
+    placement: 'middle',
+    scale: 1,
+    color: '#7A3E12',
+    effect: 'engraved',
+  });
 
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     if (latest < 0.3) {
       setScrollShape({ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 });
       setScrollFinish('raw_clay');
       setPreviewColor('#C4A882');
+      setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
     } else if (latest < 0.6) {
       const p = (latest - 0.3) / 0.3; // 0 to 1
       setScrollShape({ 
@@ -44,18 +53,28 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
       });
       setScrollFinish('raw_clay');
       setPreviewColor('#C4A882');
+      setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
     } else {
       setScrollShape({ height: 40, bodyWidth: 60, neckWidth: 10, rimSize: 20, curvature: 100 });
       const p = (latest - 0.6) / 0.4;
-      if (p < 0.33) {
+      if (p < 0.25) {
         setScrollFinish('glazed');
         setPreviewColor('#A0522D');
-      } else if (p < 0.66) {
+        setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
+      } else if (p < 0.5) {
         setScrollFinish('ceramic');
-        setPreviewColor('#4682B4'); // Steel Blue
+        setPreviewColor('#C65A2E');
+        setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
       } else {
-        setScrollFinish('metallic');
-        setPreviewColor('#C0C0C0'); // Silver/Metallic
+        setScrollFinish('glazed');
+        setPreviewColor('#FFFFFF');
+        setScrollDecoration({
+          patternId: 'traditional-curl',
+          placement: 'full',
+          scale: 1.1,
+          color: '#315A9F',
+          effect: 'engraved',
+        });
       }
     }
   });
@@ -122,11 +141,17 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
   const rawShapeY = useTransform(scrollYProgress, [0.2, 0.3, 0.5, 0.6], [40, 0, 0, -40]);
   const shapeY = useSpring(rawShapeY, positionSpring);
   
-  const rawFinishOpacity = useTransform(scrollYProgress, [0.48, 0.58, 0.92, 1], [0, 1, 1, 0.8]);
+  const rawFinishOpacity = useTransform(scrollYProgress, [0.46, 0.56, 0.7, 0.78], [0, 1, 1, 0]);
   const finishOpacity = useSpring(rawFinishOpacity, opacitySpring);
   
-  const rawFinishY = useTransform(scrollYProgress, [0.5, 0.6, 0.95], [40, 0, 0]);
+  const rawFinishY = useTransform(scrollYProgress, [0.48, 0.58, 0.72], [40, 0, -40]);
   const finishY = useSpring(rawFinishY, positionSpring);
+
+  const rawDecorOpacity = useTransform(scrollYProgress, [0.68, 0.78, 0.96, 1], [0, 1, 1, 1]);
+  const decorOpacity = useSpring(rawDecorOpacity, opacitySpring);
+
+  const rawDecorY = useTransform(scrollYProgress, [0.7, 0.8, 1], [40, 0, 0]);
+  const decorY = useSpring(rawDecorY, positionSpring);
 
   const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.05, 0.9, 1], [1, 0, 0, 0]);
 
@@ -136,7 +161,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
       style={{ backgroundColor: bgTransform, color: colorTransform }}
       className="relative"
     >
-      <div className="h-[400vh]">
+      <div className="h-[500vh]">
         {/* Sticky container */}
         <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col lg:flex-row max-w-[var(--container-width)] mx-auto">
           
@@ -182,6 +207,20 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
             {/* Slide 3: Finish */}
             <motion.div 
               style={{ opacity: finishOpacity, y: finishY, willChange: 'opacity, transform' }}
+              className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+            >
+              <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
+                Find Your <br />
+                <span className="text-[#823E0B]">Perfect Finish.</span>
+              </h2>
+              <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px] mb-8">
+                Choose from raw clay, elegant ceramic, or brilliant glazed finishes to perfectly match your aesthetic.
+              </p>
+            </motion.div>
+
+            {/* Slide 4: Decor */}
+            <motion.div
+              style={{ opacity: decorOpacity, y: decorY, willChange: 'opacity, transform' }}
               className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
               <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
@@ -189,7 +228,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
                 <span className="text-[#823E0B]">To Life.</span>
               </h2>
               <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px] mb-8">
-                Choose from raw clay, elegant ceramic, or brilliant glazed finishes to perfectly match your aesthetic.
+                Add original patterns, choose where they wrap, and finish them painted or engraved for a piece with your own signature.
               </p>
               <div className="flex gap-4">
                 <button
@@ -224,6 +263,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
                       modelFile={previewModel}
                       shapeParams={scrollShape}
                       materialParams={{ finish: scrollFinish, color: previewColor }}
+                      decorationParams={scrollDecoration}
                       onMorphDetected={() => {}}
                     />
                   </Suspense>

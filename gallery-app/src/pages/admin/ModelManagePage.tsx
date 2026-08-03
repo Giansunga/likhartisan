@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import AttachmentManagePanel from './AttachmentManagePanel';
 
 interface Model3D {
   id: string;
@@ -18,6 +19,7 @@ interface ShopOption {
 }
 
 export default function ModelManagePage() {
+  const [libraryView, setLibraryView] = useState<'models' | 'attachments'>('models');
   const [models, setModels] = useState<Model3D[]>([]);
   const [shops, setShops] = useState<ShopOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,8 @@ export default function ModelManagePage() {
     fetchModels();
   }
 
+  if (libraryView === 'attachments') return <AttachmentManagePanel onBack={() => setLibraryView('models')} />;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -185,6 +189,12 @@ export default function ModelManagePage() {
           <input type="text" placeholder="Search models..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent bg-white" />
         </div>
+        <button
+          onClick={() => setLibraryView('attachments')}
+          className="px-4 py-2.5 rounded-xl text-sm font-medium border border-cream-tertiary bg-white text-brown-medium hover:bg-cream-secondary transition-colors whitespace-nowrap"
+        >
+          Manage 3D Attachments
+        </button>
         <button
           onClick={() => setShowArchived(!showArchived)}
           className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors flex items-center gap-2 ${

@@ -9,9 +9,13 @@ import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
 import MaterialTab from '../components/freeform/MaterialTab';
+import DecorTab from '../components/freeform/DecorTab';
+import AttachmentTab from '../components/freeform/AttachmentTab';
 import SaveTab from '../components/freeform/SaveTab';
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
+import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
+import { type AttachmentParams } from '../components/freeform/attachments';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -57,6 +61,8 @@ export default function FreeformPage() {
   /* Design params */
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
   const [materialParams, setMaterialParams] = useState(DEFAULT_MATERIAL);
+  const [decorationParams, setDecorationParams] = useState<DecorationParams>(DEFAULT_DECORATION);
+  const [attachmentParams, setAttachmentParams] = useState<AttachmentParams[]>([]);
 
   /* Shop selection (freeform entry) */
   const [shopSelectOpen, setShopSelectOpen] = useState(false);
@@ -99,6 +105,8 @@ export default function FreeformPage() {
     if (resetParams) {
       setShapeParams(DEFAULT_SHAPE);
       setMaterialParams(DEFAULT_MATERIAL);
+      setDecorationParams(DEFAULT_DECORATION);
+      setAttachmentParams([]);
     }
   }
 
@@ -109,11 +117,15 @@ export default function FreeformPage() {
     shop_name?: string;
     shape_params: typeof DEFAULT_SHAPE;
     material_params: typeof DEFAULT_MATERIAL;
+    decor_params?: DecorationParams;
+    attachment_params?: AttachmentParams[];
   }) {
     setSelectedModel(design.model_file);
     setModelName(design.model_name);
     setShapeParams(design.shape_params || DEFAULT_SHAPE);
     setMaterialParams(design.material_params || DEFAULT_MATERIAL);
+    setDecorationParams(design.decor_params || DEFAULT_DECORATION);
+    setAttachmentParams(design.attachment_params || []);
     if (design.shop_id) {
       setSelectedShopId(design.shop_id);
       setSelectedShopName(design.shop_name || '');
@@ -295,6 +307,8 @@ export default function FreeformPage() {
       model_file: selectedModel,
       shape_params: shapeParams,
       material_params: materialParams,
+      decor_params: decorationParams,
+      attachment_params: attachmentParams,
       thumbnail: thumbnail || null,
     });
 
@@ -349,6 +363,8 @@ export default function FreeformPage() {
         model_file: selectedModel,
         shape: shapeParams,
         material: materialParams,
+        decor: decorationParams,
+        attachments: attachmentParams,
       },
     });
 
@@ -430,14 +446,16 @@ export default function FreeformPage() {
   /* ─── Derived state ─── */
 
   const completedSteps = STEPS.filter((_, i) => i < stepIndex).map((s) => s.key);
-  const estimatedPrice =
+  const basePrice =
     materialParams.finish === 'acrylic_paint' ? 1350 :
     materialParams.finish === 'water_paint' ? 1300 :
     materialParams.finish === 'glazed' ? 1450 : 1250;
-  const estimatedDays =
+  const baseDays =
     materialParams.finish === 'acrylic_paint' ? 6 :
     materialParams.finish === 'water_paint' ? 6 :
     materialParams.finish === 'glazed' ? 7 : 5;
+  const estimatedPrice = basePrice + attachmentParams.reduce((total, item) => total + item.priceAdjustment, 0);
+  const estimatedDays = baseDays + attachmentParams.reduce((total, item) => total + item.productionDaysAdjustment, 0);
 
   /* ─── Render ─── */
 
@@ -475,7 +493,7 @@ export default function FreeformPage() {
             );
           })}
         </div>
-        <button onClick={() => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); }} className="freeform-reset-btn">
+        <button onClick={() => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); }} className="freeform-reset-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
             <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" /><path d="M3 3v5h5" />
           </svg>
@@ -502,15 +520,10 @@ export default function FreeformPage() {
                 )}
                 {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
-                {activeStep === 'decor' && (
-                  <div style={{ textAlign: 'center', padding: '40px 16px' }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '48px', height: '48px', margin: '0 auto 16px', opacity: 0.5 }}>
-                      <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-                    </svg>
-                    <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>Coming Soon</p>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Text engraving and decorations will be available in a future update.</p>
-                  </div>
-                )}
+                {activeStep === 'decor' && <>
+                  <DecorTab decoration={decorationParams} onChange={setDecorationParams} />
+                  <AttachmentTab shopId={selectedShopId} modelCategory={modelCategory} value={attachmentParams} onChange={setAttachmentParams} />
+                </>}
                 {activeStep === 'review' && (
                   <div>
                     <div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
@@ -553,6 +566,8 @@ export default function FreeformPage() {
               modelFile={selectedModel}
               shapeParams={shapeParams}
               materialParams={materialParams}
+              decorationParams={decorationParams}
+              attachmentParams={attachmentParams}
               onMorphDetected={() => {}}
               onControlsReady={handleControlsReady}
             />
@@ -610,7 +625,7 @@ export default function FreeformPage() {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Decor</span>
-                <span className="freeform-summary-field-value">None</span>
+                <span className="freeform-summary-field-value">{getPattern(decorationParams.patternId)?.name || 'None'}</span>
               </div>
             </div>
 
