@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
+import uploadRoutes from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
@@ -16,6 +17,14 @@ for (const v of requiredEnvVars) {
   if (!process.env[v]) {
     console.error(`[FATAL] Missing required env var: ${v}`);
     process.exit(1);
+  }
+}
+
+// Warn if R2 env vars are missing (needed for file uploads)
+const r2EnvVars = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'];
+for (const v of r2EnvVars) {
+  if (!process.env[v]) {
+    console.warn(`[WARN] Missing R2 env var: ${v} - File uploads will not work`);
   }
 }
 
@@ -107,6 +116,9 @@ app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 
 // Lalamove routes
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
+
+// Upload routes (presigned URLs for R2)
+app.use('/api/upload', uploadRoutes);
 
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {

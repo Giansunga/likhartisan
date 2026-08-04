@@ -1,31 +1,35 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-
-const r2 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${import.meta.env.VITE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
-  },
-});
+import { API_BASE } from './api';
 
 export async function uploadToR2(file: File, folder: string): Promise<string> {
-  const ext = file.name.split('.').pop() || 'bin';
-  const key = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  // Step 1: Get presigned URL from backend
+  const response = await fetch(`${API_BASE}/api/upload/presign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, folder }),
+  });
 
-  const arrayBuffer = await file.arrayBuffer();
-  const body = new Uint8Array(arrayBuffer);
+  if (!response.ok) {
+    throw new Error('Failed to get upload URL');
+  }
 
-  await r2.send(new PutObjectCommand({
-    Bucket: import.meta.env.VITE_R2_BUCKET,
-    Key: key,
-    Body: body,
-    ContentType: file.type || 'application/octet-stream',
-  }));
+  const { presignedUrl, publicUrl } = await response.json();
 
-  return `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`;
+  // Step 2: Upload directly to R2 using presigned URL
+  const uploadResponse = await fetch(presignedUrl, {
+    method: 'PUT',
+    body: file,
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error('Failed to upload file');
+  }
+
+  return publicUrl;
 }
 
 export function getR2PublicUrl(key: string): string {
-  return `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`;
+  return key; // Keys are now full URLs from the backend
 }
