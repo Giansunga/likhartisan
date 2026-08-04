@@ -185,12 +185,7 @@ export default function ModelManagePage() {
           <input type="text" placeholder="Search models..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent bg-white" />
         </div>
-        <button
-          onClick={() => setLibraryView('attachments')}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium border border-cream-tertiary bg-white text-brown-medium hover:bg-cream-secondary transition-colors whitespace-nowrap"
-        >
-          Manage 3D Attachments
-        </button>
+        <button onClick={() => setLibraryView('attachments')} className="px-4 py-2.5 rounded-xl text-sm font-medium border border-cream-tertiary bg-white text-brown-medium hover:bg-cream-secondary whitespace-nowrap">Generated Attachments</button>
         <button
           onClick={() => setShowArchived(!showArchived)}
           className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors flex items-center gap-2 ${

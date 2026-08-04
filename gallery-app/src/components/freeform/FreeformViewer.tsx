@@ -1,10 +1,22 @@
-import { Suspense, useRef, useMemo, Component, type ReactNode } from 'react';
+import { Suspense, useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
+/* eslint-disable react-hooks/immutability -- R3F animation code intentionally mutates Three.js objects owned by the scene. */
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
-import { type AttachmentParams } from './attachments';
+import { type AttachmentPlacement, type AttachmentSelection, type GeneratedAttachmentSocket } from './attachments';
+import {
+  analyzeAttachmentSockets,
+  attachmentPlacementKey,
+  attachmentPlacementsCollide,
+  getAttachmentMountTransform,
+  getLiveAttachmentTransformLimits,
+  resolveAttachmentPlacement,
+  resolveAttachmentPoint,
+  type AttachmentPlacementLimitMap,
+} from './attachmentPlacement';
+import { disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -21,10 +33,13 @@ const FINISH_PROPS: Record<string, { roughness: number; metalness: number }> = {
   ceramic: { roughness: 0.4, metalness: 0.1 },
   glazed: { roughness: 0.15, metalness: 0.2 },
   metallic: { roughness: 0.3, metalness: 0.8 },
+  acrylic_paint: { roughness: 0.45, metalness: 0.0 },
+  water_paint: { roughness: 0.62, metalness: 0.0 },
 };
 
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
 type MaterialParams = { finish: string; color: string };
+type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void };
 
 type GeometrySnapshot = { rootPositions: Float32Array; rootToLocal: THREE.Matrix4 };
 type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
@@ -124,42 +139,25 @@ function getProfileScale(t: number, shapeParams: ShapeParams): number {
   return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
 }
 
-function AttachmentModel({ attachment, baseScene, materialParams }: { attachment: AttachmentParams; baseScene: THREE.Group; materialParams: MaterialParams }) {
-  const gltf = useLoader(GLTFLoader, attachment.fileUrl);
-  const groupRef = useRef<THREE.Group>(null);
-  const attachmentScene = useMemo(() => {
-    const clone = gltf.scene.clone(true);
-    clone.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry = child.geometry.clone();
-        child.material = Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone();
-      }
-    });
-    return clone;
-  }, [gltf]);
-  const color = useMemo(() => new THREE.Color(materialParams.color), [materialParams.color]);
-  const finish = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
+class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?: () => void }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch() { this.props.onError?.(); }
+  render() { return this.state.hasError ? null : this.props.children; }
+}
 
-  useFrame(() => {
-    if (!groupRef.current) return;
-    const box = new THREE.Box3().setFromObject(baseScene);
-    if (box.isEmpty()) return;
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const sideVectors: Record<AttachmentParams['anchorSide'], THREE.Vector3> = {
-      front: new THREE.Vector3(0, 0, 1), back: new THREE.Vector3(0, 0, -1), left: new THREE.Vector3(-1, 0, 0), right: new THREE.Vector3(1, 0, 0), top: new THREE.Vector3(0, 1, 0), bottom: new THREE.Vector3(0, -1, 0),
-    };
-    const vector = sideVectors[attachment.anchorSide] || sideVectors.right;
-    const radialSize = Math.max(size.x, size.z) / 2;
-    groupRef.current.position.set(
-      center.x + vector.x * radialSize,
-      attachment.anchorSide === 'top' ? box.max.y : attachment.anchorSide === 'bottom' ? box.min.y : box.min.y + size.y * attachment.anchorHeight,
-      center.z + vector.z * radialSize,
-    );
-    groupRef.current.rotation.set(0, Math.atan2(vector.x, vector.z) + THREE.MathUtils.degToRad(attachment.rotation), 0);
-    const modelScale = Math.max(size.x, size.y, size.z) / 22;
-    groupRef.current.scale.setScalar(modelScale * attachment.scale);
-    groupRef.current.traverse((child) => {
+function AttachmentModel({ attachment, placement, currentSocket, baseScene, shapeKey, material }: { attachment: AttachmentSelection; placement: AttachmentPlacement; currentSocket?: GeneratedAttachmentSocket; baseScene: THREE.Group; shapeKey: string; material: MaterialParams }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const placementKeyRef = useRef('');
+  const recipe = getGeneratedAttachmentRecipe(attachment.recipeKey, attachment.recipeVersion);
+  const attachmentScene = useMemo(() => recipe?.build() || new THREE.Group(), [recipe]);
+  const color = useMemo(() => new THREE.Color(material.color), [material.color]);
+  const finish = FINISH_PROPS[material.finish] || FINISH_PROPS.raw_clay;
+
+  useEffect(() => () => disposeGeneratedAttachment(attachmentScene), [attachmentScene]);
+
+  useEffect(() => {
+    attachmentScene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((material) => {
@@ -167,11 +165,47 @@ function AttachmentModel({ attachment, baseScene, materialParams }: { attachment
         material.color.copy(color);
         material.roughness = finish.roughness;
         material.metalness = finish.metalness;
+        material.needsUpdate = true;
       });
     });
+  }, [attachmentScene, color, finish.metalness, finish.roughness]);
+
+  useFrame(() => {
+    if (!groupRef.current || !recipe) return;
+    const { socket: savedSocket, transform } = placement;
+    const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
+    const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${recipe.key}|${recipe.version}`;
+    if (placementKeyRef.current === placementKey) return;
+    const resolved = resolveAttachmentPlacement(baseScene, socket, transform);
+    if (!resolved) return;
+    const mount = getAttachmentMountTransform(resolved.normal, resolved.maxDimension, recipe, transform);
+    groupRef.current.position.copy(resolved.position).add(mount.offset);
+    groupRef.current.quaternion.copy(mount.quaternion);
+    groupRef.current.scale.setScalar(mount.scale);
+    placementKeyRef.current = placementKey;
   });
 
   return <group ref={groupRef}><primitive object={attachmentScene} /></group>;
+}
+
+function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: GeneratedAttachmentSocket; baseScene: THREE.Group; selected: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const resolved = resolveAttachmentPoint(baseScene, socket.height, socket.azimuth);
+    if (!resolved) return;
+    groupRef.current.position.copy(resolved.position).addScaledVector(resolved.normal, resolved.maxDimension * 0.025);
+    groupRef.current.scale.setScalar(Math.max(resolved.maxDimension * 0.025, 0.015));
+  });
+  return <group ref={groupRef}>
+    <mesh>
+      <sphereGeometry args={[1, 18, 18]} />
+      <meshStandardMaterial color={selected ? '#F59E0B' : '#9A4C10'} emissive={selected ? '#7C2D12' : '#311306'} emissiveIntensity={0.35} depthTest={false} />
+    </mesh>
+    <Html center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+      <span style={{ display: 'block', whiteSpace: 'nowrap', borderRadius: '999px', background: selected ? '#F59E0B' : '#fff', color: selected ? '#fff' : '#4B2E1F', padding: '3px 7px', fontSize: '10px', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>{socket.name}</span>
+    </Html>
+  </group>;
 }
 
 function Scene({
@@ -180,17 +214,29 @@ function Scene({
   materialParams,
   decorationParams = DEFAULT_DECORATION,
   attachmentParams = [],
+  attachmentSockets = [],
+  selectedSocketIds = [],
   onMorphDetected,
   onControlsReady,
+  onAttachmentError,
+  onSocketsChange,
+  onAttachmentLimitsChange,
+  showAttachmentSockets = true,
   previewMode = false,
 }: {
   modelFile: string;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
   decorationParams?: DecorationParams;
-  attachmentParams?: AttachmentParams[];
+  attachmentParams?: AttachmentSelection[];
+  attachmentSockets?: GeneratedAttachmentSocket[];
+  selectedSocketIds?: string[];
   onMorphDetected: (has: boolean) => void;
-  onControlsReady?: (controls: any, camera: THREE.Camera) => void;
+  onControlsReady?: (controls: OrbitControlsApi | null, camera: THREE.Camera) => void;
+  onAttachmentError?: (attachment: AttachmentSelection) => void;
+  onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
+  onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
+  showAttachmentSockets?: boolean;
   previewMode?: boolean;
 }) {
   const gltf = useLoader(GLTFLoader, modelFile);
@@ -198,6 +244,8 @@ function Scene({
   const groupRef = useRef<THREE.Group>(null);
   const initialized = useRef(false);
   const morphChecked = useRef(false);
+  const analyzedShapeRef = useRef('');
+  const analyzedPlacementRef = useRef('');
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
   const modelBoundsRef = useRef<ModelBounds>({ minY: 0, rangeY: 1, centerX: 0, centerY: 0, centerZ: 0 });
 
@@ -270,14 +318,14 @@ function Scene({
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
       camera.lookAt(target);
 
-      const orbitControls = controls as any;
+      const orbitControls = controls as unknown as OrbitControlsApi | null;
       if (orbitControls?.target) {
         orbitControls.target.copy(target);
         orbitControls.update?.();
       }
 
       initialized.current = true;
-      onControlsReady?.(controls, camera);
+      onControlsReady?.(controls as unknown as OrbitControlsApi | null, camera);
     }
 
     if (!morphChecked.current) {
@@ -402,12 +450,52 @@ function Scene({
         });
       }
     });
+
+    const analyzedShape = `${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`;
+    let liveSockets = attachmentSockets;
+    if ((onSocketsChange || onAttachmentLimitsChange) && analyzedShapeRef.current !== analyzedShape) {
+      scene.updateMatrixWorld(true);
+      analyzedShapeRef.current = analyzedShape;
+      liveSockets = analyzeAttachmentSockets(scene);
+      onSocketsChange?.(liveSockets);
+      analyzedPlacementRef.current = '';
+    }
+    const placementAnalysisKey = `${analyzedShape}|${attachmentParams.flatMap((selection) => selection.placements.map((placement) => `${selection.id}:${placement.socket.id}:${Object.values(placement.transform).join(',')}`)).join('|')}`;
+    if (onAttachmentLimitsChange && analyzedPlacementRef.current !== placementAnalysisKey) {
+      analyzedPlacementRef.current = placementAnalysisKey;
+      const socketsById = new Map(liveSockets.map((socket) => [socket.id, socket]));
+      const instances = attachmentParams.flatMap((selection) => {
+        const recipe = getGeneratedAttachmentRecipe(selection.recipeKey, selection.recipeVersion);
+        return recipe ? selection.placements.map((placement) => ({ selection, placement, recipe, socket: socketsById.get(placement.socket.id) })) : [];
+      }).filter((instance) => instance.socket);
+      const limitMap: AttachmentPlacementLimitMap = {};
+      scene.updateMatrixWorld(true);
+      const placementBox = new THREE.Box3().setFromObject(scene);
+      instances.forEach((instance) => {
+        const socket = instance.socket!;
+        limitMap[attachmentPlacementKey(instance.selection.id, socket.id)] = getLiveAttachmentTransformLimits(scene, instance.recipe, socket, instance.placement.transform, (candidate, box) => instances.every((other) => {
+          if (other === instance || !other.socket) return true;
+          return !attachmentPlacementsCollide(
+            scene,
+            { socket, recipe: instance.recipe, transform: candidate },
+            { socket: other.socket, recipe: other.recipe, transform: other.placement.transform },
+            box,
+          );
+        }), placementBox);
+      });
+      onAttachmentLimitsChange(limitMap);
+    }
   });
 
   return (
     <group ref={groupRef}>
       <primitive object={scene} />
-      {attachmentParams.map((attachment) => <AttachmentModel key={attachment.id} attachment={attachment} baseScene={scene} materialParams={materialParams} />)}
+      {showAttachmentSockets && attachmentSockets.map((socket) => <AttachmentSocketMarker key={socket.id} socket={socket} baseScene={scene} selected={selectedSocketIds.includes(socket.id)} />)}
+      {attachmentParams.flatMap((attachment) => attachment.placements.map((placement) => (
+        <AttachmentErrorBoundary key={`${attachment.recipeKey}-${attachment.recipeVersion}-${placement.socket.id}`} onError={() => onAttachmentError?.(attachment)}>
+          <AttachmentModel attachment={attachment} placement={placement} currentSocket={attachmentSockets.find((socket) => socket.id === placement.socket.id)} material={materialParams} baseScene={scene} shapeKey={`${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`} />
+        </AttachmentErrorBoundary>
+      )))}
     </group>
   );
 }
@@ -419,17 +507,29 @@ export default function FreeformViewer({
   materialParams,
   decorationParams = DEFAULT_DECORATION,
   attachmentParams = [],
+  attachmentSockets = [],
+  selectedSocketIds = [],
   onMorphDetected,
   onControlsReady,
+  onAttachmentError,
+  onSocketsChange,
+  onAttachmentLimitsChange,
+  showAttachmentSockets = true,
   preview = false,
 }: {
   modelFile: string;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
   decorationParams?: DecorationParams;
-  attachmentParams?: AttachmentParams[];
+  attachmentParams?: AttachmentSelection[];
+  attachmentSockets?: GeneratedAttachmentSocket[];
+  selectedSocketIds?: string[];
   onMorphDetected: (has: boolean) => void;
-  onControlsReady?: (controls: any, camera: THREE.Camera) => void;
+  onControlsReady?: (controls: OrbitControlsApi | null, camera: THREE.Camera) => void;
+  onAttachmentError?: (attachment: AttachmentSelection) => void;
+  onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
+  onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
+  showAttachmentSockets?: boolean;
   preview?: boolean;
 }) {
   if (!modelFile) {
@@ -510,8 +610,14 @@ export default function FreeformViewer({
               materialParams={materialParams}
               decorationParams={decorationParams}
               attachmentParams={attachmentParams}
+              attachmentSockets={attachmentSockets}
+              selectedSocketIds={selectedSocketIds}
               onMorphDetected={onMorphDetected}
               onControlsReady={preview ? undefined : onControlsReady}
+              onAttachmentError={onAttachmentError}
+              onSocketsChange={onSocketsChange}
+              onAttachmentLimitsChange={onAttachmentLimitsChange}
+              showAttachmentSockets={showAttachmentSockets}
               previewMode={preview}
             />
 

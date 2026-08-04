@@ -15,7 +15,8 @@ import SaveTab from '../components/freeform/SaveTab';
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
-import { type AttachmentParams } from '../components/freeform/attachments';
+import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
+import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -35,13 +36,12 @@ const STEPS: { key: Step; label: string; sublabel: string; num: number }[] = [
 
 const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
 const DEFAULT_MATERIAL = { finish: 'raw_clay', color: '#C4A882' };
-
 const FINISH_LABELS: Record<string, string> = {
-  raw_clay: 'Terracotta',
+  raw_clay: 'Raw Clay',
+  terra_cotta: 'Terracotta',
   matte: 'Matte',
-  glazed: 'Glossy',
-  acrylic_paint: 'Acrylic Paint',
-  water_paint: 'Water Paint',
+  glazed: 'Glazed',
+  glossy: 'Glossy',
 };
 
 /* ─── Component ─── */
@@ -54,6 +54,7 @@ export default function FreeformPage() {
   /* Step & model state */
   const [activeStep, setActiveStep] = useState<Step>('model');
   const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [modelName, setModelName] = useState('');
   const [modelCategory, setModelCategory] = useState('Vase');
   const [modelThumbnail, setModelThumbnail] = useState('');
@@ -62,7 +63,9 @@ export default function FreeformPage() {
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
   const [materialParams, setMaterialParams] = useState(DEFAULT_MATERIAL);
   const [decorationParams, setDecorationParams] = useState<DecorationParams>(DEFAULT_DECORATION);
-  const [attachmentParams, setAttachmentParams] = useState<AttachmentParams[]>([]);
+  const [attachmentParams, setAttachmentParams] = useState<AttachmentSelection[]>([]);
+  const [attachmentSockets, setAttachmentSockets] = useState<GeneratedAttachmentSocket[]>([]);
+  const [attachmentPlacementLimits, setAttachmentPlacementLimits] = useState<AttachmentPlacementLimitMap>({});
 
   /* Shop selection (freeform entry) */
   const [shopSelectOpen, setShopSelectOpen] = useState(false);
@@ -81,6 +84,7 @@ export default function FreeformPage() {
 
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showAttachmentSockets, setShowAttachmentSockets] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
@@ -96,9 +100,11 @@ export default function FreeformPage() {
     name: string,
     category = 'Vase',
     thumbnail = '',
+    id: string | null = null,
     resetParams = true,
   ) {
     setSelectedModel(file);
+    setSelectedModelId(id);
     setModelName(name);
     setModelCategory(category || 'Vase');
     setModelThumbnail(thumbnail || '');
@@ -106,26 +112,33 @@ export default function FreeformPage() {
       setShapeParams(DEFAULT_SHAPE);
       setMaterialParams(DEFAULT_MATERIAL);
       setDecorationParams(DEFAULT_DECORATION);
+      if (attachmentParams.length) toast.info('Attachments were removed because the base model changed.');
       setAttachmentParams([]);
+      setAttachmentSockets([]);
+      setAttachmentPlacementLimits({});
     }
   }
 
   function applyDesign(design: {
     model_file: string;
+    model_id?: string | null;
     model_name: string;
     shop_id?: string;
     shop_name?: string;
     shape_params: typeof DEFAULT_SHAPE;
     material_params: typeof DEFAULT_MATERIAL;
     decor_params?: DecorationParams;
-    attachment_params?: AttachmentParams[];
+    attachment_params?: unknown;
   }) {
     setSelectedModel(design.model_file);
+    setSelectedModelId(design.model_id || null);
     setModelName(design.model_name);
     setShapeParams(design.shape_params || DEFAULT_SHAPE);
     setMaterialParams(design.material_params || DEFAULT_MATERIAL);
     setDecorationParams(design.decor_params || DEFAULT_DECORATION);
-    setAttachmentParams(design.attachment_params || []);
+    setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
+    setAttachmentSockets([]);
+    setAttachmentPlacementLimits({});
     if (design.shop_id) {
       setSelectedShopId(design.shop_id);
       setSelectedShopName(design.shop_name || '');
@@ -142,6 +155,7 @@ export default function FreeformPage() {
 
   useEffect(() => {
     const navState = location.state as {
+      modelId?: string;
       modelUrl?: string;
       modelName?: string;
       modelCategory?: string;
@@ -172,7 +186,13 @@ export default function FreeformPage() {
                 .maybeSingle();
               shopName = shop?.name || '';
             }
-            applyDesign({ ...data, shop_name: shopName });
+            const modelQuery = data.model_id
+              ? supabase.from('models_3d').select('id,category,thumbnail').eq('id', data.model_id)
+              : supabase.from('models_3d').select('id,category,thumbnail').eq('file_url', data.model_file);
+            const { data: savedModel } = await modelQuery.maybeSingle();
+            applyDesign({ ...data, model_id: savedModel?.id || data.model_id, shop_name: shopName });
+            setModelCategory(savedModel?.category || 'Vase');
+            setModelThumbnail(savedModel?.thumbnail || data.thumbnail || '');
             setActiveStep('review');
             return;
           }
@@ -186,6 +206,7 @@ export default function FreeformPage() {
           navState.modelName || 'Selected Model',
           navState.modelCategory || 'Vase',
           navState.modelThumbnail || '',
+          navState.modelId || null,
           false,
         );
         if (navState.color) {
@@ -304,6 +325,7 @@ export default function FreeformPage() {
       name: designName.trim(),
       shop_id: selectedShopId,
       model_name: modelName,
+      model_id: selectedModelId,
       model_file: selectedModel,
       shape_params: shapeParams,
       material_params: materialParams,
@@ -454,8 +476,9 @@ export default function FreeformPage() {
     materialParams.finish === 'acrylic_paint' ? 6 :
     materialParams.finish === 'water_paint' ? 6 :
     materialParams.finish === 'glazed' ? 7 : 5;
-  const estimatedPrice = basePrice + attachmentParams.reduce((total, item) => total + item.priceAdjustment, 0);
-  const estimatedDays = baseDays + attachmentParams.reduce((total, item) => total + item.productionDaysAdjustment, 0);
+  const attachmentEstimate = attachmentTotals(attachmentParams);
+  const estimatedPrice = basePrice + attachmentEstimate.price;
+  const estimatedDays = baseDays + attachmentEstimate.productionDays;
 
   /* ─── Render ─── */
 
@@ -516,13 +539,13 @@ export default function FreeformPage() {
             <div className="freeform-sidebar-scroll">
               <div className="freeform-tab-section">
                 {activeStep === 'model' && selectedShopId && (
-                  <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t) => selectModel(f, n, c, t)} />
+                  <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id) => selectModel(f, n, c, t, id)} />
                 )}
                 {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <>
                   <DecorTab decoration={decorationParams} onChange={setDecorationParams} />
-                  <AttachmentTab shopId={selectedShopId} modelCategory={modelCategory} value={attachmentParams} onChange={setAttachmentParams} />
+                  <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightCm={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
                 </>}
                 {activeStep === 'review' && (
                   <div>
@@ -533,6 +556,7 @@ export default function FreeformPage() {
                       <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>Design Complete</p>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or send to a shop.</p>
                     </div>
+                    {attachmentParams.length > 0 && <div className="attachment-review-list"><div className="decor-field-label">Generated attachments</div>{attachmentParams.map((attachment) => <div key={attachment.id}><span>{attachment.name}{attachment.placements.length === 2 ? ' × 2' : ''}</span><small>{attachment.placements.map((placement) => placement.socket.name).join(' + ')} · ₱{attachmentTotals([attachment]).price.toLocaleString()}</small></div>)}</div>}
                     <SaveTab
                       onLoad={(d) => { applyDesign(d); setActiveStep('review'); }}
                     />
@@ -568,12 +592,37 @@ export default function FreeformPage() {
               materialParams={materialParams}
               decorationParams={decorationParams}
               attachmentParams={attachmentParams}
+              attachmentSockets={attachmentSockets}
+              showAttachmentSockets={activeStep === 'decor' && showAttachmentSockets}
+              selectedSocketIds={[...selectedSocketIds(attachmentParams)]}
+              onSocketsChange={setAttachmentSockets}
+              onAttachmentLimitsChange={setAttachmentPlacementLimits}
               onMorphDetected={() => {}}
               onControlsReady={handleControlsReady}
+              onAttachmentError={(attachment) => toast.error(`${attachment.name} could not be loaded. The rest of your design is still available.`)}
             />
           </div>
 
           <div className="freeform-toolbar">
+            {activeStep === 'decor' && (
+              <button
+                type="button"
+                onClick={() => setShowAttachmentSockets((visible) => !visible)}
+                title={showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}
+                aria-label={showAttachmentSockets ? 'Hide socket places' : 'Show socket places'}
+                aria-pressed={showAttachmentSockets}
+                className="freeform-toolbar-btn"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
+                  {showAttachmentSockets ? (
+                    <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>
+                  ) : (
+                    <><path d="M3 3l18 18" /><path d="M10.6 6.2A11.7 11.7 0 0112 6c6.5 0 10 6 10 6a17 17 0 01-2.1 2.8M6.5 6.5C3.6 8.3 2 12 2 12s3.5 6 10 6a10.8 10.8 0 004.1-.8" /></>
+                  )}
+                </svg>
+                <span className="freeform-toolbar-label">{showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}</span>
+              </button>
+            )}
             {[
               { icon: 'M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', label: 'Reset View', action: handleResetView },
               { icon: isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3', label: 'Fullscreen', action: handleToggleFullscreen },
@@ -625,7 +674,7 @@ export default function FreeformPage() {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Decor</span>
-                <span className="freeform-summary-field-value">{getPattern(decorationParams.patternId)?.name || 'None'}</span>
+                <span className="freeform-summary-field-value">{getPattern(decorationParams.patternId)?.name || 'None'}{attachmentParams.length ? ` · ${attachmentParams.length} 3D` : ''}</span>
               </div>
             </div>
 
@@ -779,6 +828,15 @@ export default function FreeformPage() {
       <ShopSelectModal
         open={shopSelectOpen}
         onSelect={(id, name) => {
+          if (selectedShopId !== id && attachmentParams.length) {
+            const compatibleAttachments = attachmentParams.filter((attachment) => !attachment.shopId || attachment.shopId === id);
+            if (compatibleAttachments.length !== attachmentParams.length) {
+              setAttachmentParams(compatibleAttachments);
+              toast.info('Attachments unavailable at the new shop were removed.');
+            }
+            setAttachmentSockets([]);
+            setAttachmentPlacementLimits({});
+          }
           setSelectedShopId(id);
           setSelectedShopName(name);
           setShopSelectOpen(false);

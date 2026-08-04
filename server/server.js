@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
-import uploadRoutes from './routes/upload.js';
+import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
 
 // Upload routes (presigned URLs for R2)
-app.use('/api/upload', uploadRoutes);
+app.use('/api/upload', createUploadRouter({ verifyAuth, requireSuperAdmin }));
 
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {

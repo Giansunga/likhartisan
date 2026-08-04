@@ -812,15 +812,23 @@
     height: auto;
     min-height: 100vh;
     overflow: auto;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .freeform-stepper {
     padding: 12px 16px;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .freeform-stepper-track {
+    grid-column: 1;
+    min-width: 0;
     overflow-x: auto;
     gap: 0;
     scrollbar-width: none;
@@ -856,6 +864,9 @@
     padding: 0 12px 12px;
     overflow: visible;
     height: auto;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .freeform-sidebar {
@@ -1125,9 +1136,11 @@
 /* 3D attachment library */
 .attachment-tab { border-top: 1px solid var(--bg-tertiary); margin-top: 20px; padding-top: 20px; }
 .attachment-empty { padding: 14px 0; font-size: .8rem; color: var(--text-muted); }
-.attachment-filter { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
-.attachment-filter::-webkit-scrollbar { display: none; }
-.attachment-filter button { flex: 0 0 auto; border: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-muted); border-radius: 999px; padding: 6px 10px; font-size: .72rem; font-weight: 600; cursor: pointer; }
+.attachment-filter { display: flex; gap: 6px; min-width: 0; overflow-x: auto; margin-bottom: 10px; padding: 2px; scroll-behavior: smooth; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--primary-color) 55%, transparent) transparent; }
+.attachment-filter::-webkit-scrollbar { height: 5px; }
+.attachment-filter::-webkit-scrollbar-track { background: transparent; }
+.attachment-filter::-webkit-scrollbar-thumb { border-radius: 999px; background: color-mix(in srgb, var(--primary-color) 55%, transparent); }
+.attachment-filter button { flex: 0 0 auto; scroll-snap-align: start; border: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-muted); border-radius: 999px; padding: 6px 10px; font-size: .72rem; font-weight: 600; cursor: pointer; }
 .attachment-filter button.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
 .attachment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .attachment-card { display: grid; grid-template-columns: 38px 1fr; grid-template-rows: auto auto; text-align: left; gap: 1px 8px; align-items: center; min-height: 58px; padding: 7px; border: 1px solid var(--bg-tertiary); border-radius: 10px; background: #fff; cursor: pointer; color: var(--text-dark); font-size: .75rem; font-weight: 700; }
@@ -1136,4 +1149,63 @@
 .attachment-card small { color: var(--text-muted); font-size: .65rem; font-weight: 500; }
 .attachment-selected-list { margin-top: 14px; }
 .attachment-selected { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--bg-tertiary); font-size: .78rem; color: var(--text-dark); }
+.attachment-selected span { display: grid; gap: 2px; }
+.attachment-selected small { color: var(--text-muted); font-size: .66rem; }
 .attachment-selected button { border: 0; background: transparent; color: #b33a27; font-size: .72rem; cursor: pointer; }
+.attachment-error { color: #b33a27; }
+.attachment-slot-list { display: grid; gap: 8px; }
+.attachment-slot { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--bg-tertiary); border-radius: 10px; background: #fff; }
+.attachment-slot > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.attachment-slot strong { font-size: .76rem; color: var(--text-dark); }
+.attachment-slot small { color: var(--text-muted); font-size: .65rem; }
+.attachment-slot > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
+.attachment-slot button { border: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-dark); border-radius: 8px; padding: 6px 9px; font-size: .69rem; cursor: pointer; }
+.attachment-slot button.primary { border-color: var(--primary-color); background: var(--primary-color); color: #fff; }
+.attachment-editor { margin-top: 16px; padding: 14px; border: 1px solid var(--bg-tertiary); border-radius: 14px; background: rgba(255,255,255,.8); }
+.attachment-editor-header { display: flex; align-items: start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.attachment-editor-header strong { display: block; font-size: .84rem; color: var(--text-dark); }
+.attachment-editor-header small { display: block; margin-top: 2px; font-size: .68rem; color: var(--text-muted); }
+.attachment-editor-header > button { border: 0; background: transparent; color: #b33a27; font-size: .72rem; cursor: pointer; }
+.attachment-segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; margin-bottom: 14px; border-radius: 10px; background: var(--bg-tertiary); }
+.attachment-segmented button { border: 0; border-radius: 8px; padding: 7px; background: transparent; color: var(--text-muted); font-size: .72rem; font-weight: 700; cursor: pointer; }
+.attachment-segmented button.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.attachment-range { display: block; margin-bottom: 12px; }
+.attachment-range > span { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; color: var(--text-muted); font-size: .7rem; font-weight: 600; }
+.attachment-range output { color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.attachment-range input { width: 100%; accent-color: var(--primary-color); }
+.attachment-rotation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.attachment-range.compact > span { display: grid; gap: 1px; }
+.attachment-finish-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 7px 0 12px; }
+.attachment-finish-grid button { display: flex; align-items: center; gap: 6px; padding: 7px; border: 1px solid var(--bg-tertiary); border-radius: 9px; background: #fff; color: var(--text-muted); font-size: .68rem; cursor: pointer; }
+.attachment-finish-grid button.selected { border-color: var(--primary-color); color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
+.attachment-finish-grid span { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.08); }
+.attachment-color-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-bottom: 10px; }
+.attachment-color-grid button { aspect-ratio: 1; padding: 0; border: 2px solid transparent; border-radius: 6px; cursor: pointer; }
+.attachment-color-grid button.selected { border-color: var(--primary-color); transform: scale(1.1); box-shadow: 0 1px 5px rgba(0,0,0,.18); }
+.attachment-custom-color { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--text-muted); font-size: .7rem; }
+.attachment-custom-color input { width: 30px; height: 28px; border: 0; padding: 0; background: transparent; }
+.attachment-custom-color code { color: var(--text-dark); }
+.attachment-review-list { margin: 0 0 18px; padding: 12px; border: 1px solid var(--bg-tertiary); border-radius: 12px; }
+.attachment-review-list > div:not(.decor-field-label) { display: flex; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--bg-tertiary); font-size: .75rem; color: var(--text-dark); }
+.attachment-review-list small { color: var(--text-muted); }
+.attachment-adjust-card { display: block; padding: 12px; margin-top: 9px; border: 1px solid var(--bg-tertiary); border-radius: 12px; background: rgba(255,255,255,.86); }
+.attachment-adjust-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.attachment-adjust-heading > span { min-width: 0; }
+.attachment-adjust-heading > span strong, .attachment-adjust-heading > span small { display: block; overflow-wrap: anywhere; }
+.attachment-adjust-heading > button { flex: 0 0 auto; padding: 3px 0; }
+.attachment-instance-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 3px; margin: 10px 0; border-radius: 9px; background: var(--bg-tertiary); }
+.attachment-instance-tabs button { min-width: 0; border: 0; border-radius: 7px; padding: 7px; background: transparent; color: var(--text-muted); font-size: .7rem; font-weight: 700; }
+.attachment-instance-tabs button.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.attachment-offset-controls { display: grid; gap: 10px; margin-top: 11px; min-width: 0; }
+.attachment-offset-control { display: grid; gap: 5px; min-width: 0; }
+.attachment-offset-control > span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: .68rem; }
+.attachment-offset-control strong { color: var(--text-dark); font-size: .7rem; }
+.attachment-offset-control output { flex: 0 0 auto; color: var(--primary-color); font-weight: 700; font-variant-numeric: tabular-nums; }
+.attachment-offset-control input[type='range'] { display: block; width: 100%; min-width: 0; margin: 0; accent-color: var(--primary-color); }
+.attachment-selected .attachment-reset-position { justify-self: start; width: fit-content; border: 1px solid var(--bg-tertiary); border-radius: 8px; padding: 6px 9px; background: #fff; color: var(--text-dark); font-size: .69rem; font-weight: 600; }
+
+@media (max-width: 520px) {
+  .attachment-adjust-card { padding: 10px; }
+  .attachment-offset-control > span { gap: 5px; }
+  .attachment-offset-control strong { line-height: 1.25; }
+}

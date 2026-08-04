@@ -17,7 +17,7 @@ export default function ModelTab({
 }: {
   selectedModel: string;
   shopId: string;
-  onSelect: (file: string, name: string, category: string, thumbnail: string) => void;
+  onSelect: (file: string, name: string, category: string, thumbnail: string, id: string) => void;
 }) {
   const [models, setModels] = useState<Model3D[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ export default function ModelTab({
           {models.map((model) => (
             <button
               key={model.id}
-              onClick={() => onSelect(model.file_url, model.name, model.category, model.thumbnail || '')}
+              onClick={() => onSelect(model.file_url, model.name, model.category, model.thumbnail || '', model.id)}
               className={`freeform-tab-option${selectedModel === model.file_url ? ' selected' : ''}`}
             >
               <div style={{

@@ -1,20 +1,26 @@
 import { API_BASE } from './api';
+import { supabase } from './supabase';
 
 export async function uploadToR2(file: File, folder: string): Promise<string> {
-  // Step 1: Get presigned URL from backend
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('You must be signed in to upload files.');
+
   const response = await fetch(`${API_BASE}/api/upload/presign`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename: file.name, folder }),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ filename: file.name, folder, size: file.size, contentType: file.type }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get upload URL');
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || 'Failed to get upload URL');
   }
 
   const { presignedUrl, publicUrl } = await response.json();
 
-  // Step 2: Upload directly to R2 using presigned URL
   const uploadResponse = await fetch(presignedUrl, {
     method: 'PUT',
     body: file,

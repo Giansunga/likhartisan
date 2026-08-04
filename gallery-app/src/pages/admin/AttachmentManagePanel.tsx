@@ -1,34 +1,138 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import FreeformViewer from '../../components/freeform/FreeformViewer';
+import {
+  createAttachmentSelection,
+  recipeFitsSocket,
+  type CatalogSettingsRecord,
+  type GeneratedAttachmentSocket,
+  type ShopOverrideRecord,
+} from '../../components/freeform/attachments';
+import { GENERATED_ATTACHMENT_RECIPES } from '../../components/freeform/generatedAttachmentCatalog';
 import { supabase } from '../../lib/supabase';
-import { uploadToR2 } from '../../lib/r2';
 
-type Attachment = { id: string; name: string; attachment_type: string; file_url: string; thumbnail: string; shop_id: string | null; compatible_categories: string[]; anchor_side: string; anchor_height: number; rotation: number; scale: number; status: 'active' | 'archived'; };
 type Shop = { id: string; name: string };
+type Model = { id: string; name: string; file_url: string; status: string };
+type GlobalDraft = { active: boolean; price: number; days: number };
+type OverrideDraft = { mode: 'inherit' | 'enabled' | 'disabled'; price: string; days: string };
+
+const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
 
 export default function AttachmentManagePanel({ onBack }: { onBack: () => void }) {
-  const [items, setItems] = useState<Attachment[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
-  const [editing, setEditing] = useState<Attachment | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [models, setModels] = useState<Model[]>([]);
+  const [globals, setGlobals] = useState<Record<string, GlobalDraft>>({});
+  const [overrides, setOverrides] = useState<Record<string, OverrideDraft>>({});
+  const [selectedShopId, setSelectedShopId] = useState('');
+  const [previewRecipeKey, setPreviewRecipeKey] = useState(GENERATED_ATTACHMENT_RECIPES[0].key);
+  const [previewModelId, setPreviewModelId] = useState('');
+  const [previewSockets, setPreviewSockets] = useState<GeneratedAttachmentSocket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState('');
   const [error, setError] = useState('');
-  const [name, setName] = useState(''); const [type, setType] = useState('handle'); const [shopId, setShopId] = useState('');
-  const [categories, setCategories] = useState('Vase'); const [side, setSide] = useState('right'); const [height, setHeight] = useState('0.5'); const [scale, setScale] = useState('1'); const [rotation, setRotation] = useState('0');
-  const [file, setFile] = useState<File | null>(null); const [thumbnail, setThumbnail] = useState<File | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null); const thumbnailRef = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState('');
 
-  async function load() { const [{ data: attachments }, { data: shopData }] = await Promise.all([supabase.from('model_attachments').select('*').order('created_at', { ascending: false }), supabase.from('shops').select('id,name').order('name')]); setItems((attachments || []) as Attachment[]); setShops((shopData || []) as Shop[]); }
-  useEffect(() => { load(); }, []);
-  async function upload(fileToUpload: File, folder: string) { return uploadToR2(fileToUpload, folder); }
-  function openCreate() { setEditing(null); setName(''); setType('handle'); setShopId(''); setCategories('Vase'); setSide('right'); setHeight('0.5'); setScale('1'); setRotation('0'); setFile(null); setThumbnail(null); setError(''); setShowForm(true); }
-  function openEdit(item: Attachment) { setEditing(item); setName(item.name); setType(item.attachment_type); setShopId(item.shop_id || ''); setCategories((item.compatible_categories || []).join(', ')); setSide(item.anchor_side); setHeight(String(item.anchor_height)); setScale(String(item.scale)); setRotation(String(item.rotation)); setFile(null); setThumbnail(null); setError(''); setShowForm(true); }
-  async function save(event: React.FormEvent) { event.preventDefault(); if ((!editing && !file) || !name.trim()) return; setSaving(true); setError(''); try { const fileUrl = file ? await upload(file, 'attachments') : editing!.file_url; const thumbnailUrl = thumbnail ? await upload(thumbnail, 'attachments') : editing?.thumbnail || ''; const values = { name: name.trim(), attachment_type: type, file_url: fileUrl, thumbnail: thumbnailUrl, shop_id: shopId || null, compatible_categories: categories.split(',').map((item) => item.trim()).filter(Boolean), anchor_side: side, anchor_height: Number(height), scale: Number(scale), rotation: Number(rotation) }; const result = editing ? await supabase.from('model_attachments').update(values).eq('id', editing.id) : await supabase.from('model_attachments').insert(values); if (result.error) throw result.error; setShowForm(false); setEditing(null); load(); } catch (err: any) { setError(err.message || 'Could not save attachment.'); } finally { setSaving(false); } }
-  async function toggleStatus(item: Attachment) { await supabase.from('model_attachments').update({ status: item.status === 'active' ? 'archived' : 'active' }).eq('id', item.id); load(); }
-  async function remove(id: string) { if (!confirm('Delete this attachment record? The uploaded GLB will remain in storage.')) return; await supabase.from('model_attachments').delete().eq('id', id); load(); }
+  async function load() {
+    setLoading(true); setError('');
+    const [settingsResult, shopsResult, modelsResult] = await Promise.all([
+      supabase.from('generated_attachment_catalog_settings').select('*').order('recipe_key'),
+      supabase.from('shops').select('id,name').order('name'),
+      supabase.from('models_3d').select('id,name,file_url,status').eq('status', 'active').order('name'),
+    ]);
+    const firstError = settingsResult.error || shopsResult.error || modelsResult.error;
+    if (firstError) setError(firstError.message);
+    const settingsByKey = new Map(((settingsResult.data || []) as CatalogSettingsRecord[]).map((row) => [row.recipe_key, row]));
+    setGlobals(Object.fromEntries(GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
+      const row = settingsByKey.get(recipe.key);
+      return [recipe.key, { active: row?.active ?? false, price: Number(row?.default_price || 0), days: Number(row?.default_production_days || 0) }];
+    })));
+    const nextModels = (modelsResult.data || []) as Model[];
+    setShops((shopsResult.data || []) as Shop[]);
+    setModels(nextModels);
+    setPreviewModelId((current) => current || nextModels[0]?.id || '');
+    setLoading(false);
+  }
 
-  return <div>
-    <div className="flex items-center justify-between mb-6"><div><button onClick={onBack} className="text-sm text-brown-medium hover:text-primary mb-2">← Base models</button><h2 className="text-2xl font-bold text-brown-dark">3D Attachment Library</h2><p className="text-sm text-brown-medium mt-1">Upload GLB pieces and define where they attach to pottery.</p></div><button onClick={openCreate} className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light">Upload Attachment</button></div>
-    {items.length === 0 ? <div className="text-center py-16 bg-white rounded-2xl border border-cream-tertiary text-brown-medium">No attachments uploaded yet.</div> : <div className="bg-white rounded-2xl border border-cream-tertiary overflow-hidden"><table className="w-full"><thead><tr className="border-b border-cream-tertiary bg-cream-secondary/50"><th className="text-left px-5 py-3 text-xs uppercase text-brown-medium">Attachment</th><th className="text-left px-5 py-3 text-xs uppercase text-brown-medium">Type</th><th className="text-left px-5 py-3 text-xs uppercase text-brown-medium">Anchor</th><th className="text-left px-5 py-3 text-xs uppercase text-brown-medium">Shop</th><th className="text-right px-5 py-3 text-xs uppercase text-brown-medium">Actions</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className={`border-b border-cream-tertiary/50 ${item.status === 'archived' ? 'opacity-50' : ''}`}><td className="px-5 py-3 text-sm font-semibold text-brown-dark">{item.name}<div className="text-xs text-brown-light font-normal">{item.file_url.split('/').pop()}</div></td><td className="px-5 py-3 text-sm text-brown-dark capitalize">{item.attachment_type}</td><td className="px-5 py-3 text-sm text-brown-dark capitalize">{item.anchor_side}, {Math.round(item.anchor_height * 100)}%</td><td className="px-5 py-3 text-sm text-brown-dark">{shops.find((shop) => shop.id === item.shop_id)?.name || 'All shops'}</td><td className="px-5 py-3 text-right space-x-2"><button onClick={() => openEdit(item)} className="px-3 py-1.5 text-xs border rounded-lg text-blue-700 border-blue-200">Edit</button><button onClick={() => toggleStatus(item)} className="px-3 py-1.5 text-xs border rounded-lg text-amber-700 border-amber-200">{item.status === 'active' ? 'Archive' : 'Activate'}</button><button onClick={() => remove(item.id)} className="px-3 py-1.5 text-xs border rounded-lg text-red-600 border-red-200">Delete</button></td></tr>)}</tbody></table></div>}
-    {showForm && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowForm(false)}><form onSubmit={save} onClick={(event) => event.stopPropagation()} className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto"><div className="flex justify-between"><h3 className="text-lg font-bold text-brown-dark">{editing ? 'Edit 3D attachment' : 'Upload 3D attachment'}</h3><button type="button" onClick={() => setShowForm(false)}>×</button></div>{error && <p className="text-sm text-red-600">{error}</p>}<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Attachment name" className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm" /><div className="grid grid-cols-2 gap-3"><select value={type} onChange={(event) => setType(event.target.value)} className="px-3 py-2.5 rounded-xl border border-cream-tertiary text-sm">{['handle','lid','spout','foot','knob','other'].map((value) => <option key={value}>{value}</option>)}</select><select value={shopId} onChange={(event) => setShopId(event.target.value)} className="px-3 py-2.5 rounded-xl border border-cream-tertiary text-sm"><option value="">All shops</option>{shops.map((shop) => <option value={shop.id} key={shop.id}>{shop.name}</option>)}</select></div><input value={categories} onChange={(event) => setCategories(event.target.value)} placeholder="Compatible categories, e.g. Vase, Jar" className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm" /><div className="grid grid-cols-3 gap-3"><select value={side} onChange={(event) => setSide(event.target.value)} className="px-3 py-2.5 rounded-xl border border-cream-tertiary text-sm">{['front','back','left','right','top','bottom'].map((value) => <option key={value}>{value}</option>)}</select><input type="number" min="0" max="1" step="0.05" value={height} onChange={(event) => setHeight(event.target.value)} title="Height 0 to 1" className="px-3 py-2.5 rounded-xl border border-cream-tertiary text-sm" /><input type="number" min="0.1" step="0.1" value={scale} onChange={(event) => setScale(event.target.value)} title="Scale" className="px-3 py-2.5 rounded-xl border border-cream-tertiary text-sm" /></div><input type="number" value={rotation} onChange={(event) => setRotation(event.target.value)} placeholder="Rotation in degrees" className="w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm" /><div><label className="text-sm text-brown-dark">GLB / GLTF {editing ? '(optional)' : '*'}</label><input ref={fileRef} type="file" accept=".glb,.gltf" className="hidden" onChange={(event) => setFile(event.target.files?.[0] || null)} /><button type="button" onClick={() => fileRef.current?.click()} className="block mt-2 w-full p-3 border-2 border-dashed rounded-xl text-sm text-brown-medium">{file?.name || (editing ? 'Keep current GLB / choose replacement' : 'Choose GLB / GLTF file')}</button></div><div><label className="text-sm text-brown-dark">Thumbnail (optional)</label><input ref={thumbnailRef} type="file" accept="image/*" className="hidden" onChange={(event) => setThumbnail(event.target.files?.[0] || null)} /><button type="button" onClick={() => thumbnailRef.current?.click()} className="block mt-2 w-full p-3 border-2 border-dashed rounded-xl text-sm text-brown-medium">{thumbnail?.name || 'Choose thumbnail'}</button></div><button disabled={(!editing && !file) || !name.trim() || saving} className="w-full bg-primary text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">{saving ? 'Saving...' : editing ? 'Save changes' : 'Upload attachment'}</button></form></div>}
+  // Loading the settings collections is the mount effect's purpose.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadOverrides() {
+      if (!selectedShopId) { setOverrides({}); return; }
+      const { data, error: overrideError } = await supabase.from('generated_attachment_shop_overrides').select('*').eq('shop_id', selectedShopId);
+      if (!alive) return;
+      if (overrideError) { setError(overrideError.message); return; }
+      const byKey = new Map(((data || []) as ShopOverrideRecord[]).map((row) => [row.recipe_key, row]));
+      setOverrides(Object.fromEntries(GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
+        const row = byKey.get(recipe.key);
+        return [recipe.key, row ? { mode: row.enabled ? 'enabled' : 'disabled', price: row.price_adjustment == null ? '' : String(row.price_adjustment), days: row.production_days_adjustment == null ? '' : String(row.production_days_adjustment) } : { mode: 'inherit', price: '', days: '' }];
+      })));
+    }
+    void loadOverrides();
+    return () => { alive = false; };
+  }, [selectedShopId]);
+
+  async function saveGlobal(recipeKey: string) {
+    const draft = globals[recipeKey];
+    if (!draft) return;
+    setSavingKey(`global:${recipeKey}`); setError(''); setMessage('');
+    const { error: saveError } = await supabase.from('generated_attachment_catalog_settings').upsert({
+      recipe_key: recipeKey,
+      active: draft.active,
+      default_price: Math.max(0, draft.price),
+      default_production_days: Math.max(0, Math.round(draft.days)),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'recipe_key' });
+    if (saveError) setError(saveError.message); else setMessage('Global settings saved.');
+    setSavingKey('');
+  }
+
+  async function saveOverride(recipeKey: string) {
+    if (!selectedShopId) return;
+    const draft = overrides[recipeKey] || { mode: 'inherit', price: '', days: '' };
+    setSavingKey(`override:${recipeKey}`); setError(''); setMessage('');
+    const result = draft.mode === 'inherit'
+      ? await supabase.from('generated_attachment_shop_overrides').delete().eq('recipe_key', recipeKey).eq('shop_id', selectedShopId)
+      : await supabase.from('generated_attachment_shop_overrides').upsert({
+          recipe_key: recipeKey,
+          shop_id: selectedShopId,
+          enabled: draft.mode === 'enabled',
+          price_adjustment: draft.price === '' ? null : Math.max(0, Number(draft.price)),
+          production_days_adjustment: draft.days === '' ? null : Math.max(0, Math.round(Number(draft.days))),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'recipe_key,shop_id' });
+    if (result.error) setError(result.error.message); else setMessage('Shop override saved.');
+    setSavingKey('');
+  }
+
+  const previewRecipe = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.key === previewRecipeKey)!;
+  const previewModel = models.find((model) => model.id === previewModelId);
+  const previewSocket = previewSockets.find((socket) => recipeFitsSocket(previewRecipe, socket));
+  const previewSelections = useMemo(() => {
+    if (!previewSocket || !previewRecipe) return [];
+    const draft = globals[previewRecipe.key] || { active: false, price: 0, days: 0 };
+    return [createAttachmentSelection({ recipe: previewRecipe, shopId: null, priceAdjustment: draft.price, productionDaysAdjustment: draft.days }, [previewSocket])];
+  }, [globals, previewRecipe, previewSocket]);
+
+  if (loading) return <div className="py-16 text-center text-brown-medium">Loading generated catalog…</div>;
+
+  return <div className="space-y-7">
+    <div className="flex items-start justify-between gap-4"><div><button onClick={onBack} className="text-sm text-brown-medium hover:text-primary mb-2">← Base models</button><h2 className="text-2xl font-bold text-brown-dark">Generated Attachments</h2><p className="text-sm text-brown-medium mt-1">Geometry is fixed in code. Configure availability, pricing, production time, and shop overrides.</p></div><span className="px-3 py-2 rounded-xl bg-cream-secondary text-xs font-semibold text-brown-medium whitespace-nowrap">{GENERATED_ATTACHMENT_RECIPES.length} code-owned recipes</span></div>
+    {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>}
+    {message && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">{message}</div>}
+
+    <section className="grid xl:grid-cols-[minmax(0,1fr)_420px] gap-6">
+      <div className="bg-white rounded-2xl border border-cream-tertiary overflow-hidden"><div className="px-5 py-4 border-b"><h3 className="font-bold">Global catalog</h3><p className="text-xs text-brown-medium mt-1">Inactive recipes are hidden from every shopper.</p></div><div className="divide-y divide-cream-tertiary">{GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
+        const draft = globals[recipe.key] || { active: false, price: 0, days: 0 };
+        return <div key={recipe.key} className="p-4 grid sm:grid-cols-[64px_minmax(150px,1fr)_90px_80px_auto] gap-3 items-center"><button type="button" onClick={() => setPreviewRecipeKey(recipe.key)} className={`rounded-xl overflow-hidden border-2 ${previewRecipeKey === recipe.key ? 'border-primary' : 'border-transparent'}`}><img src={recipe.thumbnail} alt="" className="w-16 h-12 object-cover" /></button><div><strong className="text-sm">{recipe.name}</strong><p className="text-xs text-brown-medium capitalize">{recipe.family} · {recipe.style} · v{recipe.version}</p></div><label className="text-xs">Price ₱<input type="number" min="0" value={draft.price} onChange={(event) => setGlobals({ ...globals, [recipe.key]: { ...draft, price: Number(event.target.value) } })} className="mt-1 w-full px-2 py-2 rounded-lg border" /></label><label className="text-xs">Days<input type="number" min="0" value={draft.days} onChange={(event) => setGlobals({ ...globals, [recipe.key]: { ...draft, days: Number(event.target.value) } })} className="mt-1 w-full px-2 py-2 rounded-lg border" /></label><div className="flex sm:flex-col items-center gap-2"><label className="text-xs flex gap-2"><input type="checkbox" checked={draft.active} onChange={(event) => setGlobals({ ...globals, [recipe.key]: { ...draft, active: event.target.checked } })} /> Active</label><button onClick={() => saveGlobal(recipe.key)} disabled={savingKey === `global:${recipe.key}`} className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs disabled:opacity-50">Save</button></div></div>;
+      })}</div></div>
+      <aside className="space-y-3"><div className="grid grid-cols-2 gap-3"><label className="text-xs">Preview recipe<select value={previewRecipeKey} onChange={(event) => setPreviewRecipeKey(event.target.value)} className="mt-1 w-full px-3 py-2 rounded-xl border bg-white">{GENERATED_ATTACHMENT_RECIPES.map((recipe) => <option key={recipe.key} value={recipe.key}>{recipe.name}</option>)}</select></label><label className="text-xs">Base model<select value={previewModelId} onChange={(event) => { setPreviewModelId(event.target.value); setPreviewSockets([]); }} className="mt-1 w-full px-3 py-2 rounded-xl border bg-white">{models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label></div><div className="h-[500px] rounded-2xl overflow-hidden border bg-cream-secondary">{previewModel ? <FreeformViewer modelFile={previewModel.file_url} shapeParams={DEFAULT_SHAPE} materialParams={{ finish: 'raw_clay', color: '#C4A882' }} attachmentParams={previewSelections} attachmentSockets={previewSocket ? [previewSocket] : []} selectedSocketIds={previewSocket ? [previewSocket.id] : []} onSocketsChange={setPreviewSockets} onMorphDetected={() => {}} preview /> : <div className="h-full grid place-items-center text-sm text-brown-medium">No active base model.</div>}</div>{previewModel && previewSockets.length > 0 && !previewSocket && <p className="text-xs text-amber-700">This recipe does not safely fit the selected model.</p>}</aside>
+    </section>
+
+    <section className="bg-white rounded-2xl border border-cream-tertiary overflow-hidden"><div className="p-5 border-b flex flex-wrap items-end justify-between gap-3"><div><h3 className="font-bold">Per-shop overrides</h3><p className="text-xs text-brown-medium mt-1">Inherit global pricing, override it, or disable a recipe for one shop.</p></div><label className="text-xs">Shop<select value={selectedShopId} onChange={(event) => setSelectedShopId(event.target.value)} className="ml-2 px-3 py-2 rounded-xl border bg-white"><option value="">Choose shop</option>{shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}</select></label></div>{!selectedShopId ? <p className="p-8 text-center text-sm text-brown-medium">Choose a shop to manage its overrides.</p> : <div className="divide-y divide-cream-tertiary">{GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
+      const draft = overrides[recipe.key] || { mode: 'inherit', price: '', days: '' };
+      return <div key={recipe.key} className="p-4 grid sm:grid-cols-[minmax(160px,1fr)_130px_110px_90px_auto] gap-3 items-end"><div><strong className="text-sm">{recipe.name}</strong><p className="text-xs text-brown-medium">Global: ₱{globals[recipe.key]?.price || 0} · +{globals[recipe.key]?.days || 0} days</p></div><label className="text-xs">Availability<select value={draft.mode} onChange={(event) => setOverrides({ ...overrides, [recipe.key]: { ...draft, mode: event.target.value as OverrideDraft['mode'] } })} className="mt-1 w-full px-2 py-2 rounded-lg border bg-white"><option value="inherit">Inherit</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></label><label className="text-xs">Price override<input type="number" min="0" value={draft.price} placeholder="Inherit" onChange={(event) => setOverrides({ ...overrides, [recipe.key]: { ...draft, price: event.target.value } })} className="mt-1 w-full px-2 py-2 rounded-lg border" /></label><label className="text-xs">Days<input type="number" min="0" value={draft.days} placeholder="Inherit" onChange={(event) => setOverrides({ ...overrides, [recipe.key]: { ...draft, days: event.target.value } })} className="mt-1 w-full px-2 py-2 rounded-lg border" /></label><button onClick={() => saveOverride(recipe.key)} disabled={savingKey === `override:${recipe.key}`} className="px-3 py-2 rounded-lg border border-primary text-primary text-xs disabled:opacity-50">Save</button></div>;
+    })}</div>}</section>
   </div>;
 }

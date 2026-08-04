@@ -21,24 +21,33 @@ export default function AdminLayout() {
 
   useEffect(() => {
     if (authLoading) return;
-    checkAdminAccess();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user]);
+    let active = true;
+    async function checkAdminAccess() {
+      try {
+        if (!user) { if (active) setIsAdmin(false); return; }
 
-  function checkAdminAccess() {
-    try {
-      if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
+        const normalizedEmail = user.email?.trim().toLowerCase();
+        const isConfiguredAdmin = Boolean(normalizedEmail) && ADMIN_EMAILS.some(
+          (email: string) => email.trim().toLowerCase() === normalizedEmail,
+        );
+
+        if (isConfiguredAdmin) {
+          if (active) setIsAdmin(true);
+          return;
+        }
+
+        const { data, error } = await supabase.from('user_roles').select('id').eq('user_id', user.id).eq('role', 'super_admin').maybeSingle();
+        if (active) setIsAdmin(!error && Boolean(data));
+      } catch (e) {
+        console.error('Admin access check error:', e);
+        if (active) setIsAdmin(false);
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch (e) {
-      console.error('Admin access check error:', e);
-      setIsAdmin(false);
-    } finally {
-      setLoading(false);
     }
-  }
+    void checkAdminAccess();
+    return () => { active = false; };
+  }, [authLoading, user]);
 
   if (loading) {
     return (
