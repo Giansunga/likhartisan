@@ -13,12 +13,13 @@ export async function uploadToR2(file: File, folder: string): Promise<string> {
   const ext = file.name.split('.').pop() || 'bin';
   const key = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const arrayBuffer = await file.arrayBuffer();
+  const body = new Uint8Array(arrayBuffer);
 
   await r2.send(new PutObjectCommand({
     Bucket: import.meta.env.VITE_R2_BUCKET,
     Key: key,
-    Body: buffer,
+    Body: body,
     ContentType: file.type || 'application/octet-stream',
   }));
 
