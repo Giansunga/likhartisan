@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { uploadToR2 } from '../../lib/r2';
 import { recomputeProductStock } from '../../lib/stockSync';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
@@ -116,23 +117,13 @@ export default function ProductCreatePage() {
   }
 
   async function uploadFile(file: File): Promise<string | null> {
-    const ext = file.name.split('.').pop() || 'bin';
-    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-    const { error } = await supabase.storage
-      .from('products')
-      .upload(fileName, file);
-
-    if (error) {
+    try {
+      const folder = file.name.endsWith('.glb') || file.name.endsWith('.gltf') ? 'models' : 'products';
+      return await uploadToR2(file, folder);
+    } catch (error) {
       console.error('Upload error:', error);
       return null;
     }
-
-    const { data: urlData } = supabase.storage
-      .from('products')
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

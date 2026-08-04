@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { uploadToR2 } from '../../lib/r2';
 import AttachmentManagePanel from './AttachmentManagePanel';
 
 interface Model3D {
@@ -93,12 +94,7 @@ export default function ModelManagePage() {
   }
 
   async function uploadFile(file: File, folder: string): Promise<string> {
-    const ext = file.name.split('.').pop() || 'bin';
-    const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: uploadErr } = await supabase.storage.from('products').upload(path, file);
-    if (uploadErr) throw uploadErr;
-    const { data: urlData } = supabase.storage.from('products').getPublicUrl(path);
-    return urlData.publicUrl;
+    return uploadToR2(file, folder);
   }
 
   async function handleSave(e: React.FormEvent) {
