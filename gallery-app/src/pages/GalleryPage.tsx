@@ -1,10 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  createVisitSeed,
+  normalizeSearchQuery,
+  orderRecommendedProducts,
+  productMatchesSearch,
+  type UserProductSignal,
+} from '../lib/recommendations';
 
 const PAGE_SIZE = 24;
 
@@ -25,9 +32,14 @@ export default function GalleryPage() {
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('popularity');
+  const [sort, setSort] = useState('recommended');
   const [showFavorites, setShowFavorites] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
+  const [signals, setSignals] = useState<UserProductSignal[]>([]);
+  const [loadingSignals, setLoadingSignals] = useState(true);
+  const [resettingRecommendations, setResettingRecommendations] = useState(false);
+  const [visitSeed] = useState(createVisitSeed);
+  const recordedSearches = useRef(new Set<string>());
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -40,7 +52,7 @@ export default function GalleryPage() {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const loggedIn = !!user;
 
   useEffect(() => {
@@ -51,13 +63,46 @@ export default function GalleryPage() {
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites]);
+  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
     e.stopPropagation();
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   }
+
+  useEffect(() => {
+    if (authLoading) return;
+    let active = true;
+
+    if (!user) {
+      Promise.resolve().then(() => {
+        if (!active) return;
+        setSignals([]);
+        setLoadingSignals(false);
+        recordedSearches.current.clear();
+      });
+      return () => { active = false; };
+    }
+
+    setLoadingSignals(true);
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('user_product_signals')
+      .select('id, user_id, event_type, query_text, product_id, created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) console.error('Recommendation signals fetch error:', error);
+        setSignals((data as UserProductSignal[] | null) ?? []);
+        setLoadingSignals(false);
+      });
+
+    return () => { active = false; };
+  }, [authLoading, user]);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -124,7 +169,7 @@ export default function GalleryPage() {
     fetchProducts();
   }, []);
 
-  const filteredProducts = useMemo(() => {
+  const eligibleProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
     if (showFavorites) {
       list = list.filter(p => favorites.includes(p.id));
@@ -132,19 +177,106 @@ export default function GalleryPage() {
     if (activeCategory) {
       list = list.filter(p => p.category === activeCategory);
     }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-    }
-    switch (sort) {
-      case 'popularity': list.sort((a, b) => (productRatings[b.id]?.count ?? 0) - (productRatings[a.id]?.count ?? 0)); break;
-      case 'price-asc': list.sort((a, b) => (variantPrices[a.id] ?? a.price) - (variantPrices[b.id] ?? b.price)); break;
-      case 'price-desc': list.sort((a, b) => (variantPrices[b.id] ?? b.price) - (variantPrices[a.id] ?? a.price)); break;
-      case 'name-asc': list.sort((a, b) => a.name.localeCompare(b.name)); break;
-      default: break;
-    }
     return list;
-  }, [allProducts, activeCategory, search, sort, showFavorites, favorites, variantPrices, productRatings]);
+  }, [allProducts, activeCategory, showFavorites, favorites]);
+
+  const searchFilteredProducts = useMemo(() => {
+    const normalizedQuery = normalizeSearchQuery(search);
+    if (normalizedQuery.length < 2) return eligibleProducts;
+    return eligibleProducts.filter(product => productMatchesSearch(product, normalizedQuery));
+  }, [eligibleProducts, search]);
+
+  useEffect(() => {
+    if (!user) return;
+    const normalizedQuery = normalizeSearchQuery(search);
+    if (normalizedQuery.length < 2 || searchFilteredProducts.length === 0 || recordedSearches.current.has(normalizedQuery)) return;
+
+    let active = true;
+    const timeoutId = window.setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('user_product_signals')
+        .insert({
+          user_id: user.id,
+          event_type: 'search',
+          query_text: normalizedQuery,
+          product_id: null,
+        })
+        .select('id, user_id, event_type, query_text, product_id, created_at')
+        .single();
+
+      if (!active) return;
+      if (error) {
+        console.error('Recommendation search signal error:', error);
+        return;
+      }
+      recordedSearches.current.add(normalizedQuery);
+      if (data) setSignals(previous => [data as UserProductSignal, ...previous].slice(0, 100));
+    }, 750);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [search, searchFilteredProducts.length, user]);
+
+  function trackProductClick(productId: string) {
+    if (!user) return;
+    const queryText = normalizeSearchQuery(search) || null;
+    void supabase
+      .from('user_product_signals')
+      .insert({
+        user_id: user.id,
+        event_type: 'product_click',
+        query_text: queryText,
+        product_id: productId,
+      })
+      .then(({ error }) => {
+        if (error) console.error('Recommendation click signal error:', error);
+      });
+  }
+
+  async function resetRecommendations() {
+    if (!user || resettingRecommendations) return;
+    if (!window.confirm('Reset your recommendation history? This cannot be undone.')) return;
+    setResettingRecommendations(true);
+    const { error } = await supabase
+      .from('user_product_signals')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Recommendation reset error:', error);
+    } else {
+      setSignals([]);
+      recordedSearches.current.clear();
+      setPage(1);
+    }
+    setResettingRecommendations(false);
+  }
+
+  const filteredProducts = useMemo(() => {
+    const list = [...searchFilteredProducts];
+    switch (sort) {
+      case 'popularity':
+        return list.sort((a, b) =>
+          (productRatings[b.id]?.count ?? 0) - (productRatings[a.id]?.count ?? 0) || a.id.localeCompare(b.id));
+      case 'price-asc':
+        return list.sort((a, b) =>
+          (variantPrices[a.id] ?? a.price) - (variantPrices[b.id] ?? b.price) || a.id.localeCompare(b.id));
+      case 'price-desc':
+        return list.sort((a, b) =>
+          (variantPrices[b.id] ?? b.price) - (variantPrices[a.id] ?? a.price) || a.id.localeCompare(b.id));
+      case 'name-asc':
+        return list.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+      default:
+        return orderRecommendedProducts(list, {
+          signals: loggedIn ? signals : [],
+          catalog: allProducts,
+          seed: visitSeed,
+          query: search,
+        });
+    }
+  }, [searchFilteredProducts, sort, productRatings, variantPrices, loggedIn, signals, allProducts, visitSeed, search]);
 
   const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const products = useMemo(() => {
@@ -288,8 +420,25 @@ export default function GalleryPage() {
                     Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
                   </button>
                   )}
+                  {loggedIn && (
+                    <button
+                      type="button"
+                      onClick={resetRecommendations}
+                      disabled={signals.length === 0 || resettingRecommendations}
+                      title="Delete your saved search and product-click recommendation history"
+                      style={{
+                        padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
+                        background: '#fff', color: '#666', fontSize: '0.8rem', fontWeight: 600,
+                        cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
+                        opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
+                    </button>
+                  )}
                   <div className="sort-select-wrapper">
                     <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
+                      <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
                       <option value="popularity">Popularity</option>
                       <option value="price-asc">Price: Low to High</option>
                       <option value="price-desc">Price: High to Low</option>
@@ -309,7 +458,7 @@ export default function GalleryPage() {
       {/* Product Grid */}
       <section style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          {loadingProducts ? (
+          {loadingProducts || loadingSignals ? (
             /* Shimmer skeleton grid */
             <div style={isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
               {Array.from({ length: isMobile ? 6 : 12 }).map((_, i) => (
@@ -336,7 +485,7 @@ export default function GalleryPage() {
           ) : (
             <div className="product-grid">
               {products.map(p => (
-                <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group">
+                <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
                     <img src={p.image} alt={p.name} />
                     {loggedIn && (
@@ -466,6 +615,7 @@ export default function GalleryPage() {
             <label style={{ fontWeight: 600 }}>Sort By</label>
             <div className="sort-select-wrapper" style={{ width: '100%', maxWidth: 'none', background: '#f9f8f6' }}>
               <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
+                <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
                 <option value="popularity">Popularity</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
@@ -494,6 +644,19 @@ export default function GalleryPage() {
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                 </svg>
                 Show Only Favorites {favorites.length > 0 && <span>({favorites.length})</span>}
+              </button>
+              <button
+                type="button"
+                onClick={resetRecommendations}
+                disabled={signals.length === 0 || resettingRecommendations}
+                style={{
+                  marginTop: '10px', padding: '12px', width: '100%', border: '1.5px solid #E8E0D8',
+                  borderRadius: '10px', background: '#fff', color: '#666', fontSize: '0.88rem', fontWeight: 600,
+                  cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
+                  opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1,
+                }}
+              >
+                {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
               </button>
             </div>
           )}
