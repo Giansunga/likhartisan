@@ -152,46 +152,51 @@ export default function HomePage() {
       </header>
 
       {/* ── HISTORY SECTION ── */}
-      <section className="py-[100px] bg-[var(--bg-primary)]">
+      <section className="history-section py-16 md:py-[100px] bg-[var(--bg-primary)]">
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-20 items-center">
-            <div className="flex flex-col gap-6">
-              <h2 className="section-title">A Tradition Shaped<br /><span>Through Generations</span></h2>
-              <p className="text-[1.125rem] text-brown-dark leading-[1.6]">
+          <div className="history-section-grid grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-10 md:gap-x-20 md:gap-y-6 items-center">
+            <div className="history-copy-block order-1 md:col-start-1 md:row-start-1 flex flex-col gap-5 md:gap-6">
+              <h2 className="section-title max-md:text-[2rem] max-md:leading-[1.12] max-md:mb-0">A Tradition Shaped<br /><span>Through Generations</span></h2>
+              <p className="text-[1rem] md:text-[1.125rem] text-brown-dark leading-[1.65] md:leading-[1.6]">
                 Santo Tomas, Pampanga is known as the <span className="font-bold text-primary">Pottery Capital of the Philippines</span>. For centuries, local artisans have turned simple clay into remarkable works of art – preserving techniques passed down through generations and shaping a legacy of craftsmanship that continues to thrive today.
               </p>
-              <div className="grid grid-cols-2 gap-6 mt-4">
-                <div className="flex flex-col gap-3">
-                  <div className="w-[70px] h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
-                      <path d="M12 8V12L15 15" strokeLinecap="round" /><circle cx="12" cy="12" r="9" />
-                    </svg>
-                  </div>
-                  <h4 className="text-[1.25rem] font-bold text-brown-dark">Rich History</h4>
-                  <p className="text-[0.95rem] text-brown-medium leading-[1.5]">Rooted in pre-colonial traditions and refined through generations.</p>
+            </div>
+
+            <div className="history-feature-list order-3 md:order-none md:col-start-1 md:row-start-2 grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6 md:mt-4">
+              <div className="flex flex-row md:flex-col gap-4 md:gap-3 items-start">
+                <div className="w-[52px] h-[52px] md:w-[70px] md:h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 md:w-8 md:h-8">
+                    <path d="M12 8V12L15 15" strokeLinecap="round" /><circle cx="12" cy="12" r="9" />
+                  </svg>
                 </div>
-                <div className="flex flex-col gap-3">
-                  <div className="w-[70px] h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-8 h-8">
-                      <path d="M4.5 16.5C4.5 16.5 6 12 12 12C18 12 19.5 16.5 19.5 16.5" strokeLinecap="round" />
-                      <path d="M12 12V3" strokeLinecap="round" /><circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </div>
-                  <h4 className="text-[1.25rem] font-bold text-brown-dark">Cultural Significance</h4>
-                  <p className="text-[0.95rem] text-brown-medium leading-[1.5]">Pottery reflects the identity, creativity, and heritage of the Kapampangans.</p>
+                <div className="flex flex-col gap-2 md:gap-3">
+                  <h4 className="text-[1.1rem] md:text-[1.25rem] font-bold text-brown-dark">Rich History</h4>
+                  <p className="text-[0.88rem] md:text-[0.95rem] text-brown-medium leading-[1.5]">Rooted in pre-colonial traditions and refined through generations.</p>
+                </div>
+              </div>
+              <div className="flex flex-row md:flex-col gap-4 md:gap-3 items-start">
+                <div className="w-[52px] h-[52px] md:w-[70px] md:h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 md:w-8 md:h-8">
+                    <path d="M4.5 16.5C4.5 16.5 6 12 12 12C18 12 19.5 16.5 19.5 16.5" strokeLinecap="round" />
+                    <path d="M12 12V3" strokeLinecap="round" /><circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <div className="flex flex-col gap-2 md:gap-3">
+                  <h4 className="text-[1.1rem] md:text-[1.25rem] font-bold text-brown-dark">Cultural Significance</h4>
+                  <p className="text-[0.88rem] md:text-[0.95rem] text-brown-medium leading-[1.5]">Pottery reflects the identity, creativity, and heritage of the Kapampangans.</p>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-12 grid-rows-12 h-[640px] gap-0 relative">
-              <div className="col-span-6 row-span-12 rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[var(--shadow-lg)] hover:z-10">
-                <img src="/images/hero_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] hover:scale-105" style={{ transform: 'scaleX(-1)' }} />
+            <div className="history-collage order-2 md:order-none md:col-start-2 md:row-start-1 md:row-span-2 grid grid-cols-12 grid-rows-12 h-[min(78vw,420px)] min-h-[300px] md:h-[640px] gap-2 md:gap-0 relative">
+              <div className="col-span-6 row-span-12 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
+                <img src="/images/hero_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" style={{ transform: 'scaleX(-1)' }} />
               </div>
-              <div className="col-span-6 row-span-6 ml-5 mb-2.5 rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[var(--shadow-lg)] hover:z-10">
-                <img src="/images/artisan_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] hover:scale-105" />
+              <div className="col-span-6 row-span-6 md:ml-5 md:mb-2.5 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
+                <img src="/images/artisan_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
               </div>
-              <div className="col-span-6 row-span-6 col-start-7 row-start-7 ml-5 mt-2.5 rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[var(--shadow-lg)] hover:z-10">
-                <img src="/images/history_bottom_right.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] hover:scale-105" />
+              <div className="col-span-6 row-span-6 col-start-7 row-start-7 md:ml-5 md:mt-2.5 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
+                <img src="/images/history_bottom_right.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
               </div>
             </div>
           </div>
@@ -199,23 +204,23 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS SECTION ── */}
-      <section className="py-15 bg-cream-secondary" ref={statsRef} id="stats-banner">
+      <section className="stats-banner py-15 bg-cream-secondary" ref={statsRef} id="stats-banner">
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="grid grid-cols-[1.1fr_1fr] gap-15 items-center max-md:grid-cols-1 max-md:text-center max-md:gap-10">
-            <p className="font-serif text-[1.85rem] leading-[1.35] text-brown-dark">
+          <div className="stats-banner-layout grid grid-cols-[1.1fr_1fr] gap-15 items-center max-md:grid-cols-1 max-md:text-center max-md:gap-10">
+            <p className="stats-banner-copy font-serif text-[1.85rem] leading-[1.35] text-brown-dark">
               More than just pottery, it&rsquo;s a destination of <span className="text-primary font-semibold">culture</span>, <span className="text-primary font-semibold">creativity</span>, and <span className="text-primary font-semibold">community</span>.
             </p>
-            <div className="flex justify-between gap-6 max-md:flex-wrap max-md:justify-center">
+            <div className="stats-grid flex justify-between gap-6 max-md:flex-wrap max-md:justify-center">
               {[
                 { target: 50, label: 'LOCAL ARTISANS', suffix: '+' },
                 { target: 200, label: 'YEARS OF TRADITION', suffix: '+' },
                 { target: 10000, label: 'POTTERY CREATIONS', suffix: '+' },
               ].map((s, i) => (
-                <div key={i} className="flex flex-col items-center text-center gap-3 flex-1 min-w-[120px]">
-                  <div className="w-[100px] h-[100px] rounded-full bg-cream-tertiary flex items-center justify-center font-serif text-3xl font-bold text-primary shadow-[var(--shadow-sm)] transition-all hover:scale-108 hover:bg-primary hover:text-white hover:shadow-[var(--shadow-md)]">
+                <div key={i} className="stats-item flex flex-col items-center text-center gap-3 flex-1 min-w-[120px]">
+                  <div className="stats-circle w-[100px] h-[100px] rounded-full bg-cream-tertiary flex items-center justify-center font-serif text-3xl font-bold text-primary shadow-[var(--shadow-sm)] transition-all hover:scale-108 hover:bg-primary hover:text-white hover:shadow-[var(--shadow-md)]">
                     {statsVisible ? <CountUp target={s.target} suffix={s.suffix} /> : '0'}
                   </div>
-                  <span className="text-[0.85rem] font-bold tracking-[0.05em] text-brown-dark">{s.label}</span>
+                  <span className="stats-label text-[0.85rem] font-bold tracking-[0.05em] text-brown-dark">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -229,7 +234,42 @@ export default function HomePage() {
           <div className="text-center mb-10">
             <h2 className="section-title">Explore <span>Featured Collections</span></h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+          {/* Mobile Carousel */}
+          <div className="md:hidden">
+            <div className="overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6">
+              <div className="flex gap-4">
+                {[
+                  { name: 'Vases', img: '/images/vases_collection.png', desc: 'Beautifully handcrafted pottery pieces designed to showcase timeless elegance.', link: '/gallery?category=Vases' },
+                  { name: 'Amphoras', img: '/images/amphoras_collection.png', desc: 'Classic handcrafted pottery pieces inspired by traditional forms.', link: '/gallery?category=Amphoras' },
+                  { name: 'Tea Light Vases', img: '/images/tealights_collection.png', desc: 'Carefully crafted pottery pieces designed to create a warm ambiance.', link: '/gallery?category=Tea%20Light%20Vases' },
+                ].map((c, i) => (
+                  <div key={i} className="snap-center shrink-0 w-[85vw] max-w-[320px] bg-white rounded-[10px] overflow-hidden shadow-[var(--shadow-sm)] border border-black/3 flex flex-col group hover:-translate-y-2.5 hover:shadow-[var(--shadow-lg)] hover:border-primary/15 transition-all duration-[0.3s]">
+                    <div className="h-[250px] overflow-hidden">
+                      <img src={c.img} alt={c.name} className="w-full h-full object-cover transition-all duration-[0.6s] group-hover:scale-105" />
+                    </div>
+                    <div className="p-5 flex flex-col items-center text-center flex-grow">
+                      <h3 className="font-serif text-[1.5rem] font-semibold text-primary mb-2">{c.name}</h3>
+                      <p className="text-[0.9rem] text-brown-medium leading-[1.5] mb-5 flex-grow">{c.desc}</p>
+                      <Link to={c.link}
+                        className="bg-primary text-white font-semibold text-[0.9rem] tracking-[0.05em] py-3 px-8 rounded-[10px] shadow-[var(--shadow-sm)] w-full group-hover:bg-accent group-hover:shadow-[0_4px_12px_rgba(193,87,13,0.3)] transition-all">
+                        EXPLORE
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Carousel Dots */}
+            <div className="flex justify-center gap-2 mt-6">
+              <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-primary/30"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-primary/30"></div>
+            </div>
+          </div>
+
+          {/* Desktop Grid */}
+          <div className="hidden md:grid grid-cols-3 gap-8">
             {[
               { name: 'Vases', img: '/images/vases_collection.png', desc: 'Beautifully handcrafted pottery pieces designed to showcase timeless elegance, traditional craftsmanship, and the artistic heritage of Santo Tomas\'s local artisans.', link: '/gallery?category=Vases' },
               { name: 'Amphoras', img: '/images/amphoras_collection.png', desc: 'Classic handcrafted pottery pieces inspired by traditional forms, reflecting cultural significance, detailed craftsmanship, and enduring artistic tradition.', link: '/gallery?category=Amphoras' },

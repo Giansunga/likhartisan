@@ -41,7 +41,7 @@ AS $$
     WHERE user_id = auth.uid() AND role = 'super_admin'
     UNION
     SELECT 1 FROM auth.users
-    WHERE id = auth.uid() AND email IN ('giansunga396@gmail.com', 'deang.elaizah0505@gmail.com')
+    WHERE id = auth.uid() AND email IN ('giansunga396@gmail.com', 'deang.elaizah0505@gmail.com', 'ailamavelyn.naguit@gmail.com')
   );
 $$;
 
@@ -71,7 +71,7 @@ $$;
 -- Super admins
 INSERT INTO public.user_roles (user_id, role, assigned_by)
 SELECT id, 'super_admin', id FROM auth.users
-WHERE email IN ('giansunga396@gmail.com', 'deang.elaizah0505@gmail.com')
+WHERE email IN ('giansunga396@gmail.com', 'deang.elaizah0505@gmail.com', 'ailamavelyn.naguit@gmail.com')
 ON CONFLICT (user_id, role, shop_id) DO NOTHING;
 
 -- Shop owner for Regala Pottery

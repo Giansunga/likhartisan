@@ -166,12 +166,12 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
         <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col lg:flex-row max-w-[var(--container-width)] mx-auto">
           
           {/* Left: Animated Text Content */}
-          <div className="w-full lg:w-1/2 h-1/2 lg:h-full relative flex flex-col justify-center px-6 lg:pl-12 z-10">
+          <div className="freeform-landing-text-panel w-full lg:w-1/2 h-1/2 lg:h-full relative flex flex-col justify-center px-6 lg:pl-12 z-10">
             
             {/* Slide 1: Intro */}
             <motion.div 
               style={{ opacity: introOpacity, y: introY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
+              className="freeform-landing-intro-slide absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
               <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
                 Design Pottery.<br />
@@ -244,7 +244,7 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
           </div>
 
           {/* Right: 3D Preview */}
-          <div className="w-full lg:w-1/2 h-1/2 lg:h-full relative overflow-hidden flex items-center justify-center p-6 lg:p-12">
+          <div className="freeform-landing-preview-panel w-full lg:w-1/2 h-1/2 lg:h-full relative overflow-hidden flex items-center justify-center p-6 lg:p-12">
             <div 
               className="w-full h-full max-h-[600px] rounded-[24px] overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.1)] border border-[#E8E0D8]/20 relative"
               style={{ background: 'transparent' }}

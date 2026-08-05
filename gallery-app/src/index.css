@@ -1270,6 +1270,68 @@ body {
 
 @media (max-width: 768px) {
   :root { --nav-height: 60px; }
+  .history-section { padding-top: 4rem !important; padding-bottom: 4rem !important; }
+  .history-section-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 2.5rem !important; }
+  .history-collage { height: clamp(300px, 78vw, 420px) !important; min-height: 300px !important; gap: 0.5rem !important; }
+  .history-collage > div { margin: 0 !important; }
+  .stats-banner { padding-top: 3.75rem !important; padding-bottom: 4rem !important; }
+  .stats-banner-layout { grid-template-columns: minmax(0, 1fr) !important; gap: 2.4rem !important; }
+  .stats-banner-copy {
+    max-width: 18rem;
+    margin: 0 auto;
+    font-size: clamp(1.75rem, 7vw, 2rem) !important;
+    line-height: 1.28 !important;
+    text-wrap: balance;
+  }
+  .stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.75rem 1.25rem !important;
+    justify-items: center;
+    align-items: start;
+    max-width: 22rem;
+    margin: 0 auto;
+  }
+  .stats-item {
+    min-width: 0 !important;
+    width: 100%;
+    gap: 0.85rem !important;
+  }
+  .stats-item:nth-child(3) {
+    grid-column: 1 / -1;
+    width: min(11rem, 100%);
+    margin-top: 0.1rem;
+  }
+  .stats-circle {
+    width: clamp(5.9rem, 27vw, 6.8rem) !important;
+    height: clamp(5.9rem, 27vw, 6.8rem) !important;
+    font-size: clamp(1.35rem, 5.5vw, 1.65rem) !important;
+  }
+  .stats-circle:hover {
+    transform: none !important;
+    background-color: var(--bg-tertiary) !important;
+    color: var(--primary-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+  .stats-label {
+    max-width: 9.8rem;
+    font-size: 0.78rem !important;
+    line-height: 1.25;
+    letter-spacing: 0.045em !important;
+  }
+  .freeform-landing-text-panel {
+    height: 43% !important;
+  }
+  .freeform-landing-intro-slide {
+    top: calc(50% + 10px) !important;
+  }
+  .freeform-landing-intro-slide h2 {
+    margin-bottom: 1rem !important;
+  }
+  .freeform-landing-preview-panel {
+    height: 57% !important;
+    padding-top: 0 !important;
+  }
   .hero-video-title { font-size: clamp(1.6rem, 6vw, 2.5rem); }
   .hero-video-subtitle { font-size: 0.95rem; }
   .hero-video-btn { font-size: 1.1rem; padding: 0.75rem 2rem; }
@@ -2148,5 +2210,14 @@ body {
   width: max-content;
   animation: reviewMarquee 28s linear infinite !important;
   will-change: transform;
+}
+
+/* ── Scrollbar Hide Utility ─────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 

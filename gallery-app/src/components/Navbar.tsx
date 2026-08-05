@@ -30,6 +30,7 @@ export default function Navbar() {
   const [isMobile, setIsMobile] = useState(false);
   const [cartCount, setCartCount] = useState(getCartCount());
   const [hasShopRole, setHasShopRole] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { user } = useAuth();
   const loggedIn = !!user;
 
@@ -87,6 +88,19 @@ export default function Navbar() {
     setUserEmail(user?.email ?? null);
     setUserAvatar(user?.user_metadata?.avatar_url || '');
     setHasShopRole(false);
+    setIsSuperAdmin(false);
+    if (user) {
+      const normalizedEmail = user.email?.trim().toLowerCase();
+      const emailMatch = Boolean(normalizedEmail) && ADMIN_EMAILS.some(
+        (e: string) => e.trim().toLowerCase() === normalizedEmail,
+      );
+      if (!emailMatch) {
+        supabase.from('user_roles').select('id').eq('user_id', user.id).eq('role', 'super_admin').maybeSingle()
+          .then(({ data, error }) => { if (!error && data) setIsSuperAdmin(true); });
+      } else {
+        setIsSuperAdmin(true);
+      }
+    }
     if (user?.email && SHOP_EMAILS.includes(user.email)) {
       const name = user.user_metadata?.name || user.email;
       setShopDisplayName(name);
@@ -442,7 +456,7 @@ export default function Navbar() {
                   </svg>
                 </Link>
 
-                {!isMobile && userEmail && ADMIN_EMAILS.includes(userEmail) && (
+                {!isMobile && isSuperAdmin && (
                   <Link to="/admin" aria-label="Admin dashboard" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: '44px', height: '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
