@@ -5,8 +5,6 @@ import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import ChristmasBackgroundDecals from '../components/ChristmasBackgroundDecals';
 import {
   createVisitSeed,
   normalizeSearchQuery,
@@ -25,15 +23,6 @@ const categories = [
   { name: 'Amphoras', bg: '/images/amphoras_collection.png' },
   { name: 'Tea Light Vases', bg: '/images/tealights_collection.png' },
 ];
-
-const christmasCategoryImages: Record<string, string> = {
-  'All Crafts': '/assets/themes/christmas/christmas-all-crafts.png',
-  Vases: '/assets/themes/christmas/christmas-vases.png',
-  Planters: '/assets/themes/christmas/christmas-planters.png',
-  Jars: '/assets/themes/christmas/christmas-jars.png',
-  Amphoras: '/assets/themes/christmas/christmas-amphoras.png',
-  'Tea Light Vases': '/assets/themes/christmas/christmas-tea-light-vases.png',
-};
 
 export default function GalleryPage() {
   const [searchParams] = useSearchParams();
@@ -55,11 +44,6 @@ export default function GalleryPage() {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
-  const { currentTheme } = useTheme();
-  const isChristmasTheme = currentTheme === 'christmas';
-  const heroImage = isChristmasTheme
-    ? '/assets/themes/christmas/christmas-banner.png'
-    : '/images/hero_1.png';
   
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -301,284 +285,265 @@ export default function GalleryPage() {
   }, [filteredProducts, page]);
 
   return (
-    <div className={`gallery-page${isChristmasTheme ? ' christmas-theme' : ''}`}>
-      {isChristmasTheme && <ChristmasBackgroundDecals />}
-
-      <div className="gallery-page-content">
-        {/* Banner */}
-        <header
-          className="gallery-header-banner"
-          style={isMobile ? { height: 'auto', minHeight: '180px', paddingTop: 'calc(var(--nav-height) + 12px)', paddingBottom: '20px' } : undefined}
+    <div>
+      {/* Banner */}
+      <header
+        className="gallery-header-banner"
+        style={isMobile ? { height: 'auto', minHeight: '180px', paddingTop: 'calc(var(--nav-height) + 12px)', paddingBottom: '20px' } : undefined}
+      >
+        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.png)' }} />
+        <div className="gallery-banner-overlay" />
+        <div
+          className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
+          style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
         >
-          <div className="gallery-banner-bg" style={{ backgroundImage: `url(${heroImage})` }} />
-          <div className="gallery-banner-overlay" />
-          <div
-            className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
-            style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
-          >
-            <div className="gallery-banner-content">
-              <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
-                <Link to="/">Home</Link>
-                <span className="separator">/</span>
-                <span className="current">Gallery</span>
-              </div>
-              <h1 className="gallery-title" style={isMobile ? { margin: 0, maxWidth: '34ch' } : undefined}>Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.</h1>
+          <div className="gallery-banner-content">
+            <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
+              <Link to="/">Home</Link>
+              <span className="separator">/</span>
+              <span className="current">Gallery</span>
             </div>
+            <h1 className="gallery-title" style={isMobile ? { margin: 0, maxWidth: '34ch' } : undefined}>Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.</h1>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Category Filter */}
-        <section className="py-[30px] bg-[var(--bg-primary)] border-b border-cream-secondary">
-          <div className="max-w-[var(--container-width)] mx-auto px-6" style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}>
-            {isMobile ? (
-              <div style={{
-                display: 'flex', overflowX: 'auto', gap: '10px', padding: '4px 0',
-                scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
-              }}>
-                <button
-                  onClick={() => setActiveCategory(null)}
-                  style={{
-                    flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
-                    fontWeight: 600, border: `1.5px solid ${activeCategory === null ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
-                    background: activeCategory === null ? 'var(--primary-color)' : 'var(--white)',
-                    color: activeCategory === null ? 'var(--white)' : 'var(--text-dark)',
-                    cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                  }}
-                >
-                  All Crafts
-                </button>
-                {categories.filter(c => c.name !== 'All Crafts').map(cat => {
-                  const isActive = activeCategory === cat.name;
-                  return (
-                    <button
-                      key={cat.name}
-                      onClick={() => setActiveCategory(isActive ? null : cat.name)}
-                      style={{
-                        flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
-                        fontWeight: 600, border: `1.5px solid ${isActive ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
-                        background: isActive ? 'var(--primary-color)' : 'var(--white)',
-                        color: isActive ? 'var(--white)' : 'var(--text-dark)',
-                        cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="category-zoom-grid">
-                {categories.map(cat => {
-                  const displayedImage = isChristmasTheme && christmasCategoryImages[cat.name]
-                    ? christmasCategoryImages[cat.name]
-                    : cat.bg;
-                  return (
-                    <div key={cat.name}
-                      onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
-                      className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
-                      <div className="zoom-card-bg" style={{ backgroundImage: `url(${displayedImage})` }} />
-                      <div className="zoom-card-overlay" />
-                      <div className="zoom-card-content">
-                        <span className="zoom-card-name">{cat.name}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Control Bar */}
-        <section className="py-[30px] bg-[var(--bg-primary)]">
-          <div className="max-w-[var(--container-width)] mx-auto px-6">
-            <div className="control-bar">
-              <div className="control-title-group">
-                <h2 className="control-section-title" id="control-active-title">
-                  {activeCategory || 'All Crafts'}
-                </h2>
-                {isChristmasTheme && (
-                  <div className="christmas-heading-decoration">
-                    <img src="/assets/themes/christmas/christmas-holly.png" alt="" draggable={false} className="christmas-heading-holly" />
-                    <div className="christmas-heading-divider">
-                      <span />
-                      <span className="christmas-heading-diamond" />
-                      <span />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="control-action-group">
-                <div className="search-bar-wrapper">
-                  <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                  </svg>
-                  <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
-                </div>
-                {isMobile ? (
+      {/* Category Filter */}
+      <section className="py-[30px] bg-[var(--bg-primary)] border-b border-cream-secondary">
+        <div className="max-w-[var(--container-width)] mx-auto px-6" style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}>
+          {isMobile ? (
+            <div style={{
+              display: 'flex', overflowX: 'auto', gap: '10px', padding: '4px 0',
+              scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
+            }}>
+              <button
+                onClick={() => setActiveCategory(null)}
+                style={{
+                  flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
+                  fontWeight: 600, border: `1.5px solid ${activeCategory === null ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
+                  background: activeCategory === null ? 'var(--primary-color)' : 'var(--white)',
+                  color: activeCategory === null ? 'var(--white)' : 'var(--text-dark)',
+                  cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                All Crafts
+              </button>
+              {categories.filter(c => c.name !== 'All Crafts').map(cat => {
+                const isActive = activeCategory === cat.name;
+                return (
                   <button
-                    onClick={() => setFilterModalOpen(true)}
+                    key={cat.name}
+                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
                     style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px',
-                      border: '1.5px solid #E8E0D8', borderRadius: '10px', background: '#fff',
-                      color: 'var(--text-dark)', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                      flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
+                      fontWeight: 600, border: `1.5px solid ${isActive ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
+                      background: isActive ? 'var(--primary-color)' : 'var(--white)',
+                      color: isActive ? 'var(--white)' : 'var(--text-dark)',
+                      cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
                     }}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                      <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
-                      <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
-                      <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
-                      <line x1="1" y1="14" x2="7" y2="14" />
-                      <line x1="9" y1="8" x2="15" y2="8" />
-                      <line x1="17" y1="16" x2="23" y2="16" />
-                    </svg>
-                    Filters
+                    {cat.name}
                   </button>
-                ) : (
-                  <>
-                    {loggedIn && (
+                );
+              })}
+            </div>
+          ) : (
+            <div className="category-zoom-grid">
+              {categories.map(cat => (
+                <div key={cat.name}
+                  onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
+                  className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
+                  <div className="zoom-card-bg" style={{ backgroundImage: `url(${cat.bg})` }} />
+                  <div className="zoom-card-overlay" />
+                  <div className="zoom-card-content">
+                    <span className="zoom-card-name">{cat.name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Control Bar */}
+      <section className="py-[30px] bg-[var(--bg-primary)]">
+        <div className="max-w-[var(--container-width)] mx-auto px-6">
+          <div className="control-bar">
+            <div className="control-title-group">
+              <h2 className="control-section-title" id="control-active-title">
+                {activeCategory || 'All Crafts'}
+              </h2>
+            </div>
+
+            <div className="control-action-group">
+              <div className="search-bar-wrapper">
+                <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+                <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              {isMobile ? (
+                <button
+                  onClick={() => setFilterModalOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px',
+                    border: '1.5px solid #E8E0D8', borderRadius: '10px', background: '#fff',
+                    color: 'var(--text-dark)', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+                    <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+                    <line x1="1" y1="14" x2="7" y2="14" />
+                    <line x1="9" y1="8" x2="15" y2="8" />
+                    <line x1="17" y1="16" x2="23" y2="16" />
+                  </svg>
+                  Filters
+                </button>
+              ) : (
+                <>
+                  {loggedIn && (
+                  <button
+                    onClick={() => setShowFavorites(!showFavorites)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
+                      border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
+                      borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
+                      color: showFavorites ? '#fff' : '#666', fontSize: '0.88rem', fontWeight: 600,
+                      cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill={showFavorites ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                    Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
+                  </button>
+                  )}
+                  {loggedIn && (
                     <button
-                      onClick={() => setShowFavorites(!showFavorites)}
+                      type="button"
+                      onClick={resetRecommendations}
+                      disabled={signals.length === 0 || resettingRecommendations}
+                      title="Delete your saved search and product-click recommendation history"
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
-                        border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
-                        borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
-                        color: showFavorites ? '#fff' : '#666', fontSize: '0.88rem', fontWeight: 600,
-                        cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
+                        padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
+                        background: '#fff', color: '#666', fontSize: '0.8rem', fontWeight: 600,
+                        cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
+                        opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
                       }}
                     >
-                      <svg viewBox="0 0 24 24" fill={showFavorites ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                      </svg>
-                      Favorites {favorites.length > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({favorites.length})</span>}
+                      {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
                     </button>
-                    )}
-                    {loggedIn && (
-                      <button
-                        type="button"
-                        onClick={resetRecommendations}
-                        disabled={signals.length === 0 || resettingRecommendations}
-                        title="Delete your saved search and product-click recommendation history"
-                        style={{
-                          padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                          background: '#fff', color: '#666', fontSize: '0.8rem', fontWeight: 600,
-                          cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
-                          opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
-                      </button>
-                    )}
-                    <div className="sort-select-wrapper">
-                      <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
-                        <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
-                        <option value="popularity">Popularity</option>
-                        <option value="price-asc">Price: Low to High</option>
-                        <option value="price-desc">Price: High to Low</option>
-                        <option value="name-asc">Name: A-Z</option>
-                      </select>
-                      <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </div>
-                  </>
-                )}
-              </div>
+                  )}
+                  <div className="sort-select-wrapper">
+                    <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
+                      <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
+                      <option value="popularity">Popularity</option>
+                      <option value="price-asc">Price: Low to High</option>
+                      <option value="price-desc">Price: High to Low</option>
+                      <option value="name-asc">Name: A-Z</option>
+                    </select>
+                    <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Product Grid */}
-        <section style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
-          <div className="max-w-[var(--container-width)] mx-auto px-6">
-            {loadingProducts || loadingSignals ? (
-              <div style={isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-                {Array.from({ length: isMobile ? 6 : 12 }).map((_, i) => (
-                  <div key={i} style={{ border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden', background: '#fff' }}>
-                    <div className="shimmer-skeleton" style={{ height: isMobile ? '140px' : '220px', width: '100%', borderRadius: 0 }} />
-                    <div style={{ padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div className="shimmer-skeleton" style={{ height: '16px', width: '70%', borderRadius: '4px' }} />
-                      <div className="shimmer-skeleton" style={{ height: '14px', width: '45%', borderRadius: '4px' }} />
-                      <div className="shimmer-skeleton" style={{ height: isMobile ? '18px' : '20px', width: '35%', borderRadius: '4px' }} />
-                    </div>
+      {/* Product Grid */}
+      <section style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
+        <div className="max-w-[var(--container-width)] mx-auto px-6">
+          {loadingProducts || loadingSignals ? (
+            /* Shimmer skeleton grid */
+            <div style={isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+              {Array.from({ length: isMobile ? 6 : 12 }).map((_, i) => (
+                <div key={i} style={{ border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden', background: '#fff' }}>
+                  <div className="shimmer-skeleton" style={{ height: isMobile ? '140px' : '220px', width: '100%', borderRadius: 0 }} />
+                  <div style={{ padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className="shimmer-skeleton" style={{ height: '16px', width: '70%', borderRadius: '4px' }} />
+                    <div className="shimmer-skeleton" style={{ height: '14px', width: '45%', borderRadius: '4px' }} />
+                    <div className="shimmer-skeleton" style={{ height: isMobile ? '18px' : '20px', width: '35%', borderRadius: '4px' }} />
                   </div>
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="gallery-empty-state">
-                <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.3" style={{ width: 64, height: 64, opacity: 0.6 }}>
-                  <path d="M8 3h8l1 4 3 3v8a3 3 0 01-3 3H7a3 3 0 01-3-3v-8l3-3 1-4z" />
-                  <path d="M8 7h8M9 21c1.5-2 4.5-2 6 0M9 11c1.5 1 4.5 1 6 0" />
-                </svg>
-                <h3>No crafts found</h3>
-                <p>Try adjusting your search keywords, clearing active filters, or exploring a different category.</p>
-                <button className="btn-reset-filters" onClick={() => { setActiveCategory(null); setSearch(''); }}>Clear All Filters</button>
-              </div>
-            ) : (
-              <div className="product-grid">
-                {products.map(p => (
-                  <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
-                    <div className="product-img-wrapper">
-                      <img src={p.image} alt={p.name} />
-                      {loggedIn && (
-                      <button
-                        onClick={(e) => toggleFavorite(e, p.id)}
-                        className="favorite-button"
-                        style={{
-                          position: 'absolute', top: '10px', right: '10px', zIndex: 5,
-                          width: '34px', height: '34px', borderRadius: '50%',
-                          background: 'rgba(255,255,255,0.9)', border: 'none',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                          transition: 'transform 0.15s',
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}
-                          fill={favorites.includes(p.id) ? '#E53935' : 'none'}
-                          stroke={favorites.includes(p.id) ? '#E53935' : '#666'}
-                          strokeWidth="2">
-                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                        </svg>
-                      </button>
+                </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="gallery-empty-state">
+              <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.3" style={{ width: 64, height: 64, opacity: 0.6 }}>
+                <path d="M8 3h8l1 4 3 3v8a3 3 0 01-3 3H7a3 3 0 01-3-3v-8l3-3 1-4z" />
+                <path d="M8 7h8M9 21c1.5-2 4.5-2 6 0M9 11c1.5 1 4.5 1 6 0" />
+              </svg>
+              <h3>No crafts found</h3>
+              <p>Try adjusting your search keywords, clearing active filters, or exploring a different category.</p>
+              <button className="btn-reset-filters" onClick={() => { setActiveCategory(null); setSearch(''); }}>Clear All Filters</button>
+            </div>
+          ) : (
+            <div className="product-grid">
+              {products.map(p => (
+                <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
+                  <div className="product-img-wrapper">
+                    <img src={p.image} alt={p.name} />
+                    {loggedIn && (
+                    <button
+                      onClick={(e) => toggleFavorite(e, p.id)}
+                      style={{
+                        position: 'absolute', top: '10px', right: '10px', zIndex: 5,
+                        width: '34px', height: '34px', borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.9)', border: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                        transition: 'transform 0.15s',
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }}
+                        fill={favorites.includes(p.id) ? '#E53935' : 'none'}
+                        stroke={favorites.includes(p.id) ? '#E53935' : '#666'}
+                        strokeWidth="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                    </button>
+                    )}
+                  </div>
+                  <div className="product-details">
+                    <div className="product-card-header">
+                      <span className="product-tag">{p.category}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>
+                      {productRatings[p.id] && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.7rem', color: '#999' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                          {productRatings[p.id].avg.toFixed(1)} ({productRatings[p.id].count})
+                        </span>
                       )}
                     </div>
-                    <div className="product-details">
-                      <div className="product-card-header">
-                        <span className="product-tag">{p.category}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>
-                        {productRatings[p.id] && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.7rem', color: '#999' }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
-                            {productRatings[p.id].avg.toFixed(1)} ({productRatings[p.id].count})
-                          </span>
-                        )}
-                      </div>
-                      <div className="product-card-artisan-line">
-                        <span className="product-card-shop">{p.shopName}</span>
-                      </div>
-                      <div className="product-card-footer">
-                        <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
-                      </div>
+                    <div className="product-card-artisan-line">
+                      <span className="product-card-shop">{p.shopName}</span>
                     </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              total={filteredProducts.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-            />
-          </div>
-        </section>
-      </div>
+                    <div className="product-card-footer">
+                      <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filteredProducts.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </div>
+      </section>
 
       {/* Design Yours Modal */}
       <div className={`modal-overlay ${designModalOpen ? 'active' : ''}`}>
