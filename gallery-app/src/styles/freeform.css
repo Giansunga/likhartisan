@@ -969,6 +969,50 @@
     padding: 12px 20px;
     justify-content: center;
   }
+
+  /* Freeform Landing Section Mobile Adjustments */
+  .freeform-landing-text-panel {
+    padding-bottom: 0;
+  }
+
+  .freeform-landing-preview-panel {
+    padding-top: 0;
+  }
+
+  .freeform-landing-intro-slide,
+  .freeform-landing-text-panel > div {
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .freeform-landing-intro-slide::-webkit-scrollbar,
+  .freeform-landing-text-panel > div::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Freeform Landing: Very Small Screens ≤ 375px ────────────────────────── */
+@media (max-width: 375px) {
+  .freeform-landing-text-panel {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .freeform-landing-preview-panel {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .freeform-landing-text-panel h2 {
+    font-size: 1.75rem;
+  }
+
+  .freeform-landing-text-panel p {
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

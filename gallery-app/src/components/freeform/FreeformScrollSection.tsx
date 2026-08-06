@@ -166,40 +166,34 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
         <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col lg:flex-row max-w-[var(--container-width)] mx-auto">
           
           {/* Left: Animated Text Content */}
-          <div className="freeform-landing-text-panel w-full lg:w-1/2 h-1/2 lg:h-full relative flex flex-col justify-center px-6 lg:pl-12 z-10">
+          <div className="freeform-landing-text-panel w-full lg:w-1/2 h-[38%] lg:h-full relative flex flex-col justify-center px-5 sm:px-6 lg:pl-12 z-10 pt-2 lg:pt-0">
             
             {/* Slide 1: Intro */}
             <motion.div 
               style={{ opacity: introOpacity, y: introY, willChange: 'opacity, transform' }}
-              className="freeform-landing-intro-slide absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
+              className="freeform-landing-intro-slide absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
-              <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
+              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
                 Design Pottery.<br />
                 <span className="text-[#823E0B]">Your Way.</span><br />
                 In 3D.
               </h2>
-              <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px]">
+              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px]">
                 Customize handcrafted pottery in real time using our interactive 3D Freeform Designer.
                 Experiment with variations, dimensions, and decorative details before placing your order.
               </p>
-              
-              {isMobile && (
-                <p className="text-[0.85rem] font-medium mt-4 text-[#8A7A6E]">
-                  (Available for Desktop Only)
-                </p>
-              )}
             </motion.div>
 
             {/* Slide 2: Shape */}
             <motion.div 
               style={{ opacity: shapeOpacity, y: shapeY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
+              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
                 Shape <br />
                 <span className="text-[#823E0B]">Your Vision.</span>
               </h2>
-              <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px]">
+              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px]">
                 Mold the perfect piece. Adjust the height, widen the base, or refine the curves seamlessly—just like a master potter at the wheel.
               </p>
             </motion.div>
@@ -207,13 +201,13 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
             {/* Slide 3: Finish */}
             <motion.div 
               style={{ opacity: finishOpacity, y: finishY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
+              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
                 Find Your <br />
                 <span className="text-[#823E0B]">Perfect Finish.</span>
               </h2>
-              <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px] mb-8">
+              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
                 Choose from raw clay, elegant ceramic, or brilliant glazed finishes to perfectly match your aesthetic.
               </p>
             </motion.div>
@@ -221,20 +215,19 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
             {/* Slide 4: Decor */}
             <motion.div
               style={{ opacity: decorOpacity, y: decorY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
+              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
-              <h2 className="font-serif text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-5">
+              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
                 Bring It <br />
                 <span className="text-[#823E0B]">To Life.</span>
               </h2>
-              <p className="text-[1rem] leading-[1.7] opacity-80 max-w-[460px] mb-8">
+              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
                 Add original patterns, choose where they wrap, and finish them painted or engraved for a piece with your own signature.
               </p>
               <div className="flex gap-4">
                 <button
-                  onClick={isMobile ? undefined : goToFreeform}
-                  disabled={isMobile}
-                  className={`flex items-center gap-2.5 text-white font-semibold text-[0.95rem] py-3.5 px-8 rounded-[10px] transition-all ${isMobile ? 'bg-[#B9A79A] cursor-not-allowed opacity-70' : 'bg-[#823E0B] shadow-[0_4px_16px_rgba(130,62,11,0.35)] hover:bg-[#6B3209] hover:scale-105 cursor-pointer'}`}
+                  onClick={goToFreeform}
+                  className="flex items-center gap-2.5 text-white font-semibold text-[0.85rem] sm:text-[0.95rem] py-3 sm:py-3.5 px-6 sm:px-8 rounded-[10px] transition-all bg-[#823E0B] shadow-[0_4px_16px_rgba(130,62,11,0.35)] hover:bg-[#6B3209] hover:scale-105 cursor-pointer"
                 >
                   Start Designing Now
                 </button>
@@ -244,9 +237,9 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
           </div>
 
           {/* Right: 3D Preview */}
-          <div className="freeform-landing-preview-panel w-full lg:w-1/2 h-1/2 lg:h-full relative overflow-hidden flex items-center justify-center p-6 lg:p-12">
+          <div className="freeform-landing-preview-panel w-full lg:w-1/2 h-[62%] lg:h-full relative overflow-hidden flex items-center justify-center p-2 sm:p-4 lg:p-12">
             <div 
-              className="w-full h-full max-h-[600px] rounded-[24px] overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.1)] border border-[#E8E0D8]/20 relative"
+              className="w-full h-full max-h-[600px] rounded-[16px] sm:rounded-[24px] overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.1)] border border-[#E8E0D8]/20 relative"
               style={{ background: 'transparent' }}
             >
                 {freeformVisible && previewModel ? (
@@ -284,10 +277,10 @@ export default function FreeformScrollSection({ isMobile }: FreeformScrollSectio
             {/* Scroll Indicator */}
             <motion.div 
               style={{ opacity: scrollIndicatorOpacity }}
-              className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
+              className="absolute bottom-6 sm:bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none"
             >
-              <span className="text-[0.7rem] uppercase tracking-widest font-semibold opacity-60">Scroll to explore</span>
-              <div className="w-[1px] h-12 bg-current opacity-30 relative overflow-hidden">
+              <span className="text-[0.6rem] sm:text-[0.7rem] uppercase tracking-widest font-semibold opacity-60">Scroll to explore</span>
+              <div className="w-[1px] h-8 sm:h-12 bg-current opacity-30 relative overflow-hidden">
                 <motion.div 
                   className="absolute top-0 left-0 w-full h-1/2 bg-current"
                   animate={{ y: ['-100%', '200%'] }}

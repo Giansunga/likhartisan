@@ -412,6 +412,7 @@ body {
 }
 
 .zoom-card-name {
+  font-family: 'Times New Roman', serif;
   font-size: 1.15rem;
   font-weight: 700;
   text-shadow: 0 2px 5px rgba(0,0,0,0.7);

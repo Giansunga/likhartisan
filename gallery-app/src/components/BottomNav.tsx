@@ -1,10 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Grid3X3, Store, User, LogIn } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { Home, Grid3X3, Store, Palette } from 'lucide-react';
 
 export default function BottomNav() {
   const location = useLocation();
-  const { user } = useAuth();
 
   if (location.pathname.startsWith('/artisan-dashboard')) {
     return null;
@@ -19,20 +17,8 @@ export default function BottomNav() {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Gallery', path: '/gallery', icon: Grid3X3 },
     { name: 'Shops', path: '/shops', icon: Store },
-    {
-      name: 'Profile',
-      path: user ? '/dashboard' : '',
-      action: !user ? 'open-auth' : undefined,
-      icon: user ? User : LogIn,
-    },
+    { name: 'Design', path: '/freeform', icon: Palette },
   ];
-
-  const handleAction = (e: React.MouseEvent, item: (typeof navItems)[number]) => {
-    if (item.action === 'open-auth') {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' }));
-    }
-  };
 
   return (
     <nav className="bottom-nav">
@@ -42,7 +28,6 @@ export default function BottomNav() {
           <Link
             key={item.name}
             to={item.path}
-            onClick={(e) => handleAction(e, item)}
             className={`bottom-nav-item ${active ? 'bottom-nav-item--active' : ''}`}
           >
             <item.icon size={22} strokeWidth={active ? 2.5 : 1.8} />
