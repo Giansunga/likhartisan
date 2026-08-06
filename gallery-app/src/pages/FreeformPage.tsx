@@ -600,10 +600,6 @@ function applyDesign(design: {
                     </svg>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                     <button onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }} className="freeform-save-btn" style={{ width: '100%' }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                        <path d="M3 9l7-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                        <polyline points="9 22 9 12h6v10" />
-                      </svg>
                       Select a Shop
                     </button>
                   </div>
