@@ -4,6 +4,7 @@ import { addToCart } from '../data/store';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { SITE_URL } from '../config';
 import type { Product, ProductVariation, ProductReview, CartItem } from '../types';
 import type { ReactElement } from 'react';
 import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
@@ -312,7 +313,7 @@ export default function ProductDetailPage() {
           priceCurrency: 'PHP',
           price: displayPrice,
           availability: product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-          url: `https://likhartisan.ph/product/${product.id}`,
+          url: `${SITE_URL}/product/${product.id}`,
         },
         aggregateRating: productRating.count > 0 ? {
           '@type': 'AggregateRating',
