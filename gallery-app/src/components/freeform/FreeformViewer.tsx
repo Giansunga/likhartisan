@@ -1,7 +1,7 @@
 import { Suspense, useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
 /* eslint-disable react-hooks/immutability -- R3F animation code intentionally mutates Three.js objects owned by the scene. */
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls, useProgress } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
@@ -25,6 +25,19 @@ class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: Reac
     if (this.state.hasError) return this.props.fallback;
     return this.props.children;
   }
+}
+
+function LoadingIndicator() {
+  const { progress, active } = useProgress();
+  if (!active) return null;
+  return (
+    <Html center>
+      <div className="freeform-loading-container">
+        <div className="freeform-loading-spinner" />
+        <span className="freeform-loading-text">{Math.round(progress)}%</span>
+      </div>
+    </Html>
+  );
 }
 
 const FINISH_PROPS: Record<string, { roughness: number; metalness: number }> = {
@@ -590,7 +603,7 @@ export default function FreeformViewer({
         <Canvas
           key={modelFile}
           camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}
-          gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+          gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
           style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
           dpr={[1, 2]}
         >
@@ -602,7 +615,7 @@ export default function FreeformViewer({
           <spotLight position={[0, 10, 0]} intensity={1.0} angle={0.35} penumbra={0.8} color="#FFF8F0" />
           <spotLight position={[-5, 6, 5]} intensity={0.3} angle={0.5} penumbra={1} color="#FFE8D6" />
 
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingIndicator />}>
             <Scene
               key={modelFile}
               modelFile={modelFile}

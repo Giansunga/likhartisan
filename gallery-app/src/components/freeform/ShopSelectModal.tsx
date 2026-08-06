@@ -83,6 +83,21 @@ export default function ShopSelectModal({
   return (
     <div className="shop-select-overlay">
       <div className="shop-select-modal" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onSelect('', '')}
+          style={{
+            position: 'absolute', top: '16px', right: '16px', zIndex: 10,
+            width: '28px', height: '28px', borderRadius: '50%',
+            border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+          aria-label="Close"
+        >
+          &times;
+        </button>
         <div className="shop-select-header">
           <h3 className="freeform-modal-title">Select a Shop</h3>
         </div>

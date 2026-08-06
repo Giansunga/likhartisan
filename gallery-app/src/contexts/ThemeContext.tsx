@@ -59,45 +59,6 @@ export const THEMES: Record<ThemeName, Theme> = {
       border: '#F8BBD0',
     },
   },
-  'holy-week': {
-    name: 'holy-week',
-    label: 'Holy Week',
-    colors: {
-      primary: '#4A148C',
-      primaryLight: '#7B1FA2',
-      accent: '#7B1FA2',
-      bg: '#F3E5F5',
-      bgSecondary: '#EDE7F6',
-      text: '#311B92',
-      border: '#D1C4E9',
-    },
-  },
-  'mothers-day': {
-    name: 'mothers-day',
-    label: "Mother's Day",
-    colors: {
-      primary: '#AD1457',
-      primaryLight: '#E91E63',
-      accent: '#F48FB1',
-      bg: '#FCE4EC',
-      bgSecondary: '#F8BBD0',
-      text: '#880E4F',
-      border: '#F48FB1',
-    },
-  },
-  'fathers-day': {
-    name: 'fathers-day',
-    label: "Father's Day",
-    colors: {
-      primary: '#1565C0',
-      primaryLight: '#42A5F5',
-      accent: '#42A5F5',
-      bg: '#E3F2FD',
-      bgSecondary: '#BBDEFB',
-      text: '#0D47A1',
-      border: '#90CAF9',
-    },
-  },
 };
 
 function getAutoDetectTheme(): ThemeName {
@@ -107,9 +68,6 @@ function getAutoDetectTheme(): ThemeName {
 
   if (month === 12) return 'christmas';
   if (month === 2 && day <= 14) return 'valentines';
-  if ((month === 3 || month === 4) && day <= 30) return 'holy-week';
-  if (month === 5 && day <= 15) return 'mothers-day';
-  if (month === 6 && day <= 21) return 'fathers-day';
   return 'default';
 }
 

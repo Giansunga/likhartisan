@@ -177,8 +177,10 @@ export default function HomePage() {
               <div className="flex flex-row md:flex-col gap-4 md:gap-3 items-start">
                 <div className="w-[52px] h-[52px] md:w-[70px] md:h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary shrink-0">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 md:w-8 md:h-8">
-                    <path d="M4.5 16.5C4.5 16.5 6 12 12 12C18 12 19.5 16.5 19.5 16.5" strokeLinecap="round" />
-                    <path d="M12 12V3" strokeLinecap="round" /><circle cx="12" cy="7" r="4" />
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="9" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M23 21v-2a4 4 0 00-3-3.87" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M16 3.13a4 4 0 010 7.75" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
                 <div className="flex flex-col gap-2 md:gap-3">

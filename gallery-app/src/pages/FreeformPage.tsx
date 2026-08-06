@@ -11,7 +11,7 @@ import ShapeTab from '../components/freeform/ShapeTab';
 import MaterialTab from '../components/freeform/MaterialTab';
 import DecorTab from '../components/freeform/DecorTab';
 import AttachmentTab from '../components/freeform/AttachmentTab';
-import SaveTab from '../components/freeform/SaveTab';
+
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import SavedDesignsModal from '../components/freeform/SavedDesignsModal';
@@ -611,7 +611,7 @@ function applyDesign(design: {
                   <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightCm={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
                 </>}
                 {activeStep === 'review' && (
-                  <div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', paddingTop: '80px' }}>
 <div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 12px' }}>
                         <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
@@ -625,9 +625,6 @@ function applyDesign(design: {
                       </svg>
                       Save Design
 </button>
-                    <SaveTab
-                      onLoad={(d) => { applyDesign(d); setActiveStep('review'); }}
-                    />
                   </div>
                 )}
               </div>
@@ -683,17 +680,17 @@ function applyDesign(design: {
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
                   {showAttachmentSockets ? (
-                    <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>
+                    <><path d="M12 2v6M12 16v6M8 12H2M22 12h-6" /><circle cx="12" cy="12" r="3" /></>
                   ) : (
-                    <><path d="M3 3l18 18" /><path d="M10.6 6.2A11.7 11.7 0 0112 6c6.5 0 10 6 10 6a17 17 0 01-2.1 2.8M6.5 6.5C3.6 8.3 2 12 2 12s3.5 6 10 6a10.8 10.8 0 004.1-.8" /></>
+                    <><path d="M12 2v4M12 18v4M8 12H4M20 12h-4" /><circle cx="12" cy="12" r="2" strokeDasharray="2 2" /></>
                   )}
                 </svg>
                 <span className="freeform-toolbar-label">{showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}</span>
               </button>
             )}
 {[
-              { icon: 'M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', label: 'Reset View', action: handleResetView },
-              { icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM14 14l-2-2-2 2M12 12V2', label: 'Reset Design', action: () => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); } },
+              { icon: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 100 6 3 3 0 000-6z', label: 'Reset View', action: handleResetView },
+              { icon: 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15', label: 'Reset Design', action: () => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); } },
               { icon: isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3', label: 'Fullscreen', action: handleToggleFullscreen },
               { icon: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a5 5 0 100-10 5 5 0 000 10z', label: 'Screenshot', action: handleScreenshot },
             ].map((btn) => (
@@ -749,10 +746,12 @@ function applyDesign(design: {
 
               <div className="freeform-summary-row">
                 <div className="freeform-summary-row-icon">
-                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)' }}>Aa</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z" />
+                  </svg>
                 </div>
                 <div className="freeform-summary-row-info">
-                  <span className="freeform-summary-row-label">DECOR</span>
+                  <span className="freeform-summary-row-label">PATTERN</span>
                   <span className="freeform-summary-row-value">{getPattern(decorationParams.patternId)?.name || 'None'}</span>
                 </div>
               </div>
@@ -799,7 +798,8 @@ function applyDesign(design: {
               <div className="freeform-summary-row">
                 <div className="freeform-summary-row-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
-                    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="7" cy="7" r="1.5" fill="var(--text-muted)" />
                   </svg>
                 </div>
                 <div className="freeform-summary-row-info">
@@ -862,10 +862,12 @@ function applyDesign(design: {
 
             <div className="freeform-summary-field">
               <div className="freeform-summary-icon" style={{ borderStyle: 'dashed' }}>
-                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)' }}>Aa</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '20px', height: '20px' }}>
+                  <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z" />
+                </svg>
               </div>
               <div className="freeform-summary-field-text">
-                <span className="freeform-summary-field-label">Decor</span>
+                <span className="freeform-summary-field-label">Pattern</span>
                 <span className="freeform-summary-field-value">{getPattern(decorationParams.patternId)?.name || 'None'}{attachmentParams.length ? ` · ${attachmentParams.length} 3D` : ''}</span>
               </div>
             </div>
@@ -935,6 +937,21 @@ function applyDesign(design: {
       {saveModalOpen && (
         <div className="freeform-modal-overlay" onClick={() => setSaveModalOpen(false)}>
           <div className="freeform-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setSaveModalOpen(false)}
+              style={{
+                position: 'absolute', top: '16px', right: '16px',
+                width: '28px', height: '28px', borderRadius: '50%',
+                border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+              aria-label="Close"
+            >
+              &times;
+            </button>
             <div style={{ padding: '28px 28px 0' }}>
               <h3 className="freeform-modal-title">Save Your Design</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px' }}>Give your creation a name to save it.</p>
@@ -971,6 +988,21 @@ function applyDesign(design: {
       {showShopModal && (
         <div className="freeform-modal-overlay" onClick={() => setShowShopModal(false)}>
           <div className="freeform-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowShopModal(false)}
+              style={{
+                position: 'absolute', top: '16px', right: '16px',
+                width: '28px', height: '28px', borderRadius: '50%',
+                border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+              aria-label="Close"
+            >
+              &times;
+            </button>
             <div style={{ padding: '28px 28px 0' }}>
               <h3 className="freeform-modal-title">Select a Shop</h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px' }}>Choose who to send your design to</p>

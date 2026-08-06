@@ -91,19 +91,27 @@ export default function SavedDesignsModal({
   return (
     <div className="freeform-modal-overlay" onClick={onClose}>
       <div className="freeform-modal saved-designs-modal" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: '16px', right: '16px', zIndex: 10,
+            width: '28px', height: '28px', borderRadius: '50%',
+            border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
+          aria-label="Close"
+        >
+          &times;
+        </button>
         <div style={{ padding: '24px 28px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div>
-              <h3 className="freeform-modal-title">Load Saved Design</h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                {designs.length} saved design{designs.length !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <button onClick={onClose} style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 4, color: 'var(--text-muted)' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '20px', height: '20px' }}>
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 className="freeform-modal-title">Load Saved Design</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {designs.length} saved design{designs.length !== 1 ? 's' : ''}
+            </p>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>

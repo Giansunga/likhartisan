@@ -2,8 +2,8 @@ name: Keep Server Alive
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Every 10 minutes
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   ping:
@@ -11,4 +11,11 @@ jobs:
     steps:
       - name: Ping Health Endpoint
         run: |
-          curl -s https://likhartisan.onrender.com/health || echo "Ping failed"
+          response=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: GitHub-Actions-Ping" https://likhartisan.onrender.com/health)
+          echo "HTTP status: $response"
+          if [ "$response" -ne 200 ]; then
+            echo "Ping returned non-200 status, retrying in 30s..."
+            sleep 30
+            response=$(curl -s -o /dev/null -w "%{http_code}" -H "User-Agent: GitHub-Actions-Ping" https://likhartisan.onrender.com/health)
+            echo "Retry HTTP status: $response"
+          fi
