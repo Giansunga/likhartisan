@@ -14,7 +14,10 @@ import AttachmentTab from '../components/freeform/AttachmentTab';
 import SaveTab from '../components/freeform/SaveTab';
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
+import SavedDesignsModal from '../components/freeform/SavedDesignsModal';
+import { type SavedDesign } from '../hooks/useSavedDesigns';
 import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
+import { FINISHES } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import * as THREE from 'three';
@@ -36,12 +39,22 @@ const STEPS: { key: Step; label: string; sublabel: string; num: number }[] = [
 
 const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
 const DEFAULT_MATERIAL = { finish: 'raw_clay', color: '#C4A882' };
-const FINISH_LABELS: Record<string, string> = {
-  raw_clay: 'Raw Clay',
-  terra_cotta: 'Terracotta',
-  matte: 'Matte',
-  glazed: 'Glazed',
-  glossy: 'Glossy',
+function getFinishLabel(finishId: string): string {
+  return FINISHES.find((f) => f.id === finishId)?.label || finishId.replace(/_/g, ' ');
+}
+
+const COLOR_NAMES: Record<string, string> = {
+  '#C4A882': 'Terracotta', '#A0522D': 'Sienna', '#8B4513': 'Saddle Brown',
+  '#D2691E': 'Chocolate', '#CD853F': 'Peru', '#DEB887': 'Burlywood',
+  '#B8860B': 'Dark Goldenrod', '#DAA520': 'Goldenrod', '#F4A460': 'Sandy Brown',
+  '#E8C39E': 'Warm Beige', '#2E8B57': 'Sea Green', '#3CB371': 'Medium Sea Green',
+  '#66CDAA': 'Aquamarine', '#8FBC8F': 'Dark Sea Green', '#228B22': 'Forest Green',
+  '#006400': 'Dark Green', '#556B2F': 'Olive', '#6B8E23': 'Olive Drab',
+  '#4682B4': 'Steel Blue', '#5F9EA0': 'Cadet Blue', '#87CEEB': 'Sky Blue',
+  '#4169E1': 'Royal Blue', '#1E90FF': 'Dodger Blue', '#0000CD': 'Medium Blue',
+  '#8B0000': 'Dark Red', '#B22222': 'Firebrick', '#DC143C': 'Crimson',
+  '#FF6347': 'Tomato', '#FF4500': 'Orange Red', '#FF8C00': 'Dark Orange',
+  '#FFD700': 'Gold', '#FFFFFF': 'White',
 };
 
 /* ─── Component ─── */
@@ -81,6 +94,8 @@ export default function FreeformPage() {
   const [designName, setDesignName] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [savedDesignsOpen, setSavedDesignsOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -119,7 +134,7 @@ export default function FreeformPage() {
     }
   }
 
-  function applyDesign(design: {
+function applyDesign(design: {
     model_file: string;
     model_id?: string | null;
     model_name: string;
@@ -139,9 +154,50 @@ export default function FreeformPage() {
     setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
     setAttachmentSockets([]);
     setAttachmentPlacementLimits({});
+    setHasUnsavedChanges(false);
     if (design.shop_id) {
       setSelectedShopId(design.shop_id);
       setSelectedShopName(design.shop_name || '');
+    }
+  }
+
+  async function handleLoadSavedDesign(design: SavedDesign) {
+    if (selectedShopId && design.shop_id && design.shop_id !== selectedShopId) {
+      const ok = confirm(`Switch Shop?\n\nThis design was created for ${design.shops?.name || 'another shop'}.\nLoading it will switch your current shop and replace the current design.`);
+      if (!ok) return;
+    }
+
+    if (hasUnsavedChanges && selectedModel) {
+      const ok = confirm(`Replace Current Design?\n\nYour current changes have not been saved.\nLoading another design will replace them.`);
+      if (!ok) return;
+    }
+
+    try {
+      if (design.shops?.name) {
+        setSelectedShopId(design.shop_id);
+        setSelectedShopName(design.shops.name);
+      }
+
+      setSelectedModel(design.model_file);
+      setSelectedModelId(design.model_id || null);
+      setModelName(design.model_name);
+      setModelCategory(design.models_3d?.category || 'Vase');
+      setModelThumbnail(design.models_3d?.thumbnail || design.thumbnail || '');
+
+      setShapeParams(design.shape_params || DEFAULT_SHAPE);
+      setMaterialParams(design.material_params || DEFAULT_MATERIAL);
+      setDecorationParams(design.decor_params || DEFAULT_DECORATION);
+      setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
+      setAttachmentSockets([]);
+      setAttachmentPlacementLimits({});
+      setHasUnsavedChanges(false);
+
+      setActiveStep('review');
+      setSavedDesignsOpen(false);
+
+      toast.success(`Loaded "${design.name}"`);
+    } catch {
+      toast.error('Could load this design.');
     }
   }
 
@@ -219,16 +275,16 @@ export default function FreeformPage() {
         return;
       }
 
-      // Default: open shop selection modal only once per mount
-      if (!shopModalShownRef.current) {
-        shopModalShownRef.current = true;
-        setShopSelectOpen(true);
-      }
+      // Default: do nothing — user sees empty state with Start/Load buttons
     }
 
     bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (selectedModel) setHasUnsavedChanges(true);
+  }, [selectedModel, shapeParams, materialParams, decorationParams, attachmentParams]);
 
   /* ─── Viewport controls ─── */
 
@@ -268,28 +324,6 @@ export default function FreeformPage() {
     link.download = `likhartisan-design-${Date.now()}.png`;
     link.href = url;
     link.click();
-  }
-
-  async function handleShare() {
-    if (!selectedModel) {
-      toast.error('Select a model before sharing.');
-      return;
-    }
-    const url = captureScreenshot();
-    if (!url) return;
-
-    const title = modelName ? `${modelName} — LikhArtisan Design` : 'My LikhArtisan Design';
-    try {
-      const blob = await (await fetch(url)).blob();
-      const file = new File([blob], 'likhartisan-design.png', { type: 'image/png' });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title, text: 'Check out my custom pottery design!', files: [file] });
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    handleScreenshot();
   }
 
   /* ─── Save design ─── */
@@ -358,6 +392,18 @@ export default function FreeformPage() {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
     }
+
+    // Default to the design's associated shop if available
+    if (selectedShopId) {
+      const { data: shop } = await supabase.from('shops').select('*').eq('id', selectedShopId).maybeSingle();
+      if (shop) {
+        setShops([shop]);
+        setSelectedShop(shop.id);
+        setShowShopModal(true);
+        return;
+      }
+    }
+
     const { data } = await supabase.from('shops').select('*').order('created_at', { ascending: false });
     if (data && data.length > 0) {
       setShops(data);
@@ -516,12 +562,7 @@ export default function FreeformPage() {
             );
           })}
         </div>
-        <button onClick={() => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); }} className="freeform-reset-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-            <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" /><path d="M3 3v5h5" />
-          </svg>
-          Reset Design
-        </button>
+        
       </div>
 
       {/* ── MAIN ── */}
@@ -534,13 +575,39 @@ export default function FreeformPage() {
               <div className="freeform-sidebar-header">
                 <h2 className="freeform-sidebar-title">Customization</h2>
               </div>
+              {selectedShopId && (
+                <button
+                  onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }}
+                  className="freeform-load-saved-btn"
+                >
+                  Switch Shop
+                </button>
+              )}
+              <button onClick={() => setSavedDesignsOpen(true)} className="freeform-load-saved-btn">
+                Load Saved Design
+              </button>
             </div>
 
             <div className="freeform-sidebar-scroll">
               <div className="freeform-tab-section">
-                {activeStep === 'model' && selectedShopId && (
+{activeStep === 'model' && (selectedShopId ? (
                   <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id) => selectModel(f, n, c, t, id)} />
-                )}
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 12px', opacity: 0.5 }}>
+                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      <polyline points="9 22 9 12h6v10" />
+                    </svg>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
+                    <button onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }} className="freeform-save-btn" style={{ width: '100%' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                        <path d="M3 9l7-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                        <polyline points="9 22 9 12h6v10" />
+                      </svg>
+                      Select a Shop
+                    </button>
+                  </div>
+                ))}
                 {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <>
@@ -549,14 +616,19 @@ export default function FreeformPage() {
                 </>}
                 {activeStep === 'review' && (
                   <div>
-                    <div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
+<div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 12px' }}>
                         <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                       </svg>
                       <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>Design Complete</p>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or send to a shop.</p>
                     </div>
-                    {attachmentParams.length > 0 && <div className="attachment-review-list"><div className="decor-field-label">Generated attachments</div>{attachmentParams.map((attachment) => <div key={attachment.id}><span>{attachment.name}{attachment.placements.length === 2 ? ' × 2' : ''}</span><small>{attachment.placements.map((placement) => placement.socket.name).join(' + ')} · ₱{attachmentTotals([attachment]).price.toLocaleString()}</small></div>)}</div>}
+                    <button onClick={openSaveModal} className="freeform-save-btn" style={{ width: '100%', marginBottom: '16px' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      Save Design
+</button>
                     <SaveTab
                       onLoad={(d) => { applyDesign(d); setActiveStep('review'); }}
                     />
@@ -623,11 +695,11 @@ export default function FreeformPage() {
                 <span className="freeform-toolbar-label">{showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}</span>
               </button>
             )}
-            {[
+{[
               { icon: 'M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', label: 'Reset View', action: handleResetView },
+              { icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM14 14l-2-2-2 2M12 12V2', label: 'Reset Design', action: () => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); } },
               { icon: isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3', label: 'Fullscreen', action: handleToggleFullscreen },
               { icon: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a5 5 0 100-10 5 5 0 000 10z', label: 'Screenshot', action: handleScreenshot },
-              { icon: 'M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13', label: 'Share', action: handleShare },
             ].map((btn) => (
               <button key={btn.label} onClick={btn.action} title={btn.label} className="freeform-toolbar-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
@@ -638,6 +710,130 @@ export default function FreeformPage() {
             ))}
           </div>
         </div>
+
+{/* ── RIGHT SUMMARY PANEL ── */}
+        <div className="freeform-summary-panel">
+          <div className="freeform-summary-panel-inner">
+            <div className="freeform-summary-header">
+              <h2 className="freeform-summary-title">Design Summary</h2>
+            </div>
+
+            <div className="freeform-summary-content">
+              <div className="freeform-summary-row">
+                <div className="freeform-model-thumb">
+                  <ModelThumb thumbnail={modelThumbnail} size={42} />
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-value">{modelName || 'No Model'}</span>
+                  <span className="freeform-summary-row-label">{selectedShopName || modelCategory}</span>
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">FINISH</span>
+                  <span className="freeform-summary-row-value">{getFinishLabel(materialParams.finish)}</span>
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <div className="freeform-summary-row-swatch" style={{ background: materialParams.color }} />
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">COLOR</span>
+                  <span className="freeform-summary-row-value">{materialParams.color.toUpperCase()}{COLOR_NAMES[materialParams.color.toUpperCase()] ? ` · ${COLOR_NAMES[materialParams.color.toUpperCase()]}` : ''}</span>
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)' }}>Aa</span>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">DECOR</span>
+                  <span className="freeform-summary-row-value">{getPattern(decorationParams.patternId)?.name || 'None'}</span>
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 5m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">ATTACHMENTS</span>
+                  {attachmentParams.length === 0 ? (
+                    <span className="freeform-summary-row-value">None</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {attachmentParams.map((a) => (
+                        <div key={a.id} style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', lineHeight: '1.35' }}>
+                          {a.name}{a.placements.length === 2 ? ` \u00d7 2` : ''}
+                          <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>
+                            {' '}&mdash;{' '}{a.placements.map((p) => p.socket.name).join(' + ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <path d="M21 3H3v18h18V3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+                  </svg>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">DIMENSIONS</span>
+                  <span className="freeform-summary-row-value">H {shapeParams.height}cm &middot; W {shapeParams.bodyWidth}cm</span>
+                </div>
+              </div>
+</div>
+
+            <div className="freeform-summary-footer">
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                  </svg>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">EST. PRICE</span>
+                  <span className="freeform-price-total">&#8369;{estimatedPrice.toLocaleString()}.00</span>
+                </div>
+              </div>
+
+              <div className="freeform-summary-row">
+                <div className="freeform-summary-row-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '18px', height: '18px' }}>
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div className="freeform-summary-row-info">
+                  <span className="freeform-summary-row-label">EST. PRODUCTION</span>
+                  <span className="freeform-summary-row-value">{estimatedDays} Days</span>
+                </div>
+              </div>
+
+              <button onClick={handleCheckout} className="freeform-summary-send-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
+                </svg>
+                Send to Shop
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* ── BOTTOM SUMMARY BAR ── */}
@@ -662,7 +858,7 @@ export default function FreeformPage() {
               <div className="freeform-summary-swatch" style={{ background: materialParams.color }} />
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Material</span>
-                <span className="freeform-summary-field-value" style={{ textTransform: 'capitalize' }}>{FINISH_LABELS[materialParams.finish]}</span>
+                <span className="freeform-summary-field-value" style={{ textTransform: 'capitalize' }}>{getFinishLabel(materialParams.finish)}</span>
               </div>
             </div>
 
@@ -722,16 +918,11 @@ export default function FreeformPage() {
           </div>
 
           <div className="freeform-summary-actions">
-            <button onClick={openSaveModal} className="freeform-summary-save">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
-              </svg>
-              Save Design
-            </button>
-            <button onClick={handleCheckout} className="freeform-summary-action" title="Send to Shop">
+            <button onClick={handleCheckout} className="freeform-summary-save" title="Send to Shop">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
                 <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
               </svg>
+              Send to Shop
             </button>
           </div>
         </div>
@@ -841,6 +1032,12 @@ export default function FreeformPage() {
           setSelectedShopName(name);
           setShopSelectOpen(false);
         }}
+      />
+      <SavedDesignsModal
+        open={savedDesignsOpen}
+        currentShopId={selectedShopId}
+        onClose={() => setSavedDesignsOpen(false)}
+        onLoad={handleLoadSavedDesign}
       />
     </div>
   );

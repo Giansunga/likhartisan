@@ -5,6 +5,8 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
@@ -49,6 +51,16 @@ if (FRONTEND_URL.includes('localhost') || FRONTEND_URL.includes('127.0.0.1')) {
 }
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+const WARN_MISSING_R2 = '[WARN] Missing R2 env var';
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
 
 // Rate limiters
 const apiLimiter = rateLimit({
@@ -119,6 +131,28 @@ app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
 
 // Upload routes (presigned URLs for R2)
 app.use('/api/upload', createUploadRouter({ verifyAuth, requireSuperAdmin }));
+
+// ── Presigned upload for design GLB exports ──────────────────────────────────
+app.post('/api/designs/upload-model', apiLimiter, async (req, res) => {
+  try {
+    const userId = await verifyAuth(req, res);
+    if (!userId) return;
+
+    const key = `designs/${userId}/${Date.now()}_${crypto.randomBytes(4).toString('hex')}.glb`;
+    const command = new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: key,
+      ContentType: 'model/gltf-binary',
+    });
+    const presignedUrl = await getSignedUrl(r2, command, { expiresIn: 120 });
+    const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
+
+    res.json({ presignedUrl, publicUrl, key });
+  } catch (error) {
+    console.error('Design upload presign error:', error);
+    res.status(500).json({ error: 'Failed to generate upload URL' });
+  }
+});
 
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
