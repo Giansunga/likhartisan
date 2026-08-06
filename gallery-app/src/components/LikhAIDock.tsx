@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { API_BASE } from '../lib/api';
 import ChatOrderCard from './chat/ChatOrderCard';
 import ChatProductCard from './chat/ChatProductCard';
@@ -29,6 +30,8 @@ export default function LikhAIDock() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { currentTheme } = useTheme();
+  const isChristmasTheme = currentTheme === 'christmas';
 
   useEffect(() => {
     if (user?.id) setUserId(user.id);
@@ -227,15 +230,20 @@ export default function LikhAIDock() {
 
       {/* Launcher Button */}
       {!open && (
-        <button className="likhai-dock-launcher" onClick={() => setOpen(true)}>
-          <div className="likhai-dock-launcher-icon">
-            <img src="/images/likhai-logo.png" alt="LikhAI" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </div>
-          <div className="likhai-dock-launcher-text">
-            <span className="likhai-dock-launcher-label">LikhAI</span>
-            <span className="likhai-dock-launcher-sub">Customer Support</span>
-          </div>
-        </button>
+        <div className="likhai-launcher-wrapper">
+          <button className="likhai-dock-launcher" onClick={() => setOpen(true)} style={isChristmasTheme ? { background: 'linear-gradient(135deg, #b91c1c, #8f1515)', boxShadow: '0 4px 20px rgba(143, 21, 21, 0.28)' } : undefined}>
+            <div className="likhai-dock-launcher-icon">
+              <img src="/images/likhai-logo.png" alt="LikhAI" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <div className="likhai-dock-launcher-text">
+              <span className="likhai-dock-launcher-label">LikhAI</span>
+              <span className="likhai-dock-launcher-sub">Customer Support</span>
+            </div>
+          </button>
+          {isChristmasTheme && (
+            <img src="/assets/themes/christmas/christmas-holly.png" alt="" className="likhai-holly-decal" draggable={false} />
+          )}
+        </div>
       )}
 
       <style>{`
@@ -248,11 +256,25 @@ export default function LikhAIDock() {
           30% { transform: translateY(-3px); opacity: 1; }
         }
 
-        .likhai-dock-launcher {
+        .likhai-launcher-wrapper {
           position: fixed;
           bottom: 20px;
           right: 20px;
           z-index: 9999;
+        }
+        .likhai-holly-decal {
+          position: absolute;
+          top: -10px;
+          right: -6px;
+          width: 22px;
+          height: 22px;
+          object-fit: contain;
+          pointer-events: none;
+          user-select: none;
+          z-index: 1;
+        }
+
+        .likhai-dock-launcher {
           display: flex;
           align-items: center;
           gap: 6px;
@@ -491,7 +513,7 @@ export default function LikhAIDock() {
         }
 
         @media (max-width: 768px) {
-          .likhai-dock-launcher {
+          .likhai-launcher-wrapper {
             bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
             right: 16px;
           }
