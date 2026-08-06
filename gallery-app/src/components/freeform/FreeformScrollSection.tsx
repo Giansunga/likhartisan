@@ -6,11 +6,7 @@ import type { DecorationParams } from './decor';
 
 const FreeformViewer = lazy(() => import('./FreeformViewer'));
 
-interface FreeformScrollSectionProps {
-  isMobile: boolean;
-}
-
-export default function FreeformScrollSection({ isMobile }: FreeformScrollSectionProps) {
+export default function FreeformScrollSection() {
   const navigate = useNavigate();
   
   // Freeform preview state

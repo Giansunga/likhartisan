@@ -294,7 +294,7 @@ export default function HomePage() {
       </section>
 
       {/* ── FREEFORM POTTERY DESIGNER ── */}
-      <FreeformScrollSection isMobile={isMobile} />
+      <FreeformScrollSection />
 
       {/* ── THOMASIAN ARTISANS CAROUSEL ── */}
       <section className="py-16 bg-[var(--bg-primary)] overflow-hidden">
