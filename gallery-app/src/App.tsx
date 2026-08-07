@@ -31,6 +31,7 @@ const FreeformPage = lazy(() => import('./pages/FreeformPage'));
 const ArtisanDashboardPage = lazy(() => import('./pages/artisan/ArtisanDashboardPage'));
 
 // Admin lazy pages
+const AdminOrdersPage = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const ProductListPage = lazy(() => import('./pages/admin/ProductListPage'));
 const ProductCreatePage = lazy(() => import('./pages/admin/ProductCreatePage'));
@@ -113,6 +114,7 @@ function AppShell() {
           <Route path="update-password" element={<UpdatePasswordPage />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
+            <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="products" element={<ProductListPage />} />
             <Route path="products/create" element={<ProductCreatePage />} />
             <Route path="roles" element={<RoleAssignationPage />} />

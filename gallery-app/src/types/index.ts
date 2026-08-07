@@ -72,14 +72,76 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface OrderItem {
+  product_id: string;
+  product_name: string;
+  qty: number;
+  price: number;
+  image?: string;
+  shop_id?: string;
+  shop_name?: string;
+  variation_id?: string;
+  variation?: string;
+}
+
 export interface Order {
   id: string;
-  customerId: string;
-  customerName: string;
-  items: { productId: string; productName: string; qty: number; price: number }[];
+  user_id?: string;
+  user_name: string;
+  user_phone?: string;
+  user_address?: string;
+  email?: string;
+  buyer_email?: string;
+  items: OrderItem[];
+  subtotal: number;
+  shipping_fee: number;
   total: number;
-  status: 'pending' | 'completed' | 'cancelled';
-  createdAt: string;
+  delivery_option?: string;
+  delivery_status: string;
+  status: string;
+  payment_reference?: string;
+  checkout_session_id?: string;
+  payment_status?: string;
+  payment_proof_url?: string;
+  payment_verified_at?: string;
+  payment_verified_by?: string;
+  lalamove_quote_id?: string;
+  delivery_provider?: string;
+  tracking_number?: string;
+  estimated_delivery?: string;
+  delivery_notes?: string;
+  customer_notes?: string;
+  seller_notes?: string;
+  order_type?: string;
+  cancel_reason?: string;
+  cancelled_by?: string;
+  cancellation_approved?: boolean;
+  cancellation_reviewed_by?: string;
+  refund_status?: string;
+  refund_amount?: number;
+  is_problematic?: boolean;
+  problem_type?: string;
+  problem_notes?: string;
+  problem_resolution?: string;
+  flagged_for_investigation?: boolean;
+  created_at: string;
+}
+
+export interface OrderActivityLog {
+  id: string;
+  order_id: string;
+  previous_status?: string;
+  new_status?: string;
+  previous_payment_status?: string;
+  new_payment_status?: string;
+  previous_delivery_status?: string;
+  new_delivery_status?: string;
+  action_type: string;
+  actor_id?: string;
+  actor_name?: string;
+  actor_role?: string;
+  reason?: string;
+  created_at: string;
 }
 
 export interface CartItem {
