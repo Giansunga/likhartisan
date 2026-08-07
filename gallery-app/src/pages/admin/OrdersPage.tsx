@@ -31,18 +31,6 @@ function formatShortDate(d: string) {
 function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
-function timeAgo(d: string) {
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'Just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const days = Math.floor(h / 24);
-  if (days < 7) return `${days}d ago`;
-  return formatShortDate(d);
-}
-
 const PAYMENT_STATUS_OPTIONS = ['pending', 'paid', 'failed', 'refunded'] as const;
 const ORDER_STATUS_OPTIONS = ['pending', 'paid', 'completed', 'cancelled', 'refunded'] as const;
 const DELIVERY_STATUS_OPTIONS = ['pending', 'preparing', 'shipped', 'delivered', 'completed'] as const;
@@ -132,7 +120,7 @@ export default function OrdersPage() {
   const [sellerNotes, setSellerNotes] = useState('');
   const [buyerNotes, setBuyerNotes] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
-  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [, setStatusUpdating] = useState(false);
 
   // confirm dialogs
   const [confirm, setConfirm] = useState<{ open: boolean; title: string; message: string; confirmLabel?: string; confirmDanger?: boolean; action: () => void } | null>(null);
@@ -145,10 +133,6 @@ export default function OrdersPage() {
   const [refundModal, setRefundModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
-
-  // cancellation
-  const [cancelModal, setCancelModal] = useState<{ open: boolean; order: Order | null; action: 'approve' | 'reject' }>({ open: false, order: null, action: 'approve' });
-  const [cancelNote, setCancelNote] = useState('');
 
   // problem/dispute
   const [problemModal, setProblemModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
@@ -463,12 +447,6 @@ export default function OrdersPage() {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, flagged_for_investigation: newVal } : o));
     if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, flagged_for_investigation: newVal } : prev);
     showToast(newVal ? 'Order flagged for investigation' : 'Investigation flag removed', 'success');
-  }
-
-  /* ── save seller notes (quick) ── */
-  async function saveSellerNotes(orderId: string, notes: string) {
-    await supabase.from('orders').update({ seller_notes: notes }).eq('id', orderId);
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, seller_notes: notes } : o));
   }
 
   /* ── load activity logs for selected order ── */

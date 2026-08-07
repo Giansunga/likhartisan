@@ -24,12 +24,6 @@ const DATE_RANGE_OPTIONS: { key: DateRangeKey; label: string }[] = [
   { key: 'all', label: 'All Time' },
 ];
 
-const REVENUE_PERIOD_OPTIONS: { key: RevenuePeriod; label: string }[] = [
-  { key: 'monthly', label: 'Monthly' },
-  { key: 'quarterly', label: 'Quarterly' },
-  { key: 'yearly', label: 'Yearly' },
-];
-
 function isPaidOrder(o: any) {
   return o.payment_status === 'paid' || o.status === 'paid' || o.status === 'completed';
 }
@@ -40,7 +34,6 @@ function monthKeyOf(d: Date) {
 
 function getDateRange(range: DateRangeKey): { start: Date | null; end: Date | null; label: string } {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   switch (range) {
     case 'this_month':
       return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 1), label: `${MONTH_SHORT[now.getMonth()]} ${now.getFullYear()}` };
@@ -152,13 +145,12 @@ export default function DashboardPage() {
   const [ordersTrend, setOrdersTrend] = useState(0);
   const [productsTrend, setProductsTrend] = useState(0);
   const [shopsTrend, setShopsTrend] = useState(0);
-  const [periodLabel, setPeriodLabel] = useState('');
   const [prevPeriodLabel, setPrevPeriodLabel] = useState('');
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [allShops, setAllShops] = useState<any[]>([]);
 
-  const { start, end, label: rangeLabel } = useMemo(() => getDateRange(dateRange), [dateRange]);
+  const { start, end } = useMemo(() => getDateRange(dateRange), [dateRange]);
 
   const filteredOrders = useMemo(() => allOrders.filter((o: any) => inRange(o.created_at, start, end)), [allOrders, start, end]);
   const filteredProducts = useMemo(() => allProducts.filter((p: any) => inRange(p.created_at, start, end)), [allProducts, start, end]);
@@ -292,7 +284,6 @@ export default function DashboardPage() {
     setOrdersTrend(pct(curOrders, prevOrders));
     setProductsTrend(pct(curProducts, prevProducts));
     setShopsTrend(pct(curShops, prevShops));
-    setPeriodLabel(`${MONTH_SHORT[currentStart.getMonth()]} ${currentEnd.getFullYear()}`);
     setPrevPeriodLabel(`${MONTH_SHORT[prevStart.getMonth()]} ${prevStart.getFullYear()}`);
   }
 

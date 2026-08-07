@@ -59,6 +59,45 @@ export const THEMES: Record<ThemeName, Theme> = {
       border: '#F8BBD0',
     },
   },
+  'holy-week': {
+    name: 'holy-week',
+    label: 'Holy Week',
+    colors: {
+      primary: '#6D4C41',
+      primaryLight: '#8D6E63',
+      accent: '#A1887F',
+      bg: '#EFEBE9',
+      bgSecondary: '#D7CCC8',
+      text: '#3E2723',
+      border: '#BCAAA4',
+    },
+  },
+  'mothers-day': {
+    name: 'mothers-day',
+    label: "Mother's Day",
+    colors: {
+      primary: '#C2185B',
+      primaryLight: '#E91E63',
+      accent: '#F06292',
+      bg: '#FCE4EC',
+      bgSecondary: '#F8BBD0',
+      text: '#880E4F',
+      border: '#F48FB1',
+    },
+  },
+  'fathers-day': {
+    name: 'fathers-day',
+    label: "Father's Day",
+    colors: {
+      primary: '#1565C0',
+      primaryLight: '#1E88E5',
+      accent: '#42A5F5',
+      bg: '#E3F2FD',
+      bgSecondary: '#BBDEFB',
+      text: '#0D47A1',
+      border: '#90CAF9',
+    },
+  },
 };
 
 function getAutoDetectTheme(): ThemeName {
