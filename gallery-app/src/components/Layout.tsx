@@ -43,7 +43,7 @@ export default function Layout() {
 
   return (
     <LayoutErrorBoundary>
-      <div className="min-h-screen bg-cream">
+      <div className="seasonal-storefront-shell min-h-screen bg-cream">
         <a href="#main-content" style={{
           position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden',
         }} onFocus={(e) => {

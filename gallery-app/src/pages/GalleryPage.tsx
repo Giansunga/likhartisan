@@ -18,12 +18,12 @@ import {
 const PAGE_SIZE = 24;
 
 const categories = [
-  { name: 'All Crafts', bg: '/images/pottery-collage.png', christmasBg: '/images/christmas-all-crafts.webp' },
-  { name: 'Vases', bg: '/images/vases_collection.png', christmasBg: '/images/christmas-vases.webp' },
-  { name: 'Planters', bg: '/images/planters_collection.png', christmasBg: '/images/christmas-planters.webp' },
-  { name: 'Jars', bg: '/images/jars_collection.png', christmasBg: '/images/christmas-jars.webp' },
-  { name: 'Amphoras', bg: '/images/amphoras_collection.png', christmasBg: '/images/christmas-amphoras.webp' },
-  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png', christmasBg: '/images/christmas-tealights.webp' },
+  { name: 'All Crafts', bg: '/images/pottery-collage.png', christmasBg: '/images/christmas-all-crafts.webp', valentinesBg: '/images/valentines-all-crafts.webp' },
+  { name: 'Vases', bg: '/images/vases_collection.png', christmasBg: '/images/christmas-vases.webp', valentinesBg: '/images/valentines-vases.webp' },
+  { name: 'Planters', bg: '/images/planters_collection.png', christmasBg: '/images/christmas-planters.webp', valentinesBg: '/images/valentines-planters.webp' },
+  { name: 'Jars', bg: '/images/jars_collection.png', christmasBg: '/images/christmas-jars.webp', valentinesBg: '/images/valentines-jars.webp' },
+  { name: 'Amphoras', bg: '/images/amphoras_collection.png', christmasBg: '/images/christmas-amphoras.webp', valentinesBg: '/images/valentines-amphoras.webp' },
+  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png', christmasBg: '/images/christmas-tealights.webp', valentinesBg: '/images/valentines-tealights.webp' },
 ];
 
 export default function GalleryPage() {
@@ -58,6 +58,7 @@ export default function GalleryPage() {
   const { user, loading: authLoading } = useAuth();
   const loggedIn = !!user;
   const isChristmasTheme = currentTheme === 'christmas';
+  const isValentinesTheme = currentTheme === 'valentines';
 
   useEffect(() => {
     const cat = searchParams.get('category');
@@ -342,7 +343,7 @@ export default function GalleryPage() {
                   className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
                   <div
                     className="zoom-card-bg"
-                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : cat.bg})` }}
+                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : isValentinesTheme ? cat.valentinesBg : cat.bg})` }}
                   />
                   <div className="zoom-card-overlay" />
                   <div className="zoom-card-content">

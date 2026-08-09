@@ -7,10 +7,11 @@ interface GalleryHeroProps {
 }
 
 export default function GalleryHero({ currentTheme, isMobile }: GalleryHeroProps) {
-  const isChristmasTheme = currentTheme === 'christmas';
-  const backgroundImage = isChristmasTheme
+  const backgroundImage = currentTheme === 'christmas'
     ? '/images/christmas-gallery-hero.webp'
-    : '/images/hero_1.jpg';
+    : currentTheme === 'valentines'
+      ? '/images/valentines-gallery-hero.webp'
+      : '/images/hero_1.jpg';
 
   return (
     <header

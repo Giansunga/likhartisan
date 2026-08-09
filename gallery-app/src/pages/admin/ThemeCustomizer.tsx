@@ -3,7 +3,7 @@ import { useTheme, THEMES, type ThemeName } from '../../contexts/ThemeContext';
 const THEME_DESCRIPTIONS: Record<ThemeName, string> = {
   default: 'The classic LikhArtisan earthy tones',
   christmas: 'Festive reds and greens for the holiday season',
-  valentines: 'Romantic reds and pinks for love season',
+  valentines: 'Burgundy, blush, and candlelit pottery for love season',
 };
 
 export default function ThemeCustomizer() {

@@ -77,26 +77,28 @@ html.theme-christmas {
   --color-brown-light: #A07763 !important;
 }
 html.theme-valentines {
-  --primary-color: #D32F2F !important;
-  --primary-light: #EF5350 !important;
-  --accent-color: #E91E63 !important;
-  --bg-primary: #FFF0F3 !important;
-  --bg-secondary: #FCE4EC !important;
-  --bg-tertiary: #F8BBD0 !important;
-  --text-dark: #880E4F !important;
-  --text-muted: #AD1457 !important;
-  --text-light: #F48FB1 !important;
-  --color-primary: #D32F2F !important;
-  --color-primary-light: #EF5350 !important;
-  --color-accent: #E91E63 !important;
-  --color-accent-light: #F48FB1 !important;
-  --color-cream: #FFF0F3 !important;
-  --color-cream-secondary: #FCE4EC !important;
-  --color-cream-tertiary: #F8BBD0 !important;
-  --color-cream-light: #FFF0F3 !important;
-  --color-brown-dark: #880E4F !important;
-  --color-brown-medium: #AD1457 !important;
-  --color-brown-light: #F48FB1 !important;
+  --primary-color: #9E1B32 !important;
+  --primary-light: #C43F5A !important;
+  --accent-color: #B58A52 !important;
+  --bg-primary: #FFF7F6 !important;
+  --bg-secondary: #F8E8E9 !important;
+  --bg-tertiary: #E8C8CA !important;
+  --text-dark: #3B2025 !important;
+  --text-muted: #745057 !important;
+  --text-light: #A97882 !important;
+  --valentine-ivory: #FFFCFA;
+  --valentine-rose-gold: #B58A52;
+  --color-primary: #9E1B32 !important;
+  --color-primary-light: #C43F5A !important;
+  --color-accent: #B58A52 !important;
+  --color-accent-light: #D0AA79 !important;
+  --color-cream: #FFF7F6 !important;
+  --color-cream-secondary: #F8E8E9 !important;
+  --color-cream-tertiary: #E8C8CA !important;
+  --color-cream-light: #FFFCFA !important;
+  --color-brown-dark: #3B2025 !important;
+  --color-brown-medium: #745057 !important;
+  --color-brown-light: #A97882 !important;
 }
 
 html.theme-christmas body {
@@ -105,10 +107,53 @@ html.theme-christmas body {
 
 html.theme-christmas #main-navbar {
   background-color: rgba(255, 250, 242, 0.96) !important;
-  background-image: url('/images/christmas-gallery-pattern.webp');
-  background-position: center 47%;
-  background-size: 1550px auto;
+  background-image: none;
   border-bottom-color: rgba(184, 135, 45, 0.24);
+}
+
+#main-navbar .logo {
+  position: relative;
+}
+
+.christmas-logo-hat {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  width: 48px;
+  height: auto;
+  left: 0;
+  top: 50%;
+  transform: translateY(-39px) rotate(-5deg);
+  pointer-events: none;
+}
+
+html.theme-christmas #main-navbar .christmas-logo-hat {
+  display: block;
+}
+
+.christmas-navbar-snowflakes {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  html.theme-christmas #main-navbar .christmas-navbar-snowflakes {
+    display: block;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    color: #D19532;
+  }
+
+  .christmas-navbar-snowflakes span {
+    position: absolute;
+    line-height: 1;
+    opacity: 0.82;
+  }
+
+  .christmas-navbar-snowflakes span:nth-child(1) { left: 40px; top: 12px; font-size: 22px; }
+  .christmas-navbar-snowflakes span:nth-child(2) { left: 104px; bottom: 12px; font-size: 14px; }
+  .christmas-navbar-snowflakes span:nth-child(3) { right: 104px; bottom: 12px; font-size: 14px; }
+  .christmas-navbar-snowflakes span:nth-child(4) { right: 40px; top: 12px; font-size: 22px; }
 }
 
 html.theme-christmas .gallery-page {
@@ -117,6 +162,19 @@ html.theme-christmas .gallery-page {
   background-position: top center;
   background-size: 1920px auto;
   background-repeat: repeat-y;
+}
+
+html.theme-christmas .seasonal-pattern-page {
+  min-height: 100vh;
+  background-color: #fffaf2;
+  background-image: url('/images/christmas-gallery-pattern.webp');
+  background-position: top center;
+  background-size: 1920px auto;
+  background-repeat: repeat-y;
+}
+
+html.theme-christmas .seasonal-pattern-page > section {
+  background-color: transparent !important;
 }
 
 html.theme-christmas .gallery-page > section {
@@ -269,7 +327,8 @@ html.theme-christmas .modal-box {
 }
 
 @media (max-width: 768px) {
-  html.theme-christmas .gallery-page {
+  html.theme-christmas .gallery-page,
+  html.theme-christmas .seasonal-pattern-page {
     background-size: 1120px auto;
   }
 
@@ -283,6 +342,216 @@ html.theme-christmas .modal-box {
 
   html.theme-christmas .control-bar {
     padding: 0;
+  }
+
+  .christmas-logo-hat {
+    width: 31px;
+    left: -1px;
+    transform: translateY(-29px) rotate(-5deg);
+  }
+
+}
+
+html.theme-christmas .seasonal-storefront-shell,
+html.theme-valentines .seasonal-storefront-shell {
+  background-color: transparent !important;
+}
+
+html.theme-christmas .layout-main {
+  background-color: #fffaf2;
+  background-image: url('/images/christmas-gallery-pattern.webp');
+  background-position: top center;
+  background-size: 1920px auto;
+  background-repeat: repeat-y;
+}
+
+html.theme-valentines body {
+  background-color: #fff7f6;
+}
+
+html.theme-valentines .layout-main,
+html.theme-valentines .gallery-page,
+html.theme-valentines .seasonal-pattern-page {
+  background-color: #fff7f6;
+  background-image: url('/images/valentines-gallery-pattern.webp');
+  background-position: top center;
+  background-size: 1920px auto;
+  background-repeat: repeat-y;
+}
+
+html.theme-valentines .gallery-page > section,
+html.theme-valentines .seasonal-pattern-page > section {
+  background-color: transparent !important;
+}
+
+html.theme-valentines #main-navbar {
+  background-color: rgba(255, 247, 246, 0.96) !important;
+  background-image: none;
+  border-bottom-color: rgba(181, 138, 82, 0.25);
+}
+
+html.theme-valentines #main-footer {
+  background-color: #641526;
+  background-image:
+    linear-gradient(rgba(100, 21, 38, 0.94), rgba(65, 19, 28, 0.97)),
+    url('/images/valentines-gallery-pattern.webp');
+  background-position: center;
+  background-size: cover;
+}
+
+html.theme-valentines .gallery-header-banner {
+  height: 320px;
+}
+
+html.theme-valentines .gallery-banner-bg {
+  background-position: center 53%;
+  filter: saturate(1.02) contrast(1.02) brightness(0.86);
+  transform: none;
+}
+
+html.theme-valentines .gallery-banner-overlay {
+  background: linear-gradient(90deg, rgba(38, 13, 20, 0.7) 0%, rgba(48, 18, 26, 0.52) 42%, rgba(48, 18, 26, 0.08) 73%);
+}
+
+html.theme-valentines .gallery-banner-content .breadcrumbs .current,
+html.theme-valentines .gallery-title {
+  color: var(--valentine-ivory);
+}
+
+html.theme-valentines .gallery-title {
+  max-width: 780px;
+  text-shadow: 0 3px 18px rgba(38, 13, 20, 0.56);
+}
+
+html.theme-valentines .category-zoom-card {
+  height: 165px;
+  border-color: rgba(181, 138, 82, 0.2);
+  border-radius: 7px;
+  background: var(--valentine-ivory);
+  box-shadow: 0 6px 18px rgba(89, 35, 48, 0.12);
+}
+
+html.theme-valentines .category-zoom-card .zoom-card-overlay {
+  background: linear-gradient(180deg, transparent 46%, rgba(43, 15, 23, 0.74) 100%);
+}
+
+html.theme-valentines .category-zoom-card.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 12px 30px rgba(158, 27, 50, 0.2);
+}
+
+html.theme-valentines .category-zoom-card.active .zoom-card-overlay {
+  background: linear-gradient(180deg, rgba(158, 27, 50, 0.02) 38%, rgba(83, 16, 31, 0.8) 100%);
+}
+
+html.theme-valentines .control-bar {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.theme-valentines .control-section-title {
+  position: relative;
+  color: var(--primary-color);
+}
+
+html.theme-valentines .control-section-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 84px;
+  height: 1px;
+  background: var(--valentine-rose-gold);
+}
+
+html.theme-valentines .gallery-mobile-category-pill,
+html.theme-valentines .gallery-filter-button,
+html.theme-valentines .gallery-favorites-button,
+html.theme-valentines .gallery-reset-button {
+  border-color: rgba(181, 138, 82, 0.46) !important;
+  background: rgba(255, 252, 250, 0.92) !important;
+  color: var(--text-dark) !important;
+}
+
+html.theme-valentines .gallery-mobile-category-pill.active,
+html.theme-valentines .gallery-favorites-button.active {
+  border-color: var(--primary-color) !important;
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+html.theme-valentines .search-bar-wrapper input,
+html.theme-valentines .sort-select-wrapper select {
+  border-color: rgba(181, 138, 82, 0.46);
+  background-color: rgba(255, 252, 250, 0.92);
+}
+
+html.theme-valentines .search-bar-wrapper input:focus,
+html.theme-valentines .sort-select-wrapper select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(158, 27, 50, 0.12);
+}
+
+html.theme-valentines .product-card-item {
+  border-color: rgba(181, 138, 82, 0.24);
+  background: linear-gradient(180deg, rgba(255, 252, 250, 0.97), rgba(255, 247, 246, 0.97));
+  box-shadow: 0 8px 22px rgba(89, 35, 48, 0.09);
+}
+
+html.theme-valentines .product-card-item:hover {
+  border-color: rgba(158, 27, 50, 0.28);
+  box-shadow: 0 16px 34px rgba(158, 27, 50, 0.15);
+}
+
+html.theme-valentines .product-img-wrapper {
+  background: linear-gradient(135deg, rgba(196, 63, 90, 0.08), rgba(181, 138, 82, 0.13));
+}
+
+html.theme-valentines .product-tag {
+  color: var(--primary-color);
+  background: rgba(196, 63, 90, 0.09);
+}
+
+html.theme-valentines .product-card-price {
+  color: var(--primary-color);
+}
+
+html.theme-valentines .gallery-favorite-icon-button {
+  border: 1px solid rgba(181, 138, 82, 0.34) !important;
+  background: rgba(255, 252, 250, 0.95) !important;
+}
+
+html.theme-valentines .gallery-favorite-icon-button.active {
+  box-shadow: 0 0 0 3px rgba(158, 27, 50, 0.14) !important;
+}
+
+html.theme-valentines .pagination-arrow,
+html.theme-valentines .pagination-page:not([aria-current='page']) {
+  border-color: rgba(181, 138, 82, 0.36) !important;
+}
+
+html.theme-valentines .modal-box {
+  border: 1px solid rgba(181, 138, 82, 0.28);
+  background: var(--valentine-ivory);
+}
+
+@media (max-width: 768px) {
+  html.theme-christmas .layout-main,
+  html.theme-valentines .layout-main,
+  html.theme-valentines .gallery-page,
+  html.theme-valentines .seasonal-pattern-page {
+    background-size: 1120px auto;
+  }
+
+  html.theme-valentines .gallery-banner-bg {
+    background-position: 68% center;
+  }
+
+  html.theme-valentines .gallery-banner-overlay {
+    background: linear-gradient(90deg, rgba(38, 13, 20, 0.82) 0%, rgba(48, 18, 26, 0.64) 58%, rgba(48, 18, 26, 0.2) 100%);
   }
 }
 body {

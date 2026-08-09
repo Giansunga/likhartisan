@@ -16,7 +16,7 @@ const milestones = [
 
 export default function AboutPage() {
   return (
-    <div>
+    <div className="seasonal-pattern-page">
       {/* Hero Banner */}
       <header className="gallery-header-banner">
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.jpg)' }} />

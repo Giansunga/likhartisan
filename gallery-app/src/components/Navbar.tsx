@@ -359,9 +359,16 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]" id="main-navbar" aria-label="Main navigation">
+      <div className="christmas-navbar-snowflakes" aria-hidden="true">
+        <span>❄</span>
+        <span>❄</span>
+        <span>❄</span>
+        <span>❄</span>
+      </div>
       {isArtisanDashboard ? (
         <div className="h-full flex items-center justify-between" style={{ padding: '0 24px' }}>
           <Link to="/" className="logo flex items-center gap-2">
+            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
             <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
           </Link>
           <div className="flex items-center gap-4">
@@ -403,6 +410,7 @@ export default function Navbar() {
 
 
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
+            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
             <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
           </Link>
 

@@ -68,7 +68,7 @@ export default function ArtisansPage() {
   }, []);
 
   return (
-    <div>
+    <div className="seasonal-pattern-page">
       <header className="gallery-header-banner">
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/artisans-hero.PNG)' }} />
         <div className="gallery-banner-overlay" />

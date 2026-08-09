@@ -27,7 +27,7 @@ export default function ShopsPage() {
   }, []);
 
   return (
-    <div>
+    <div className="seasonal-pattern-page">
       <header
         className="gallery-header-banner"
         style={isMobile ? { height: 'auto', minHeight: '240px', paddingTop: 'calc(var(--nav-height) + 28px)', paddingBottom: '28px' } : undefined}
