@@ -3,84 +3,41 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import {
+  ExceptionSummary,
+  OrderDetailDrawer,
+  OrdersList,
+  OrdersToolbar,
+  QueueTabs,
+  StatusBadge,
+  formatCurrency,
+  type DetailTab,
+  type FilterChip,
+  type QueueKey,
+} from '../../components/admin/orders/OrderManagementUI';
 import { exportToCsv } from '../../lib/csvExport';
 import type { Order, OrderActivityLog } from '../../types';
+import '../../components/admin/orders/orders.css';
 
 const INPUT_STYLE: React.CSSProperties = {
   padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
   fontSize: '0.88rem', outline: 'none', background: '#fff',
   color: 'var(--text-dark)', cursor: 'pointer',
 };
-const SEARCH_INPUT: React.CSSProperties = {
-  ...INPUT_STYLE, paddingLeft: '38px', width: '100%', boxSizing: 'border-box' as const, cursor: 'text',
-};
-const CARD_BG = '#fff';
-const CARD_BORDER = '1px solid #E9DED2';
-const CARD_RADIUS = '14px';
-const CARD_SHADOW = '0 2px 8px rgba(147,67,8,0.04)';
-
-function formatCurrency(v: number) {
-  return '\u20B1' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-function formatShortDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-function formatTime(d: string) {
-  return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-}
-const PAYMENT_STATUS_OPTIONS = ['pending', 'paid', 'failed', 'refunded'] as const;
-const ORDER_STATUS_OPTIONS = ['pending', 'paid', 'completed', 'cancelled', 'refunded'] as const;
-const DELIVERY_STATUS_OPTIONS = ['pending', 'preparing', 'shipped', 'delivered', 'completed'] as const;
 
 function paymentBadge(status?: string) {
-  const map: Record<string, { bg: string; color: string; label: string }> = {
-    pending:  { bg: '#FFF3E0', color: '#E65100', label: 'Pending' },
-    paid:     { bg: '#E8F5E9', color: '#2E7D32', label: 'Paid' },
-    failed:   { bg: '#FFEBEE', color: '#C62828', label: 'Failed' },
-    refunded: { bg: '#F3E5F5', color: '#6A1B9A', label: 'Refunded' },
-  };
-  const s = map[status || 'pending'] || map.pending;
-  return (
-    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color }}>
-      {s.label}
-    </span>
-  );
+  return <StatusBadge kind="payment" status={status} />;
 }
 
 function orderBadge(status?: string) {
-  const map: Record<string, { bg: string; color: string; label: string }> = {
-    pending:   { bg: '#FFF3E0', color: '#E65100', label: 'Pending' },
-    paid:      { bg: '#E8F5E9', color: '#2E7D32', label: 'Paid' },
-    completed: { bg: '#E8F5E9', color: '#1B5E20', label: 'Completed' },
-    cancelled: { bg: '#FFEBEE', color: '#C62828', label: 'Cancelled' },
-    refunded:  { bg: '#F3E5F5', color: '#6A1B9A', label: 'Refunded' },
-  };
-  const s = map[status || 'pending'] || map.pending;
-  return (
-    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color }}>
-      {s.label}
-    </span>
-  );
+  return <StatusBadge kind="order" status={status} />;
 }
 
 function deliveryBadge(status?: string) {
-  const map: Record<string, { bg: string; color: string; label: string }> = {
-    pending:   { bg: '#FFF3E0', color: '#E65100', label: 'Pending' },
-    preparing: { bg: '#E3F2FD', color: '#1565C0', label: 'Preparing' },
-    shipped:   { bg: '#F3E5F5', color: '#6A1B9A', label: 'Shipped' },
-    delivered: { bg: '#E8F5E9', color: '#2E7D32', label: 'Delivered' },
-    completed: { bg: '#E8F5E9', color: '#1B5E20', label: 'Completed' },
-    cancelled: { bg: '#FFEBEE', color: '#C62828', label: 'Cancelled' },
-  };
-  const s = map[status || 'pending'] || map.pending;
-  return (
-    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color }}>
-      {s.label}
-    </span>
-  );
+  return <StatusBadge kind="delivery" status={status} />;
 }
 
 function displayVariation(v?: string) {
@@ -102,8 +59,11 @@ export default function OrdersPage() {
   /* ── state ── */
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [activeQueue, setActiveQueue] = useState<QueueKey>('all');
+  const [exceptionFilter, setExceptionFilter] = useState<'all' | 'problematic' | 'investigation'>('all');
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [filterPayment, setFilterPayment] = useState('all');
   const [filterDelivery, setFilterDelivery] = useState('all');
   const [filterType, setFilterType] = useState('all');
@@ -115,7 +75,7 @@ export default function OrdersPage() {
   const PAGE_SIZE = 12;
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'payment' | 'delivery' | 'activity' | 'problems'>('overview');
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [activityLogs, setActivityLogs] = useState<OrderActivityLog[]>([]);
   const [sellerNotes, setSellerNotes] = useState('');
   const [buyerNotes, setBuyerNotes] = useState('');
@@ -144,6 +104,7 @@ export default function OrdersPage() {
   /* ── fetch ── */
   const fetchOrders = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -153,6 +114,7 @@ export default function OrdersPage() {
       setOrders((data || []) as Order[]);
     } catch (e: any) {
       console.error('Failed to fetch orders:', e);
+      setLoadError(e?.message || 'Check your connection and try again.');
       showToast('Failed to load orders', 'error');
     } finally {
       setLoading(false);
@@ -169,10 +131,13 @@ export default function OrdersPage() {
         setOrders(prev => [payload.new as Order, ...prev]);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-        setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new as Order : o));
+        const nextOrder = payload.new as Order;
+        setOrders(prev => prev.map(o => o.id === nextOrder.id ? nextOrder : o));
+        setSelectedOrder(prev => prev?.id === nextOrder.id ? nextOrder : prev);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
         setOrders(prev => prev.filter(o => o.id !== payload.old.id));
+        setSelectedOrder(prev => prev?.id === payload.old.id ? null : prev);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -472,6 +437,10 @@ export default function OrdersPage() {
   /* ── filtering ── */
   const filtered = useMemo(() => {
     let list = [...orders];
+    if (activeQueue === 'cancelled') list = list.filter(o => o.status === 'cancelled');
+    else if (activeQueue === 'completed') list = list.filter(o => o.status === 'completed' || o.delivery_status === 'completed');
+    else if (activeQueue === 'pending') list = list.filter(o => o.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(o.status));
+    else if (activeQueue !== 'all') list = list.filter(o => o.delivery_status === activeQueue && o.status !== 'cancelled');
     if (search) {
       const s = search.toLowerCase();
       list = list.filter(o =>
@@ -481,8 +450,9 @@ export default function OrdersPage() {
         (o.items || []).some(i => i.product_name?.toLowerCase().includes(s) || i.shop_name?.toLowerCase().includes(s))
       );
     }
-    if (filterStatus !== 'all') list = list.filter(o => o.status === filterStatus);
     if (filterPayment !== 'all') list = list.filter(o => o.payment_status === filterPayment);
+    if (exceptionFilter === 'problematic') list = list.filter(o => o.is_problematic);
+    if (exceptionFilter === 'investigation') list = list.filter(o => o.flagged_for_investigation);
     if (filterDelivery !== 'all') list = list.filter(o => o.delivery_status === filterDelivery);
     if (filterType !== 'all') list = list.filter(o => (o.order_type || 'product') === filterType);
     if (dateFrom) list = list.filter(o => new Date(o.created_at) >= new Date(dateFrom));
@@ -498,24 +468,24 @@ export default function OrdersPage() {
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return list;
-  }, [orders, search, filterStatus, filterPayment, filterDelivery, filterType, dateFrom, dateTo, sortField, sortDir]);
+  }, [orders, activeQueue, search, filterPayment, filterDelivery, filterType, exceptionFilter, dateFrom, dateTo, sortField, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   /* ── summary stats ── */
-  const stats = useMemo(() => {
-    const total = orders.length;
-    const pendingConfirmation = orders.filter(o => o.status === 'pending' && o.delivery_status === 'pending').length;
-    const preparing = orders.filter(o => o.delivery_status === 'preparing').length;
-    const readyForDelivery = orders.filter(o => o.delivery_status === 'shipped').length;
-    const shipped = orders.filter(o => o.delivery_status === 'shipped').length;
-    const delivered = orders.filter(o => o.delivery_status === 'delivered').length;
-    const completed = orders.filter(o => o.status === 'completed').length;
-    const cancelled = orders.filter(o => o.status === 'cancelled').length;
-    const paymentIssues = orders.filter(o => o.payment_status === 'failed').length;
-    return { total, pendingConfirmation, preparing, readyForDelivery, shipped, delivered, completed, cancelled, paymentIssues };
-  }, [orders]);
+  const stats = useMemo(() => ({
+    total: orders.length,
+    pending: orders.filter(o => o.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(o.status)).length,
+    preparing: orders.filter(o => o.delivery_status === 'preparing' && o.status !== 'cancelled').length,
+    shipped: orders.filter(o => o.delivery_status === 'shipped' && o.status !== 'cancelled').length,
+    delivered: orders.filter(o => o.delivery_status === 'delivered' && o.status !== 'cancelled').length,
+    completed: orders.filter(o => o.status === 'completed' || o.delivery_status === 'completed').length,
+    cancelled: orders.filter(o => o.status === 'cancelled').length,
+    paymentIssues: orders.filter(o => o.payment_status === 'failed').length,
+    problematic: orders.filter(o => o.is_problematic).length,
+    investigations: orders.filter(o => o.flagged_for_investigation).length,
+  }), [orders]);
 
   /* ── export ── */
   function handleExport() {
@@ -543,9 +513,51 @@ export default function OrdersPage() {
     setDetailTab('overview');
   }
 
+  const closeDetail = useCallback(() => setSelectedOrder(null), []);
+
+  function selectQueue(queue: QueueKey) {
+    setActiveQueue(queue);
+    setPage(1);
+  }
+
+  function clearAllFilters() {
+    setSearch('');
+    setActiveQueue('all');
+    setExceptionFilter('all');
+    setFilterPayment('all');
+    setFilterDelivery('all');
+    setFilterType('all');
+    setDateFrom('');
+    setDateTo('');
+    setPage(1);
+  }
+
+  function handleSort(field: 'created_at' | 'total') {
+    if (sortField === field) setSortDir(direction => direction === 'desc' ? 'asc' : 'desc');
+    else { setSortField(field); setSortDir('desc'); }
+  }
+
+  const queueTabs = [
+    { key: 'all' as const, label: 'All orders', count: stats.total },
+    { key: 'pending' as const, label: 'Pending', count: stats.pending },
+    { key: 'preparing' as const, label: 'Preparing', count: stats.preparing },
+    { key: 'shipped' as const, label: 'Shipped', count: stats.shipped },
+    { key: 'delivered' as const, label: 'Delivered', count: stats.delivered },
+    { key: 'completed' as const, label: 'Completed', count: stats.completed },
+    { key: 'cancelled' as const, label: 'Cancelled', count: stats.cancelled },
+  ];
+
+  const filterChips: FilterChip[] = [];
+  if (search) filterChips.push({ key: 'search', label: `Search: ${search}`, onRemove: () => { setSearch(''); setPage(1); } });
+  if (filterPayment !== 'all') filterChips.push({ key: 'payment', label: `Payment: ${filterPayment}`, onRemove: () => { setFilterPayment('all'); setPage(1); } });
+  if (filterType !== 'all') filterChips.push({ key: 'type', label: filterType === 'customized' ? 'Customized pottery' : 'Regular product', onRemove: () => { setFilterType('all'); setPage(1); } });
+  if (dateFrom) filterChips.push({ key: 'from', label: `From: ${dateFrom}`, onRemove: () => { setDateFrom(''); setPage(1); } });
+  if (dateTo) filterChips.push({ key: 'to', label: `To: ${dateTo}`, onRemove: () => { setDateTo(''); setPage(1); } });
+  if (exceptionFilter !== 'all') filterChips.push({ key: 'exception', label: exceptionFilter === 'problematic' ? 'Problem orders' : 'Under investigation', onRemove: () => { setExceptionFilter('all'); setPage(1); } });
+
   /* ── render ── */
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="orders-page">
       {/* ── TOAST ── */}
       <AnimatePresence>
         {toast && (
@@ -566,384 +578,108 @@ export default function OrdersPage() {
         )}
       </AnimatePresence>
 
-      {/* ── HEADER ── */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px', fontFamily: 'var(--font-serif)' }}>
-          Orders Management
-        </h1>
-        <p style={{ fontSize: '0.9rem', color: '#8C7B6E' }}>Monitor and manage all customer orders across every shop.</p>
-      </motion.div>
-
-      {/* ── SUMMARY CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        {[
-          { label: 'Total Orders', value: stats.total },
-          { label: 'Pending', value: stats.pendingConfirmation },
-          { label: 'Preparing', value: stats.preparing },
-          { label: 'Shipped', value: stats.shipped },
-          { label: 'Delivered', value: stats.delivered },
-          { label: 'Completed', value: stats.completed },
-          { label: 'Cancelled', value: stats.cancelled },
-          { label: 'Payment Issues', value: stats.paymentIssues },
-        ].map((stat, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05, duration: 0.4 }}
-            whileHover={{ y: -3, boxShadow: '0 8px 24px rgba(147,67,8,0.1)' }}
-            style={{ background: '#fff', border: '1px solid #E9DED2', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(147,67,8,0.04)' }}
-          >
-            <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F1F1F', marginBottom: '4px', lineHeight: 1 }}>
-              {stat.value}
-            </p>
-            <p style={{ fontSize: '0.78rem', color: '#77716B', fontWeight: 500 }}>{stat.label}</p>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* ── SEARCH, FILTERS, EXPORT ── */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }}
-        style={{ background: CARD_BG, border: CARD_BORDER, borderRadius: CARD_RADIUS, padding: '20px 24px', marginBottom: '20px', boxShadow: CARD_SHADOW }}
-      >
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* search */}
-          <div style={{ position: 'relative', flex: '1 1 220px', minWidth: '200px' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="#929090" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '15px', height: '15px', pointerEvents: 'none' }}>
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input type="text" placeholder="Search order, customer, product..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} style={SEARCH_INPUT} />
-          </div>
-
-          {/* order status */}
-          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} style={INPUT_STYLE}>
-            <option value="all">All Status</option>
-            {ORDER_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-          </select>
-
-          {/* payment status */}
-          <select value={filterPayment} onChange={e => { setFilterPayment(e.target.value); setPage(1); }} style={INPUT_STYLE}>
-            <option value="all">All Payment</option>
-            {PAYMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-          </select>
-
-          {/* delivery status */}
-          <select value={filterDelivery} onChange={e => { setFilterDelivery(e.target.value); setPage(1); }} style={INPUT_STYLE}>
-            <option value="all">All Delivery</option>
-            {DELIVERY_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-          </select>
-
-          {/* order type */}
-          <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} style={INPUT_STYLE}>
-            <option value="all">All Types</option>
-            <option value="product">Regular Product</option>
-            <option value="customized">Customized Pottery</option>
-          </select>
-
-          {/* date range */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: '#8C7B6E', flexShrink: 0 }}>From</span>
-            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} style={INPUT_STYLE} />
-          </div>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: '#8C7B6E', flexShrink: 0 }}>To</span>
-            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} style={INPUT_STYLE} />
-          </div>
-
-          {/* sort */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <select value={sortField} onChange={e => setSortField(e.target.value as 'created_at' | 'total')} style={INPUT_STYLE}>
-              <option value="created_at">Sort by Date</option>
-              <option value="total">Sort by Total</option>
-            </select>
-            <button
-              onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
-              style={{ ...INPUT_STYLE, width: '38px', textAlign: 'center', padding: '10px', cursor: 'pointer', fontSize: '1rem' }}
-              title={sortDir === 'desc' ? 'Descending' : 'Ascending'}
-            >
-              {sortDir === 'desc' ? '\u2193' : '\u2191'}
-            </button>
-          </div>
-
-          {/* export */}
-          <button
-            onClick={handleExport}
-            style={{
-              ...INPUT_STYLE, background: 'var(--primary-color)', color: '#fff', fontWeight: 600,
-              display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-            }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-            </svg>
-            Export CSV
-          </button>
+      <header className="orders-page-header">
+        <div>
+          <h1>Orders Management</h1>
+          <p>Process fulfillment across every LikhArtisan shop.</p>
         </div>
+        <span className="orders-page-header-meta">{filtered.length} matching order{filtered.length === 1 ? '' : 's'}</span>
+      </header>
 
-        {/* active filter count + clear */}
-        {(filterStatus !== 'all' || filterPayment !== 'all' || filterDelivery !== 'all' || filterType !== 'all' || dateFrom || dateTo || search) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #F0EBE4' }}>
-            <span style={{ fontSize: '0.78rem', color: '#8C7B6E' }}>
-              Showing {filtered.length} of {orders.length} orders
-            </span>
-            <button
-              onClick={() => { setSearch(''); setFilterStatus('all'); setFilterPayment('all'); setFilterDelivery('all'); setFilterType('all'); setDateFrom(''); setDateTo(''); setPage(1); }}
-              style={{ fontSize: '0.78rem', color: 'var(--primary-color)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Clear all
-            </button>
+      <QueueTabs tabs={queueTabs} active={activeQueue} onChange={selectQueue} />
+
+      <ExceptionSummary
+        paymentIssues={stats.paymentIssues}
+        problematic={stats.problematic}
+        investigations={stats.investigations}
+        onPaymentIssues={() => { setFilterPayment('failed'); setExceptionFilter('all'); setPage(1); }}
+        onProblematic={() => { setExceptionFilter('problematic'); setPage(1); }}
+        onInvestigations={() => { setExceptionFilter('investigation'); setPage(1); }}
+      />
+
+      <OrdersToolbar
+        search={search}
+        onSearchChange={(value) => { setSearch(value); setPage(1); }}
+        advancedOpen={advancedFiltersOpen}
+        onToggleAdvanced={() => setAdvancedFiltersOpen(open => !open)}
+        payment={filterPayment}
+        onPaymentChange={(value) => { setFilterPayment(value); setPage(1); }}
+        orderType={filterType}
+        onOrderTypeChange={(value) => { setFilterType(value); setPage(1); }}
+        dateFrom={dateFrom}
+        onDateFromChange={(value) => { setDateFrom(value); setPage(1); }}
+        dateTo={dateTo}
+        onDateToChange={(value) => { setDateTo(value); setPage(1); }}
+        chips={filterChips}
+        onClearAll={clearAllFilters}
+        onExport={handleExport}
+      />
+
+      <OrdersList
+        orders={paged}
+        loading={loading}
+        error={loadError}
+        onRetry={fetchOrders}
+        onOpen={openDetail}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSort={handleSort}
+      />
+
+      {totalPages > 1 ? (
+        <div className="orders-pagination">
+          <span>Page {page} of {totalPages} · {filtered.length} orders</span>
+          <div className="orders-pagination-buttons">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(1)} aria-label="First page">«</button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} aria-label="Previous page">‹</button>
+            {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
+              let pageNumber: number;
+              if (totalPages <= 5) pageNumber = index + 1;
+              else if (page <= 3) pageNumber = index + 1;
+              else if (page >= totalPages - 2) pageNumber = totalPages - 4 + index;
+              else pageNumber = page - 2 + index;
+              return <button type="button" className={pageNumber === page ? 'is-active' : ''} key={pageNumber} onClick={() => setPage(pageNumber)} aria-label={`Page ${pageNumber}`} aria-current={pageNumber === page ? 'page' : undefined}>{pageNumber}</button>;
+            })}
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage(current => current + 1)} aria-label="Next page">›</button>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage(totalPages)} aria-label="Last page">»</button>
           </div>
-        )}
-      </motion.div>
-
-      {/* ── ORDERS TABLE ── */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.4 }}
-        style={{ background: CARD_BG, border: CARD_BORDER, borderRadius: CARD_RADIUS, overflow: 'hidden', boxShadow: CARD_SHADOW }}
-      >
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #E8E0D8', textAlign: 'left' }}>
-              {[
-                { label: 'Order #', key: 'id', width: '90px' },
-                { label: 'Customer', key: 'user_name', width: '140px' },
-                { label: 'Products', key: 'items', width: '200px' },
-                { label: 'Total', key: 'total', width: '100px', sortable: true },
-                { label: 'Payment', key: 'payment_status', width: '90px' },
-                { label: 'Status', key: 'status', width: '100px' },
-                { label: 'Delivery', key: 'delivery_status', width: '100px' },
-                { label: 'Date', key: 'created_at', width: '130px', sortable: true },
-                { label: 'Actions', key: 'actions', width: '110px' },
-              ].map(col => (
-                <th
-                  key={col.key}
-                  onClick={col.sortable ? () => {
-                    if (sortField === col.key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
-                    else { setSortField(col.key as any); setSortDir('desc'); }
-                  } : undefined}
-                  style={{
-                    padding: '14px 16px', fontWeight: 600, color: 'var(--text-light)', fontSize: '0.72rem',
-                    textTransform: 'uppercase', letterSpacing: '0.5px', width: col.width, minWidth: col.width,
-                    cursor: col.sortable ? 'pointer' : 'default', userSelect: 'none',
-                  }}
-                >
-                  {col.label}
-                  {col.sortable && sortField === col.key && (
-                    <span style={{ marginLeft: '4px' }}>{sortDir === 'desc' ? '\u2193' : '\u2191'}</span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f5f0eb' }}>
-                  {Array.from({ length: 9 }).map((__, j) => (
-                    <td key={j} style={{ padding: '14px 16px' }}>
-                      <div className="shimmer-skeleton" style={{ height: j === 0 ? '16px' : '20px', width: j === 1 ? '100%' : '80px', borderRadius: j <= 1 ? '4px' : '12px' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : paged.length === 0 ? (
-              <tr>
-                <td colSpan={9} style={{ padding: '60px 16px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>No orders found</p>
-                  <p style={{ fontSize: '0.85rem', color: '#A89688' }}>Try adjusting your filters or date range.</p>
-                </td>
-              </tr>
-            ) : paged.map(order => (
-              <tr
-                key={order.id}
-                onClick={() => openDetail(order)}
-                style={{ borderBottom: '1px solid #f5f0eb', cursor: 'pointer', transition: 'background 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#FDF8F4')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.82rem', fontFamily: 'monospace' }}>
-                  #{order.id.slice(0, 8).toUpperCase()}
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--text-dark)' }}>{order.user_name || 'Customer'}</p>
-                  <p style={{ fontSize: '0.75rem', color: '#A89688' }}>{order.email || order.buyer_email || ''}</p>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  {(order.items || []).slice(0, 2).map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: idx === 0 && order.items.length > 1 ? '4px' : 0 }}>
-                      {item.image && <img src={item.image} alt="" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />}
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
-                          {item.product_name || 'Product'}
-                        </p>
-                        {item.variation && <p style={{ fontSize: '0.7rem', color: '#A89688' }}>{displayVariation(item.variation) || item.variation}</p>}
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: '#8C7B6E', flexShrink: 0 }}>x{item.qty}</span>
-                    </div>
-                  ))}
-                  {(order.items || []).length > 2 && (
-                    <p style={{ fontSize: '0.72rem', color: '#A89688', marginTop: '2px' }}>+{order.items.length - 2} more</p>
-                  )}
-                </td>
-                <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-dark)' }}>
-                  {formatCurrency(order.total || 0)}
-                </td>
-                <td style={{ padding: '14px 16px' }}>{paymentBadge(order.payment_status)}</td>
-                <td style={{ padding: '14px 16px' }}>{orderBadge(order.status)}</td>
-                <td style={{ padding: '14px 16px' }}>{deliveryBadge(order.delivery_status)}</td>
-                <td style={{ padding: '14px 16px', fontSize: '0.8rem', color: '#8C7B6E' }}>
-                  {formatShortDate(order.created_at)}<br />
-                  <span style={{ fontSize: '0.72rem', color: '#A89688' }}>{formatTime(order.created_at)}</span>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {order.is_problematic && (
-                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#C62828', flexShrink: 0 }} title="Has a problem" />
-                    )}
-                    {order.flagged_for_investigation && (
-                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#E65100', flexShrink: 0 }} title="Under investigation" />
-                    )}
-                    <button
-                      onClick={e => { e.stopPropagation(); openDetail(order); }}
-                      style={{
-                        padding: '5px 12px', border: '1.5px solid #E8E0D8', borderRadius: '6px', background: '#fff',
-                        color: 'var(--text-dark)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.color = 'var(--primary-color)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E0D8'; e.currentTarget.style.color = 'var(--text-dark)'; }}
-                    >
-                      View
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* pagination */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderTop: '1px solid #f5f0eb' }}>
-            <span style={{ fontSize: '0.8rem', color: '#8C7B6E' }}>
-              Page {page} of {totalPages} ({filtered.length} orders)
-            </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button disabled={page <= 1} onClick={() => setPage(1)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #E8E0D8', background: '#fff', cursor: page <= 1 ? 'default' : 'pointer', fontSize: '0.8rem', opacity: page <= 1 ? 0.4 : 1 }}>
-                {'\u00AB'}
-              </button>
-              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #E8E0D8', background: '#fff', cursor: page <= 1 ? 'default' : 'pointer', fontSize: '0.8rem', opacity: page <= 1 ? 0.4 : 1 }}>
-                {'\u2039'}
-              </button>
-              {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) pageNum = i + 1;
-                else if (page <= 3) pageNum = i + 1;
-                else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
-                else pageNum = page - 2 + i;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    style={{
-                      padding: '6px 12px', borderRadius: '6px', border: pageNum === page ? '1.5px solid var(--primary-color)' : '1px solid #E8E0D8',
-                      background: pageNum === page ? 'var(--primary-color)' : '#fff', color: pageNum === page ? '#fff' : 'var(--text-dark)',
-                      fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #E8E0D8', background: '#fff', cursor: page >= totalPages ? 'default' : 'pointer', fontSize: '0.8rem', opacity: page >= totalPages ? 0.4 : 1 }}>
-                {'\u203A'}
-              </button>
-              <button disabled={page >= totalPages} onClick={() => setPage(totalPages)} style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #E8E0D8', background: '#fff', cursor: page >= totalPages ? 'default' : 'pointer', fontSize: '0.8rem', opacity: page >= totalPages ? 0.4 : 1 }}>
-                {'\u00BB'}
-              </button>
-            </div>
-          </div>
-        )}
-      </motion.div>
+        </div>
+      ) : null}
 
       {/* ═══════════════════════════════════════════════════════════════════
           ORDER DETAIL DRAWER
           ═══════════════════════════════════════════════════════════════════ */}
-      <AnimatePresence>
-        {selectedOrder && (
+      <OrderDetailDrawer
+        order={selectedOrder}
+        activeTab={detailTab}
+        onTabChange={setDetailTab}
+        onClose={closeDetail}
+        onToggleInvestigation={() => selectedOrder && toggleInvestigation(selectedOrder.id)}
+        footer={selectedOrder ? (
           <>
-            {/* overlay */}
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1500 }}
-              onClick={() => setSelectedOrder(null)}
-            />
-            {/* drawer */}
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-              style={{
-                position: 'fixed', top: 0, right: 0, width: '680px', maxWidth: '95vw', height: '100vh',
-                background: '#FAFAF7', zIndex: 1600, display: 'flex', flexDirection: 'column',
-                boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
-              }}
-            >
-              {/* drawer header */}
-              <div style={{ padding: '20px 28px', background: '#fff', borderBottom: '1px solid #EDE8E2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-dark)', fontFamily: 'var(--font-serif)', margin: 0 }}>
-                    Order #{selectedOrder.id.slice(0, 8).toUpperCase()}
-                  </h2>
-                  <p style={{ fontSize: '0.8rem', color: '#8C7B6E', marginTop: '2px' }}>
-                    {formatDate(selectedOrder.created_at)} &middot; {selectedOrder.order_type === 'customized' ? 'Customized Pottery' : 'Regular Product'}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button
-                    onClick={() => toggleInvestigation(selectedOrder.id)}
-                    title={selectedOrder.flagged_for_investigation ? 'Remove investigation flag' : 'Flag for investigation'}
-                    style={{
-                      width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: selectedOrder.flagged_for_investigation ? '#FFF3E0' : '#fff',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
-                    }}
-                  >
-                    {selectedOrder.flagged_for_investigation ? '!' : '?'}
-                  </button>
-                  <button
-                    onClick={() => setSelectedOrder(null)}
-                    style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8C7B6E', fontSize: '1rem' }}
-                  >
-                    &#x2715;
-                  </button>
-                </div>
-              </div>
-
-              {/* tab nav */}
-              <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #EDE8E2', background: '#fff', flexShrink: 0, padding: '0 28px' }}>
-                {([
-                  { key: 'overview', label: 'Overview' },
-                  { key: 'payment', label: 'Payment' },
-                  { key: 'delivery', label: 'Delivery' },
-                  { key: 'activity', label: 'Activity' },
-                  { key: 'problems', label: 'Problems' },
-                ] as const).map(tab => {
-                  const active = detailTab === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => setDetailTab(tab.key)}
-                      style={{
-                        padding: '12px 18px', background: 'none', border: 'none', borderBottom: active ? '2px solid var(--primary-color)' : '2px solid transparent',
-                        color: active ? 'var(--primary-color)' : '#8C7B6E', fontWeight: active ? 600 : 500, fontSize: '0.85rem',
-                        cursor: 'pointer', transition: 'all 0.15s',
-                      }}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* drawer body — scrollable */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+            <div className="orders-drawer-footer-secondary">
+              <button type="button" className="orders-secondary-action" onClick={() => toggleInvestigation(selectedOrder.id)}>
+                {selectedOrder.flagged_for_investigation ? 'Remove flag' : 'Investigate'}
+              </button>
+              {!selectedOrder.is_problematic ? (
+                <button type="button" className="orders-secondary-action" onClick={() => setProblemModal({ open: true, order: selectedOrder })}>Report issue</button>
+              ) : (
+                <button type="button" className="orders-secondary-action" onClick={() => setResolveModal({ open: true, order: selectedOrder })}>Resolve issue</button>
+              )}
+              {selectedOrder.payment_status === 'paid' ? <button type="button" className="orders-secondary-action" onClick={() => setRefundModal({ open: true, order: selectedOrder })}>Refund</button> : null}
+              {!['cancelled', 'completed', 'refunded'].includes(selectedOrder.status) ? <button type="button" className="orders-secondary-action" onClick={() => setConfirm({ open: true, title: 'Cancel Order', message: 'Are you sure? This cannot be undone.', confirmLabel: 'Cancel Order', confirmDanger: true, action: () => updateOrderStatus(selectedOrder.id, 'cancelled', 'Cancelled by admin') })}>Cancel</button> : null}
+            </div>
+            <div className="orders-drawer-footer-primary">
+              {selectedOrder.status === 'pending' ? <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Confirm Order', message: 'Mark this order as confirmed (paid)?', confirmLabel: 'Confirm', action: () => updateOrderStatus(selectedOrder.id, 'paid') })}>Confirm order</ActionBtn> : null}
+              {selectedOrder.status !== 'pending' && selectedOrder.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(selectedOrder.status) ? <ActionBtn color="#1565C0" onClick={() => setConfirm({ open: true, title: 'Start Preparing', message: 'Move this order to preparing status?', confirmLabel: 'Start', action: () => updateDeliveryStatus(selectedOrder.id, 'preparing') })}>Start preparing</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'preparing' ? <ActionBtn color="#6A1B9A" onClick={() => setConfirm({ open: true, title: 'Ship Order', message: 'Mark this order as shipped?', confirmLabel: 'Ship', action: () => updateDeliveryStatus(selectedOrder.id, 'shipped') })}>Ship order</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'shipped' ? <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Mark Delivered', message: 'Confirm this order has been delivered?', confirmLabel: 'Delivered', action: () => updateDeliveryStatus(selectedOrder.id, 'delivered') })}>Mark delivered</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'delivered' ? <ActionBtn color="#1B5E20" onClick={() => setConfirm({ open: true, title: 'Complete Order', message: 'Mark this order as fully completed?', confirmLabel: 'Complete', action: () => updateDeliveryStatus(selectedOrder.id, 'completed') })}>Complete order</ActionBtn> : null}
+            </div>
+          </>
+        ) : undefined}
+      >
+        {selectedOrder ? <>
 
                 {/* ── OVERVIEW TAB ── */}
                 {detailTab === 'overview' && (
@@ -1292,11 +1028,9 @@ export default function OrdersPage() {
                     )}
                   </div>
                 )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </>
+            : null}
+      </OrderDetailDrawer>
 
       {/* ═══════════════════════════════════════════════════════════════════
           MODALS
