@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FINISHES, MATERIAL_COLORS, SHOP_FINISHES, type MaterialParams } from './materials';
+import { FINISHES, MATERIAL_COLORS, SHOP_FINISHES, isFinishId, type FinishId, type MaterialParams } from './materials';
 
 export default function MaterialTab({
   materialParams,
@@ -18,20 +18,20 @@ export default function MaterialTab({
     : FINISHES;
 
   useEffect(() => {
-    if (availableFinishIds && !availableFinishIds.includes(materialParams.finish)) {
+    if (availableFinishIds && (!isFinishId(materialParams.finish) || !availableFinishIds.includes(materialParams.finish))) {
       const first = FINISHES.find((f) => f.id === availableFinishIds[0]);
       if (first) {
-        onChange({ finish: first.id, color: first.color });
-        setCustomColor(first.color);
+        onChange({ ...materialParams, finish: first.id });
       }
     }
-  }, [shopName]);
+  }, [availableFinishIds, materialParams, onChange]);
 
-  function selectFinish(finish: string) {
+  function selectFinish(finish: FinishId) {
     const f = FINISHES.find((x) => x.id === finish);
     if (f) {
-      onChange({ finish, color: f.color });
-      setCustomColor(f.color);
+      const color = finish === 'raw_clay' ? f.color : materialParams.color;
+      if (finish === 'raw_clay') setCustomColor(color);
+      onChange({ ...materialParams, finish, color });
     }
   }
 
@@ -53,7 +53,7 @@ export default function MaterialTab({
             className={`freeform-tab-option${materialParams.finish === f.id ? ' selected' : ''}`}
             style={{ padding: '10px' }}
           >
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid rgba(0,0,0,0.08)', flexShrink: 0, background: f.color }} />
+            <div aria-hidden="true" style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid rgba(0,0,0,0.08)', flexShrink: 0, background: f.preview, boxShadow: f.id === 'glazed' ? 'inset -2px -2px 5px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.16)' : 'inset -2px -2px 4px rgba(0,0,0,.12)' }} />
             <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-dark)' }}>{f.label}</span>
           </button>
         ))}
@@ -100,7 +100,7 @@ export default function MaterialTab({
         </div>
       </div>
 
-      <button onClick={() => { onChange({ finish: 'raw_clay', color: '#C4A882' }); setCustomColor('#C4A882'); }} className="freeform-tab-btn-outline">
+      <button onClick={() => { onChange({ finish: 'raw_clay', color: '#BE734F' }); setCustomColor('#BE734F'); }} className="freeform-tab-btn-outline">
         Reset Material
       </button>
     </div>

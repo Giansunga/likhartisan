@@ -612,7 +612,7 @@ export default function ShopPage() {
             {shopArtisans.map((artisan) => (
               <div key={artisan.id} style={{ minWidth: '280px', maxWidth: '320px', flex: '1', background: '#fff', borderRadius: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.06)', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '210px', overflow: 'hidden' }}>
-                  <img src={artisan.cover_image || '/images/artisan_1.png'} alt={artisan.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={artisan.cover_image || '/images/artisan_1.jpg'} alt={artisan.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>{artisan.name}</h3>

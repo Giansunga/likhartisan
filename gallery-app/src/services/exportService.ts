@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { applyFinishToScene, generateCylindricalUVs } from '../components/freeform/finishMaterials';
+import type { MaterialParams } from '../components/freeform/materials';
 
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
-type MaterialParams = { finish: string; color: string };
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -38,16 +39,6 @@ function getProfileScale(t: number, shapeParams: ShapeParams): number {
 
   return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
 }
-
-const FINISH_PROPS: Record<string, { roughness: number; metalness: number }> = {
-  raw_clay: { roughness: 0.9, metalness: 0.0 },
-  matte: { roughness: 0.7, metalness: 0.0 },
-  ceramic: { roughness: 0.4, metalness: 0.1 },
-  glazed: { roughness: 0.15, metalness: 0.2 },
-  metallic: { roughness: 0.3, metalness: 0.8 },
-  acrylic_paint: { roughness: 0.45, metalness: 0.0 },
-  water_paint: { roughness: 0.62, metalness: 0.0 },
-};
 
 type GeometrySnapshot = { rootPositions: Float32Array; rootToLocal: THREE.Matrix4 };
 type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
@@ -164,28 +155,6 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
   });
 }
 
-function applyMaterialToScene(clone: THREE.Group, materialParams: MaterialParams): void {
-  const color = new THREE.Color(materialParams.color);
-  const finish = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
-
-  clone.traverse((child) => {
-    if (!(child instanceof THREE.Mesh)) return;
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((mat) => {
-      if (!(mat instanceof THREE.MeshStandardMaterial)) return;
-      if (mat.map) {
-        mat.map = null;
-        mat.needsUpdate = true;
-      }
-      mat.color.copy(color);
-      mat.roughness = finish.roughness;
-      mat.metalness = finish.metalness;
-      mat.onBeforeCompile = () => {};
-      mat.needsUpdate = true;
-    });
-  });
-}
-
 export async function exportSceneToGLB(
   baseScene: THREE.Group,
   shapeParams: ShapeParams,
@@ -207,8 +176,9 @@ export async function exportSceneToGLB(
   });
   clone.updateMatrixWorld(true);
 
+  generateCylindricalUVs(clone);
   applyDeformationToClone(clone, shapeParams);
-  applyMaterialToScene(clone, materialParams);
+  applyFinishToScene(clone, materialParams);
 
   return new Promise<ArrayBuffer | null>((resolve) => {
     const exporter = new GLTFExporter();

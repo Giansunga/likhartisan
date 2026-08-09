@@ -2,9 +2,9 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 const team = [
-  { name: 'Mang Julio', role: 'Master Potter', img: '/images/artisan_1.png', bio: '35+ years crafting traditional clay vessels.' },
-  { name: 'Aling Maria', role: 'Glaze Specialist', img: '/images/hero_1.png', bio: 'Organic glaze recipes passed through generations.' },
-  { name: 'Kuya Ben', role: 'Modern Sculptor', img: '/images/artisan_1.png', bio: 'Blending modern design with traditional clay.' },
+  { name: 'Mang Julio', role: 'Master Potter', img: '/images/artisan_1.jpg', bio: '35+ years crafting traditional clay vessels.' },
+  { name: 'Aling Maria', role: 'Glaze Specialist', img: '/images/hero_1.jpg', bio: 'Organic glaze recipes passed through generations.' },
+  { name: 'Kuya Ben', role: 'Modern Sculptor', img: '/images/artisan_1.jpg', bio: 'Blending modern design with traditional clay.' },
 ];
 
 const milestones = [
@@ -19,7 +19,7 @@ export default function AboutPage() {
     <div>
       {/* Hero Banner */}
       <header className="gallery-header-banner">
-        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.png)' }} />
+        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.jpg)' }} />
         <div className="gallery-banner-overlay" />
         <div className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full">
           <div className="gallery-banner-content">

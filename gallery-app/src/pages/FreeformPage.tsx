@@ -17,7 +17,7 @@ import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import SavedDesignsModal from '../components/freeform/SavedDesignsModal';
 import { type SavedDesign } from '../hooks/useSavedDesigns';
 import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
-import { FINISHES } from '../components/freeform/materials';
+import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import * as THREE from 'three';
@@ -25,7 +25,7 @@ import '../styles/freeform.css';
 
 /* ─── Types ─── */
 
-type Step = 'model' | 'shape' | 'material' | 'decor' | 'review';
+type Step = 'model' | 'shape' | 'material' | 'decor' | 'attachment' | 'review';
 
 /* ─── Constants ─── */
 
@@ -33,18 +33,19 @@ const STEPS: { key: Step; label: string; sublabel: string; num: number }[] = [
   { key: 'model', label: 'Model', sublabel: 'Choose your base', num: 1 },
   { key: 'shape', label: 'Shape', sublabel: 'Customize shape', num: 2 },
   { key: 'material', label: 'Material', sublabel: 'Select material', num: 3 },
-  { key: 'decor', label: 'Decor', sublabel: 'Add decorations', num: 4 },
-  { key: 'review', label: 'Review', sublabel: 'Preview & save', num: 5 },
+  { key: 'decor', label: 'Pattern', sublabel: 'Add patterns', num: 4 },
+  { key: 'attachment', label: 'Attachment', sublabel: 'Add 3D details', num: 5 },
+  { key: 'review', label: 'Review', sublabel: 'Review & share', num: 6 },
 ];
 
 const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
-const DEFAULT_MATERIAL = { finish: 'raw_clay', color: '#C4A882' };
+const DEFAULT_MATERIAL: MaterialParams = { finish: 'raw_clay', color: '#BE734F' };
 function getFinishLabel(finishId: string): string {
-  return FINISHES.find((f) => f.id === finishId)?.label || finishId.replace(/_/g, ' ');
+  return getFinishDefinition(finishId).label;
 }
 
 const COLOR_NAMES: Record<string, string> = {
-  '#C4A882': 'Terracotta', '#A0522D': 'Sienna', '#8B4513': 'Saddle Brown',
+  '#BE734F': 'Terracotta', '#C4A882': 'Natural Clay', '#A0522D': 'Sienna', '#8B4513': 'Saddle Brown',
   '#D2691E': 'Chocolate', '#CD853F': 'Peru', '#DEB887': 'Burlywood',
   '#B8860B': 'Dark Goldenrod', '#DAA520': 'Goldenrod', '#F4A460': 'Sandy Brown',
   '#E8C39E': 'Warm Beige', '#2E8B57': 'Sea Green', '#3CB371': 'Medium Sea Green',
@@ -100,7 +101,6 @@ export default function FreeformPage() {
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAttachmentSockets, setShowAttachmentSockets] = useState(true);
-  const [isShapeAdjusting, setIsShapeAdjusting] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
@@ -142,7 +142,7 @@ function applyDesign(design: {
     shop_id?: string;
     shop_name?: string;
     shape_params: typeof DEFAULT_SHAPE;
-    material_params: typeof DEFAULT_MATERIAL;
+    material_params: Partial<{ finish: unknown; color: unknown }>;
     decor_params?: DecorationParams;
     attachment_params?: unknown;
   }) {
@@ -150,7 +150,7 @@ function applyDesign(design: {
     setSelectedModelId(design.model_id || null);
     setModelName(design.model_name);
     setShapeParams(design.shape_params || DEFAULT_SHAPE);
-    setMaterialParams(design.material_params || DEFAULT_MATERIAL);
+    setMaterialParams(normalizeMaterialParams(design.material_params));
     setDecorationParams(design.decor_params || DEFAULT_DECORATION);
     setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
     setAttachmentSockets([]);
@@ -186,7 +186,7 @@ function applyDesign(design: {
       setModelThumbnail(design.models_3d?.thumbnail || design.thumbnail || '');
 
       setShapeParams(design.shape_params || DEFAULT_SHAPE);
-      setMaterialParams(design.material_params || DEFAULT_MATERIAL);
+      setMaterialParams(normalizeMaterialParams(design.material_params));
       setDecorationParams(design.decor_params || DEFAULT_DECORATION);
       setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
       setAttachmentSockets([]);
@@ -543,7 +543,6 @@ function applyDesign(design: {
                 <button
                   onClick={() => {
                     if (!canGoTo(i)) return;
-                    setIsShapeAdjusting(false);
                     setActiveStep(step.key);
                   }}
                   className={`freeform-step-btn${isActive ? ' active' : ''}`}
@@ -580,17 +579,17 @@ function applyDesign(design: {
               <div className="freeform-sidebar-header">
                 <h2 className="freeform-sidebar-title">Customization</h2>
               </div>
-              {selectedShopId && (
+              <div className="freeform-sidebar-action-row compact">
                 <button
                   onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }}
                   className="freeform-load-saved-btn"
                 >
-                  Switch Shop
+                  {selectedShopId ? 'Switch Shop' : 'Select Shop'}
                 </button>
-              )}
-              <button onClick={() => setSavedDesignsOpen(true)} className="freeform-load-saved-btn">
-                Load Saved Design
-              </button>
+                <button onClick={() => setSavedDesignsOpen(true)} className="freeform-load-saved-btn">
+                  Load Saved Design
+                </button>
+              </div>
             </div>
 
             <div className="freeform-sidebar-scroll">
@@ -604,17 +603,14 @@ function applyDesign(design: {
                       <polyline points="9 22 9 12h6v10" />
                     </svg>
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
-                    <button onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }} className="freeform-save-btn" style={{ width: '100%' }}>
-                      Select a Shop
-                    </button>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} onInteractionChange={setIsShapeAdjusting} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
-                {activeStep === 'decor' && <>
-                  <DecorTab decoration={decorationParams} onChange={setDecorationParams} />
+                {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
+                {activeStep === 'attachment' && (
                   <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightCm={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
-                </>}
+                )}
                 {activeStep === 'review' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', paddingTop: '80px' }}>
 <div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
@@ -622,7 +618,7 @@ function applyDesign(design: {
                         <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                       </svg>
                       <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>Design Complete</p>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or send to a shop.</p>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or share with a shop.</p>
                     </div>
                     <button onClick={openSaveModal} className="freeform-save-btn" style={{ width: '100%', marginBottom: '16px' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
@@ -663,11 +659,12 @@ function applyDesign(design: {
               decorationParams={decorationParams}
               attachmentParams={attachmentParams}
               attachmentSockets={attachmentSockets}
-              showAttachmentSockets={activeStep === 'decor' && showAttachmentSockets}
+              showAttachmentSockets={activeStep === 'attachment' && showAttachmentSockets}
               selectedSocketIds={[...selectedSocketIds(attachmentParams)]}
-              onSocketsChange={setAttachmentSockets}
-              onAttachmentLimitsChange={setAttachmentPlacementLimits}
-              pauseAttachmentAnalysis={isShapeAdjusting}
+              // Socket and collision analysis is intentionally lazy. Running it
+              // after every shape-slider release blocks the next interaction.
+              onSocketsChange={activeStep === 'attachment' ? setAttachmentSockets : undefined}
+              onAttachmentLimitsChange={activeStep === 'attachment' ? setAttachmentPlacementLimits : undefined}
               onMorphDetected={() => {}}
               onControlsReady={handleControlsReady}
               onAttachmentError={(attachment) => toast.error(`${attachment.name} could not be loaded. The rest of your design is still available.`)}
@@ -675,7 +672,7 @@ function applyDesign(design: {
           </div>
 
           <div className="freeform-toolbar">
-            {activeStep === 'decor' && (
+            {activeStep === 'attachment' && (
               <button
                 type="button"
                 onClick={() => setShowAttachmentSockets((visible) => !visible)}
@@ -935,7 +932,7 @@ function applyDesign(design: {
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '14px', height: '14px' }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          You can review and save your design anytime.
+          You can review and share your design anytime.
         </div>
       </div>
 

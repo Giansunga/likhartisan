@@ -2,9 +2,49 @@ import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent, useSpring } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { DEFAULT_ATTACHMENT_TRANSFORM, type AttachmentSelection } from './attachments';
 import type { DecorationParams } from './decor';
+import type { KnownFinishId } from './materials';
 
 const FreeformViewer = lazy(() => import('./FreeformViewer'));
+
+const LANDING_HANDLE_HEIGHT = 0.485;
+
+const FEATURED_ATTACHMENT: AttachmentSelection = {
+  version: 4,
+  id: 'landing-bamboo-loop-pair',
+  recipeKey: 'bamboo-loop',
+  recipeVersion: 1,
+  name: 'Bamboo Loop',
+  family: 'handle',
+  shopId: null,
+  placements: [
+    {
+      socket: {
+        id: 'landing-handle-left',
+        name: 'Left handle',
+        family: 'handle',
+        height: LANDING_HANDLE_HEIGHT,
+        azimuth: -90,
+        pairGroup: 'landing-handle-pair',
+      },
+      transform: { ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: 1.05 },
+    },
+    {
+      socket: {
+        id: 'landing-handle-right',
+        name: 'Right handle',
+        family: 'handle',
+        height: LANDING_HANDLE_HEIGHT,
+        azimuth: 90,
+        pairGroup: 'landing-handle-pair',
+      },
+      transform: { ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: 1.05 },
+    },
+  ],
+  priceAdjustment: 0,
+  productionDaysAdjustment: 0,
+};
 
 export default function FreeformScrollSection() {
   const navigate = useNavigate();
@@ -14,7 +54,7 @@ export default function FreeformScrollSection() {
   const [previewModelMeta, setPreviewModelMeta] = useState<{ name: string; category: string; thumbnail: string } | null>(null);
   const freeformSectionRef = useRef<HTMLDivElement>(null);
   const [freeformVisible, setFreeformVisible] = useState(false);
-  const [previewColor, setPreviewColor] = useState('#C4A882');
+  const [previewColor, setPreviewColor] = useState('#BE734F');
 
   // Framer motion scroll setup
   const { scrollYProgress } = useScroll({ target: freeformSectionRef, offset: ['start start', 'end end'] });
@@ -23,7 +63,8 @@ export default function FreeformScrollSection() {
   
   // Dynamic shape params
   const [scrollShape, setScrollShape] = useState({ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 });
-  const [scrollFinish, setScrollFinish] = useState('raw_clay');
+  const [scrollFinish, setScrollFinish] = useState<KnownFinishId>('raw_clay');
+  const [scrollAttachments, setScrollAttachments] = useState<AttachmentSelection[]>([]);
   const [scrollDecoration, setScrollDecoration] = useState<DecorationParams>({
     patternId: '',
     placement: 'middle',
@@ -36,7 +77,8 @@ export default function FreeformScrollSection() {
     if (latest < 0.3) {
       setScrollShape({ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 });
       setScrollFinish('raw_clay');
-      setPreviewColor('#C4A882');
+      setPreviewColor('#BE734F');
+      setScrollAttachments((current) => current.length ? [] : current);
       setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
     } else if (latest < 0.6) {
       const p = (latest - 0.3) / 0.3; // 0 to 1
@@ -48,7 +90,8 @@ export default function FreeformScrollSection() {
         curvature: 50 + p * 50
       });
       setScrollFinish('raw_clay');
-      setPreviewColor('#C4A882');
+      setPreviewColor('#BE734F');
+      setScrollAttachments((current) => current.length ? [] : current);
       setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
     } else {
       setScrollShape({ height: 40, bodyWidth: 60, neckWidth: 10, rimSize: 20, curvature: 100 });
@@ -56,11 +99,24 @@ export default function FreeformScrollSection() {
       if (p < 0.25) {
         setScrollFinish('glazed');
         setPreviewColor('#A0522D');
+        setScrollAttachments((current) => current.length ? [] : current);
         setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
       } else if (p < 0.5) {
         setScrollFinish('ceramic');
         setPreviewColor('#C65A2E');
+        setScrollAttachments((current) => current.length ? [] : current);
         setScrollDecoration((current) => current.patternId ? { ...current, patternId: '' } : current);
+      } else if (p < 0.75) {
+        setScrollFinish('glazed');
+        setPreviewColor('#FFFFFF');
+        setScrollAttachments((current) => current.length ? [] : current);
+        setScrollDecoration({
+          patternId: 'traditional-curl',
+          placement: 'full',
+          scale: 1.1,
+          color: '#315A9F',
+          effect: 'engraved',
+        });
       } else {
         setScrollFinish('glazed');
         setPreviewColor('#FFFFFF');
@@ -71,6 +127,7 @@ export default function FreeformScrollSection() {
           color: '#315A9F',
           effect: 'engraved',
         });
+        setScrollAttachments((current) => current.length ? current : [FEATURED_ATTACHMENT]);
       }
     }
   });
@@ -143,11 +200,17 @@ export default function FreeformScrollSection() {
   const rawFinishY = useTransform(scrollYProgress, [0.48, 0.58, 0.72], [40, 0, -40]);
   const finishY = useSpring(rawFinishY, positionSpring);
 
-  const rawDecorOpacity = useTransform(scrollYProgress, [0.68, 0.78, 0.96, 1], [0, 1, 1, 1]);
+  const rawDecorOpacity = useTransform(scrollYProgress, [0.68, 0.76, 0.82, 0.88], [0, 1, 1, 0]);
   const decorOpacity = useSpring(rawDecorOpacity, opacitySpring);
 
-  const rawDecorY = useTransform(scrollYProgress, [0.7, 0.8, 1], [40, 0, 0]);
+  const rawDecorY = useTransform(scrollYProgress, [0.7, 0.78, 0.88], [40, 0, -40]);
   const decorY = useSpring(rawDecorY, positionSpring);
+
+  const rawAttachmentOpacity = useTransform(scrollYProgress, [0.82, 0.9, 1], [0, 1, 1]);
+  const attachmentOpacity = useSpring(rawAttachmentOpacity, opacitySpring);
+
+  const rawAttachmentY = useTransform(scrollYProgress, [0.84, 0.92, 1], [40, 0, 0]);
+  const attachmentY = useSpring(rawAttachmentY, positionSpring);
 
   const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.05, 0.9, 1], [1, 0, 0, 0]);
 
@@ -157,7 +220,7 @@ export default function FreeformScrollSection() {
       style={{ backgroundColor: bgTransform, color: colorTransform }}
       className="relative"
     >
-      <div className="h-[500vh]">
+      <div className="h-[600vh]">
         {/* Sticky container */}
         <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col lg:flex-row max-w-[var(--container-width)] mx-auto">
           
@@ -211,7 +274,7 @@ export default function FreeformScrollSection() {
             {/* Slide 4: Decor */}
             <motion.div
               style={{ opacity: decorOpacity, y: decorY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
+              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
               <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
                 Bring It <br />
@@ -220,10 +283,24 @@ export default function FreeformScrollSection() {
               <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
                 Add original patterns, choose where they wrap, and finish them painted or engraved for a piece with your own signature.
               </p>
+            </motion.div>
+
+            {/* Slide 5: 3D Attachments */}
+            <motion.div
+              style={{ opacity: attachmentOpacity, y: attachmentY, willChange: 'opacity, transform' }}
+              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
+            >
+              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
+                Add The <br />
+                <span className="text-[#A95A20]">Finishing Touch.</span>
+              </h2>
+              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
+                Complete your piece with sculpted handles and dimensional accents. Preview every attachment directly on your pottery in real time.
+              </p>
               <div className="flex gap-4">
                 <button
                   onClick={goToFreeform}
-                  className="flex items-center gap-2.5 text-white font-semibold text-[0.85rem] sm:text-[0.95rem] py-3 sm:py-3.5 px-6 sm:px-8 rounded-[10px] transition-all bg-[#823E0B] shadow-[0_4px_16px_rgba(130,62,11,0.35)] hover:bg-[#6B3209] hover:scale-105 cursor-pointer"
+                  className="flex items-center gap-2.5 text-white font-semibold text-[0.85rem] sm:text-[0.95rem] py-3 sm:py-3.5 px-6 sm:px-8 rounded-[10px] transition-all bg-[#A95A20] shadow-[0_4px_16px_rgba(169,90,32,0.35)] hover:bg-[#8F4818] hover:scale-105 cursor-pointer"
                 >
                   Start Designing Now
                 </button>
@@ -253,6 +330,8 @@ export default function FreeformScrollSection() {
                       shapeParams={scrollShape}
                       materialParams={{ finish: scrollFinish, color: previewColor }}
                       decorationParams={scrollDecoration}
+                      attachmentParams={scrollAttachments}
+                      showAttachmentSockets={false}
                       onMorphDetected={() => {}}
                     />
                   </Suspense>

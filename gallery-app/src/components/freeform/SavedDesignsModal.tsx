@@ -4,7 +4,7 @@ import { useSavedDesigns, type SavedDesign } from '../../hooks/useSavedDesigns';
 import { FINISHES } from './materials';
 
 const COLOR_NAMES: Record<string, string> = {
-  '#C4A882': 'Terracotta', '#A0522D': 'Sienna', '#8B4513': 'Saddle Brown',
+  '#BE734F': 'Terracotta', '#C4A882': 'Natural Clay', '#A0522D': 'Sienna', '#8B4513': 'Saddle Brown',
   '#D2691E': 'Chocolate', '#CD853F': 'Peru', '#DEB887': 'Burlywood',
   '#B8860B': 'Dark Goldenrod', '#DAA520': 'Goldenrod', '#F4A460': 'Sandy Brown',
   '#E8C39E': 'Warm Beige', '#2E8B57': 'Sea Green', '#3CB371': 'Medium Sea Green',

@@ -10,6 +10,7 @@ import {
   getLiveAttachmentTransformLimits,
   isAttachmentPlacementSafe,
   probeContinuousSafeRange,
+  resolveAttachmentMount,
   resolveAttachmentPlacement,
   resolveAttachmentPoint,
 } from '../attachmentPlacement';
@@ -26,6 +27,14 @@ function narrowNeckVase() {
     new THREE.Vector2(2, 1.1), new THREE.Vector2(1.05, 1.8), new THREE.Vector2(0.9, 2.7), new THREE.Vector2(1.1, 3),
   ];
   return new THREE.Mesh(new THREE.LatheGeometry(profile, 48), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+}
+
+function roundedVase() {
+  const profile = [
+    new THREE.Vector2(1.25, -3), new THREE.Vector2(2.05, -2.1), new THREE.Vector2(2.65, -0.5),
+    new THREE.Vector2(2.7, 0), new THREE.Vector2(2.45, 1.1), new THREE.Vector2(1.55, 2.5), new THREE.Vector2(1.3, 3),
+  ];
+  return new THREE.Mesh(new THREE.LatheGeometry(profile, 64), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
 }
 
 describe('automatic attachment socket placement', () => {
@@ -104,14 +113,49 @@ describe('automatic attachment socket placement', () => {
     }
   });
 
-  it('aligns local +Z, then applies depth, twist, and scale', () => {
+  it('aligns local +Z, seats handle contacts, then applies depth, twist, and scale', () => {
     const normal = new THREE.Vector3(1, 0.2, 0).normalize();
     const recipe = GENERATED_ATTACHMENT_RECIPES[0];
     const placement = { ...DEFAULT_ATTACHMENT_TRANSFORM, surfaceOffsetRatio: 0.02, twistDegrees: 45, scaleMultiplier: 1.25 };
     const transform = getAttachmentMountTransform(normal, 11, recipe, placement);
     expect(new THREE.Vector3(0, 0, 1).applyQuaternion(transform.quaternion).angleTo(normal)).toBeLessThan(0.00001);
-    expect(transform.offset.length()).toBeCloseTo(0.22);
+    const expectedInset = Math.min(recipe.envelope.contactRadius * recipe.scaleRatio * placement.scaleMultiplier * 0.4, 0.014);
+    expect(transform.offset.dot(normal)).toBeCloseTo(11 * (placement.surfaceOffsetRatio - expectedInset));
     expect(transform.scale).toBeCloseTo(11 * recipe.scaleRatio * 1.25);
+  });
+
+  it('slightly embeds default handle lugs but leaves body ornaments outside the surface', () => {
+    const handle = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.family === 'handle')!;
+    const body = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.family === 'body')!;
+    const normal = new THREE.Vector3(0, 0, 1);
+
+    for (const maxDimension of [6, 10, 18]) {
+      expect(getAttachmentMountTransform(normal, maxDimension, handle).offset.dot(normal)).toBeLessThan(0);
+    }
+    expect(getAttachmentMountTransform(normal, 10, body).offset.dot(normal)).toBeCloseTo(0.06);
+  });
+
+  it('fits both handle contacts to a rounded live surface', () => {
+    const scene = roundedVase();
+    const socket = analyzeAttachmentSockets(scene).find((candidate) => candidate.family === 'handle')!;
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'round-loop-handle')!;
+    const centerPlacement = resolveAttachmentPlacement(scene, socket, DEFAULT_ATTACHMENT_TRANSFORM)!;
+    const mount = resolveAttachmentMount(scene, socket, recipe, DEFAULT_ATTACHMENT_TRANSFORM)!;
+    const centerRadius = new THREE.Vector2(centerPlacement.position.x, centerPlacement.position.z).length();
+    const fittedRadius = new THREE.Vector2(mount.position.x, mount.position.z).length();
+
+    expect(fittedRadius).toBeLessThan(centerRadius);
+    expect(mount.verticalScale).toBeGreaterThanOrEqual(mount.scale * 0.85);
+    expect(mount.verticalScale).toBeLessThanOrEqual(mount.scale * 1.25);
+
+    const boxHeight = mount.box.getSize(new THREE.Vector3()).y;
+    for (const contactY of recipe.mountContactY!) {
+      const surface = resolveAttachmentPoint(scene, mount.height + contactY * mount.scale / boxHeight, mount.azimuth, mount.box)!;
+      const contact = new THREE.Vector3(0, contactY * mount.verticalScale, 0)
+        .applyQuaternion(mount.quaternion)
+        .add(mount.position);
+      expect(contact.distanceTo(surface.position)).toBeLessThan(recipe.envelope.contactRadius * mount.scale);
+    }
   });
 
   it.each(GENERATED_ATTACHMENT_RECIPES.filter((recipe) => recipe.family === 'handle'))('mounts $name upright and outward on left and right sockets at safe scales', (recipe) => {

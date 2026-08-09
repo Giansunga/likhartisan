@@ -3,6 +3,7 @@ import {
   DEFAULT_ATTACHMENT_TRANSFORM,
   attachmentTotals,
   createAttachmentSelection,
+  getDefaultAttachmentTransform,
   normalizeAttachmentSelections,
   recipeFitsSocket,
   resolveCatalogAssets,
@@ -35,9 +36,15 @@ describe('generated attachment selections', () => {
       version: 4,
       recipeKey: 'bamboo-loop',
       recipeVersion: 1,
-      placements: [{ socket: { id: 'left', height: 0.5, azimuth: -90 }, transform: DEFAULT_ATTACHMENT_TRANSFORM }],
+      placements: [{ socket: { id: 'left', height: 0.5, azimuth: -90 }, transform: getDefaultAttachmentTransform('handle') }],
       priceAdjustment: 100,
     });
+  });
+
+  it('places handles slightly lower by default without moving other attachment families', () => {
+    expect(getDefaultAttachmentTransform('handle')).toMatchObject({ verticalRatio: -0.035 });
+    expect(getDefaultAttachmentTransform('body')).toEqual(DEFAULT_ATTACHMENT_TRANSFORM);
+    expect(getDefaultAttachmentTransform('neck')).toEqual(DEFAULT_ATTACHMENT_TRANSFORM);
   });
 
   it('charges every physical handle but adds production days once', () => {
@@ -80,7 +87,7 @@ describe('generated attachment selections', () => {
       family: 'handle', shopId: null, slots: [left], priceAdjustment: 50, productionDaysAdjustment: 1,
     };
     const upgraded = normalizeAttachmentSelections([legacy]);
-    expect(upgraded[0]).toMatchObject({ version: 4, placements: [{ socket: { id: 'left' }, transform: DEFAULT_ATTACHMENT_TRANSFORM }] });
+    expect(upgraded[0]).toMatchObject({ version: 4, placements: [{ socket: { id: 'left' }, transform: getDefaultAttachmentTransform('handle') }] });
     expect(normalizeAttachmentSelections(upgraded)).toEqual(upgraded);
     expect(normalizeAttachmentSelections([{ version: 2, id: 'old', points: [] }, { version: 1, id: 'older' }])).toEqual([]);
   });

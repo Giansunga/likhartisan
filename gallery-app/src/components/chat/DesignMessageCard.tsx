@@ -20,7 +20,7 @@ export default function DesignMessageCard({ data }: { data: { design?: any } }) 
       <div
         className="chat-product-img"
         style={{
-          background: material.color || '#C4A882',
+          background: material.color || '#BE734F',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

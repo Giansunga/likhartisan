@@ -173,6 +173,71 @@ export function resolveAttachmentPlacement(scene: THREE.Object3D, socket: Attach
   return { ...resolved, height, azimuth };
 }
 
+export function resolveAttachmentMount(
+  scene: THREE.Object3D,
+  socket: AttachmentSocketSnapshot,
+  recipe: GeneratedAttachmentRecipe,
+  transform: AttachmentPlacementTransform = DEFAULT_ATTACHMENT_TRANSFORM,
+  knownBox?: THREE.Box3,
+) {
+  const resolved = resolveAttachmentPlacement(scene, socket, transform, knownBox);
+  if (!resolved) return null;
+  const baseMount = getAttachmentMountTransform(resolved.normal, resolved.maxDimension, recipe, transform);
+  const fallback = {
+    ...resolved,
+    position: resolved.position.clone().add(baseMount.offset),
+    quaternion: baseMount.quaternion,
+    scale: baseMount.scale,
+    verticalScale: baseMount.scale,
+  };
+  if (recipe.family !== 'handle' || !recipe.mountContactY) return fallback;
+
+  const boxHeight = resolved.box.getSize(new THREE.Vector3()).y;
+  const [lowerContactY, upperContactY] = recipe.mountContactY;
+  const contactSpan = upperContactY - lowerContactY;
+  if (boxHeight <= 0 || contactSpan <= 0) return fallback;
+
+  // A handle has two physical lugs, while a curved pot has a different radius
+  // at each lug height. Fit the handle to both live surface points so neither
+  // end floats when the source model or the shape controls change.
+  const lower = resolveAttachmentPoint(
+    scene,
+    resolved.height + lowerContactY * baseMount.scale / boxHeight,
+    resolved.azimuth,
+    resolved.box,
+  );
+  const upper = resolveAttachmentPoint(
+    scene,
+    resolved.height + upperContactY * baseMount.scale / boxHeight,
+    resolved.azimuth,
+    resolved.box,
+  );
+  if (!lower || !upper) return fallback;
+
+  const contactDirection = upper.position.clone().sub(lower.position);
+  const contactDistance = contactDirection.length();
+  if (contactDistance < 0.000001) return fallback;
+  const tangentUp = contactDirection.multiplyScalar(1 / contactDistance);
+  const outward = lower.normal.clone().add(upper.normal).add(resolved.normal).normalize();
+  outward.addScaledVector(tangentUp, -outward.dot(tangentUp));
+  if (outward.lengthSq() < 0.000001) return fallback;
+  outward.normalize();
+  const tangentRight = new THREE.Vector3().crossVectors(tangentUp, outward).normalize();
+  tangentUp.crossVectors(outward, tangentRight).normalize();
+  const quaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tangentRight, tangentUp, outward));
+  const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(transform.twistDegrees));
+  quaternion.multiply(twist);
+
+  const offsetDistance = baseMount.offset.dot(resolved.normal);
+  return {
+    ...resolved,
+    position: lower.position.clone().add(upper.position).multiplyScalar(0.5).addScaledVector(outward, offsetDistance),
+    quaternion,
+    scale: baseMount.scale,
+    verticalScale: THREE.MathUtils.clamp(contactDistance / contactSpan, baseMount.scale * 0.85, baseMount.scale * 1.25),
+  };
+}
+
 export function isAttachmentPlacementSafe(scene: THREE.Object3D, socket: GeneratedAttachmentSocket, recipe: GeneratedAttachmentRecipe, transform: AttachmentPlacementTransform, knownBox?: THREE.Box3) {
   const limits = getSocketTransformLimits(recipe, socket);
   if (!limits) return false;
@@ -206,15 +271,13 @@ export function attachmentPlacementsCollide(
   second: { socket: AttachmentSocketSnapshot; recipe: GeneratedAttachmentRecipe; transform: AttachmentPlacementTransform },
   knownBox?: THREE.Box3,
 ) {
-  const firstResolved = resolveAttachmentPlacement(scene, first.socket, first.transform, knownBox);
-  const secondResolved = resolveAttachmentPlacement(scene, second.socket, second.transform, firstResolved?.box || knownBox);
-  if (!firstResolved || !secondResolved) return true;
-  const firstMount = getAttachmentMountTransform(firstResolved.normal, firstResolved.maxDimension, first.recipe, first.transform);
-  const secondMount = getAttachmentMountTransform(secondResolved.normal, secondResolved.maxDimension, second.recipe, second.transform);
-  const firstCenter = firstResolved.position.clone().add(firstMount.offset);
-  const secondCenter = secondResolved.position.clone().add(secondMount.offset);
-  const firstRadius = Math.hypot(first.recipe.envelope.width, first.recipe.envelope.height, first.recipe.envelope.depth) * firstMount.scale * 0.42;
-  const secondRadius = Math.hypot(second.recipe.envelope.width, second.recipe.envelope.height, second.recipe.envelope.depth) * secondMount.scale * 0.42;
+  const firstMount = resolveAttachmentMount(scene, first.socket, first.recipe, first.transform, knownBox);
+  const secondMount = resolveAttachmentMount(scene, second.socket, second.recipe, second.transform, firstMount?.box || knownBox);
+  if (!firstMount || !secondMount) return true;
+  const firstCenter = firstMount.position;
+  const secondCenter = secondMount.position;
+  const firstRadius = Math.hypot(first.recipe.envelope.width * firstMount.scale, first.recipe.envelope.height * firstMount.verticalScale, first.recipe.envelope.depth * firstMount.scale) * 0.42;
+  const secondRadius = Math.hypot(second.recipe.envelope.width * secondMount.scale, second.recipe.envelope.height * secondMount.verticalScale, second.recipe.envelope.depth * secondMount.scale) * 0.42;
   return firstCenter.distanceTo(secondCenter) < firstRadius + secondRadius;
 }
 
@@ -290,8 +353,14 @@ export function getAttachmentMountTransform(normal: THREE.Vector3, maxDimension:
   tangentUp.crossVectors(outward, tangentRight).normalize();
   const surfaceQuaternion = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tangentRight, tangentUp, outward));
   const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(transform.twistDegrees));
+  // Handle recipes expose a local Z=0 contact plane with broad clay lugs. Seat
+  // that plane slightly below the live surface so the lugs read as joined clay
+  // instead of hovering, while retaining the shopper's outward-offset control.
+  const seatingInsetRatio = recipe.family === 'handle'
+    ? Math.min(recipe.envelope.contactRadius * recipe.scaleRatio * transform.scaleMultiplier * 0.4, 0.014)
+    : 0;
   return {
-    offset: outward.clone().multiplyScalar(maxDimension * transform.surfaceOffsetRatio),
+    offset: outward.clone().multiplyScalar(maxDimension * (transform.surfaceOffsetRatio - seatingInsetRatio)),
     quaternion: surfaceQuaternion.multiply(twist),
     scale: maxDimension * recipe.scaleRatio * transform.scaleMultiplier,
   };

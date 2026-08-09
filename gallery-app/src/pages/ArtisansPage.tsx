@@ -105,7 +105,7 @@ export default function ArtisansPage() {
               {artisans.map((a) => (
                 <div key={a.id} className="w-[calc(25%-22.5px)] min-w-[280px] bg-white rounded-[15px] shadow-[0_4px_15px_rgba(0,0,0,0.06)] overflow-hidden border border-black/3 flex flex-col group hover:-translate-y-2 hover:shadow-[0_10px_25px_rgba(0,0,0,0.12)] hover:border-primary/10 transition-all cursor-pointer">
                   <div className="h-[210px] overflow-hidden">
-                    <img src={a.cover_image || '/images/hero_1.png'} alt={a.name} className="w-full h-full object-cover transition-all duration-[0.6s] group-hover:scale-105" />
+                    <img src={a.cover_image || '/images/hero_1.jpg'} alt={a.name} className="w-full h-full object-cover transition-all duration-[0.6s] group-hover:scale-105" />
                   </div>
                   <div className="p-5 flex flex-col flex-grow">
                     <h4 className="text-[1.25rem] font-bold text-brown-dark mb-1">{a.name}</h4>

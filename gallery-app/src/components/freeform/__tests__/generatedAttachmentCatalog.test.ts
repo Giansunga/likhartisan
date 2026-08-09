@@ -32,6 +32,12 @@ describe('generated attachment catalog', () => {
     expect(size.y).toBeGreaterThan(size.x);
     expect(size.y).toBeGreaterThan(size.z);
     expect(size.z).toBeGreaterThan(size.x);
+    const contactMeshes = object.children.filter((child) => child instanceof THREE.Mesh && child.geometry.type === 'SphereGeometry' && new THREE.Box3().setFromObject(child).min.z <= 0.001);
+    expect(contactMeshes.length).toBeGreaterThanOrEqual(2);
+    contactMeshes.forEach((contact) => {
+      const contactSize = new THREE.Box3().setFromObject(contact).getSize(new THREE.Vector3());
+      expect(Math.max(contactSize.x, contactSize.y, contactSize.z)).toBeLessThanOrEqual(0.4);
+    });
     disposeGeneratedAttachment(object);
   });
 

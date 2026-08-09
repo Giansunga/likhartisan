@@ -173,7 +173,7 @@
 .freeform-sidebar-inner {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -236,6 +236,21 @@
   background: rgba(139, 90, 43, 0.04);
 }
 
+.freeform-sidebar-action-row.compact {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.freeform-sidebar-action-row.compact .freeform-load-saved-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-top: 0;
+  padding: 8px 6px;
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
 .saved-designs-modal {
   max-width: 640px;
   width: calc(100% - 40px);
@@ -288,6 +303,26 @@
 .decor-option-row .decor-field-label { margin-bottom: 7px; }
 .decor-color-input { width: 34px; height: 28px; padding: 2px; border: 1px solid var(--bg-tertiary); border-radius: 7px; background: #fff; cursor: pointer; }
 .decor-remove { width: 100%; border: 0; background: transparent; color: #A13E2B; font: inherit; font-size: 0.75rem; font-weight: 600; padding: 14px 4px 2px; cursor: pointer; }
+
+/* Guided Pattern / Attachment workflow */
+.guided-panel-list { display: grid; gap: 9px; }
+.guided-panel-section { min-width: 0; border: 1px solid var(--bg-tertiary); border-radius: 12px; background: #fff; overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; }
+.guided-panel-section.expanded { border-color: color-mix(in srgb, var(--primary-color) 46%, var(--bg-tertiary)); box-shadow: 0 3px 12px rgba(130, 62, 11, .08); }
+.guided-panel-section.disabled { background: color-mix(in srgb, var(--bg-tertiary) 38%, #fff); }
+.guided-panel-trigger { width: 100%; min-width: 0; display: grid; grid-template-columns: 26px minmax(0, 1fr) 18px; align-items: center; gap: 9px; border: 0; background: transparent; padding: 10px; color: var(--text-dark); text-align: left; font: inherit; cursor: pointer; }
+.guided-panel-trigger:disabled { cursor: not-allowed; opacity: .55; }
+.guided-panel-trigger:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+.guided-panel-number { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--bg-tertiary); color: var(--text-muted); font-size: .7rem; font-weight: 800; }
+.guided-panel-section.completed .guided-panel-number { background: var(--primary-color); color: #fff; }
+.guided-panel-heading { min-width: 0; display: grid; gap: 2px; }
+.guided-panel-heading strong { font-size: .76rem; line-height: 1.2; }
+.guided-panel-heading small { overflow: hidden; color: var(--text-muted); font-size: .65rem; font-weight: 500; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.guided-panel-chevron { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; transition: transform .18s ease; }
+.guided-panel-section.expanded .guided-panel-chevron { transform: rotate(180deg); }
+.guided-panel-content { padding: 2px 10px 12px; border-top: 1px solid color-mix(in srgb, var(--bg-tertiary) 72%, transparent); }
+.guided-panel-content[hidden] { display: none; }
+.guided-panel-content .decor-category-nav { margin-top: 10px; }
+.guided-panel-content .decor-pattern-grid { margin-bottom: 0; }
 
 .freeform-sidebar-actions {
   flex-shrink: 0;
@@ -1417,7 +1452,7 @@
 }
 
 /* 3D attachment library */
-.attachment-tab { border-top: 1px solid var(--bg-tertiary); margin-top: 20px; padding-top: 20px; }
+.attachment-tab { padding: 2px 0 16px; }
 .attachment-empty { padding: 14px 0; font-size: .8rem; color: var(--text-muted); }
 .attachment-filter { display: flex; gap: 6px; min-width: 0; overflow-x: auto; margin-bottom: 10px; padding: 2px; scroll-behavior: smooth; scroll-snap-type: x proximity; overscroll-behavior-inline: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--primary-color) 55%, transparent) transparent; }
 .attachment-filter::-webkit-scrollbar { height: 5px; }
@@ -1430,7 +1465,7 @@
 .attachment-card.selected { border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
 .attachment-card img, .attachment-placeholder { grid-row: 1 / span 2; width: 38px; height: 38px; object-fit: cover; border-radius: 7px; background: var(--bg-tertiary); display: grid; place-items: center; color: var(--primary-color); font-size: .65rem; }
 .attachment-card small { color: var(--text-muted); font-size: .65rem; font-weight: 500; }
-.attachment-selected-list { margin-top: 14px; }
+.attachment-selected-list { display: grid; gap: 8px; }
 .attachment-selected { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--bg-tertiary); font-size: .78rem; color: var(--text-dark); }
 .attachment-selected span { display: grid; gap: 2px; }
 .attachment-selected small { color: var(--text-muted); font-size: .66rem; }
@@ -1476,6 +1511,10 @@
 .attachment-adjust-heading > span { min-width: 0; }
 .attachment-adjust-heading > span strong, .attachment-adjust-heading > span small { display: block; overflow-wrap: anywhere; }
 .attachment-adjust-heading > button { flex: 0 0 auto; padding: 3px 0; }
+.attachment-adjust-heading .attachment-adjust-toggle { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; padding: 0; background: transparent; color: var(--text-dark); text-align: left; }
+.attachment-adjust-toggle > span { min-width: 0; }
+.attachment-adjust-toggle svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: var(--text-muted); stroke-width: 1.8; transition: transform .18s ease; }
+.attachment-adjust-card.expanded .attachment-adjust-toggle svg { transform: rotate(180deg); }
 .attachment-instance-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 3px; margin: 10px 0; border-radius: 9px; background: var(--bg-tertiary); }
 .attachment-instance-tabs button { min-width: 0; border: 0; border-radius: 7px; padding: 7px; background: transparent; color: var(--text-muted); font-size: .7rem; font-weight: 700; }
 .attachment-instance-tabs button.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 4px rgba(0,0,0,.08); }

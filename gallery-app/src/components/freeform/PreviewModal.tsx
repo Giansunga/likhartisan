@@ -1,26 +1,16 @@
-import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { toast } from 'sonner';
 import { exportSceneToGLB, downloadGLB } from '../../services/exportService';
+import { applyFinishToScene, disposeFinishedScene, generateCylindricalUVs } from './finishMaterials';
+import type { MaterialParams } from './materials';
+import NeutralStudioEnvironment from './NeutralStudioEnvironment';
+import { livePreviewScenes } from './previewSceneRegistry';
 
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
-type MaterialParams = { finish: string; color: string };
-
-const FINISH_PROPS: Record<string, { roughness: number; metalness: number }> = {
-  raw_clay: { roughness: 0.9, metalness: 0.0 },
-  matte: { roughness: 0.7, metalness: 0.0 },
-  ceramic: { roughness: 0.4, metalness: 0.1 },
-  glazed: { roughness: 0.15, metalness: 0.2 },
-  metallic: { roughness: 0.3, metalness: 0.8 },
-  acrylic_paint: { roughness: 0.45, metalness: 0.0 },
-  water_paint: { roughness: 0.62, metalness: 0.0 },
-};
-
-const liveScenes = new Map<string, THREE.Group>();
-
 function PreviewScene({
   modelFile,
   materialParams,
@@ -30,18 +20,8 @@ function PreviewScene({
   materialParams: MaterialParams;
 }) {
   const gltf = useLoader(GLTFLoader, modelFile);
-  const groupRef = useRef<THREE.Group>(null);
-  const initialized = useRef(false);
-
-  const materialColor = useMemo(() => new THREE.Color(materialParams.color), [materialParams.color]);
-  const finish = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
-
-  useEffect(() => {
-    if (groupRef.current) {
-      liveScenes.set(modelFile, groupRef.current);
-    }
-    return () => { liveScenes.delete(modelFile); };
-  }, [modelFile]);
+  const materialFinish = materialParams.finish;
+  const materialColor = materialParams.color;
 
   const clone = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
@@ -61,44 +41,23 @@ function PreviewScene({
     box.getCenter(center);
     clonedScene.position.sub(center);
     clonedScene.updateMatrixWorld(true);
+    generateCylindricalUVs(clonedScene);
     return clonedScene;
   }, [gltf]);
 
-  useFrame(() => {
-    if (!groupRef.current) return;
-    if (!initialized.current) {
-      groupRef.current.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const box = new THREE.Box3().setFromObject(groupRef.current!);
-          const size = new THREE.Vector3();
-          box.getSize(size);
-        }
-      });
-      initialized.current = true;
-    }
+  useEffect(() => () => disposeFinishedScene(clone), [clone]);
 
-    groupRef.current.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      materials.forEach((mat) => {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) return;
-        mat.color.copy(materialColor);
-        mat.roughness = finish.roughness;
-        mat.metalness = finish.metalness;
-        if (mat.map) { mat.map = null; mat.needsUpdate = true; }
-        mat.needsUpdate = true;
-      });
-    });
-  });
+  useEffect(() => {
+    applyFinishToScene(clone, { finish: materialFinish, color: materialColor });
+  }, [clone, materialColor, materialFinish]);
 
-  return (
-    <group ref={groupRef}>
-      <primitive object={clone} />
-    </group>
-  );
+  useEffect(() => {
+    livePreviewScenes.set(modelFile, clone);
+    return () => { livePreviewScenes.delete(modelFile); };
+  }, [clone, modelFile]);
+
+  return <primitive object={clone} />;
 }
-
-export { liveScenes };
 
 export default function PreviewModal({
   open,
@@ -130,7 +89,7 @@ export default function PreviewModal({
   if (!open || !modelFile) return null;
 
   async function handleExportGLB() {
-    const group = liveScenes.get(modelFile);
+    const group = livePreviewScenes.get(modelFile);
     if (!group) {
       toast.error('Scene not ready. Please wait and try again.');
       return;
@@ -185,10 +144,11 @@ export default function PreviewModal({
             style={{ width: '100%', height: '100%', display: 'block' }}
             dpr={[1, 2]}
           >
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[5, 10, 5]} intensity={1.4} color="#FFF5EB" />
-            <directionalLight position={[-4, 6, -3]} intensity={0.6} color="#FFE8D0" />
-            <spotLight position={[0, 10, 0]} intensity={1.2} angle={0.35} penumbra={0.8} color="#FFF8F0" />
+            <NeutralStudioEnvironment intensity={0.95} />
+            <ambientLight intensity={0.65} color="#FFFFFF" />
+            <directionalLight position={[5, 10, 5]} intensity={1.15} color="#FFFFFF" />
+            <directionalLight position={[-4, 6, -3]} intensity={0.42} color="#F2F6FF" />
+            <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
             <Suspense fallback={null}>
               <PreviewScene modelFile={modelFile} shapeParams={shapeParams} materialParams={materialParams} />
             </Suspense>

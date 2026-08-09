@@ -36,6 +36,13 @@ export const DEFAULT_ATTACHMENT_TRANSFORM: AttachmentPlacementTransform = {
   scaleMultiplier: 1,
 };
 
+export function getDefaultAttachmentTransform(family: AttachmentFamily): AttachmentPlacementTransform {
+  return {
+    ...DEFAULT_ATTACHMENT_TRANSFORM,
+    verticalRatio: family === 'handle' ? -0.035 : DEFAULT_ATTACHMENT_TRANSFORM.verticalRatio,
+  };
+}
+
 export type CatalogSettingsRecord = {
   recipe_key: string;
   active: boolean;
@@ -131,7 +138,7 @@ export function createAttachmentSelection(asset: GeneratedAttachmentAsset, socke
     shopId: asset.shopId,
     placements: orderedSockets.map(({ id, name, family, height, azimuth, pairGroup }) => ({
       socket: { id, name, family, height, azimuth, pairGroup },
-      transform: { ...DEFAULT_ATTACHMENT_TRANSFORM },
+      transform: getDefaultAttachmentTransform(family),
     })),
     priceAdjustment: asset.priceAdjustment,
     productionDaysAdjustment: asset.productionDaysAdjustment,
@@ -191,7 +198,7 @@ export function normalizeAttachmentSelections(input: unknown): AttachmentSelecti
     } else if (raw.version === 3 && Array.isArray(raw.slots)) {
       placements = raw.slots.reduce<AttachmentPlacement[]>((placementResult, socketValue) => {
         const socket = normalizeSocket(socketValue, family);
-        if (socket) placementResult.push({ socket, transform: { ...DEFAULT_ATTACHMENT_TRANSFORM } });
+        if (socket) placementResult.push({ socket, transform: getDefaultAttachmentTransform(family) });
         return placementResult;
       }, []);
     }

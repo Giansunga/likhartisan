@@ -291,7 +291,7 @@ export default function GalleryPage() {
         className="gallery-header-banner"
         style={isMobile ? { height: 'auto', minHeight: '180px', paddingTop: 'calc(var(--nav-height) + 12px)', paddingBottom: '20px' } : undefined}
       >
-        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.png)' }} />
+        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.jpg)' }} />
         <div className="gallery-banner-overlay" />
         <div
           className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"

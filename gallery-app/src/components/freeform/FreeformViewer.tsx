@@ -5,18 +5,21 @@ import { Html, OrbitControls, useProgress } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
+import { getDecorationProjection } from './decorationProjection';
 import { type AttachmentPlacement, type AttachmentSelection, type GeneratedAttachmentSocket } from './attachments';
 import {
   analyzeAttachmentSockets,
   attachmentPlacementKey,
   attachmentPlacementsCollide,
-  getAttachmentMountTransform,
   getLiveAttachmentTransformLimits,
-  resolveAttachmentPlacement,
+  resolveAttachmentMount,
   resolveAttachmentPoint,
   type AttachmentPlacementLimitMap,
 } from './attachmentPlacement';
 import { disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
+import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensurePhysicalMaterials, generateCylindricalUVs } from './finishMaterials';
+import type { MaterialParams } from './materials';
+import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -40,18 +43,7 @@ function LoadingIndicator() {
   );
 }
 
-const FINISH_PROPS: Record<string, { roughness: number; metalness: number }> = {
-  raw_clay: { roughness: 0.9, metalness: 0.0 },
-  matte: { roughness: 0.7, metalness: 0.0 },
-  ceramic: { roughness: 0.4, metalness: 0.1 },
-  glazed: { roughness: 0.15, metalness: 0.2 },
-  metallic: { roughness: 0.3, metalness: 0.8 },
-  acrylic_paint: { roughness: 0.45, metalness: 0.0 },
-  water_paint: { roughness: 0.62, metalness: 0.0 },
-};
-
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
-type MaterialParams = { finish: string; color: string };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void };
 
 type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
@@ -153,24 +145,14 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
   const placementKeyRef = useRef('');
   const recipe = getGeneratedAttachmentRecipe(attachment.recipeKey, attachment.recipeVersion);
   const attachmentScene = useMemo(() => recipe?.build() || new THREE.Group(), [recipe]);
-  const color = useMemo(() => new THREE.Color(material.color), [material.color]);
-  const finish = FINISH_PROPS[material.finish] || FINISH_PROPS.raw_clay;
+  const materialFinish = material.finish;
+  const materialColor = material.color;
 
   useEffect(() => () => disposeGeneratedAttachment(attachmentScene), [attachmentScene]);
 
   useEffect(() => {
-    attachmentScene.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      materials.forEach((material) => {
-        if (!(material instanceof THREE.MeshStandardMaterial)) return;
-        material.color.copy(color);
-        material.roughness = finish.roughness;
-        material.metalness = finish.metalness;
-        material.needsUpdate = true;
-      });
-    });
-  }, [attachmentScene, color, finish.metalness, finish.roughness]);
+    applyFinishToScene(attachmentScene, { finish: materialFinish, color: materialColor });
+  }, [attachmentScene, materialColor, materialFinish]);
 
   useFrame(() => {
     if (!groupRef.current || !recipe) return;
@@ -178,12 +160,11 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
     const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
     const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${recipe.key}|${recipe.version}`;
     if (placementKeyRef.current === placementKey) return;
-    const resolved = resolveAttachmentPlacement(baseScene, socket, transform);
-    if (!resolved) return;
-    const mount = getAttachmentMountTransform(resolved.normal, resolved.maxDimension, recipe, transform);
-    groupRef.current.position.copy(resolved.position).add(mount.offset);
+    const mount = resolveAttachmentMount(baseScene, socket, recipe, transform);
+    if (!mount) return;
+    groupRef.current.position.copy(mount.position);
     groupRef.current.quaternion.copy(mount.quaternion);
-    groupRef.current.scale.setScalar(mount.scale);
+    groupRef.current.scale.set(mount.scale, mount.verticalScale, mount.scale);
     placementKeyRef.current = placementKey;
   });
 
@@ -274,12 +255,13 @@ function Scene({
     box.getCenter(center);
     clonedScene.position.sub(center);
     clonedScene.updateMatrixWorld(true);
+    generateCylindricalUVs(clonedScene);
 
     return clonedScene;
   }, [gltf]);
 
-  const materialColor = useMemo(() => new THREE.Color(materialParams.color), [materialParams.color]);
-  const finishProps = FINISH_PROPS[materialParams.finish] || FINISH_PROPS.raw_clay;
+  useEffect(() => () => disposeFinishedScene(scene), [scene]);
+
   const decorTexture = useMemo(() => {
     if (!decorationParams.patternId) return null;
     const patternColor = decorationParams.effect === 'engraved'
@@ -290,6 +272,8 @@ function Scene({
     texture.wrapS = THREE.RepeatWrapping;
     return texture;
   }, [decorationParams.color, decorationParams.effect, decorationParams.patternId, decorationParams.placement]);
+
+  useEffect(() => () => decorTexture?.dispose(), [decorTexture]);
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -356,6 +340,12 @@ function Scene({
     const rimDelta = normalizeParam(shapeParams.rimSize, 12);
     const curvatureDelta = normalizeParam(shapeParams.curvature, 50);
     const { minY, rangeY, centerX, centerY, centerZ } = modelBoundsRef.current;
+    const decorProjection = getDecorationProjection(
+      { minY, rangeY, centerY },
+      hScale,
+      shapeParams.bodyWidth,
+      decorationParams.scale,
+    );
     const rootVertex = new THREE.Vector3();
     const localVertex = new THREE.Vector3();
 
@@ -410,33 +400,35 @@ function Scene({
         mesh.geometry.computeBoundingSphere();
       }
 
-      if (appearanceChanged && mesh.material) {
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      if ((appearanceChanged || shapeChanged) && mesh.material) {
+        const materials = ensurePhysicalMaterials(mesh);
         materials.forEach((mat) => {
-        if (!(mat instanceof THREE.MeshStandardMaterial)) return;
-        mat.color.copy(materialColor);
+        if (appearanceChanged) applyFinishToMaterial(mat, materialParams);
         if ('decorOriginalSide' in mat.userData && mat.side !== mat.userData.decorOriginalSide) {
           mat.side = mat.userData.decorOriginalSide as THREE.Side;
           mat.needsUpdate = true;
         }
-        if (mat.map) {
-          mat.map = null;
-          mat.needsUpdate = true;
-        }
-        mat.roughness = finishProps.roughness;
-        mat.metalness = finishProps.metalness;
-
         // Project patterns from cylindrical object space rather than the model's UVs.
         // Uploaded pottery models often have inconsistent UV unwraps, which turns a
         // horizontal band into the diagonal streak shown in the editor.
+        mat.userData.decorUniformValues = {
+          map: decorTexture,
+          enabled: decorTexture ? 1 : 0,
+          repeat: decorProjection.repeat,
+          minY: decorProjection.minY,
+          height: decorProjection.height,
+          engraved: decorationParams.effect === 'engraved' ? 1 : 0,
+        };
+
         if (!mat.userData.decorShaderConfigured) {
           mat.onBeforeCompile = (shader) => {
-            shader.uniforms.decorMap = { value: null };
-            shader.uniforms.decorEnabled = { value: 0 };
-            shader.uniforms.decorRepeat = { value: 4 };
-            shader.uniforms.decorMinY = { value: 0 };
-            shader.uniforms.decorHeight = { value: 1 };
-            shader.uniforms.decorEngraved = { value: 0 };
+            const values = mat.userData.decorUniformValues;
+            shader.uniforms.decorMap = { value: values.map };
+            shader.uniforms.decorEnabled = { value: values.enabled };
+            shader.uniforms.decorRepeat = { value: values.repeat };
+            shader.uniforms.decorMinY = { value: values.minY };
+            shader.uniforms.decorHeight = { value: values.height };
+            shader.uniforms.decorEngraved = { value: values.engraved };
             shader.vertexShader = `varying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\n${shader.vertexShader}`.replace(
               '#include <begin_vertex>',
               '#include <begin_vertex>\n  decorWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n  decorWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );'
@@ -465,9 +457,9 @@ function Scene({
           const shader = mat.userData.decorShader;
           shader.uniforms.decorMap.value = decorTexture;
           shader.uniforms.decorEnabled.value = decorTexture ? 1 : 0;
-          shader.uniforms.decorRepeat.value = 4 / decorationParams.scale;
-          shader.uniforms.decorMinY.value = minY;
-          shader.uniforms.decorHeight.value = rangeY;
+          shader.uniforms.decorRepeat.value = decorProjection.repeat;
+          shader.uniforms.decorMinY.value = decorProjection.minY;
+          shader.uniforms.decorHeight.value = decorProjection.height;
           shader.uniforms.decorEngraved.value = decorationParams.effect === 'engraved' ? 1 : 0;
         }
         });
@@ -623,12 +615,12 @@ export default function FreeformViewer({
           dpr={[1, 2]}
         >
 
-          <ambientLight intensity={preview ? 1 : 0.5} />
-          <directionalLight position={[5, 10, 5]} intensity={preview ? 1.2 : 1.8} color="#FFF5EB" />
-          <directionalLight position={[-4, 6, -3]} intensity={0.5} color="#FFE8D0" />
-          <directionalLight position={[0, 3, -8]} intensity={0.3} color="#F0E0D0" />
-          <spotLight position={[0, 10, 0]} intensity={1.0} angle={0.35} penumbra={0.8} color="#FFF8F0" />
-          <spotLight position={[-5, 6, 5]} intensity={0.3} angle={0.5} penumbra={1} color="#FFE8D6" />
+          <NeutralStudioEnvironment intensity={preview ? 0.95 : 0.82} />
+          <ambientLight intensity={preview ? 0.65 : 0.45} color="#FFFFFF" />
+          <directionalLight position={[5, 10, 5]} intensity={preview ? 1.15 : 1.35} color="#FFFFFF" />
+          <directionalLight position={[-4, 6, -3]} intensity={0.42} color="#F2F6FF" />
+          <directionalLight position={[0, 3, -8]} intensity={0.22} color="#FFFFFF" />
+          <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
 
           <Suspense fallback={<LoadingIndicator />}>
             <Scene

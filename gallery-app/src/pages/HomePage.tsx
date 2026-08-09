@@ -55,7 +55,7 @@ export default function HomePage() {
           experience: a.experience || '',
           location: a.location || '',
           bio: a.description || '',
-          cover: a.cover_image || '/images/artisan_1.png',
+          cover: a.cover_image || '/images/artisan_1.jpg',
           shop_id: a.shop_id || '',
         })));
       }
@@ -192,13 +192,13 @@ export default function HomePage() {
 
             <div className="history-collage order-2 md:order-none md:col-start-2 md:row-start-1 md:row-span-2 grid grid-cols-12 grid-rows-12 h-[min(78vw,420px)] min-h-[300px] md:h-[640px] gap-2 md:gap-0 relative">
               <div className="col-span-6 row-span-12 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
-                <img src="/images/hero_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" style={{ transform: 'scaleX(-1)' }} />
+                <img src="/images/hero_1.jpg" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" style={{ transform: 'scaleX(-1)' }} />
               </div>
               <div className="col-span-6 row-span-6 md:ml-5 md:mb-2.5 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
-                <img src="/images/artisan_1.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
+                <img src="/images/history_bottom_right.jpg" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
               </div>
               <div className="col-span-6 row-span-6 col-start-7 row-start-7 md:ml-5 md:mt-2.5 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
-                <img src="/images/history_bottom_right.png" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
+                <img src="/images/artisan_1.jpg" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
               </div>
             </div>
           </div>

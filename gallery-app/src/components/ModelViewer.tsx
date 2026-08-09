@@ -75,7 +75,8 @@ export default function ModelViewer({ url }: { url: string }) {
           target={[target.x, target.y, target.z]}
           enablePan={false}
           enableZoom={true}
-          autoRotate={false}
+          autoRotate
+          autoRotateSpeed={1.2}
         />
       </Canvas>
     </div>

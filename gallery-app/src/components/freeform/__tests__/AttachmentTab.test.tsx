@@ -24,11 +24,16 @@ const sockets: GeneratedAttachmentSocket[] = [
   { id: 'right', name: 'Right', family: 'handle', height: 0.5, azimuth: 90, pairGroup: 'pair', maxWidthRatio: 0.3, maxHeightRatio: 0.3 },
 ];
 
-describe('AttachmentTab', () => {
-  it('places a linked pair and exposes independent offset controls', async () => {
+describe('AttachmentTab guided workflow', () => {
+  it('advances through selection and placement, then exposes independent controls', async () => {
     const onChange = vi.fn();
     const { rerender } = render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightCm={25} value={[]} onChange={onChange} />);
-    expect(await screen.findByText('Bamboo Loop')).toBeInTheDocument();
+    const attachmentCard = await screen.findByRole('button', { name: /Bamboo Loop/ });
+    expect(screen.getByRole('button', { name: /Choose Attachment/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Choose Position/ })).toBeDisabled();
+
+    fireEvent.click(attachmentCard);
+    expect(screen.getByRole('button', { name: /Choose Position.*Select a socket/ })).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Pair' }));
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     const selection = onChange.mock.calls.at(-1)![0][0];
@@ -40,7 +45,8 @@ describe('AttachmentTab', () => {
       return <AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightCm={25} value={value} onChange={(next) => { onChange(next); setValue(next); }} />;
     }
     rerender(<Harness />);
-    await waitFor(() => expect(screen.queryByText('Analyzing compatible attachments…')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Adjust Placement.*1 selected attachment/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('tab', { name: 'Left' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Right' })).toBeInTheDocument();
     expect(screen.getByLabelText('Horizontal Position')).toBeInTheDocument();
@@ -52,5 +58,13 @@ describe('AttachmentTab', () => {
     fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '45' } });
     await waitFor(() => expect(screen.getByText('45°')).toBeInTheDocument());
     expect(onChange.mock.calls.some(([next]) => next[0].placements.some((placement: AttachmentSelection['placements'][number]) => placement.transform.twistDegrees === 45))).toBe(true);
+
+    const adjustmentCard = screen.getByRole('button', { name: /Bamboo Loop.*Left.*Right/ });
+    fireEvent.click(adjustmentCard);
+    expect(adjustmentCard).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByLabelText('Rotation')).not.toBeVisible();
+    fireEvent.click(adjustmentCard);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(screen.getByRole('button', { name: /Choose Position/ })).toHaveAttribute('aria-expanded', 'true');
   });
 });
