@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 interface ShapeParams {
   height: number;
   bodyWidth: number;
@@ -25,12 +27,56 @@ const DEFAULTS: ShapeParams = { height: 25, bodyWidth: 20, neckWidth: 15, rimSiz
 export default function ShapeTab({
   shapeParams,
   onChange,
+  onInteractionChange,
 }: {
   shapeParams: ShapeParams;
   onChange: (params: ShapeParams) => void;
+  onInteractionChange?: (active: boolean) => void;
 }) {
+  const [draftParams, setDraftParams] = useState(shapeParams);
+  const draftRef = useRef(shapeParams);
+  const frameRef = useRef<number | null>(null);
+  const interactingRef = useRef(false);
+
+  useEffect(() => {
+    if (interactingRef.current) return;
+    draftRef.current = shapeParams;
+    setDraftParams(shapeParams);
+  }, [shapeParams]);
+
+  useEffect(() => () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+  }, []);
+
+  function beginInteraction() {
+    if (interactingRef.current) return;
+    interactingRef.current = true;
+    onInteractionChange?.(true);
+  }
+
+  function flushChange() {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    onChange(draftRef.current);
+  }
+
+  function endInteraction() {
+    flushChange();
+    interactingRef.current = false;
+    onInteractionChange?.(false);
+  }
+
   function handleChange(key: keyof ShapeParams, value: number) {
-    onChange({ ...shapeParams, [key]: value });
+    const next = { ...draftRef.current, [key]: value };
+    draftRef.current = next;
+    setDraftParams(next);
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      onChange(draftRef.current);
+    });
   }
 
   return (
@@ -39,7 +85,7 @@ export default function ShapeTab({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {SLIDERS.map((s) => {
-          const val = shapeParams[s.key];
+          const val = draftParams[s.key];
           const pct = ((val - s.min) / (s.max - s.min)) * 100;
           return (
             <div key={s.key}>
@@ -53,6 +99,15 @@ export default function ShapeTab({
                 min={s.min}
                 max={s.max}
                 value={val}
+                aria-label={s.label}
+                onPointerDown={beginInteraction}
+                onPointerUp={endInteraction}
+                onPointerCancel={endInteraction}
+                onKeyDown={beginInteraction}
+                onKeyUp={endInteraction}
+                onBlur={() => {
+                  if (interactingRef.current) endInteraction();
+                }}
                 onChange={(e) => handleChange(s.key, Number(e.target.value))}
                 className="freeform-tab-slider"
                 style={{
@@ -64,7 +119,15 @@ export default function ShapeTab({
         })}
       </div>
 
-      <button onClick={() => onChange({ ...DEFAULTS })} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
+      <button onClick={() => {
+        if (frameRef.current !== null) {
+          cancelAnimationFrame(frameRef.current);
+          frameRef.current = null;
+        }
+        draftRef.current = { ...DEFAULTS };
+        setDraftParams(draftRef.current);
+        onChange(draftRef.current);
+      }} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
         Reset Shape
       </button>
     </div>

@@ -100,6 +100,7 @@ export default function FreeformPage() {
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAttachmentSockets, setShowAttachmentSockets] = useState(true);
+  const [isShapeAdjusting, setIsShapeAdjusting] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
@@ -540,7 +541,11 @@ function applyDesign(design: {
             return (
               <div key={step.key} style={{ display: 'flex', alignItems: 'center' }}>
                 <button
-                  onClick={() => { if (canGoTo(i)) setActiveStep(step.key); }}
+                  onClick={() => {
+                    if (!canGoTo(i)) return;
+                    setIsShapeAdjusting(false);
+                    setActiveStep(step.key);
+                  }}
                   className={`freeform-step-btn${isActive ? ' active' : ''}`}
                 >
                   <div className={`freeform-step-circle${isActive ? ' active' : isCompleted ? ' completed' : ' upcoming'}`}>
@@ -604,7 +609,7 @@ function applyDesign(design: {
                     </button>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} onInteractionChange={setIsShapeAdjusting} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <>
                   <DecorTab decoration={decorationParams} onChange={setDecorationParams} />
@@ -662,6 +667,7 @@ function applyDesign(design: {
               selectedSocketIds={[...selectedSocketIds(attachmentParams)]}
               onSocketsChange={setAttachmentSockets}
               onAttachmentLimitsChange={setAttachmentPlacementLimits}
+              pauseAttachmentAnalysis={isShapeAdjusting}
               onMorphDetected={() => {}}
               onControlsReady={handleControlsReady}
               onAttachmentError={(attachment) => toast.error(`${attachment.name} could not be loaded. The rest of your design is still available.`)}

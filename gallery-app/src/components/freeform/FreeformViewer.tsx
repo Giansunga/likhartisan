@@ -54,7 +54,7 @@ type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSi
 type MaterialParams = { finish: string; color: string };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void };
 
-type GeometrySnapshot = { rootPositions: Float32Array; rootToLocal: THREE.Matrix4 };
+type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
 type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -94,7 +94,7 @@ function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnaps
     rootPositions[i * 3 + 2] = vertex.z;
   }
 
-  return { rootPositions, rootToLocal };
+  return { rootPositions, profileCoefficients: new Float32Array(position.count * 4), rootToLocal };
 }
 
 function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBounds {
@@ -122,34 +122,23 @@ function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBou
   };
 }
 
-function getProfileScale(t: number, shapeParams: ShapeParams): number {
-  // How much each control deviates from its default (0 at default, range -1 to +1)
-  const bodyDelta = normalizeParam(shapeParams.bodyWidth, 20);
-  const neckDelta = normalizeParam(shapeParams.neckWidth, 15);
-  const rimDelta = normalizeParam(shapeParams.rimSize, 12);
-  const curvature = normalizeParam(shapeParams.curvature, 50);
-
-  // Region influence weights (how much each region affects this height t)
-  const baseInfluence = 1 - smoothstep(0.06, 0.3, t);
-  const bodyInfluence = smoothstep(0.1, 0.35, t) * (1 - smoothstep(0.55, 0.75, t));
-  const shoulderInfluence = smoothstep(0.5, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
-  const neckInfluence = smoothstep(0.6, 0.8, t) * (1 - smoothstep(0.85, 0.96, t));
-  const rimInfluence = smoothstep(0.82, 1.0, t);
-
-  // Each region contributes a scale offset proportional to its control's deviation
+function cacheProfileCoefficients(snapshot: GeometrySnapshot, bounds: ModelBounds) {
+  const { minY, rangeY } = bounds;
+  const { rootPositions, profileCoefficients } = snapshot;
   const strength = 0.45;
-  let scaleOffset = 0;
-  scaleOffset += baseInfluence * bodyDelta * strength * 0.7;
-  scaleOffset += bodyInfluence * bodyDelta * strength;
-  scaleOffset += shoulderInfluence * ((bodyDelta + neckDelta) / 2) * strength;
-  scaleOffset += neckInfluence * neckDelta * strength;
-  scaleOffset += rimInfluence * rimDelta * strength;
-
-  // Curvature adds a belly bulge
-  const bellyCurve = Math.sin(t * Math.PI) * 0.16 * curvature;
-  const shoulderCurve = shoulderInfluence * -0.08 * curvature;
-
-  return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
+  for (let vertexIndex = 0; vertexIndex < rootPositions.length / 3; vertexIndex++) {
+    const t = Math.max(0, Math.min(1, (rootPositions[vertexIndex * 3 + 1] - minY) / rangeY));
+    const baseInfluence = 1 - smoothstep(0.06, 0.3, t);
+    const bodyInfluence = smoothstep(0.1, 0.35, t) * (1 - smoothstep(0.55, 0.75, t));
+    const shoulderInfluence = smoothstep(0.5, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
+    const neckInfluence = smoothstep(0.6, 0.8, t) * (1 - smoothstep(0.85, 0.96, t));
+    const rimInfluence = smoothstep(0.82, 1.0, t);
+    const coefficientIndex = vertexIndex * 4;
+    profileCoefficients[coefficientIndex] = strength * (baseInfluence * 0.7 + bodyInfluence + shoulderInfluence * 0.5);
+    profileCoefficients[coefficientIndex + 1] = strength * (shoulderInfluence * 0.5 + neckInfluence);
+    profileCoefficients[coefficientIndex + 2] = strength * rimInfluence;
+    profileCoefficients[coefficientIndex + 3] = Math.sin(t * Math.PI) * 0.16 - shoulderInfluence * 0.08;
+  }
 }
 
 class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?: () => void }, { hasError: boolean }> {
@@ -234,6 +223,7 @@ function Scene({
   onAttachmentError,
   onSocketsChange,
   onAttachmentLimitsChange,
+  pauseAttachmentAnalysis = false,
   showAttachmentSockets = true,
   previewMode = false,
 }: {
@@ -249,6 +239,7 @@ function Scene({
   onAttachmentError?: (attachment: AttachmentSelection) => void;
   onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
   onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
+  pauseAttachmentAnalysis?: boolean;
   showAttachmentSockets?: boolean;
   previewMode?: boolean;
 }) {
@@ -259,6 +250,8 @@ function Scene({
   const morphChecked = useRef(false);
   const analyzedShapeRef = useRef('');
   const analyzedPlacementRef = useRef('');
+  const appliedShapeRef = useRef('');
+  const appliedAppearanceRef = useRef('');
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
   const modelBoundsRef = useRef<ModelBounds>({ minY: 0, rangeY: 1, centerX: 0, centerY: 0, centerZ: 0 });
 
@@ -314,6 +307,7 @@ function Scene({
       });
 
       modelBoundsRef.current = getBoundsFromSnapshots(geometrySnapshotsRef.current.values());
+      geometrySnapshotsRef.current.forEach((snapshot) => cacheProfileCoefficients(snapshot, modelBoundsRef.current));
 
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
@@ -352,35 +346,51 @@ function Scene({
       morphChecked.current = true;
     }
 
+    const shapeKey = `${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`;
+    const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
+    const shapeChanged = appliedShapeRef.current !== shapeKey;
+    const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
     const hScale = THREE.MathUtils.clamp(shapeParams.height / 25, 0.35, 1.8);
+    const bodyDelta = normalizeParam(shapeParams.bodyWidth, 20);
+    const neckDelta = normalizeParam(shapeParams.neckWidth, 15);
+    const rimDelta = normalizeParam(shapeParams.rimSize, 12);
+    const curvatureDelta = normalizeParam(shapeParams.curvature, 50);
     const { minY, rangeY, centerX, centerY, centerZ } = modelBoundsRef.current;
     const rootVertex = new THREE.Vector3();
     const localVertex = new THREE.Vector3();
 
-    groupRef.current.traverse((child) => {
+    if (shapeChanged || appearanceChanged) groupRef.current.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const mesh = child as THREE.Mesh;
 
-      if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+      if (shapeChanged && mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
         mesh.morphTargetInfluences.fill(0);
       }
 
-      if (mesh.geometry) {
+      if (shapeChanged && mesh.geometry) {
         const snapshot = geometrySnapshotsRef.current.get(mesh.geometry);
         if (!snapshot) return;
 
         const pos = mesh.geometry.attributes.position;
         const arr = pos.array as Float32Array;
         const count = pos.count;
-        const { rootPositions, rootToLocal } = snapshot;
+        const { rootPositions, profileCoefficients, rootToLocal } = snapshot;
 
         for (let i = 0; i < count; i++) {
           const ox = rootPositions[i * 3];
           const oy = rootPositions[i * 3 + 1];
           const oz = rootPositions[i * 3 + 2];
 
-          const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
-          const scaleXZ = getProfileScale(t, shapeParams);
+          const coefficientIndex = i * 4;
+          const scaleXZ = THREE.MathUtils.clamp(
+            1
+              + profileCoefficients[coefficientIndex] * bodyDelta
+              + profileCoefficients[coefficientIndex + 1] * neckDelta
+              + profileCoefficients[coefficientIndex + 2] * rimDelta
+              + profileCoefficients[coefficientIndex + 3] * curvatureDelta,
+            0.25,
+            1.8,
+          );
 
           rootVertex.set(
             centerX + (ox - centerX) * scaleXZ,
@@ -400,7 +410,7 @@ function Scene({
         mesh.geometry.computeBoundingSphere();
       }
 
-      if (mesh.material) {
+      if (appearanceChanged && mesh.material) {
         const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         materials.forEach((mat) => {
         if (!(mat instanceof THREE.MeshStandardMaterial)) return;
@@ -464,9 +474,12 @@ function Scene({
       }
     });
 
-    const analyzedShape = `${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`;
+    if (shapeChanged) appliedShapeRef.current = shapeKey;
+    if (appearanceChanged) appliedAppearanceRef.current = appearanceKey;
+
+    const analyzedShape = shapeKey;
     let liveSockets = attachmentSockets;
-    if ((onSocketsChange || onAttachmentLimitsChange) && analyzedShapeRef.current !== analyzedShape) {
+    if (!pauseAttachmentAnalysis && (onSocketsChange || onAttachmentLimitsChange) && analyzedShapeRef.current !== analyzedShape) {
       scene.updateMatrixWorld(true);
       analyzedShapeRef.current = analyzedShape;
       liveSockets = analyzeAttachmentSockets(scene);
@@ -474,7 +487,7 @@ function Scene({
       analyzedPlacementRef.current = '';
     }
     const placementAnalysisKey = `${analyzedShape}|${attachmentParams.flatMap((selection) => selection.placements.map((placement) => `${selection.id}:${placement.socket.id}:${Object.values(placement.transform).join(',')}`)).join('|')}`;
-    if (onAttachmentLimitsChange && analyzedPlacementRef.current !== placementAnalysisKey) {
+    if (!pauseAttachmentAnalysis && onAttachmentLimitsChange && analyzedPlacementRef.current !== placementAnalysisKey) {
       analyzedPlacementRef.current = placementAnalysisKey;
       const socketsById = new Map(liveSockets.map((socket) => [socket.id, socket]));
       const instances = attachmentParams.flatMap((selection) => {
@@ -527,6 +540,7 @@ export default function FreeformViewer({
   onAttachmentError,
   onSocketsChange,
   onAttachmentLimitsChange,
+  pauseAttachmentAnalysis = false,
   showAttachmentSockets = true,
   preview = false,
 }: {
@@ -542,6 +556,7 @@ export default function FreeformViewer({
   onAttachmentError?: (attachment: AttachmentSelection) => void;
   onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
   onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
+  pauseAttachmentAnalysis?: boolean;
   showAttachmentSockets?: boolean;
   preview?: boolean;
 }) {
@@ -630,6 +645,7 @@ export default function FreeformViewer({
               onAttachmentError={onAttachmentError}
               onSocketsChange={onSocketsChange}
               onAttachmentLimitsChange={onAttachmentLimitsChange}
+              pauseAttachmentAnalysis={pauseAttachmentAnalysis}
               showAttachmentSockets={showAttachmentSockets}
               previewMode={preview}
             />
