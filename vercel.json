@@ -2,9 +2,16 @@
   "buildCommand": "cd gallery-app && npm install && npm run build",
   "outputDirectory": "gallery-app/dist",
   "rewrites": [
-    { "source": "/((?!api/|videos/|images/|assets/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/videos/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "Content-Type", "value": "video/mp4" }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
