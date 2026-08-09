@@ -1478,7 +1478,7 @@
 .attachment-slot small { color: var(--text-muted); font-size: .65rem; }
 .attachment-slot > div:last-child { display: flex; gap: 6px; flex-wrap: wrap; }
 .attachment-slot button { border: 1px solid var(--bg-tertiary); background: #fff; color: var(--text-dark); border-radius: 8px; padding: 6px 9px; font-size: .69rem; cursor: pointer; }
-.attachment-slot button.primary { border-color: var(--primary-color); background: var(--primary-color); color: #fff; }
+.attachment-slot button.selected { border-color: var(--primary-color); background: var(--primary-color); color: #fff; }
 .attachment-editor { margin-top: 16px; padding: 14px; border: 1px solid var(--bg-tertiary); border-radius: 14px; background: rgba(255,255,255,.8); }
 .attachment-editor-header { display: flex; align-items: start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .attachment-editor-header strong { display: block; font-size: .84rem; color: var(--text-dark); }

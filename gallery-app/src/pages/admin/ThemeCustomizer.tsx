@@ -4,9 +4,6 @@ const THEME_DESCRIPTIONS: Record<ThemeName, string> = {
   default: 'The classic LikhArtisan earthy tones',
   christmas: 'Festive reds and greens for the holiday season',
   valentines: 'Romantic reds and pinks for love season',
-  'holy-week': 'Solemn purples for the sacred week',
-  'mothers-day': 'Soft pinks honoring all mothers',
-  'fathers-day': 'Bold blues celebrating all fathers',
 };
 
 export default function ThemeCustomizer() {

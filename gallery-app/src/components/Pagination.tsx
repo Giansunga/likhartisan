@@ -26,14 +26,15 @@ export default function Pagination({ page, totalPages, total, pageSize, onPageCh
   }
 
   return (
-    <div style={{
+    <div className="pagination" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '30px 0'
     }}>
       <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>
         Showing {start}–{end} of {total} products
       </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="pagination-controls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
+          className="pagination-arrow"
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
           aria-label="Previous page"
@@ -56,6 +57,7 @@ export default function Pagination({ page, totalPages, total, pageSize, onPageCh
             <span key={`dots-${i}`} style={{ width: 36, textAlign: 'center', color: 'var(--text-light)', fontSize: '0.85rem' }}>...</span>
           ) : (
             <button
+              className="pagination-page"
               key={p}
               onClick={() => onPageChange(p)}
               aria-label={`Page ${p}`}
@@ -76,6 +78,7 @@ export default function Pagination({ page, totalPages, total, pageSize, onPageCh
         )}
 
         <button
+          className="pagination-arrow"
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
           aria-label="Next page"

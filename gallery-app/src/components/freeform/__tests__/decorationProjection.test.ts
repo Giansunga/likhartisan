@@ -23,9 +23,9 @@ describe('decoration projection', () => {
     const middle = createPatternSvg('floral', '#123456', 'middle');
     const lower = createPatternSvg('floral', '#123456', 'lower');
 
-    expect(upper).toContain('translate(0 26)');
+    expect(upper).toContain('translate(0 174)');
     expect(middle).toContain('translate(0 100)');
-    expect(lower).toContain('translate(0 174)');
+    expect(lower).toContain('translate(0 26)');
   });
 
   it('fills full wrap with rows from top to bottom', () => {

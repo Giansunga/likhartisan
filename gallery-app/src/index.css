@@ -53,26 +53,28 @@ html {
 
 /* ── Seasonal Theme Classes ── */
 html.theme-christmas {
-  --primary-color: #C62828 !important;
-  --primary-light: #EF5350 !important;
-  --accent-color: #2E7D32 !important;
-  --bg-primary: #FFF5F5 !important;
-  --bg-secondary: #FFEBEE !important;
-  --bg-tertiary: #FFCDD2 !important;
-  --text-dark: #B71C1C !important;
-  --text-muted: #C62828 !important;
-  --text-light: #EF9A9A !important;
-  --color-primary: #C62828 !important;
-  --color-primary-light: #EF5350 !important;
-  --color-accent: #2E7D32 !important;
-  --color-accent-light: #66BB6A !important;
-  --color-cream: #FFF5F5 !important;
-  --color-cream-secondary: #FFEBEE !important;
-  --color-cream-tertiary: #FFCDD2 !important;
-  --color-cream-light: #FFF5F5 !important;
-  --color-brown-dark: #B71C1C !important;
-  --color-brown-medium: #C62828 !important;
-  --color-brown-light: #EF9A9A !important;
+  --primary-color: #9F1D25 !important;
+  --primary-light: #C83D42 !important;
+  --accent-color: #B8872D !important;
+  --bg-primary: #FFF8F1 !important;
+  --bg-secondary: #F4E6D3 !important;
+  --bg-tertiary: #E7CFAE !important;
+  --text-dark: #2D1B16 !important;
+  --text-muted: #6E4B3F !important;
+  --text-light: #A07763 !important;
+  --holiday-pine: #1F6B4F;
+  --holiday-cream: #FFFDF8;
+  --color-primary: #9F1D25 !important;
+  --color-primary-light: #C83D42 !important;
+  --color-accent: #B8872D !important;
+  --color-accent-light: #D6A94A !important;
+  --color-cream: #FFF8F1 !important;
+  --color-cream-secondary: #F4E6D3 !important;
+  --color-cream-tertiary: #E7CFAE !important;
+  --color-cream-light: #FFFDF8 !important;
+  --color-brown-dark: #2D1B16 !important;
+  --color-brown-medium: #6E4B3F !important;
+  --color-brown-light: #A07763 !important;
 }
 html.theme-valentines {
   --primary-color: #D32F2F !important;
@@ -96,73 +98,193 @@ html.theme-valentines {
   --color-brown-medium: #AD1457 !important;
   --color-brown-light: #F48FB1 !important;
 }
-html.theme-holy-week {
-  --primary-color: #4A148C !important;
-  --primary-light: #7B1FA2 !important;
-  --accent-color: #7B1FA2 !important;
-  --bg-primary: #F3E5F5 !important;
-  --bg-secondary: #EDE7F6 !important;
-  --bg-tertiary: #D1C4E9 !important;
-  --text-dark: #311B92 !important;
-  --text-muted: #4A148C !important;
-  --text-light: #CE93D8 !important;
-  --color-primary: #4A148C !important;
-  --color-primary-light: #7B1FA2 !important;
-  --color-accent: #7B1FA2 !important;
-  --color-accent-light: #CE93D8 !important;
-  --color-cream: #F3E5F5 !important;
-  --color-cream-secondary: #EDE7F6 !important;
-  --color-cream-tertiary: #D1C4E9 !important;
-  --color-cream-light: #F3E5F5 !important;
-  --color-brown-dark: #311B92 !important;
-  --color-brown-medium: #4A148C !important;
-  --color-brown-light: #CE93D8 !important;
-}
-html.theme-mothers-day {
-  --primary-color: #AD1457 !important;
-  --primary-light: #E91E63 !important;
-  --accent-color: #F48FB1 !important;
-  --bg-primary: #FCE4EC !important;
-  --bg-secondary: #F8BBD0 !important;
-  --bg-tertiary: #F48FB1 !important;
-  --text-dark: #880E4F !important;
-  --text-muted: #AD1457 !important;
-  --text-light: #F8BBD0 !important;
-  --color-primary: #AD1457 !important;
-  --color-primary-light: #E91E63 !important;
-  --color-accent: #F48FB1 !important;
-  --color-accent-light: #F8BBD0 !important;
-  --color-cream: #FCE4EC !important;
-  --color-cream-secondary: #F8BBD0 !important;
-  --color-cream-tertiary: #F48FB1 !important;
-  --color-cream-light: #FCE4EC !important;
-  --color-brown-dark: #880E4F !important;
-  --color-brown-medium: #AD1457 !important;
-  --color-brown-light: #F8BBD0 !important;
-}
-html.theme-fathers-day {
-  --primary-color: #1565C0 !important;
-  --primary-light: #42A5F5 !important;
-  --accent-color: #42A5F5 !important;
-  --bg-primary: #E3F2FD !important;
-  --bg-secondary: #BBDEFB !important;
-  --bg-tertiary: #90CAF9 !important;
-  --text-dark: #0D47A1 !important;
-  --text-muted: #1565C0 !important;
-  --text-light: #90CAF9 !important;
-  --color-primary: #1565C0 !important;
-  --color-primary-light: #42A5F5 !important;
-  --color-accent: #42A5F5 !important;
-  --color-accent-light: #90CAF9 !important;
-  --color-cream: #E3F2FD !important;
-  --color-cream-secondary: #BBDEFB !important;
-  --color-cream-tertiary: #90CAF9 !important;
-  --color-cream-light: #E3F2FD !important;
-  --color-brown-dark: #0D47A1 !important;
-  --color-brown-medium: #1565C0 !important;
-  --color-brown-light: #90CAF9 !important;
+
+html.theme-christmas body {
+  background-color: #fffaf2;
 }
 
+html.theme-christmas #main-navbar {
+  background-color: rgba(255, 250, 242, 0.96) !important;
+  background-image: url('/images/christmas-gallery-pattern.webp');
+  background-position: center 47%;
+  background-size: 1550px auto;
+  border-bottom-color: rgba(184, 135, 45, 0.24);
+}
+
+html.theme-christmas .gallery-page {
+  background-color: #fffaf2;
+  background-image: url('/images/christmas-gallery-pattern.webp');
+  background-position: top center;
+  background-size: 1920px auto;
+  background-repeat: repeat-y;
+}
+
+html.theme-christmas .gallery-page > section {
+  background-color: transparent !important;
+}
+
+html.theme-christmas .gallery-header-banner {
+  height: 320px;
+}
+
+html.theme-christmas .gallery-banner-bg {
+  background-position: center 54%;
+  filter: saturate(1.02) contrast(1.02) brightness(0.88);
+  transform: none;
+}
+
+html.theme-christmas .gallery-banner-overlay {
+  background: linear-gradient(90deg, rgba(28, 16, 10, 0.68) 0%, rgba(39, 21, 12, 0.52) 39%, rgba(39, 21, 12, 0.08) 72%);
+}
+
+html.theme-christmas .gallery-banner-content .breadcrumbs .current,
+html.theme-christmas .gallery-title {
+  color: #FFFDF8;
+}
+
+html.theme-christmas .gallery-title {
+  max-width: 780px;
+  text-shadow: 0 3px 18px rgba(20, 12, 9, 0.52);
+}
+
+html.theme-christmas .category-zoom-card {
+  height: 165px;
+  background: var(--holiday-cream);
+  border-color: rgba(184, 135, 45, 0.18);
+  border-radius: 7px;
+  box-shadow: 0 6px 18px rgba(82, 43, 27, 0.12);
+}
+
+html.theme-christmas .category-zoom-card .zoom-card-overlay {
+  background: linear-gradient(180deg, transparent 48%, rgba(31, 15, 10, 0.72) 100%);
+}
+
+html.theme-christmas .category-zoom-card.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 12px 30px rgba(159, 29, 37, 0.18);
+}
+
+html.theme-christmas .category-zoom-card.active .zoom-card-overlay {
+  background: linear-gradient(180deg, rgba(159, 29, 37, 0.02) 38%, rgba(66, 18, 18, 0.78) 100%);
+}
+
+html.theme-christmas .control-bar {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.theme-christmas .control-section-title {
+  position: relative;
+  color: var(--primary-color);
+}
+
+html.theme-christmas .control-section-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 84px;
+  height: 1px;
+  background: var(--accent-color);
+}
+
+html.theme-christmas .gallery-mobile-category-pill,
+html.theme-christmas .gallery-filter-button,
+html.theme-christmas .gallery-favorites-button,
+html.theme-christmas .gallery-reset-button {
+  border-color: rgba(184, 135, 45, 0.46) !important;
+  background: rgba(255, 253, 248, 0.9) !important;
+  color: var(--text-dark) !important;
+}
+
+html.theme-christmas .gallery-mobile-category-pill.active,
+html.theme-christmas .gallery-favorites-button.active {
+  border-color: var(--primary-color) !important;
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+html.theme-christmas .search-bar-wrapper input,
+html.theme-christmas .sort-select-wrapper select {
+  border-color: rgba(184, 135, 45, 0.46);
+  background-color: rgba(255, 253, 248, 0.9);
+}
+
+html.theme-christmas .search-bar-wrapper input:focus,
+html.theme-christmas .sort-select-wrapper select:focus {
+  border-color: var(--holiday-pine);
+  box-shadow: 0 0 0 3px rgba(31, 107, 79, 0.12);
+}
+
+html.theme-christmas .product-card-item {
+  border-color: rgba(184, 135, 45, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96) 0%, rgba(255, 248, 241, 0.96) 100%);
+  box-shadow: 0 8px 22px rgba(111, 55, 36, 0.09);
+}
+
+html.theme-christmas .product-card-item:hover {
+  border-color: rgba(159, 29, 37, 0.26);
+  box-shadow: 0 16px 34px rgba(159, 29, 37, 0.16);
+}
+
+html.theme-christmas .product-img-wrapper {
+  background:
+    linear-gradient(135deg, rgba(31, 107, 79, 0.1), rgba(184, 135, 45, 0.14));
+}
+
+html.theme-christmas .product-tag {
+  color: var(--holiday-pine);
+  background: rgba(31, 107, 79, 0.1);
+}
+
+html.theme-christmas .product-card-price {
+  color: var(--primary-color);
+}
+
+html.theme-christmas .gallery-favorite-icon-button {
+  border: 1px solid rgba(184, 135, 45, 0.34) !important;
+  background: rgba(255, 253, 248, 0.94) !important;
+}
+
+html.theme-christmas .gallery-favorite-icon-button.active {
+  box-shadow: 0 0 0 3px rgba(159, 29, 37, 0.14) !important;
+}
+
+html.theme-christmas .pagination {
+  color: var(--text-muted);
+}
+
+html.theme-christmas .pagination-arrow,
+html.theme-christmas .pagination-page:not([aria-current='page']) {
+  border-color: rgba(184, 135, 45, 0.36) !important;
+}
+
+html.theme-christmas .modal-box {
+  border: 1px solid rgba(184, 135, 45, 0.28);
+  background: var(--holiday-cream);
+}
+
+@media (max-width: 768px) {
+  html.theme-christmas .gallery-page {
+    background-size: 1120px auto;
+  }
+
+  html.theme-christmas .gallery-banner-bg {
+    background-position: 70% center;
+  }
+
+  html.theme-christmas .gallery-banner-overlay {
+    background: linear-gradient(90deg, rgba(28, 16, 10, 0.8) 0%, rgba(39, 21, 12, 0.64) 58%, rgba(39, 21, 12, 0.2) 100%);
+  }
+
+  html.theme-christmas .control-bar {
+    padding: 0;
+  }
+}
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);

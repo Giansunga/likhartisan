@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,7 +6,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import FreeformScrollSection from '../components/freeform/FreeformScrollSection';
 import UShapeReviewScroller from '../components/UShapeReviewScroller';
 
-const VIDEO_PARTS = ['/videos/part1.mp4', '/videos/part2.mp4', '/videos/part3.mp4'];
+const HERO_VIDEO = '/videos/LikhArtisan.mp4';
 
 interface HomeArtisan {
   name: string;
@@ -28,22 +28,6 @@ export default function HomePage() {
   const artisanTrackRef = useRef<HTMLDivElement>(null);
   const [artisansData, setArtisansData] = useState<HomeArtisan[]>([]);
   const [reviewsData, setReviewsData] = useState<{ id: string; userName: string; rating: number; body: string; productName: string; createdAt: string }[]>([]);
-
-  // Sequential video player state
-  const [activeIdx, setActiveIdx] = useState(0);
-  const vidRef = useRef<HTMLVideoElement>(null);
-
-  const handleEnded = useCallback(() => {
-    setActiveIdx(prev => (prev + 1) % VIDEO_PARTS.length);
-  }, []);
-
-  useEffect(() => {
-    const vid = vidRef.current;
-    if (!vid) return;
-    vid.src = VIDEO_PARTS[activeIdx];
-    vid.load();
-    vid.play().catch(() => {});
-  }, [activeIdx]);
 
   useEffect(() => {
     async function fetchArtisans() {
@@ -130,15 +114,14 @@ export default function HomePage() {
       {/* ── HERO VIDEO ── */}
       <header className="hero-video-section">
         <video
-          ref={vidRef}
           className="hero-video"
           autoPlay
           muted
+          loop
           playsInline
           preload="auto"
-          onEnded={handleEnded}
         >
-          <source src={VIDEO_PARTS[0]} type="video/mp4" />
+          <source src={HERO_VIDEO} type="video/mp4" />
         </video>
         <div className="hero-video-overlay"></div>
         <div className="hero-video-content">

@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
 import Pagination from '../components/Pagination';
+import GalleryHero from '../components/GalleryHero';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   createVisitSeed,
   normalizeSearchQuery,
@@ -16,16 +18,17 @@ import {
 const PAGE_SIZE = 24;
 
 const categories = [
-  { name: 'All Crafts', bg: '/images/pottery-collage.png' },
-  { name: 'Vases', bg: '/images/vases_collection.png' },
-  { name: 'Planters', bg: '/images/planters_collection.png' },
-  { name: 'Jars', bg: '/images/jars_collection.png' },
-  { name: 'Amphoras', bg: '/images/amphoras_collection.png' },
-  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png' },
+  { name: 'All Crafts', bg: '/images/pottery-collage.png', christmasBg: '/images/christmas-all-crafts.webp' },
+  { name: 'Vases', bg: '/images/vases_collection.png', christmasBg: '/images/christmas-vases.webp' },
+  { name: 'Planters', bg: '/images/planters_collection.png', christmasBg: '/images/christmas-planters.webp' },
+  { name: 'Jars', bg: '/images/jars_collection.png', christmasBg: '/images/christmas-jars.webp' },
+  { name: 'Amphoras', bg: '/images/amphoras_collection.png', christmasBg: '/images/christmas-amphoras.webp' },
+  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png', christmasBg: '/images/christmas-tealights.webp' },
 ];
 
 export default function GalleryPage() {
   const [searchParams] = useSearchParams();
+  const { currentTheme } = useTheme();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
@@ -54,6 +57,7 @@ export default function GalleryPage() {
   }, []);
   const { user, loading: authLoading } = useAuth();
   const loggedIn = !!user;
+  const isChristmasTheme = currentTheme === 'christmas';
 
   useEffect(() => {
     const cat = searchParams.get('category');
@@ -285,28 +289,9 @@ export default function GalleryPage() {
   }, [filteredProducts, page]);
 
   return (
-    <div>
+    <div className="gallery-page">
       {/* Banner */}
-      <header
-        className="gallery-header-banner"
-        style={isMobile ? { height: 'auto', minHeight: '180px', paddingTop: 'calc(var(--nav-height) + 12px)', paddingBottom: '20px' } : undefined}
-      >
-        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/hero_1.jpg)' }} />
-        <div className="gallery-banner-overlay" />
-        <div
-          className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
-          style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
-        >
-          <div className="gallery-banner-content">
-            <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
-              <Link to="/">Home</Link>
-              <span className="separator">/</span>
-              <span className="current">Gallery</span>
-            </div>
-            <h1 className="gallery-title" style={isMobile ? { margin: 0, maxWidth: '34ch' } : undefined}>Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.</h1>
-          </div>
-        </div>
-      </header>
+      <GalleryHero currentTheme={currentTheme} isMobile={isMobile} />
 
       {/* Category Filter */}
       <section className="py-[30px] bg-[var(--bg-primary)] border-b border-cream-secondary">
@@ -317,6 +302,7 @@ export default function GalleryPage() {
               scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
             }}>
               <button
+                className={`gallery-mobile-category-pill ${activeCategory === null ? 'active' : ''}`}
                 onClick={() => setActiveCategory(null)}
                 style={{
                   flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
@@ -332,6 +318,7 @@ export default function GalleryPage() {
                 const isActive = activeCategory === cat.name;
                 return (
                   <button
+                    className={`gallery-mobile-category-pill ${isActive ? 'active' : ''}`}
                     key={cat.name}
                     onClick={() => setActiveCategory(isActive ? null : cat.name)}
                     style={{
@@ -353,7 +340,10 @@ export default function GalleryPage() {
                 <div key={cat.name}
                   onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
                   className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
-                  <div className="zoom-card-bg" style={{ backgroundImage: `url(${cat.bg})` }} />
+                  <div
+                    className="zoom-card-bg"
+                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : cat.bg})` }}
+                  />
                   <div className="zoom-card-overlay" />
                   <div className="zoom-card-content">
                     <span className="zoom-card-name">{cat.name}</span>
@@ -384,6 +374,7 @@ export default function GalleryPage() {
               </div>
               {isMobile ? (
                 <button
+                  className="gallery-filter-button"
                   onClick={() => setFilterModalOpen(true)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 18px',
@@ -405,6 +396,7 @@ export default function GalleryPage() {
                 <>
                   {loggedIn && (
                   <button
+                    className={`gallery-favorites-button ${showFavorites ? 'active' : ''}`}
                     onClick={() => setShowFavorites(!showFavorites)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
@@ -422,6 +414,7 @@ export default function GalleryPage() {
                   )}
                   {loggedIn && (
                     <button
+                      className="gallery-reset-button"
                       type="button"
                       onClick={resetRecommendations}
                       disabled={signals.length === 0 || resettingRecommendations}
@@ -456,7 +449,7 @@ export default function GalleryPage() {
       </section>
 
       {/* Product Grid */}
-      <section style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
+      <section className="gallery-products-section" style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
           {loadingProducts || loadingSignals ? (
             /* Shimmer skeleton grid */
@@ -490,6 +483,8 @@ export default function GalleryPage() {
                     <img src={p.image} alt={p.name} />
                     {loggedIn && (
                     <button
+                      className={`gallery-favorite-icon-button ${favorites.includes(p.id) ? 'active' : ''}`}
+                      aria-label={favorites.includes(p.id) ? `Remove ${p.name} from favorites` : `Add ${p.name} to favorites`}
                       onClick={(e) => toggleFavorite(e, p.id)}
                       style={{
                         position: 'absolute', top: '10px', right: '10px', zIndex: 5,

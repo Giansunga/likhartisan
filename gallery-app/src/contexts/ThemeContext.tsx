@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
-export type ThemeName = 'default' | 'christmas' | 'valentines' | 'holy-week' | 'mothers-day' | 'fathers-day';
+export type ThemeName = 'default' | 'christmas' | 'valentines';
 
 export interface ThemeColors {
   primary: string;
@@ -37,13 +37,13 @@ export const THEMES: Record<ThemeName, Theme> = {
     name: 'christmas',
     label: 'Christmas',
     colors: {
-      primary: '#C62828',
-      primaryLight: '#EF5350',
-      accent: '#2E7D32',
-      bg: '#FFF5F5',
-      bgSecondary: '#FFEBEE',
-      text: '#B71C1C',
-      border: '#FFCDD2',
+      primary: '#9F1D25',
+      primaryLight: '#C83D42',
+      accent: '#B8872D',
+      bg: '#FFF8F1',
+      bgSecondary: '#F4E6D3',
+      text: '#2D1B16',
+      border: '#E7CFAE',
     },
   },
   valentines: {
@@ -59,45 +59,6 @@ export const THEMES: Record<ThemeName, Theme> = {
       border: '#F8BBD0',
     },
   },
-  'holy-week': {
-    name: 'holy-week',
-    label: 'Holy Week',
-    colors: {
-      primary: '#6D4C41',
-      primaryLight: '#8D6E63',
-      accent: '#A1887F',
-      bg: '#EFEBE9',
-      bgSecondary: '#D7CCC8',
-      text: '#3E2723',
-      border: '#BCAAA4',
-    },
-  },
-  'mothers-day': {
-    name: 'mothers-day',
-    label: "Mother's Day",
-    colors: {
-      primary: '#C2185B',
-      primaryLight: '#E91E63',
-      accent: '#F06292',
-      bg: '#FCE4EC',
-      bgSecondary: '#F8BBD0',
-      text: '#880E4F',
-      border: '#F48FB1',
-    },
-  },
-  'fathers-day': {
-    name: 'fathers-day',
-    label: "Father's Day",
-    colors: {
-      primary: '#1565C0',
-      primaryLight: '#1E88E5',
-      accent: '#42A5F5',
-      bg: '#E3F2FD',
-      bgSecondary: '#BBDEFB',
-      text: '#0D47A1',
-      border: '#90CAF9',
-    },
-  },
 };
 
 function getAutoDetectTheme(): ThemeName {
@@ -110,7 +71,11 @@ function getAutoDetectTheme(): ThemeName {
   return 'default';
 }
 
-const THEME_CLASSES = ['theme-christmas', 'theme-valentines', 'theme-holy-week', 'theme-mothers-day', 'theme-fathers-day'] as const;
+const THEME_CLASSES = ['theme-christmas', 'theme-valentines'] as const;
+
+function isThemeName(name: unknown): name is ThemeName {
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(THEMES, name);
+}
 
 function injectThemeStyle(name: ThemeName) {
   const existing = document.getElementById('theme-dynamic-vars');
@@ -190,7 +155,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           if (data.auto_detect) {
             applyTheme(getAutoDetectTheme());
           } else {
-            applyTheme((data.theme_name as ThemeName) || 'default');
+            applyTheme(isThemeName(data.theme_name) ? data.theme_name : 'default');
           }
         } else {
           applyTheme(getAutoDetectTheme());
@@ -215,9 +180,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   async function setTheme(name: ThemeName) {
     applyTheme(name);
     try {
-      await supabase
+      const { error } = await supabase
         .from('theme_settings')
         .upsert({ id: 'current', theme_name: name, auto_detect: false, updated_at: new Date().toISOString() });
+      if (error) throw error;
       setAutoDetectState(false);
     } catch (e) {
       console.error('Failed to save theme:', e);
@@ -230,9 +196,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyTheme(getAutoDetectTheme());
     }
     try {
-      await supabase
+      const { error } = await supabase
         .from('theme_settings')
         .upsert({ id: 'current', auto_detect: val, updated_at: new Date().toISOString() });
+      if (error) throw error;
     } catch (e) {
       console.error('Failed to save auto-detect setting:', e);
     }

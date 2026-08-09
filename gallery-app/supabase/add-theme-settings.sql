@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS theme_settings (
   id TEXT PRIMARY KEY DEFAULT 'current',
   theme_name TEXT NOT NULL DEFAULT 'default'
-    CHECK (theme_name IN ('default', 'christmas', 'valentines', 'holy-week', 'mothers-day', 'fathers-day')),
+    CHECK (theme_name IN ('default', 'christmas', 'valentines')),
   auto_detect BOOLEAN DEFAULT true,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_by UUID REFERENCES auth.users(id)

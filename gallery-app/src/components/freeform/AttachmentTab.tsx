@@ -166,6 +166,14 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm,
     setActiveStage(3);
   }
 
+  function isSocketChoiceSelected(socketsToCheck: GeneratedAttachmentSocket[]) {
+    if (!selectedAsset) return false;
+    const expectedIds = new Set(socketsToCheck.map((socket) => socket.id));
+    return value.some((selection) => selection.recipeKey === selectedAsset.recipe.key
+      && selection.placements.length === expectedIds.size
+      && selection.placements.every((placement) => expectedIds.has(placement.socket.id)));
+  }
+
   function removeSelection(selectionId: string) {
     const next = value.filter((item) => item.id !== selectionId);
     onChange(next);
@@ -204,7 +212,11 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm,
       </PanelSection>
 
       <PanelSection number={2} title="Choose Position" summary={lastSelection ? lastSelection.placements.map((placement) => placement.socket.name).join(' + ') : selectedAsset ? 'Select a socket' : 'Choose an attachment first'} expanded={visibleStage === 2} completed={Boolean(lastSelection)} disabled={!selectedAsset} onToggle={() => setActiveStage(2)} regionId="attachment-position-section">
-        <div className="attachment-slot-list">{socketGroups.map((group) => <div className="attachment-slot" key={group.key}><div><strong>{group.name}</strong><small>{group.sockets.some((socket) => occupied.has(socket.id)) ? 'Occupied — selecting replaces it' : 'Available'}</small></div><div>{group.sockets.length === 2 ? <><button type="button" onClick={() => place([group.sockets[0]])}>{group.sockets[0].name}</button><button type="button" onClick={() => place([group.sockets[1]])}>{group.sockets[1].name}</button><button type="button" className="primary" onClick={() => place(group.sockets)}>Pair</button></> : <button type="button" className="primary" onClick={() => place(group.sockets)}>Place</button>}</div></div>)}</div>
+        <div className="attachment-slot-list">{socketGroups.map((group) => <div className="attachment-slot" key={group.key}><div><strong>{group.name}</strong><small>{group.sockets.some((socket) => occupied.has(socket.id)) ? 'Occupied — selecting replaces it' : 'Available'}</small></div><div>{group.sockets.length === 2 ? <>
+          <button type="button" aria-pressed={isSocketChoiceSelected([group.sockets[0]])} className={isSocketChoiceSelected([group.sockets[0]]) ? 'selected' : ''} onClick={() => place([group.sockets[0]])}>{group.sockets[0].name}</button>
+          <button type="button" aria-pressed={isSocketChoiceSelected([group.sockets[1]])} className={isSocketChoiceSelected([group.sockets[1]]) ? 'selected' : ''} onClick={() => place([group.sockets[1]])}>{group.sockets[1].name}</button>
+          <button type="button" aria-pressed={isSocketChoiceSelected(group.sockets)} className={isSocketChoiceSelected(group.sockets) ? 'selected' : ''} onClick={() => place(group.sockets)}>Pair</button>
+        </> : <button type="button" aria-pressed={isSocketChoiceSelected(group.sockets)} className={isSocketChoiceSelected(group.sockets) ? 'selected' : ''} onClick={() => place(group.sockets)}>Place</button>}</div></div>)}</div>
       </PanelSection>
 
       <PanelSection number={3} title="Adjust Placement" summary={value.length ? `${value.length} selected attachment${value.length === 1 ? '' : 's'}` : 'Place an attachment first'} expanded={visibleStage === 3} completed={value.length > 0} disabled={!value.length} onToggle={() => setActiveStage(3)} regionId="attachment-adjust-section">

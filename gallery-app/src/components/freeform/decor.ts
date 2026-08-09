@@ -89,7 +89,9 @@ export function createPatternSvg(patternId: string, color: string, placement: De
   const pattern = getPattern(patternId);
   if (!pattern) return '';
   const content = pattern.content.replaceAll('currentColor', color);
-  const y = placement === 'upper' ? 26 : placement === 'lower' ? 174 : 100;
+  // Three.js uploads these SVG textures with a vertically flipped texture axis,
+  // so the source rows must be authored opposite the pottery-space labels.
+  const y = placement === 'upper' ? 174 : placement === 'lower' ? 26 : 100;
   const patternRows = placement === 'full'
     // Reserve the upper rim area, then repeat complete pattern rows only.
     ? [6, 72, 138, 204].map((offset) => `<g transform="translate(0 ${offset})">${content}</g>`).join('')

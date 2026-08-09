@@ -34,7 +34,10 @@ describe('AttachmentTab guided workflow', () => {
 
     fireEvent.click(attachmentCard);
     expect(screen.getByRole('button', { name: /Choose Position.*Select a socket/ })).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Pair' }));
+    const pairButton = screen.getByRole('button', { name: 'Pair' });
+    expect(pairButton).toHaveAttribute('aria-pressed', 'false');
+    expect(pairButton).not.toHaveClass('selected');
+    fireEvent.click(pairButton);
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     const selection = onChange.mock.calls.at(-1)![0][0];
     expect(selection).toMatchObject({ version: 4, recipeKey: 'bamboo-loop', family: 'handle' });
@@ -46,6 +49,10 @@ describe('AttachmentTab guided workflow', () => {
     }
     rerender(<Harness />);
     await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Choose Position/ }));
+    expect(screen.getByRole('button', { name: 'Pair' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Pair' })).toHaveClass('selected');
+    fireEvent.click(screen.getByRole('button', { name: /Adjust Placement/ }));
     expect(screen.getByRole('button', { name: /Adjust Placement.*1 selected attachment/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('tab', { name: 'Left' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Right' })).toBeInTheDocument();
