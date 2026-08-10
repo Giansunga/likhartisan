@@ -34,8 +34,8 @@ export default function Layout() {
   const isFreeform = location.pathname === '/freeform';
   const isChat = location.pathname === '/chat';
   const hideNavPadding = isAdmin || isArtisan || isFreeform;
-  // Hide footer and bottom nav on chat/freeform to prevent mobile layout conflicts/flash
-  const hideFooterAndBottom = isFreeform || isArtisan;
+  const hideFooter = isFreeform || isArtisan;
+  const hideBottomNav = isArtisan;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -73,8 +73,8 @@ export default function Layout() {
         <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} layout-main${isChat ? ' layout-main--chat' : ''}`}>
           <Outlet />
         </main>
-        {!hideFooterAndBottom && <Footer />}
-        {!hideFooterAndBottom && <BottomNav />}
+        {!hideFooter && <Footer />}
+        {!hideBottomNav && <BottomNav />}
       </div>
     </LayoutErrorBoundary>
   );

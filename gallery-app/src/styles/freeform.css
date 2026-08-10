@@ -1943,6 +1943,13 @@
   .freeform-instruction-dot { display: none; }
 }
 
+@media (max-width: 768px) {
+  .layout-main:has(.freeform-page) { padding-bottom: 0; }
+  .freeform-page { padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+  .freeform-mobile-actions { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .freeform-bottom-wrap { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}
+
 @media (min-width: 768px) and (max-width: 1100px) and (max-height: 500px) {
   .freeform-stepper { padding-top: 5px; padding-bottom: 5px; }
   .freeform-step-subtitle { display: none; }
