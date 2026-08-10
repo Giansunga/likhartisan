@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
@@ -21,6 +21,17 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import LikhAIDock from './components/LikhAIDock';
 import AdminLayout from './components/admin/AdminLayout';
+import ArtisanLayout from './components/artisan/ArtisanLayout';
+import {
+  ArtisanListingsRoute,
+  ArtisanMessagesRoute,
+  ArtisanNotificationsRoute,
+  ArtisanOrdersRoute,
+  ArtisanOverviewRoute,
+  ArtisanProfileRoute,
+  ArtisanRequestsRoute,
+  ArtisanVaultRoute,
+} from './pages/artisan/ArtisanRoutes';
 
 
 // Lazy-loaded heavy pages
@@ -28,8 +39,6 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const FreeformPage = lazy(() => import('./pages/FreeformPage'));
-const ArtisanDashboardPage = lazy(() => import('./pages/artisan/ArtisanDashboardPage'));
-
 // Admin lazy pages
 const AdminOrdersPage = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
@@ -83,7 +92,8 @@ function AppShell() {
   const isCartPage = location.pathname === '/cart';
   const isChatPage = location.pathname === '/chat';
   const isDashboardPage = location.pathname === '/dashboard';
-  const shouldHideDock = isMobile && (isProductPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage);
+  const isArtisanPage = location.pathname.startsWith('/artisan-dashboard');
+  const shouldHideDock = isArtisanPage || (isMobile && (isProductPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
 
   return (
     <>
@@ -109,7 +119,19 @@ function AppShell() {
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="freeform" element={<FreeformPage />} />
-            <Route path="artisan-dashboard" element={<ArtisanDashboardPage />} />
+          </Route>
+          <Route path="artisan-dashboard" element={<Layout />}>
+            <Route element={<ArtisanLayout />}>
+              <Route index element={<ArtisanOverviewRoute />} />
+              <Route path="orders" element={<ArtisanOrdersRoute />} />
+              <Route path="messages" element={<ArtisanMessagesRoute />} />
+              <Route path="listings" element={<ArtisanListingsRoute />} />
+              <Route path="requests" element={<ArtisanRequestsRoute />} />
+              <Route path="profile" element={<ArtisanProfileRoute />} />
+              <Route path="design-vault" element={<ArtisanVaultRoute />} />
+              <Route path="notifications" element={<ArtisanNotificationsRoute />} />
+              <Route path="*" element={<Navigate to="/artisan-dashboard" replace />} />
+            </Route>
           </Route>
           <Route path="update-password" element={<UpdatePasswordPage />} />
           <Route path="/admin" element={<AdminLayout />}>

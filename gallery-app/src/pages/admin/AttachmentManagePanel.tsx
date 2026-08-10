@@ -118,7 +118,7 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
   if (loading) return <div className="py-16 text-center text-brown-medium">Loading generated catalog…</div>;
 
   return <div className="space-y-7">
-    <div className="flex items-start justify-between gap-4"><div><button onClick={onBack} className="text-sm text-brown-medium hover:text-primary mb-2">← Base models</button><h2 className="text-2xl font-bold text-brown-dark">Generated Attachments</h2><p className="text-sm text-brown-medium mt-1">Geometry is fixed in code. Configure availability, pricing, production time, and shop overrides.</p></div><span className="px-3 py-2 rounded-xl bg-cream-secondary text-xs font-semibold text-brown-medium whitespace-nowrap">{GENERATED_ATTACHMENT_RECIPES.length} code-owned recipes</span></div>
+    <div className="portal-action-bar portal-action-bar--between"><button onClick={onBack} className="text-sm text-brown-medium hover:text-primary">← Base models</button><span className="px-3 py-2 rounded-xl bg-cream-secondary text-xs font-semibold text-brown-medium whitespace-nowrap">{GENERATED_ATTACHMENT_RECIPES.length} code-owned recipes</span></div>
     {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>}
     {message && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">{message}</div>}
 

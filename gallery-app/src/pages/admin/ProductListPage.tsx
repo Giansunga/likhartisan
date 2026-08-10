@@ -220,11 +220,7 @@ export default function ProductListPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-brown-dark">Product Management</h2>
-          <p className="text-sm text-brown-medium mt-1">Manage all pottery listings</p>
-        </div>
+      <div className="portal-action-bar">
         <Link
           to="/admin/products/create"
           className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors flex items-center gap-2"

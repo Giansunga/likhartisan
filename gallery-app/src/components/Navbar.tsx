@@ -291,7 +291,7 @@ export default function Navbar() {
           {unreadNotifications > 0 && (
             <button onClick={markAllRead} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
           )}
-          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard/notifications'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
         </div>
       </div>
       <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
@@ -315,7 +315,7 @@ export default function Navbar() {
                   markNotificationRead(n.id); 
                   setShowNotifications(false); 
                   if (n.order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
-                    navigate(`/artisan-dashboard?panel=orders&orderId=${n.order_id}`);
+                    navigate(`/artisan-dashboard/orders?orderId=${n.order_id}`);
                   } else if (n.order_id) {
                     navigate('/dashboard?tab=purchases');
                     window.dispatchEvent(new CustomEvent('deep-link-order', { detail: { orderId: n.order_id } }));

@@ -3,8 +3,6 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE } from '../lib/api';
-import { FALLBACK_BUYER_NAME } from '../lib/constants';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
@@ -15,11 +13,13 @@ import AttachmentTab from '../components/freeform/AttachmentTab';
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import SavedDesignsModal from '../components/freeform/SavedDesignsModal';
+import SendDesignRequestModal, { type RequestShop } from '../components/freeform/SendDesignRequestModal';
 import { type SavedDesign } from '../hooks/useSavedDesigns';
 import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
 import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
+import { createDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -91,6 +91,8 @@ export default function FreeformPage() {
   const [shops, setShops] = useState<any[]>([]);
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
+  const [requestConversationId, setRequestConversationId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [designName, setDesignName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -394,122 +396,39 @@ function applyDesign(design: {
       return;
     }
 
-    // Default to the design's associated shop if available
-    if (selectedShopId) {
-      const { data: shop } = await supabase.from('shops').select('*').eq('id', selectedShopId).maybeSingle();
-      if (shop) {
-        setShops([shop]);
-        setSelectedShop(shop.id);
-        setShowShopModal(true);
-        return;
-      }
-    }
-
     const { data } = await supabase.from('shops').select('*').order('created_at', { ascending: false });
     if (data && data.length > 0) {
       setShops(data);
-      setSelectedShop(null);
+      setSelectedShop(data.some(shop => shop.id === selectedShopId) ? selectedShopId : null);
+      setRequestToken(crypto.randomUUID());
+      setRequestConversationId(null);
       setShowShopModal(true);
     } else {
       toast.error('No shops available yet.');
     }
   }
 
-  async function handleSubmitToShop() {
+  async function handleSubmitToShop(quantity: number, buyerNote: string) {
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
-
-    if (!user) { setSubmitting(false); return; }
-
-    const shop = shops.find((s) => s.id === selectedShop);
-    if (!shop) { setSubmitting(false); return; }
-
-    const payload = JSON.stringify({
-      type: 'design_submission',
-      message: 'I designed a custom pottery piece and would like to submit it for creation.',
-      design: {
-        model: modelName,
-        model_file: selectedModel,
-        shape: shapeParams,
-        material: materialParams,
-        decor: decorationParams,
-        attachments: attachmentParams,
-      },
-    });
-
-    // Find or create conversation
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('buyer_id', user.id)
-      .eq('shop_id', shop.id)
-      .maybeSingle();
-
-    let convId = existing?.id;
-    if (!convId) {
-      const meta = user.user_metadata || {};
-      const { data: newConv, error } = await supabase
-        .from('conversations')
-        .insert({
-          buyer_id: user.id,
-          shop_id: shop.id,
-          shop_name: shop.name,
-          buyer_name: meta.name || user.email || FALLBACK_BUYER_NAME,
-          buyer_avatar: meta.avatar_url || '',
-          last_message: payload,
-          last_message_at: new Date().toISOString(),
-          buyer_unread: 0,
-          artisan_unread: 1,
-        })
-        .select('id')
-        .single();
-      if (error) {
-        toast.error('Could not start conversation. Please try again.');
-        setSubmitting(false);
-        return;
-      }
-      convId = newConv?.id;
-    }
-
-    // Send message
-    if (convId) {
-      await supabase.from('messages').insert({
-        conversation_id: convId,
-        sender_id: user.id,
-        text: payload,
+    if (!user || quantity < 1 || quantity > 100) { setSubmitting(false); return; }
+    try {
+      const { data, error } = await supabase.rpc('submit_design_request', {
+        p_shop_id: selectedShop,
+        p_client_token: requestToken,
+        p_design_snapshot: requestSnapshot,
+        p_quantity: quantity,
+        p_buyer_note: buyerNote.trim(),
       });
-      await supabase
-        .from('conversations')
-        .update({ last_message: payload, last_message_at: new Date().toISOString(), artisan_unread: 1 })
-        .eq('id', convId);
-      // Create real notification for shop owner via backend API to bypass RLS
-      try {
-        const { data: shopOwner } = await supabase.from('shops').select('owner_id').eq('id', shop.id).single();
-        if (shopOwner?.owner_id) {
-          const meta = user?.user_metadata || {};
-          const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
-          const { data: { session } } = await supabase.auth.getSession();
-          await fetch(`${API_BASE}/api/notifications`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
-            },
-            body: JSON.stringify({
-              user_id: shopOwner.owner_id,
-              type: 'message',
-              title: 'Design Inquiry',
-              message: `${buyerName}: ${payload.substring(0, 80)}`,
-              product_image: '',
-            })
-          });
-        }
-      } catch (e) { console.error('Failed to create message notification:', e); }
+      if (error) throw error;
+      setRequestConversationId(data?.conversation_id || null);
+      toast.success('Your design request was sent.');
+    } catch (error) {
+      console.error('Design request submission failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not send the design request. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    setShowShopModal(false);
-    navigate('/chat');
   }
 
   /* ─── Derived state ─── */
@@ -526,6 +445,15 @@ function applyDesign(design: {
   const attachmentEstimate = attachmentTotals(attachmentParams);
   const estimatedPrice = basePrice + attachmentEstimate.price;
   const estimatedDays = baseDays + attachmentEstimate.productionDays;
+  const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
+    model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
+    shape: { ...shapeParams },
+    material: { ...materialParams },
+    decoration: { ...decorationParams },
+    attachments: attachmentParams,
+    dimensions: { heightCm: shapeParams.height, widthCm: shapeParams.bodyWidth },
+    estimate: { price: estimatedPrice, productionDays: estimatedDays },
+  });
 
   /* ─── Render ─── */
 
@@ -987,64 +915,18 @@ function applyDesign(design: {
         </div>
       )}
 
-      {/* ── SHOP SELECTION MODAL ── */}
-      {showShopModal && (
-        <div className="freeform-modal-overlay" onClick={() => setShowShopModal(false)}>
-          <div className="freeform-modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowShopModal(false)}
-              style={{
-                position: 'absolute', top: '16px', right: '16px',
-                width: '28px', height: '28px', borderRadius: '50%',
-                border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
-              aria-label="Close"
-            >
-              &times;
-            </button>
-            <div style={{ padding: '28px 28px 0' }}>
-              <h3 className="freeform-modal-title">Select a Shop</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px' }}>Choose who to send your design to</p>
-            </div>
-            <div style={{ padding: '16px 28px', maxHeight: '320px', overflowY: 'auto' }}>
-              {shops.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedShop(s.id)}
-                  className={`freeform-tab-option${selectedShop === s.id ? ' selected' : ''}`}
-                  style={{ marginBottom: '8px' }}
-                >
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    {s.image ? (
-                      <img src={s.image} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--primary-color)' }}>{s.name.charAt(0)}</span>
-                    )}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.name}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div style={{ padding: '16px 28px 28px', display: 'flex', gap: '12px' }}>
-              <button onClick={() => setShowShopModal(false)} className="freeform-tab-btn-outline" style={{ flex: 1 }}>Cancel</button>
-              <button
-                onClick={handleSubmitToShop}
-                disabled={!selectedShop || submitting}
-                className="freeform-save-btn"
-                style={{ flex: 1, marginBottom: 0, opacity: !selectedShop || submitting ? 0.5 : 1 }}
-              >
-                {submitting ? 'Sending...' : 'Send Design'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SendDesignRequestModal
+        open={showShopModal}
+        shops={shops as RequestShop[]}
+        selectedShopId={selectedShop}
+        snapshot={selectedModel ? requestSnapshot : null}
+        submitting={submitting}
+        successConversationId={requestConversationId}
+        onSelectShop={(shop) => { setSelectedShop(shop.id); setSelectedShopId(shop.id); setSelectedShopName(shop.name); }}
+        onSubmit={(quantity, note) => void handleSubmitToShop(quantity, note)}
+        onClose={() => { if (!submitting) setShowShopModal(false); }}
+        onOpenMessages={() => navigate(requestConversationId ? `/chat?conversation=${encodeURIComponent(requestConversationId)}` : '/chat')}
+      />
 
       {/* ── SHOP SELECT MODAL (freeform entry) ── */}
       <ShopSelectModal

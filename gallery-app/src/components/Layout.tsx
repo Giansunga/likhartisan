@@ -35,7 +35,7 @@ export default function Layout() {
   const isChat = location.pathname === '/chat';
   const hideNavPadding = isAdmin || isArtisan || isFreeform;
   // Hide footer and bottom nav on chat/freeform to prevent mobile layout conflicts/flash
-  const hideFooterAndBottom = isFreeform;
+  const hideFooterAndBottom = isFreeform || isArtisan;
 
   useEffect(() => {
     window.scrollTo(0, 0);

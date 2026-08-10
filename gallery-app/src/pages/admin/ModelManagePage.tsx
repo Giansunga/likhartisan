@@ -163,11 +163,7 @@ export default function ModelManagePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-brown-dark">3D Model Management</h2>
-          <p className="text-sm text-brown-medium mt-1">Manage preset models for the freeform customizer</p>
-        </div>
+      <div className="portal-action-bar">
         <button onClick={openCreate}
           className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors flex items-center gap-2">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">

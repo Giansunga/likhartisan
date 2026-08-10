@@ -201,7 +201,7 @@ export default function ProductCreatePage() {
   const isValid = form.name && form.category && form.shopId;
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div>
 
       {submitted ? (
         <div style={{
@@ -216,12 +216,6 @@ export default function ProductCreatePage() {
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
-
-          {/* Header */}
-          <div style={{ marginBottom: '28px' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#2C1810', margin: '0 0 4px' }}>Upload New 3D Product</h2>
-            <p style={{ fontSize: '0.85rem', color: '#8C7B6E', margin: 0 }}>Assign a pottery product to an artisan shop</p>
-          </div>
 
           {/* Section: Product Information */}
           <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E8E0D8', padding: '28px 32px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>

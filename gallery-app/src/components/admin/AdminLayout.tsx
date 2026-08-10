@@ -3,6 +3,8 @@ import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
+import '../portal.css';
+import './admin.css';
 
 interface NavLinkItem {
   to: string;
@@ -84,9 +86,9 @@ export default function AdminLayout() {
   let lastSection = '';
 
   return (
-    <div style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
+    <div className="admin-shell" style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
       {/* ── HEADER ── */}
-      <header style={{
+      <header className="admin-header" style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: `${HEADER_HEIGHT}px`,
         background: '#fff', borderBottom: '1px solid #E9DED2',
         zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -128,9 +130,9 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <div style={{ display: 'flex', marginTop: `${HEADER_HEIGHT}px`, minHeight: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
+      <div className="admin-content-frame" style={{ display: 'flex', marginTop: `${HEADER_HEIGHT}px`, minHeight: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
         {/* ── SIDEBAR ── */}
-        <aside style={{
+        <aside className="admin-sidebar" style={{
           width: `${SIDEBAR_WIDTH}px`, minWidth: `${SIDEBAR_WIDTH}px`,
           background: '#fff', borderRight: '1px solid #E9DED2',
           position: 'fixed', top: `${HEADER_HEIGHT}px`, left: 0,
@@ -197,11 +199,11 @@ export default function AdminLayout() {
         </aside>
 
         {/* ── MAIN CONTENT ── */}
-        <main style={{
-          flex: 1, padding: '28px 32px', background: '#FAF7F2',
-          minWidth: 0, marginLeft: `${SIDEBAR_WIDTH}px`,
+        <main className="admin-main" style={{
+          flex: 1, padding: 0, background: '#FAF7F2',
+          minWidth: 0, marginLeft: `${SIDEBAR_WIDTH}px`, height: `calc(100vh - ${HEADER_HEIGHT}px)`, overflow: 'hidden',
         }}>
-          <Outlet />
+          <div className="admin-route-workspace"><Outlet /></div>
         </main>
       </div>
     </div>

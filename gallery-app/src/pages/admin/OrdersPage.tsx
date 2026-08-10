@@ -10,11 +10,11 @@ import {
   OrdersToolbar,
   QueueTabs,
   StatusBadge,
-  formatCurrency,
   type DetailTab,
   type FilterChip,
   type QueueKey,
 } from '../../components/admin/orders/OrderManagementUI';
+import { formatCurrency, matchesQueue } from '../../components/admin/orders/orderManagementUtils';
 import { exportToCsv } from '../../lib/csvExport';
 import type { Order, OrderActivityLog } from '../../types';
 import '../../components/admin/orders/orders.css';
@@ -65,7 +65,6 @@ export default function OrdersPage() {
   const [exceptionFilter, setExceptionFilter] = useState<'all' | 'problematic' | 'investigation'>('all');
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [filterPayment, setFilterPayment] = useState('all');
-  const [filterDelivery, setFilterDelivery] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -437,10 +436,7 @@ export default function OrdersPage() {
   /* ── filtering ── */
   const filtered = useMemo(() => {
     let list = [...orders];
-    if (activeQueue === 'cancelled') list = list.filter(o => o.status === 'cancelled');
-    else if (activeQueue === 'completed') list = list.filter(o => o.status === 'completed' || o.delivery_status === 'completed');
-    else if (activeQueue === 'pending') list = list.filter(o => o.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(o.status));
-    else if (activeQueue !== 'all') list = list.filter(o => o.delivery_status === activeQueue && o.status !== 'cancelled');
+    list = list.filter(order => matchesQueue(order, activeQueue));
     if (search) {
       const s = search.toLowerCase();
       list = list.filter(o =>
@@ -453,7 +449,6 @@ export default function OrdersPage() {
     if (filterPayment !== 'all') list = list.filter(o => o.payment_status === filterPayment);
     if (exceptionFilter === 'problematic') list = list.filter(o => o.is_problematic);
     if (exceptionFilter === 'investigation') list = list.filter(o => o.flagged_for_investigation);
-    if (filterDelivery !== 'all') list = list.filter(o => o.delivery_status === filterDelivery);
     if (filterType !== 'all') list = list.filter(o => (o.order_type || 'product') === filterType);
     if (dateFrom) list = list.filter(o => new Date(o.created_at) >= new Date(dateFrom));
     if (dateTo) {
@@ -468,7 +463,7 @@ export default function OrdersPage() {
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return list;
-  }, [orders, activeQueue, search, filterPayment, filterDelivery, filterType, exceptionFilter, dateFrom, dateTo, sortField, sortDir]);
+  }, [orders, activeQueue, search, filterPayment, filterType, exceptionFilter, dateFrom, dateTo, sortField, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -525,7 +520,6 @@ export default function OrdersPage() {
     setActiveQueue('all');
     setExceptionFilter('all');
     setFilterPayment('all');
-    setFilterDelivery('all');
     setFilterType('all');
     setDateFrom('');
     setDateTo('');
@@ -578,13 +572,9 @@ export default function OrdersPage() {
         )}
       </AnimatePresence>
 
-      <header className="orders-page-header">
-        <div>
-          <h1>Orders Management</h1>
-          <p>Process fulfillment across every LikhArtisan shop.</p>
-        </div>
+      <div className="portal-action-bar">
         <span className="orders-page-header-meta">{filtered.length} matching order{filtered.length === 1 ? '' : 's'}</span>
-      </header>
+      </div>
 
       <QueueTabs tabs={queueTabs} active={activeQueue} onChange={selectQueue} />
 
@@ -683,7 +673,7 @@ export default function OrdersPage() {
 
                 {/* ── OVERVIEW TAB ── */}
                 {detailTab === 'overview' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div className="orders-detail-summary-grid">
 
                     {/* customer info */}
                     <SectionCard title="Customer Information">
@@ -709,7 +699,7 @@ export default function OrdersPage() {
 
                     {/* customized design preview (if applicable) */}
                     {selectedOrder.order_type === 'customized' && selectedOrder.items?.[0]?.variation && (
-                      <SectionCard title="Customized Design">
+                      <SectionCard title="Customized Design" className="orders-detail-span-2">
                         <InfoRow label="Finish / Color / Decor" value={displayVariation(selectedOrder.items[0].variation) || selectedOrder.items[0].variation || '--'} />
                       </SectionCard>
                     )}
@@ -733,12 +723,12 @@ export default function OrdersPage() {
                     </SectionCard>
 
                     {/* timeline */}
-                    <SectionCard title="Order Timeline">
+                    <SectionCard title="Order Timeline" className="orders-detail-span-2">
                       <OrderTimeline order={selectedOrder} />
                     </SectionCard>
 
                     {/* notes */}
-                    <SectionCard title="Notes">
+                    <SectionCard title="Notes" className="orders-detail-span-2">
                       <div style={{ marginBottom: '12px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', display: 'block', marginBottom: '6px' }}>Seller Notes</label>
                         <textarea
@@ -775,41 +765,6 @@ export default function OrdersPage() {
                       </div>
                     </SectionCard>
 
-                    {/* admin quick actions */}
-                    <SectionCard title="Admin Actions">
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {selectedOrder.status === 'pending' && (
-                          <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Confirm Order', message: 'Mark this order as confirmed (paid)?', confirmLabel: 'Confirm', action: () => updateOrderStatus(selectedOrder.id, 'paid') })}>
-                            Confirm Order
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'pending' && selectedOrder.status !== 'cancelled' && (
-                          <ActionBtn color="#1565C0" onClick={() => setConfirm({ open: true, title: 'Start Preparing', message: 'Move this order to preparing status?', confirmLabel: 'Start', action: () => updateDeliveryStatus(selectedOrder.id, 'preparing') })}>
-                            Start Preparing
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'preparing' && (
-                          <ActionBtn color="#6A1B9A" onClick={() => setConfirm({ open: true, title: 'Ship Order', message: 'Mark this order as shipped?', confirmLabel: 'Ship', action: () => updateDeliveryStatus(selectedOrder.id, 'shipped') })}>
-                            Ship / Hand to Courier
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'shipped' && (
-                          <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Mark Delivered', message: 'Confirm this order has been delivered?', confirmLabel: 'Delivered', action: () => updateDeliveryStatus(selectedOrder.id, 'delivered') })}>
-                            Mark Delivered
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'delivered' && (
-                          <ActionBtn color="#1B5E20" onClick={() => setConfirm({ open: true, title: 'Complete Order', message: 'Mark this order as fully completed?', confirmLabel: 'Complete', action: () => updateDeliveryStatus(selectedOrder.id, 'completed') })}>
-                            Complete
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'completed' && selectedOrder.status !== 'refunded' && (
-                          <ActionBtn color="#C62828" onClick={() => setConfirm({ open: true, title: 'Cancel Order', message: 'Are you sure? This cannot be undone. Provide a reason below.', confirmLabel: 'Cancel Order', confirmDanger: true, action: () => updateOrderStatus(selectedOrder.id, 'cancelled', 'Cancelled by admin') })}>
-                            Cancel Order
-                          </ActionBtn>
-                        )}
-                      </div>
-                    </SectionCard>
                   </div>
                 )}
 
@@ -895,31 +850,6 @@ export default function OrdersPage() {
                       <InfoRow label="Delivery Notes" value={selectedOrder.delivery_notes || '--'} />
                     </SectionCard>
 
-                    {/* delivery status update */}
-                    <SectionCard title="Update Delivery Status">
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {selectedOrder.delivery_status === 'pending' && selectedOrder.status !== 'cancelled' && (
-                          <ActionBtn color="#1565C0" onClick={() => setConfirm({ open: true, title: 'Start Preparing', message: 'Move this order to preparing status?', confirmLabel: 'Start', action: () => updateDeliveryStatus(selectedOrder.id, 'preparing') })}>
-                            Start Preparing
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'preparing' && (
-                          <ActionBtn color="#6A1B9A" onClick={() => setConfirm({ open: true, title: 'Ship Order', message: 'Mark this order as shipped?', confirmLabel: 'Ship', action: () => updateDeliveryStatus(selectedOrder.id, 'shipped') })}>
-                            Ship / Hand to Courier
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'shipped' && (
-                          <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Mark Delivered', message: 'Confirm this order has been delivered?', confirmLabel: 'Delivered', action: () => updateDeliveryStatus(selectedOrder.id, 'delivered') })}>
-                            Mark Delivered
-                          </ActionBtn>
-                        )}
-                        {selectedOrder.delivery_status === 'delivered' && (
-                          <ActionBtn color="#1B5E20" onClick={() => setConfirm({ open: true, title: 'Complete Order', message: 'Mark this order as fully completed?', confirmLabel: 'Complete', action: () => updateDeliveryStatus(selectedOrder.id, 'completed') })}>
-                            Complete
-                          </ActionBtn>
-                        )}
-                      </div>
-                    </SectionCard>
                   </div>
                 )}
 
@@ -1197,15 +1127,15 @@ export default function OrdersPage() {
    SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function SectionCard({ title, children, accent }: { title: string; children: React.ReactNode; accent?: string }) {
+function SectionCard({ title, children, accent, className = '' }: { title: string; children: React.ReactNode; accent?: string; className?: string }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden' }}>
+    <section className={`orders-detail-section ${className}`.trim()} style={{ background: '#fff', border: '1px solid #EDE8E2', borderRadius: '14px', overflow: 'hidden' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #F0EBE4', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {accent && <span style={{ width: '4px', height: '18px', borderRadius: '2px', background: accent }} />}
         <h3 style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', fontFamily: 'var(--font-serif)', margin: 0 }}>{title}</h3>
       </div>
       <div style={{ padding: '16px 20px' }}>{children}</div>
-    </div>
+    </section>
   );
 }
 

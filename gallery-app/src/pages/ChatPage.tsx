@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +54,7 @@ function ShopAvatar({ shopId: _shopId, shopName, image, size, style }: { shopId:
 }
 
 export default function ChatPage() {
+  const [searchParams] = useSearchParams();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
@@ -79,6 +80,13 @@ export default function ChatPage() {
   const [shopPresenceMap, setShopPresenceMap] = useState<Record<string, boolean>>({});
   const [lastSeenMap, setLastSeenMap] = useState<Record<string, string>>({});
   const { user } = useAuth();
+
+  useEffect(() => {
+    const requestedConversation = searchParams.get('conversation');
+    if (!requestedConversation || !conversations.length) return;
+    const match = conversations.find(conversation => conversation.id === requestedConversation);
+    if (match && match.id !== selectedConv?.id) queueMicrotask(() => { setSelectedConv(match); setMobileShowChat(true); });
+  }, [conversations, searchParams, selectedConv?.id]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { init(); }, [user]);
@@ -619,7 +627,7 @@ export default function ChatPage() {
                               let text = msg.text;
                               try {
                                 const p = JSON.parse(msg.text);
-                                if (p.type === 'design_submission' || p.design) {
+                                if (p.type === 'design_submission' || p.type === 'design_request' || p.type === 'design_request_update' || p.design) {
                                   designData = p;
                                   text = p.message;
                                 } else if (p.type === 'product_inquiry') {
