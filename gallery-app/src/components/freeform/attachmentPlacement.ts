@@ -18,6 +18,7 @@ export type AttachmentTransformLimits = {
   surfaceOffsetRatio: TransformRange;
   twistDegrees: TransformRange;
   scaleMultiplier: TransformRange;
+  thicknessMultiplier: TransformRange;
 };
 
 export type AttachmentPlacementLimitMap = Record<string, AttachmentTransformLimits | null>;
@@ -151,6 +152,9 @@ export function getSocketTransformLimits(recipe: GeneratedAttachmentRecipe, sock
     surfaceOffsetRatio: { min: 0.002, max: 0.08, step: 0.002 },
     twistDegrees: { min: -180, max: 180, step: 1 },
     scaleMultiplier: { min: minimumScale, max: maximumScale, step: 0.05 },
+    thicknessMultiplier: recipe.family === 'handle'
+      ? { min: 0.5, max: 1.5, step: 0.05 }
+      : { min: 1, max: 1, step: 0.05 },
   };
 }
 
@@ -161,6 +165,7 @@ export function clampAttachmentTransform(transform: AttachmentPlacementTransform
     surfaceOffsetRatio: clamp(transform.surfaceOffsetRatio, limits.surfaceOffsetRatio),
     twistDegrees: clamp(transform.twistDegrees, limits.twistDegrees),
     scaleMultiplier: clamp(transform.scaleMultiplier, limits.scaleMultiplier),
+    thicknessMultiplier: clamp(transform.thicknessMultiplier, limits.thicknessMultiplier),
   };
 }
 
@@ -247,8 +252,9 @@ export function isAttachmentPlacementSafe(scene: THREE.Object3D, socket: Generat
 
   const boxSize = resolved.box.getSize(new THREE.Vector3());
   const twist = THREE.MathUtils.degToRad(clamped.twistDegrees);
-  const rawWidth = recipe.envelope.width * recipe.scaleRatio * clamped.scaleMultiplier * resolved.maxDimension;
-  const rawHeight = recipe.envelope.height * recipe.scaleRatio * clamped.scaleMultiplier * resolved.maxDimension;
+  const thicknessSafetyFactor = Math.max(1, clamped.thicknessMultiplier);
+  const rawWidth = recipe.envelope.width * recipe.scaleRatio * clamped.scaleMultiplier * thicknessSafetyFactor * resolved.maxDimension;
+  const rawHeight = recipe.envelope.height * recipe.scaleRatio * clamped.scaleMultiplier * thicknessSafetyFactor * resolved.maxDimension;
   const scaledWidth = Math.abs(rawWidth * Math.cos(twist)) + Math.abs(rawHeight * Math.sin(twist));
   const scaledHeight = Math.abs(rawHeight * Math.cos(twist)) + Math.abs(rawWidth * Math.sin(twist));
   const angularHalfWidth = THREE.MathUtils.radToDeg((scaledWidth * 0.5) / Math.max(resolved.radialDistance, 0.0001));
@@ -276,8 +282,10 @@ export function attachmentPlacementsCollide(
   if (!firstMount || !secondMount) return true;
   const firstCenter = firstMount.position;
   const secondCenter = secondMount.position;
-  const firstRadius = Math.hypot(first.recipe.envelope.width * firstMount.scale, first.recipe.envelope.height * firstMount.verticalScale, first.recipe.envelope.depth * firstMount.scale) * 0.42;
-  const secondRadius = Math.hypot(second.recipe.envelope.width * secondMount.scale, second.recipe.envelope.height * secondMount.verticalScale, second.recipe.envelope.depth * secondMount.scale) * 0.42;
+  const firstThickness = Math.max(1, first.transform.thicknessMultiplier);
+  const secondThickness = Math.max(1, second.transform.thicknessMultiplier);
+  const firstRadius = Math.hypot(first.recipe.envelope.width * firstMount.scale * firstThickness, first.recipe.envelope.height * firstMount.verticalScale * firstThickness, first.recipe.envelope.depth * firstMount.scale * firstThickness) * 0.42;
+  const secondRadius = Math.hypot(second.recipe.envelope.width * secondMount.scale * secondThickness, second.recipe.envelope.height * secondMount.verticalScale * secondThickness, second.recipe.envelope.depth * secondMount.scale * secondThickness) * 0.42;
   return firstCenter.distanceTo(secondCenter) < firstRadius + secondRadius;
 }
 
@@ -326,7 +334,7 @@ export function getLiveAttachmentTransformLimits(
   const isSafe = (candidate: AttachmentPlacementTransform) => isAttachmentPlacementSafe(scene, socket, recipe, candidate, box) && extraSafetyCheck(candidate, box);
   if (!isSafe(current)) {
     const fallbackCandidates = [
-      clampAttachmentTransform({ ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: current.scaleMultiplier }, hardLimits),
+      clampAttachmentTransform({ ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: current.scaleMultiplier, thicknessMultiplier: current.thicknessMultiplier }, hardLimits),
       clampAttachmentTransform({ ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: hardLimits.scaleMultiplier.min }, hardLimits),
     ];
     const fallback = fallbackCandidates.find(isSafe);

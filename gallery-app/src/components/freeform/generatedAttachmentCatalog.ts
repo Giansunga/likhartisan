@@ -26,23 +26,79 @@ export type GeneratedAttachmentRecipe = {
 
 const clay = () => new THREE.MeshStandardMaterial({ color: '#BE734F', roughness: 0.85, metalness: 0 });
 
+type ThicknessController = (multiplier: number) => void;
+const thicknessControllers = new WeakMap<THREE.Group, ThicknessController[]>();
+
+function registerThicknessController(group: THREE.Group, controller: ThicknessController) {
+  const controllers = thicknessControllers.get(group) || [];
+  controllers.push(controller);
+  thicknessControllers.set(group, controllers);
+}
+
+function registerScaleThickness(group: THREE.Group, object: THREE.Object3D, axes: readonly [number, number, number]) {
+  const baseScale = object.scale.clone();
+  registerThicknessController(group, (multiplier) => {
+    object.scale.set(
+      baseScale.x * (axes[0] ? multiplier : 1),
+      baseScale.y * (axes[1] ? multiplier : 1),
+      baseScale.z * (axes[2] ? multiplier : 1),
+    );
+  });
+}
+
+function registerTubeThickness(group: THREE.Group, mesh: THREE.Mesh, curve: THREE.Curve<THREE.Vector3>, tubularSegments: number, radialSegments: number) {
+  const positions = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+  const basePositions = Float32Array.from(positions.array as ArrayLike<number>);
+  const centers = new Float32Array(basePositions.length);
+  for (let ring = 0; ring <= tubularSegments; ring++) {
+    const center = curve.getPointAt(ring / tubularSegments);
+    for (let radial = 0; radial <= radialSegments; radial++) {
+      const index = (ring * (radialSegments + 1) + radial) * 3;
+      centers[index] = center.x;
+      centers[index + 1] = center.y;
+      centers[index + 2] = center.z;
+    }
+  }
+  registerThicknessController(group, (multiplier) => {
+    for (let index = 0; index < positions.count; index++) {
+      const offset = index * 3;
+      positions.setXYZ(
+        index,
+        centers[offset] + (basePositions[offset] - centers[offset]) * multiplier,
+        centers[offset + 1] + (basePositions[offset + 1] - centers[offset + 1]) * multiplier,
+        centers[offset + 2] + (basePositions[offset + 2] - centers[offset + 2]) * multiplier,
+      );
+    }
+    positions.needsUpdate = true;
+    mesh.geometry.computeBoundingBox();
+    mesh.geometry.computeBoundingSphere();
+  });
+}
+
+export function applyGeneratedAttachmentThickness(group: THREE.Group, multiplier: number) {
+  const safeMultiplier = THREE.MathUtils.clamp(Number.isFinite(multiplier) ? multiplier : 1, 0.5, 1.5);
+  thicknessControllers.get(group)?.forEach((controller) => controller(safeMultiplier));
+}
+
 function thumbnailSvg(label: string, motif: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120"><rect width="160" height="120" rx="18" fill="#F4EDE3"/><g fill="none" stroke="#91470D" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">${motif}</g><text x="80" y="108" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#5D3216">${label}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-function cylinderBetween(start: THREE.Vector3, end: THREE.Vector3, radius: number, segments = 10) {
+function cylinderBetween(start: THREE.Vector3, end: THREE.Vector3, radius: number, segments = 10, thicknessGroup?: THREE.Group) {
   const direction = end.clone().sub(start);
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, direction.length(), segments, 1, false), clay());
   mesh.position.copy(start).add(end).multiplyScalar(0.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  if (thicknessGroup) registerScaleThickness(thicknessGroup, mesh, [1, 0, 1]);
   return mesh;
 }
 
-function addJoint(group: THREE.Group, point: THREE.Vector3, radius: number) {
+function addJoint(group: THREE.Group, point: THREE.Vector3, radius: number, thicknessGroup?: THREE.Group) {
   const joint = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), clay());
   joint.position.copy(point);
   group.add(joint);
+  if (thicknessGroup) registerScaleThickness(thicknessGroup, joint, [1, 1, 1]);
 }
 
 function addHandleLug(group: THREE.Group, y: number, depth = 0.24, height = 0.32, width = 0.27) {
@@ -52,6 +108,11 @@ function addHandleLug(group: THREE.Group, y: number, depth = 0.24, height = 0.32
   lug.position.set(depth, y, 0);
   lug.scale.set(depth, height, width);
   group.add(lug);
+  const basePositionX = lug.position.x;
+  registerThicknessController(group, (multiplier) => {
+    lug.position.x = basePositionX * multiplier;
+    lug.scale.set(depth * multiplier, height * multiplier, width * multiplier);
+  });
   return lug;
 }
 
@@ -69,8 +130,8 @@ function buildBambooLoop() {
     new THREE.Vector3(1.58, -0.48, 0), new THREE.Vector3(1.58, 0.48, 0),
     new THREE.Vector3(1.08, 1.18, 0), new THREE.Vector3(0.18, 1.38, 0),
   ];
-  for (let index = 0; index < points.length - 1; index++) group.add(cylinderBetween(points[index], points[index + 1], 0.18, 10));
-  points.slice(1, -1).forEach((point) => addJoint(group, point, 0.22));
+  for (let index = 0; index < points.length - 1; index++) group.add(cylinderBetween(points[index], points[index + 1], 0.18, 10, group));
+  points.slice(1, -1).forEach((point) => addJoint(group, point, 0.22, group));
   addHandleLug(group, -1.38, 0.18, 0.19, 0.19);
   addHandleLug(group, 1.38, 0.18, 0.19, 0.19);
   return orientHandleOutward(group);
@@ -85,6 +146,9 @@ function buildSquareBridge() {
   outer.position.set(1.73, 0, 0);
   const upper = lower.clone(); upper.material = material.clone(); upper.position.y = 1.25;
   group.add(lower, outer, upper);
+  registerScaleThickness(group, lower, [0, 1, 1]);
+  registerScaleThickness(group, outer, [1, 0, 1]);
+  registerScaleThickness(group, upper, [0, 1, 1]);
   addHandleLug(group, -1.25, 0.18, 0.19, 0.19);
   addHandleLug(group, 1.25, 0.18, 0.19, 0.19);
   return orientHandleOutward(group);
@@ -101,8 +165,11 @@ function buildRoundLoopHandle() {
     new THREE.Vector3(0.78, 1.24, 0),
     new THREE.Vector3(0.18, 1.3, 0),
   ], false, 'centripetal');
-  const loop = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.17, 10, false), clay());
+  const tubularSegments = 48;
+  const radialSegments = 10;
+  const loop = new THREE.Mesh(new THREE.TubeGeometry(curve, tubularSegments, 0.17, radialSegments, false), clay());
   group.add(loop);
+  registerTubeThickness(group, loop, curve, tubularSegments, radialSegments);
 
   addHandleLug(group, -1.3, 0.18, 0.19, 0.19);
   addHandleLug(group, 1.3, 0.18, 0.19, 0.19);

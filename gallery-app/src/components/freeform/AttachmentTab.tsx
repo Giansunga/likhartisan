@@ -7,6 +7,7 @@ import {
   recipeFitsSocket,
   resolveCatalogAssets,
   selectedSocketIds,
+  updateHandleThickness,
   updateAttachmentPlacement,
   upsertAttachmentSelection,
   type AttachmentFamily,
@@ -38,6 +39,7 @@ const CONTROL_CONFIG: Array<{ key: ControlKey; label: string }> = [
   { key: 'surfaceOffsetRatio', label: 'Depth / Surface Offset' },
   { key: 'twistDegrees', label: 'Rotation' },
   { key: 'scaleMultiplier', label: 'Scale' },
+  { key: 'thicknessMultiplier', label: 'Handle Thickness' },
 ];
 
 function formatControlValue(key: ControlKey, value: number, modelHeightCm: number) {
@@ -187,7 +189,9 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm,
     const step = limits[key].step;
     const snappedValue = Math.round(rawValue / step) * step;
     const nextTransform = clampAttachmentTransform({ ...placement.transform, [key]: snappedValue }, limits);
-    onChange(updateAttachmentPlacement(value, selection.id, socketId, nextTransform));
+    onChange(key === 'thicknessMultiplier'
+      ? updateHandleThickness(value, selection.id, nextTransform.thicknessMultiplier)
+      : updateAttachmentPlacement(value, selection.id, socketId, nextTransform));
   }
 
   function renderControl(selection: AttachmentSelection, socketId: string, transform: AttachmentPlacementTransform, limits: AttachmentTransformLimits, key: ControlKey, label: string) {
@@ -195,7 +199,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm,
     const inputId = `attachment-${selection.id}-${socketId}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
     return <div className="attachment-offset-control" key={key}>
       <span><label htmlFor={inputId}><strong>{label}</strong></label><output htmlFor={inputId}>{formatControlValue(key, transform[key], modelHeightCm)}</output></span>
-      <input id={inputId} aria-label={label} type="range" min={range.min} max={range.max} step="any" value={transform[key]} onChange={(event) => updateControl(selection, socketId, key, Number(event.target.value), limits)} />
+      <input id={inputId} aria-label={label} type="range" min={range.min} max={range.max} step={key === 'thicknessMultiplier' ? range.step : 'any'} value={transform[key]} onChange={(event) => updateControl(selection, socketId, key, Number(event.target.value), limits)} />
     </div>;
   }
 
@@ -237,7 +241,10 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm,
             </div>
             <div id={adjustmentRegionId} hidden={!adjustmentExpanded}>
               {selection.placements.length > 1 && <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} instances`}>{selection.placements.map((placement) => <button type="button" role="tab" aria-selected={placement.socket.id === activePlacement.socket.id} className={placement.socket.id === activePlacement.socket.id ? 'active' : ''} key={placement.socket.id} onClick={() => setActivePlacementBySelection((current) => ({ ...current, [selection.id]: placement.socket.id }))}>{placement.socket.name}</button>)}</div>}
-              {limits ? <div className="attachment-offset-controls">{CONTROL_CONFIG.map(({ key, label }) => renderControl(selection, activePlacement.socket.id, activePlacement.transform, limits, key, label))}<button type="button" className="attachment-reset-position" onClick={() => onChange(updateAttachmentPlacement(value, selection.id, activePlacement.socket.id, clampAttachmentTransform(getDefaultAttachmentTransform(activePlacement.socket.family), limits)))}>Reset Position</button></div> : <p className="attachment-empty">This placement is unavailable for the current shape.</p>}
+              {limits ? <div className="attachment-offset-controls">{CONTROL_CONFIG.filter(({ key }) => selection.family === 'handle' || key !== 'thicknessMultiplier').map(({ key, label }) => renderControl(selection, activePlacement.socket.id, activePlacement.transform, limits, key, label))}<button type="button" className="attachment-reset-position" onClick={() => {
+                const reset = updateAttachmentPlacement(value, selection.id, activePlacement.socket.id, clampAttachmentTransform(getDefaultAttachmentTransform(activePlacement.socket.family), limits));
+                onChange(selection.family === 'handle' ? updateHandleThickness(reset, selection.id, 1) : reset);
+              }}>Reset Adjustments</button></div> : <p className="attachment-empty">This placement is unavailable for the current shape.</p>}
             </div>
           </article>;
         })}</div>

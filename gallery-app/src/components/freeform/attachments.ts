@@ -21,7 +21,16 @@ export type AttachmentPlacementTransform = {
   surfaceOffsetRatio: number;
   twistDegrees: number;
   scaleMultiplier: number;
+  thicknessMultiplier: number;
 };
+
+export const MIN_HANDLE_THICKNESS = 0.5;
+export const MAX_HANDLE_THICKNESS = 1.5;
+
+export function clampHandleThickness(value: unknown) {
+  const thickness = finiteNumber(value, 1);
+  return Math.min(MAX_HANDLE_THICKNESS, Math.max(MIN_HANDLE_THICKNESS, thickness));
+}
 
 export type AttachmentPlacement = {
   socket: AttachmentSocketSnapshot;
@@ -34,6 +43,7 @@ export const DEFAULT_ATTACHMENT_TRANSFORM: AttachmentPlacementTransform = {
   surfaceOffsetRatio: 0.006,
   twistDegrees: 0,
   scaleMultiplier: 1,
+  thicknessMultiplier: 1,
 };
 
 export function getDefaultAttachmentTransform(family: AttachmentFamily): AttachmentPlacementTransform {
@@ -99,6 +109,7 @@ function clampTransform(raw: Partial<AttachmentPlacementTransform> | null | unde
     surfaceOffsetRatio: finiteNumber(raw?.surfaceOffsetRatio, DEFAULT_ATTACHMENT_TRANSFORM.surfaceOffsetRatio),
     twistDegrees: finiteNumber(raw?.twistDegrees, 0),
     scaleMultiplier: finiteNumber(raw?.scaleMultiplier, 1),
+    thicknessMultiplier: clampHandleThickness(raw?.thicknessMultiplier),
   };
 }
 
@@ -159,6 +170,18 @@ export function updateAttachmentPlacement(selections: AttachmentSelection[], sel
     ...selection,
     version: 4 as const,
     placements: selection.placements.map((placement) => placement.socket.id === socketId ? { ...placement, transform: clampTransform(transform) } : placement),
+  });
+}
+
+export function updateHandleThickness(selections: AttachmentSelection[], selectionId: string, thicknessMultiplier: number) {
+  const thickness = clampHandleThickness(thicknessMultiplier);
+  return selections.map((selection) => selection.id !== selectionId || selection.family !== 'handle' ? selection : {
+    ...selection,
+    version: 4 as const,
+    placements: selection.placements.map((placement) => ({
+      ...placement,
+      transform: clampTransform({ ...placement.transform, thicknessMultiplier: thickness }),
+    })),
   });
 }
 

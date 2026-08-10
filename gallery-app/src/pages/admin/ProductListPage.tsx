@@ -28,6 +28,22 @@ export default function ProductListPage() {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    if (!editing) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) setEditing(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [editing, saving]);
+
   async function fetchProducts() {
     setLoading(true);
     const { data } = await supabase
@@ -245,26 +261,26 @@ export default function ProductListPage() {
 
       {/* Edit Modal */}
       {editing && (
-        <div style={{
+        <div className="product-edit-backdrop" style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-        }} onClick={() => setEditing(null)}>
-          <div style={{
+        }} onClick={() => { if (!saving) setEditing(null); }}>
+          <div className="product-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="product-edit-title" aria-describedby="product-edit-description" style={{
             background: '#fff', borderRadius: '16px', width: '900px', maxWidth: '100%',
             maxHeight: '90vh', display: 'flex', flexDirection: 'column',
             boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
           }} onClick={e => e.stopPropagation()}>
 
             {/* Header */}
-            <div style={{
+            <div className="product-edit-header" style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '24px 32px', borderBottom: '1px solid #E8E0D8', flexShrink: 0,
             }}>
               <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#2C1810', margin: 0 }}>Edit Product</h2>
-                <p style={{ fontSize: '0.82rem', color: '#8C7B6E', margin: '4px 0 0' }}>{editing.name}</p>
+                <h2 id="product-edit-title" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#2C1810', margin: 0 }}>Edit Product</h2>
+                <p id="product-edit-description" style={{ fontSize: '0.82rem', color: '#8C7B6E', margin: '4px 0 0' }}>Update {editing.name}'s catalog details, media, pricing, and stock.</p>
               </div>
-              <button onClick={() => setEditing(null)} style={{
+              <button type="button" aria-label="Close edit product dialog" disabled={saving} onClick={() => setEditing(null)} style={{
                 width: '36px', height: '36px', borderRadius: '10px', border: '1.5px solid #E8E0D8',
                 background: '#fff', fontSize: '1.2rem', cursor: 'pointer', color: '#8C7B6E',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
@@ -275,19 +291,19 @@ export default function ProductListPage() {
             </div>
 
             {/* Scrollable Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+            <div className="product-edit-body" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
 
               {/* Section: Product Specifications */}
-              <div style={{ marginBottom: '28px' }}>
+              <section className="product-edit-section product-edit-specifications" style={{ marginBottom: '28px' }}>
                 <h3 style={{
                   fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
                   letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
                   borderBottom: '1px solid #F0EBE5',
                 }}>Product Specifications</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="product-edit-specification-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Name</label>
-                    <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                    <label htmlFor="edit-product-name" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Name</label>
+                    <input id="edit-product-name" autoFocus type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                       style={{
                         width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
                         fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
@@ -298,8 +314,8 @@ export default function ProductListPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Category</label>
-                    <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                    <label htmlFor="edit-product-category" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Category</label>
+                    <select id="edit-product-category" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
                       style={{
                         width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
                         fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
@@ -310,8 +326,8 @@ export default function ProductListPage() {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Material</label>
-                    <input type="text" value={form.materials} onChange={e => setForm({ ...form, materials: e.target.value })} placeholder="e.g. Terracotta Clay"
+                    <label htmlFor="edit-product-material" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Material</label>
+                    <input id="edit-product-material" type="text" value={form.materials} onChange={e => setForm({ ...form, materials: e.target.value })} placeholder="e.g. Terracotta Clay"
                       style={{
                         width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
                         fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
@@ -322,8 +338,8 @@ export default function ProductListPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Technique</label>
-                    <input type="text" value={form.technique} onChange={e => setForm({ ...form, technique: e.target.value })} placeholder="e.g. Handcrafted &amp; Kiln-Fired"
+                    <label htmlFor="edit-product-technique" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Technique</label>
+                    <input id="edit-product-technique" type="text" value={form.technique} onChange={e => setForm({ ...form, technique: e.target.value })} placeholder="e.g. Handcrafted &amp; Kiln-Fired"
                       style={{
                         width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
                         fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
@@ -334,16 +350,16 @@ export default function ProductListPage() {
                     />
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Section: Media Upload */}
-              <div style={{ marginBottom: '28px' }}>
+              <section className="product-edit-section product-edit-media" style={{ marginBottom: '28px' }}>
                 <h3 style={{
                   fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
                   letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
                   borderBottom: '1px solid #F0EBE5',
                 }}>Media Upload</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="product-edit-media-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Image</label>
                     <label style={{
@@ -407,10 +423,10 @@ export default function ProductListPage() {
                     ) : null}
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Section: Variations */}
-              <div>
+              <section className="product-edit-section product-edit-variations">
                 <h3 style={{
                   fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
                   letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
@@ -419,7 +435,7 @@ export default function ProductListPage() {
 
                 {/* Total Stock Summary */}
                 {variations.length > 0 && (
-                  <div style={{
+                  <div className="product-edit-stock-summary" style={{
                     display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
                     padding: '10px 14px', borderRadius: '10px', background: '#F0EBE4',
                   }}>
@@ -438,13 +454,13 @@ export default function ProductListPage() {
                 )}
 
                 {variations.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                  <div className="product-edit-variation-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
                     {variations.map((v, i) => (
-                      <div key={i} style={{
+                      <div key={v.id ?? i} className="product-edit-variation-card" style={{
                         border: '1.5px solid #E8E0D8', borderRadius: '12px', padding: '16px',
                         background: '#FAF8F5', position: 'relative',
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div className="product-edit-variation-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <span style={{
                             fontSize: '0.72rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
                             letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
@@ -459,10 +475,10 @@ export default function ProductListPage() {
                             onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E0D8'; e.currentTarget.style.background = 'none'; }}
                           >Remove</button>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                        <div className="product-edit-dimension-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Dimensions</label>
-                            <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 15cm x 10cm"
+                            <label htmlFor={`edit-variation-${i}-dimensions`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Dimensions</label>
+                            <input id={`edit-variation-${i}-dimensions`} value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 15cm x 10cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -473,8 +489,8 @@ export default function ProductListPage() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Height</label>
-                            <input value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 20cm"
+                            <label htmlFor={`edit-variation-${i}-height`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Height</label>
+                            <input id={`edit-variation-${i}-height`} value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 20cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -485,8 +501,8 @@ export default function ProductListPage() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Opening Diameter</label>
-                            <input value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 8cm"
+                            <label htmlFor={`edit-variation-${i}-opening`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Opening Diameter</label>
+                            <input id={`edit-variation-${i}-opening`} value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 8cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -497,10 +513,10 @@ export default function ProductListPage() {
                             />
                           </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                        <div className="product-edit-inventory-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Price</label>
-                            <input type="number" value={v.price} onChange={e => updateVariation(i, 'price', e.target.value)} placeholder="0.00"
+                            <label htmlFor={`edit-variation-${i}-price`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Price</label>
+                            <input id={`edit-variation-${i}-price`} type="number" min="0" step="0.01" value={v.price} onChange={e => updateVariation(i, 'price', e.target.value)} placeholder="0.00"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -511,8 +527,8 @@ export default function ProductListPage() {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Stock</label>
-                            <input type="number" value={v.stock} onChange={e => updateVariation(i, 'stock', e.target.value)} placeholder="0"
+                            <label htmlFor={`edit-variation-${i}-stock`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Stock</label>
+                            <input id={`edit-variation-${i}-stock`} type="number" min="0" step="1" value={v.stock} onChange={e => updateVariation(i, 'stock', e.target.value)} placeholder="0"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -527,10 +543,10 @@ export default function ProductListPage() {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize: '0.85rem', color: '#B8A89A', marginBottom: '16px' }}>No variations added yet. Add a variation below.</p>
+                  <p className="product-edit-empty" style={{ fontSize: '0.85rem', color: '#B8A89A', marginBottom: '16px' }}>No variations added yet. Add a variation below.</p>
                 )}
 
-                <button type="button" onClick={addVariation} style={{
+                <button className="product-edit-add" type="button" onClick={addVariation} style={{
                   width: '100%', padding: '12px', border: '2px dashed #D4C8BB', borderRadius: '10px',
                   background: 'transparent', color: '#823E0B', fontWeight: 600, fontSize: '0.88rem',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -544,16 +560,16 @@ export default function ProductListPage() {
                   </svg>
                   Add New Variation
                 </button>
-              </div>
+              </section>
             </div>
 
             {/* Sticky Footer */}
-            <div style={{
+            <div className="product-edit-footer" style={{
               display: 'flex', gap: '12px', justifyContent: 'flex-end', padding: '16px 32px',
               borderTop: '1px solid #E8E0D8', background: '#fff', flexShrink: 0,
               borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px',
             }}>
-              <button onClick={() => setEditing(null)} style={{
+              <button type="button" className="product-edit-cancel" onClick={() => setEditing(null)} disabled={saving} style={{
                 padding: '11px 24px', border: '1.5px solid #D4C8BB', borderRadius: '10px',
                 background: '#fff', color: '#5A4A3E', fontSize: '0.88rem', fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -561,7 +577,7 @@ export default function ProductListPage() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.color = '#823E0B'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.color = '#5A4A3E'; }}
               >Cancel</button>
-              <button onClick={saveEdit} disabled={saving} style={{
+              <button type="button" className="product-edit-save" onClick={saveEdit} disabled={saving} style={{
                 padding: '11px 28px', border: 'none', borderRadius: '10px',
                 background: saving ? '#B8A89A' : '#823E0B', color: '#fff', fontSize: '0.88rem', fontWeight: 600,
                 cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',

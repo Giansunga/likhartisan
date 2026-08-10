@@ -9,6 +9,7 @@ import {
   resolveCatalogAssets,
   selectedSocketIds,
   updateAttachmentPlacement,
+  updateHandleThickness,
   upsertAttachmentSelection,
   type GeneratedAttachmentSocket,
 } from '../attachments';
@@ -75,6 +76,13 @@ describe('generated attachment selections', () => {
     expect(next[0].placements.find((placement) => placement.socket.id === 'right')?.transform.twistDegrees).toBe(0);
   });
 
+  it('updates thickness across both sides of a paired handle', () => {
+    const selection = createAttachmentSelection(asset, [left, right]);
+    const next = updateHandleThickness([selection], selection.id, 1.25);
+    expect(next[0].placements.map((placement) => placement.transform.thicknessMultiplier)).toEqual([1.25, 1.25]);
+    expect(updateHandleThickness(next, selection.id, 5)[0].placements[0].transform.thicknessMultiplier).toBe(1.5);
+  });
+
   it('fails closed on envelope or family mismatch', () => {
     expect(recipeFitsSocket(bamboo, left)).toBe(true);
     expect(recipeFitsSocket(bamboo, { ...left, maxWidthRatio: 0.05 })).toBe(false);
@@ -90,5 +98,16 @@ describe('generated attachment selections', () => {
     expect(upgraded[0]).toMatchObject({ version: 4, placements: [{ socket: { id: 'left' }, transform: getDefaultAttachmentTransform('handle') }] });
     expect(normalizeAttachmentSelections(upgraded)).toEqual(upgraded);
     expect(normalizeAttachmentSelections([{ version: 2, id: 'old', points: [] }, { version: 1, id: 'older' }])).toEqual([]);
+  });
+
+  it('defaults missing thickness and clamps invalid saved values', () => {
+    const selection = createAttachmentSelection(asset, [left]);
+    const withoutThickness = structuredClone(selection) as unknown as { placements: Array<{ transform: Record<string, unknown> }> };
+    delete withoutThickness.placements[0].transform.thicknessMultiplier;
+    expect(normalizeAttachmentSelections([withoutThickness])[0].placements[0].transform.thicknessMultiplier).toBe(1);
+    withoutThickness.placements[0].transform.thicknessMultiplier = 9;
+    expect(normalizeAttachmentSelections([withoutThickness])[0].placements[0].transform.thicknessMultiplier).toBe(1.5);
+    withoutThickness.placements[0].transform.thicknessMultiplier = -2;
+    expect(normalizeAttachmentSelections([withoutThickness])[0].placements[0].transform.thicknessMultiplier).toBe(0.5);
   });
 });

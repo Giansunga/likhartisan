@@ -16,7 +16,10 @@ vi.mock('../../../lib/supabase', () => {
     } as QueryMock;
     return query;
   };
-  return { supabase: { from: (table: string) => makeQuery(table === 'generated_attachment_catalog_settings' ? [{ recipe_key: 'bamboo-loop', active: true, default_price: 100, default_production_days: 1 }] : []) } };
+  return { supabase: { from: (table: string) => makeQuery(table === 'generated_attachment_catalog_settings' ? [
+    { recipe_key: 'bamboo-loop', active: true, default_price: 100, default_production_days: 1 },
+    { recipe_key: 'sampaguita-medallion', active: true, default_price: 80, default_production_days: 1 },
+  ] : []) } };
 });
 
 const sockets: GeneratedAttachmentSocket[] = [
@@ -61,6 +64,16 @@ describe('AttachmentTab guided workflow', () => {
     expect(screen.getByLabelText('Depth / Surface Offset')).toBeInTheDocument();
     expect(screen.getByLabelText('Rotation')).toBeInTheDocument();
     expect(screen.getByLabelText('Scale')).toBeInTheDocument();
+    expect(screen.getByLabelText('Handle Thickness')).toHaveAttribute('min', '0.5');
+    expect(screen.getByLabelText('Handle Thickness')).toHaveAttribute('max', '1.5');
+
+    fireEvent.change(screen.getByLabelText('Handle Thickness'), { target: { value: '1.25' } });
+    await waitFor(() => expect(screen.getByText('125%')).toBeInTheDocument());
+    expect(onChange.mock.calls.some(([next]) => next[0].placements.every((placement: AttachmentSelection['placements'][number]) => placement.transform.thicknessMultiplier === 1.25))).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Adjustments' }));
+    await waitFor(() => expect(screen.getAllByText('100%').length).toBeGreaterThanOrEqual(2));
+    expect(onChange.mock.calls.at(-1)![0][0].placements.every((placement: AttachmentSelection['placements'][number]) => placement.transform.thicknessMultiplier === 1)).toBe(true);
 
     fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '45' } });
     await waitFor(() => expect(screen.getByText('45°')).toBeInTheDocument());
@@ -73,5 +86,24 @@ describe('AttachmentTab guided workflow', () => {
     fireEvent.click(adjustmentCard);
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(screen.getByRole('button', { name: /Choose Position/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('does not expose thickness for body attachments', async () => {
+    const bodySocket: GeneratedAttachmentSocket = { id: 'front', name: 'Front', family: 'body', height: 0.5, azimuth: 0, pairGroup: null, maxWidthRatio: 0.3, maxHeightRatio: 0.3 };
+    const bodySelection: AttachmentSelection = {
+      version: 4,
+      id: 'sampaguita-medallion@1:front',
+      recipeKey: 'sampaguita-medallion',
+      recipeVersion: 1,
+      name: 'Sampaguita Medallion',
+      family: 'body',
+      shopId: null,
+      placements: [{ socket: bodySocket, transform: { horizontalDegrees: 0, verticalRatio: 0, surfaceOffsetRatio: 0.006, twistDegrees: 0, scaleMultiplier: 1, thicknessMultiplier: 1 } }],
+      priceAdjustment: 80,
+      productionDaysAdjustment: 1,
+    };
+    render(<AttachmentTab shopId={null} modelId="model-1" sockets={[bodySocket]} modelHeightCm={25} value={[bodySelection]} onChange={() => {}} />);
+    await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('Handle Thickness')).not.toBeInTheDocument();
   });
 });

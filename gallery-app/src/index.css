@@ -2618,3 +2618,212 @@ body {
   display: none;
 }
 
+/* Admin product editor */
+.product-edit-backdrop {
+  backdrop-filter: blur(3px);
+}
+
+.product-edit-dialog {
+  width: min(1120px, 100%) !important;
+  max-height: min(92vh, 920px) !important;
+  overflow: hidden;
+}
+
+.product-edit-header {
+  background: linear-gradient(135deg, #fff 0%, #fbf7f2 100%);
+}
+
+.product-edit-header h2 {
+  font-family: var(--font-serif);
+  font-size: 1.45rem !important;
+  letter-spacing: -0.02em;
+}
+
+.product-edit-header button:focus-visible,
+.product-edit-dialog input:focus-visible,
+.product-edit-dialog select:focus-visible,
+.product-edit-dialog button:focus-visible,
+.product-edit-dialog label:has(input[type="file"]:focus-visible) {
+  outline: 3px solid rgba(130, 62, 11, 0.2) !important;
+  outline-offset: 2px;
+}
+
+.product-edit-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.8fr);
+  gap: 22px;
+  background: #f7f3ee;
+}
+
+.product-edit-section {
+  min-width: 0;
+  margin: 0 !important;
+  padding: 22px;
+  border: 1px solid #e8e0d8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(44, 24, 16, 0.04);
+}
+
+.product-edit-section > h3 {
+  margin-top: 0 !important;
+  color: #6f5e52 !important;
+}
+
+.product-edit-media-grid {
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+
+.product-edit-media-grid > div > label:first-child {
+  margin-bottom: 8px !important;
+}
+
+.product-edit-media-grid > div > label:nth-child(2) {
+  min-height: 128px;
+  padding: 18px !important;
+}
+
+.product-edit-media-grid img {
+  width: 100% !important;
+  height: 150px !important;
+  margin-top: 10px !important;
+  object-fit: cover;
+  border: 1px solid #e8e0d8;
+}
+
+.product-edit-variations {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 18px;
+}
+
+.product-edit-variations > h3 {
+  grid-column: 1;
+}
+
+.product-edit-stock-summary {
+  grid-column: 2;
+  align-self: start;
+  margin-bottom: 16px !important;
+  white-space: nowrap;
+}
+
+.product-edit-variation-list,
+.product-edit-empty,
+.product-edit-add {
+  grid-column: 1 / -1;
+}
+
+.product-edit-variation-card {
+  padding: 18px !important;
+  border-color: #e5dbd1 !important;
+  background: #fcfaf8 !important;
+}
+
+.product-edit-variation-card input,
+.product-edit-specification-grid input,
+.product-edit-specification-grid select {
+  min-height: 42px;
+}
+
+.product-edit-add {
+  min-height: 46px;
+}
+
+.product-edit-footer {
+  align-items: center;
+  background: #fffdfb !important;
+}
+
+.product-edit-cancel:disabled,
+.product-edit-save:disabled {
+  cursor: not-allowed !important;
+}
+
+@media (max-width: 900px) {
+  .product-edit-dialog {
+    max-height: 94vh !important;
+  }
+
+  .product-edit-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .product-edit-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .product-edit-variations {
+    grid-column: 1;
+  }
+
+  .product-edit-dimension-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-edit-backdrop {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+
+  .product-edit-dialog {
+    width: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  .product-edit-header {
+    padding: 18px 16px !important;
+  }
+
+  .product-edit-header h2 {
+    font-size: 1.25rem !important;
+  }
+
+  .product-edit-header p {
+    max-width: 240px;
+  }
+
+  .product-edit-body {
+    gap: 14px;
+    padding: 16px !important;
+  }
+
+  .product-edit-section {
+    padding: 17px;
+  }
+
+  .product-edit-specification-grid,
+  .product-edit-media-grid,
+  .product-edit-dimension-grid,
+  .product-edit-inventory-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .product-edit-variations {
+    grid-template-columns: 1fr;
+  }
+
+  .product-edit-variations > h3,
+  .product-edit-stock-summary {
+    grid-column: 1;
+  }
+
+  .product-edit-stock-summary {
+    justify-self: stretch;
+  }
+
+  .product-edit-footer {
+    padding: 14px 16px !important;
+  }
+
+  .product-edit-footer button {
+    flex: 1;
+    padding-inline: 14px !important;
+  }
+}
+

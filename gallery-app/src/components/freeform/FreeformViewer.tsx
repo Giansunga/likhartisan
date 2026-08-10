@@ -16,7 +16,7 @@ import {
   resolveAttachmentPoint,
   type AttachmentPlacementLimitMap,
 } from './attachmentPlacement';
-import { disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
+import { applyGeneratedAttachmentThickness, disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensurePhysicalMaterials, generateCylindricalUVs } from './finishMaterials';
 import type { MaterialParams } from './materials';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
@@ -147,8 +147,13 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
   const attachmentScene = useMemo(() => recipe?.build() || new THREE.Group(), [recipe]);
   const materialFinish = material.finish;
   const materialColor = material.color;
+  const thicknessMultiplier = placement.transform.thicknessMultiplier;
 
   useEffect(() => () => disposeGeneratedAttachment(attachmentScene), [attachmentScene]);
+
+  useEffect(() => {
+    applyGeneratedAttachmentThickness(attachmentScene, thicknessMultiplier);
+  }, [attachmentScene, thicknessMultiplier]);
 
   useEffect(() => {
     applyFinishToScene(attachmentScene, { finish: materialFinish, color: materialColor });
@@ -158,7 +163,7 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
     if (!groupRef.current || !recipe) return;
     const { socket: savedSocket, transform } = placement;
     const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
-    const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${recipe.key}|${recipe.version}`;
+    const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${transform.thicknessMultiplier}|${recipe.key}|${recipe.version}`;
     if (placementKeyRef.current === placementKey) return;
     const mount = resolveAttachmentMount(baseScene, socket, recipe, transform);
     if (!mount) return;

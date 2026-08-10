@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { countRecipeTriangles, disposeGeneratedAttachment, GENERATED_ATTACHMENT_RECIPES } from '../generatedAttachmentCatalog';
+import { applyGeneratedAttachmentThickness, countRecipeTriangles, disposeGeneratedAttachment, GENERATED_ATTACHMENT_RECIPES } from '../generatedAttachmentCatalog';
 
 describe('generated attachment catalog', () => {
   it('contains the seven stable, unique versioned recipes', () => {
@@ -38,6 +38,39 @@ describe('generated attachment catalog', () => {
       const contactSize = new THREE.Box3().setFromObject(contact).getSize(new THREE.Vector3());
       expect(Math.max(contactSize.x, contactSize.y, contactSize.z)).toBeLessThanOrEqual(0.4);
     });
+    disposeGeneratedAttachment(object);
+  });
+
+  it.each(GENERATED_ATTACHMENT_RECIPES.filter((recipe) => recipe.family === 'handle'))('$name changes cross-section without rebuilding or moving its authored parts', (recipe) => {
+    const object = recipe.build();
+    object.updateMatrixWorld(true);
+    const geometries: THREE.BufferGeometry[] = [];
+    const childVerticalPositions: number[] = [];
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      geometries.push(child.geometry);
+      childVerticalPositions.push(child.position.y);
+    });
+
+    applyGeneratedAttachmentThickness(object, 0.5);
+    object.updateMatrixWorld(true);
+    const thinBox = new THREE.Box3().setFromObject(object);
+    applyGeneratedAttachmentThickness(object, 1.5);
+    object.updateMatrixWorld(true);
+    const thickBox = new THREE.Box3().setFromObject(object);
+
+    const currentGeometries: THREE.BufferGeometry[] = [];
+    const currentVerticalPositions: number[] = [];
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      currentGeometries.push(child.geometry);
+      currentVerticalPositions.push(child.position.y);
+    });
+    expect(currentGeometries).toEqual(geometries);
+    expect(currentVerticalPositions).toEqual(childVerticalPositions);
+    expect(thickBox.getSize(new THREE.Vector3()).x).toBeGreaterThan(thinBox.getSize(new THREE.Vector3()).x);
+    expect(thinBox.min.z).toBeGreaterThanOrEqual(-0.03);
+    expect(thickBox.min.z).toBeGreaterThanOrEqual(-0.03);
     disposeGeneratedAttachment(object);
   });
 
