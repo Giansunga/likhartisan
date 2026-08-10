@@ -305,7 +305,12 @@
 .buyer-chat-info:hover { border-color: #b77b4d; background: #fff8f1; }
 
 .buyer-chat-messages { background: radial-gradient(circle at 50% 0, rgba(190, 156, 128, .1), transparent 44%), #f8f5f1; }
-.buyer-chat-message-list { width: min(100%, 850px); margin: 0 auto; padding: 26px clamp(18px, 4vw, 42px); }
+.buyer-chat-message-list {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 26px clamp(18px, 4vw, 42px);
+}
 .buyer-chat-message-list .msg-avatar { overflow: visible; background: transparent; }
 .buyer-chat-message-list .msg-avatar .buyer-chat-avatar { width: 32px; height: 32px; }
 .buyer-chat-message-list .msg-ts-check svg { width: 14px; height: 14px; fill: none; stroke: currentColor; }
