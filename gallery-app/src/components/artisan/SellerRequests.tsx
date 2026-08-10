@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, Eye, Inbox, LoaderCircle, MessageCircle, Palette, RefreshCw, Send, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, Eye, Inbox, LoaderCircle, MessageCircle, Palette, Send, X, XCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -85,7 +85,6 @@ export default function SellerRequests() {
   }
 
   return <div className="seller-requests-page seller-requests-workflow">
-    <header className="seller-page-heading seller-page-heading--actions"><div><span className="seller-eyebrow">CUSTOM WORK</span><h1>Design Requests</h1><p>Review interactive pottery designs and respond with a quote.</p></div><button className="seller-button seller-button--secondary" type="button" onClick={() => void load()}><RefreshCw size={16} /> Refresh</button></header>
     <div className="seller-request-filters" role="tablist" aria-label="Request status filters">{FILTERS.map(item => <button role="tab" aria-selected={filter === item.id} className={filter === item.id ? 'is-active' : ''} type="button" key={item.id} onClick={() => setFilter(item.id)}>{item.label}<span>{item.id === 'all' ? requests.length : requests.filter(request => request.status === item.id).length}</span></button>)}</div>
     {error ? <div className="seller-message-error" role="alert">{error}</div> : null}
     {loading ? <div className="seller-request-loading"><LoaderCircle className="seller-spin" /> Loading design requests…</div> : visible.length ? <div className="seller-request-grid">{visible.map(request => {

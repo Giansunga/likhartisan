@@ -577,6 +577,9 @@ export default function FreeformViewer({
   const previewBackground = preview
     ? 'radial-gradient(ellipse 70% 55% at 50% 58%, rgba(255,252,248,0.9) 0%, transparent 70%), linear-gradient(175deg, var(--bg-tertiary) 0%, var(--bg-secondary) 55%, #E8E0D8 100%)'
     : 'transparent';
+  const renderDpr: [number, number] = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1100px)').matches
+    ? [1, 1.5]
+    : [1, 2];
 
   return (
     <div
@@ -612,7 +615,7 @@ export default function FreeformViewer({
           camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}
           gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
           style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
-          dpr={[1, 2]}
+          dpr={renderDpr}
         >
 
           <NeutralStudioEnvironment intensity={preview ? 0.95 : 0.82} />

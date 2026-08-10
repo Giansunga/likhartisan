@@ -24,7 +24,7 @@ const navItems = [
   { to: '/artisan-dashboard/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/artisan-dashboard/messages', label: 'Messages', icon: MessageSquare },
   { to: '/artisan-dashboard/listings', label: 'My Listings', icon: Package },
-  { to: '/artisan-dashboard/requests', label: 'Requests', icon: Inbox },
+  { to: '/artisan-dashboard/requests', label: 'Design Requests', icon: Inbox },
   { to: '/artisan-dashboard/profile', label: 'Shop Profile', icon: Store },
   { to: '/artisan-dashboard/design-vault', label: 'Design Vault', icon: Layers },
   { to: '/artisan-dashboard/notifications', label: 'Notifications', icon: Bell },
