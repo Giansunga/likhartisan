@@ -1143,7 +1143,7 @@ function InfoRow({ label, value, bold }: { label: string; value: React.ReactNode
   return (
     <div style={{ display: 'flex', gap: '12px', padding: '6px 0', alignItems: 'flex-start' }}>
       <span style={{ fontSize: '0.8rem', color: '#8C7B6E', width: '120px', flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: '0.88rem', color: 'var(--text-dark)', fontWeight: bold ? 600 : 400, flex: 1 }}>{value || '--'}</span>
+      <span style={{ fontSize: '0.88rem', color: 'var(--text-dark)', fontWeight: bold ? 600 : 400, flex: 1, wordBreak: 'break-all' }}>{value || '--'}</span>
     </div>
   );
 }
