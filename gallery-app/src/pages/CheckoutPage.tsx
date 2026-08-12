@@ -716,7 +716,7 @@ export default function CheckoutPage() {
                       </div>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#16A34A' }}>Free</span>
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-light)', lineHeight: 1.3 }}>Pick up at shop</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', lineHeight: 1.3 }}>Pick up at shop</div>
                   </button>
                   <button onClick={() => setDeliveryOption('courier')} style={{
                     padding: '12px', borderRadius: '10px', border: deliveryOption === 'courier' ? '2px solid var(--primary-color)' : '1.5px solid #E8E0D8',
@@ -728,7 +728,7 @@ export default function CheckoutPage() {
                       </svg>
                       <span style={{ fontWeight: 600, fontSize: '0.82rem', color: deliveryOption === 'courier' ? 'var(--primary-color)' : 'var(--text-dark)' }}>Third Party Courier</span>
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-light)', lineHeight: 1.3 }}>Deliver to address</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', lineHeight: 1.3 }}>Deliver to address</div>
                   </button>
                 </div>
 
@@ -743,10 +743,10 @@ export default function CheckoutPage() {
                         {selectedVehicle.label}
                         {lalamoveQuote?.distance && <span style={{ fontWeight: 400 }}> · {(parseInt(lalamoveQuote.distance.value) / 1000).toFixed(1)} km</span>}
                       </span>
-                      {lalamoveLoading && <span style={{ fontSize: '0.72rem', color: '#888' }}>Updating...</span>}
+                      {lalamoveLoading && <span style={{ fontSize: '0.75rem', color: '#888' }}>Updating...</span>}
                     </div>
                     {cartDimensions && (
-                      <div style={{ fontSize: '0.7rem', color: '#888', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#888', lineHeight: 1.5 }}>
                         {cartDimensions.itemCount} item{cartDimensions.itemCount > 1 ? 's' : ''} · ~{cartDimensions.totalKg.toFixed(1)} kg
                         {cartDimensions.totalL > 0 && <span> · {cartDimensions.totalL.toFixed(0)}×{cartDimensions.totalW.toFixed(0)}×{cartDimensions.totalH.toFixed(0)} cm</span>}
                       </div>
@@ -771,7 +771,7 @@ export default function CheckoutPage() {
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <img src={item.image} alt={item.productName}
                         style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #F0EBE5' }} />
-                      <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.65rem', fontWeight: 700, width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: 'var(--primary-color)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {item.qty}
                       </span>
                     </div>
@@ -780,11 +780,11 @@ export default function CheckoutPage() {
                       {item.variation && (
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</div>
                       )}
-                      <div style={{ fontSize: '0.72rem', color: '#B8A89A', fontStyle: 'italic' }}>{item.shopName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#B8A89A', fontStyle: 'italic' }}>{item.shopName}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#B8A89A' }}>{fmt(item.price)} each</div>
+                      <div style={{ fontSize: '0.75rem', color: '#B8A89A' }}>{fmt(item.price)} each</div>
                     </div>
                   </div>
                 ))}
@@ -810,7 +810,7 @@ export default function CheckoutPage() {
                 {/* Total */}
                 <div style={{ borderTop: '2px solid var(--text-dark)', paddingTop: '14px', marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>Total</span>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-color)', letterSpacing: '-0.5px' }}>{fmt(total)}</span>
+                  <span style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-color)', letterSpacing: '-0.5px' }}>{fmt(total)}</span>
                 </div>
               </div>
 
@@ -825,7 +825,7 @@ export default function CheckoutPage() {
                     letterSpacing: '0.5px', boxShadow: placing || !deliveryOption || (deliveryOption === 'courier' && !lalamoveQuote) ? 'none' : '0 4px 14px rgba(139,94,60,0.3)',
                     transition: 'all 0.2s ease',
                   }}>{placing ? 'PLACING ORDER...' : 'PLACE ORDER NOW'}</button>
-                  <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#B8A89A', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#B8A89A', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '12px', height: '12px' }}>
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>

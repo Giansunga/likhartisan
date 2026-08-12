@@ -716,9 +716,9 @@ export default function OrdersPage() {
                     {/* status badges */}
                     <SectionCard title="Status">
                       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                        <div><p style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</p>{paymentBadge(selectedOrder.payment_status)}</div>
-                        <div><p style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Order</p>{orderBadge(selectedOrder.status)}</div>
-                        <div><p style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</p>{deliveryBadge(selectedOrder.delivery_status)}</div>
+                        <div><p style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</p>{paymentBadge(selectedOrder.payment_status)}</div>
+                        <div><p style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Order</p>{orderBadge(selectedOrder.status)}</div>
+                        <div><p style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</p>{deliveryBadge(selectedOrder.delivery_status)}</div>
                       </div>
                     </SectionCard>
 
@@ -840,7 +840,7 @@ export default function OrdersPage() {
                         selectedOrder.tracking_number ? (
                           <span>
                             {selectedOrder.tracking_number}
-                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', background: '#FFF3E0', color: '#E65100', marginLeft: '8px', fontWeight: 600 }}>
+                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', background: '#FFF3E0', color: '#E65100', marginLeft: '8px', fontWeight: 600 }}>
                               Simulated
                             </span>
                           </span>
@@ -864,7 +864,7 @@ export default function OrdersPage() {
                           {activityLogs.map(log => (
                             <div key={log.id} style={{ display: 'flex', gap: '14px', padding: '12px 0', borderBottom: '1px solid #F0EBE4' }}>
                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-color)' }}>
                                   {log.action_type.includes('payment') ? 'P' : log.action_type.includes('delivery') ? 'D' : log.action_type.includes('refund') ? 'R' : log.action_type.includes('problem') ? '!' : 'A'}
                                 </span>
                               </div>
@@ -883,7 +883,7 @@ export default function OrdersPage() {
                                     Delivery: {log.previous_delivery_status || '--'} → {log.new_delivery_status || '--'}
                                   </p>
                                 )}
-                                <p style={{ fontSize: '0.72rem', color: '#A89688', marginTop: '4px' }}>
+                                <p style={{ fontSize: '0.75rem', color: '#A89688', marginTop: '4px' }}>
                                   by {log.actor_name || 'Unknown'} ({log.actor_role || 'system'}) &middot; {formatDate(log.created_at)}
                                 </p>
                               </div>
@@ -1198,7 +1198,7 @@ function OrderTimeline({ order }: { order: Order }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginTop: '2px',
           }}>
-            {step.active && <span style={{ color: '#fff', fontSize: '0.6rem', fontWeight: 700 }}>{'\u2713'}</span>}
+            {step.active && <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 700 }}>{'\u2713'}</span>}
           </div>
           {/* label */}
           <div style={{ paddingBottom: i < steps.length - 1 ? '16px' : 0 }}>
@@ -1206,7 +1206,7 @@ function OrderTimeline({ order }: { order: Order }) {
               {step.label}
             </p>
             {step.active && step.date && (
-              <p style={{ fontSize: '0.72rem', color: '#A89688', margin: '2px 0 0' }}>{formatDate(step.date)}</p>
+              <p style={{ fontSize: '0.75rem', color: '#A89688', margin: '2px 0 0' }}>{formatDate(step.date)}</p>
             )}
           </div>
         </div>
@@ -1216,7 +1216,7 @@ function OrderTimeline({ order }: { order: Order }) {
       {isCancelled && (
         <div style={{ display: 'flex', gap: '14px', position: 'relative', marginTop: '8px' }}>
           <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#C62828', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px' }}>
-            <span style={{ color: '#fff', fontSize: '0.6rem', fontWeight: 700 }}>{'\u2715'}</span>
+            <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 700 }}>{'\u2715'}</span>
           </div>
           <div>
             <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#C62828', margin: 0 }}>Cancelled</p>

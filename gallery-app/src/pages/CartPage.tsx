@@ -433,7 +433,7 @@ export default function CartPage() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.78rem', color: deliveryOption === 'pickup' ? 'var(--primary-color)' : 'var(--text-dark)' }}>Pickup</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#16A34A' }}>Free</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#16A34A' }}>Free</span>
                       </div>
                     </button>
                     <button onClick={() => setDeliveryOption('courier')} style={{
@@ -442,14 +442,14 @@ export default function CartPage() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.78rem', color: deliveryOption === 'courier' ? 'var(--primary-color)' : 'var(--text-dark)' }}>Courier</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-dark)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-dark)' }}>
                           {lalamoveLoading ? '...' : lalamoveQuote ? fmt(shippingFee) : '---'}
                         </span>
                       </div>
                     </button>
                   </div>
                   {deliveryOption === 'courier' && (
-                    <div style={{ marginTop: '8px', padding: '6px 10px', background: '#F0FDF4', borderRadius: '6px', border: '1px solid #BBF7D0', fontSize: '0.72rem', color: '#16A34A', fontWeight: 500 }}>
+                    <div style={{ marginTop: '8px', padding: '6px 10px', background: '#F0FDF4', borderRadius: '6px', border: '1px solid #BBF7D0', fontSize: '0.75rem', color: '#16A34A', fontWeight: 500 }}>
                       {selectedVehicle.label}{lalamoveQuote?.distance ? ` · ${(parseInt(lalamoveQuote.distance.value) / 1000).toFixed(1)} km` : ''}
                     </div>
                   )}

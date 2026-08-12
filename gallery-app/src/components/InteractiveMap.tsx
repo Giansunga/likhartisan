@@ -59,12 +59,12 @@ export default function InteractiveMap({ address, onAddressChange, height = 220 
             padding: '6px 12px', background: '#FAFAFA', display: 'flex',
             justifyContent: 'space-between', alignItems: 'center',
           }}>
-            <span style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)' }}>
+            <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>
               {address || 'No location set'}
             </span>
             <button onClick={() => { setManualAddress(address); setEditMode(true); }} style={{
               background: 'none', border: 'none', color: 'var(--primary-color)',
-              fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)',
             }}>
               Change
             </button>

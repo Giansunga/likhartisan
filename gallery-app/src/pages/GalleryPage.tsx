@@ -18,16 +18,16 @@ import {
 const PAGE_SIZE = 24;
 
 const categories = [
-  { name: 'All Crafts', bg: '/images/pottery-collage.png', christmasBg: '/images/christmas-all-crafts.webp', valentinesBg: '/images/valentines-all-crafts.webp' },
-  { name: 'Vases', bg: '/images/vases_collection.png', christmasBg: '/images/christmas-vases.webp', valentinesBg: '/images/valentines-vases.webp' },
-  { name: 'Planters', bg: '/images/planters_collection.png', christmasBg: '/images/christmas-planters.webp', valentinesBg: '/images/valentines-planters.webp' },
-  { name: 'Jars', bg: '/images/jars_collection.png', christmasBg: '/images/christmas-jars.webp', valentinesBg: '/images/valentines-jars.webp' },
-  { name: 'Amphoras', bg: '/images/amphoras_collection.png', christmasBg: '/images/christmas-amphoras.webp', valentinesBg: '/images/valentines-amphoras.webp' },
-  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png', christmasBg: '/images/christmas-tealights.webp', valentinesBg: '/images/valentines-tealights.webp' },
+  { name: 'All Crafts', bg: '/images/gallery-category-all-crafts-v2.webp', christmasBg: '/images/christmas-all-crafts.webp', valentinesBg: '/images/valentines-all-crafts.webp' },
+  { name: 'Vases', bg: '/images/gallery-category-vases-v2.webp', christmasBg: '/images/christmas-vases.webp', valentinesBg: '/images/valentines-vases.webp' },
+  { name: 'Planters', bg: '/images/gallery-category-planters-v2.webp', christmasBg: '/images/christmas-planters.webp', valentinesBg: '/images/valentines-planters.webp' },
+  { name: 'Jars', bg: '/images/gallery-category-jars-v2.webp', christmasBg: '/images/christmas-jars.webp', valentinesBg: '/images/valentines-jars.webp' },
+  { name: 'Amphoras', bg: '/images/gallery-category-amphoras-v2.webp', christmasBg: '/images/christmas-amphoras.webp', valentinesBg: '/images/valentines-amphoras.webp' },
+  { name: 'Tea Light Vases', bg: '/images/gallery-category-tea-lights-v2.webp', christmasBg: '/images/christmas-tealights.webp', valentinesBg: '/images/valentines-tealights.webp' },
 ];
 
 export default function GalleryPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentTheme } = useTheme();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -47,6 +47,7 @@ export default function GalleryPage() {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+  const shopFilter = searchParams.get('shop');
   
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -68,7 +69,7 @@ export default function GalleryPage() {
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed]);
+  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed, shopFilter]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
@@ -176,6 +177,9 @@ export default function GalleryPage() {
 
   const eligibleProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
+    if (shopFilter) {
+      list = list.filter(p => p.shopId === shopFilter);
+    }
     if (showFavorites) {
       list = list.filter(p => favorites.includes(p.id));
     }
@@ -183,7 +187,18 @@ export default function GalleryPage() {
       list = list.filter(p => p.category === activeCategory);
     }
     return list;
-  }, [allProducts, activeCategory, showFavorites, favorites]);
+  }, [allProducts, activeCategory, showFavorites, favorites, shopFilter]);
+
+  const shopFilterName = useMemo(
+    () => shopFilter ? allProducts.find(product => product.shopId === shopFilter)?.shopName : undefined,
+    [allProducts, shopFilter],
+  );
+
+  function clearShopFilter() {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('shop');
+    setSearchParams(nextParams);
+  }
 
   const searchFilteredProducts = useMemo(() => {
     const normalizedQuery = normalizeSearchQuery(search);
@@ -362,8 +377,9 @@ export default function GalleryPage() {
           <div className="control-bar">
             <div className="control-title-group">
               <h2 className="control-section-title" id="control-active-title">
-                {activeCategory || 'All Crafts'}
+                {shopFilter ? `${shopFilterName || 'Shop'} Collection` : activeCategory || 'All Crafts'}
               </h2>
+              {shopFilter ? <button className="gallery-shop-filter-clear" type="button" onClick={clearShopFilter}>Clear shop filter</button> : null}
             </div>
 
             <div className="control-action-group">
@@ -512,7 +528,7 @@ export default function GalleryPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                       <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>
                       {productRatings[p.id] && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.7rem', color: '#999' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.75rem', color: '#999' }}>
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                           </svg>

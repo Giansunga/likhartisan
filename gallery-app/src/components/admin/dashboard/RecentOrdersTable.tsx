@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-      fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color,
+      fontSize: '0.75rem', fontWeight: 600, background: s.bg, color: s.color,
       textTransform: 'capitalize' as const,
     }}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -70,7 +70,7 @@ export default function RecentOrdersTable({ orders }: RecentOrdersTableProps) {
         <thead>
           <tr style={{ borderBottom: '1px solid #F0EBE4' }}>
             {['ORDER', 'CUSTOMER', 'SHOP', 'AMOUNT', 'STATUS', 'DATE', 'ACTION'].map(h => (
-              <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#77716B', fontSize: '0.7rem', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{h}</th>
+              <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#77716B', fontSize: '0.75rem', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -91,7 +91,7 @@ export default function RecentOrdersTable({ orders }: RecentOrdersTableProps) {
               <td style={{ padding: '12px 16px' }}><StatusBadge status={o.status || 'pending'} /></td>
               <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: '#77716B' }}>
                 {fmtDate(o.created_at)}<br />
-                <span style={{ fontSize: '0.72rem', color: '#A89688' }}>{fmtTime(o.created_at)}</span>
+                <span style={{ fontSize: '0.75rem', color: '#A89688' }}>{fmtTime(o.created_at)}</span>
               </td>
               <td style={{ padding: '12px 16px' }}>
                 <button

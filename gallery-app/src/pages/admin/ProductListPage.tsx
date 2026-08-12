@@ -376,7 +376,7 @@ export default function ProductListPage() {
                       <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
                         {imageFile ? imageFile.name : 'Change Image'}
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
+                      <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
                       <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
                     </label>
                     {imagePreview && <img src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
@@ -397,7 +397,7 @@ export default function ProductListPage() {
                       <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
                         {glbFile ? glbFile.name : (editing.model3d ? 'Replace 3D Model' : 'Choose 3D Model')}
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
+                      <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
                       <input type="file" accept=".glb" onChange={handleGlbChange} style={{ display: 'none' }} />
                     </label>
                     {glbFile ? (
@@ -462,7 +462,7 @@ export default function ProductListPage() {
                       }}>
                         <div className="product-edit-variation-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <span style={{
-                            fontSize: '0.72rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
+                            fontSize: '0.75rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
                             letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
                             borderRadius: '6px',
                           }}>Variation {i + 1}</span>

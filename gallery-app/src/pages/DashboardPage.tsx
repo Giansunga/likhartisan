@@ -706,7 +706,7 @@ export default function DashboardPage() {
                           borderRadius: '999px',
                           background: 'var(--accent-color)',
                           color: '#fff',
-                          fontSize: '0.68rem',
+                          fontSize: '0.75rem',
                           fontWeight: 700,
                           lineHeight: 1,
                           display: 'inline-flex',
@@ -970,7 +970,7 @@ export default function DashboardPage() {
                               {!n.read && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
                             </div>
                             <p style={{ fontSize: '0.82rem', color: '#888', fontFamily: 'var(--font-sans)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                            <span style={{ fontSize: '0.72rem', color: '#aaa', fontFamily: 'var(--font-sans)', marginTop: '4px' }}>{timeAgo}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#aaa', fontFamily: 'var(--font-sans)', marginTop: '4px' }}>{timeAgo}</span>
                           </div>
                           <button aria-label="Delete notification" onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(n.id); }}
                             style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#aaa', alignSelf: 'center', opacity: 0.5, transition: 'opacity 0.15s', borderRadius: '4px' }}
@@ -1106,12 +1106,12 @@ export default function DashboardPage() {
                                 </svg>
                                 <span className="order-shop-name">{order.shop}</span>
                                 {isMobile && (
-                                  <span style={{ padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
+                                  <span style={{ padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
                                     {s.label}
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)', paddingLeft: '24px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)', paddingLeft: '24px' }}>
                                 Order #{shortId}
                                 <span style={{ margin: '0 6px', color: '#ccc' }}>|</span>
                                 Placed on {placedDate}
@@ -1235,7 +1235,7 @@ export default function DashboardPage() {
                                         </div>
                                         {/* Label */}
                                         <span style={{
-                                          fontSize: '0.6rem', textAlign: 'center', lineHeight: 1.2, maxWidth: '52px',
+                                          fontSize: '0.75rem', textAlign: 'center', lineHeight: 1.2, maxWidth: '52px',
                                           color: step.done ? '#C1570D' : '#B0B0B0',
                                           fontWeight: step.done ? 600 : 400,
                                           fontFamily: 'var(--font-sans)',
@@ -1255,7 +1255,7 @@ export default function DashboardPage() {
                                   <rect x="2" y="7" width="15" height="13" rx="2"/><path d="M17 11h3l2 2v5h-5v-7z"/><circle cx="6.5" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/>
                                 </svg>
                                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#C1570D', fontFamily: 'var(--font-sans)', flex: 1 }}>{statusHeadline}</span>
-                                <span style={{ fontSize: '0.72rem', color: '#999', fontFamily: 'var(--font-sans)' }}>{placedDate}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>{placedDate}</span>
                               </div>
 
 
@@ -1270,7 +1270,7 @@ export default function DashboardPage() {
                                       <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)', marginLeft: '6px' }}>{step.desc}</span>
                                     </div>
                                     {step.date && (
-                                      <span style={{ fontSize: '0.68rem', color: '#bbb', fontFamily: 'var(--font-sans)', flexShrink: 0, whiteSpace: 'nowrap' }}>{step.date}</span>
+                                      <span style={{ fontSize: '0.75rem', color: '#bbb', fontFamily: 'var(--font-sans)', flexShrink: 0, whiteSpace: 'nowrap' }}>{step.date}</span>
                                     )}
                                   </div>
                                 ))}

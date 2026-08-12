@@ -129,7 +129,7 @@ export default function SavedDesignsModal({
             <button
               onClick={() => setShopFilter('all')}
               className={`freeform-tab-option${shopFilter === 'all' ? ' selected' : ''}`}
-              style={{ padding: '5px 12px', fontSize: '0.72rem' }}
+              style={{ padding: '5px 12px', fontSize: '0.75rem' }}
             >
               All Shops
             </button>
@@ -138,7 +138,7 @@ export default function SavedDesignsModal({
                 key={id}
                 onClick={() => setShopFilter(id)}
                 className={`freeform-tab-option${shopFilter === id ? ' selected' : ''}`}
-                style={{ padding: '5px 12px', fontSize: '0.72rem' }}
+                style={{ padding: '5px 12px', fontSize: '0.75rem' }}
               >
                 {name}
               </button>
@@ -196,18 +196,18 @@ export default function SavedDesignsModal({
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
                       {d.shops?.name && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--primary-color)', fontWeight: 600 }}>{d.shops.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600 }}>{d.shops.name}</span>
                       )}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{d.model_name}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{d.model_name}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span className="freeform-summary-row-swatch" style={{ width: 12, height: 12, borderWidth: 1, background: d.material_params?.color }} />
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {getFinishLabel(d.material_params?.finish || '')}
                           {COLOR_NAMES[d.material_params?.color?.toUpperCase()] ? ` · ${COLOR_NAMES[d.material_params.color.toUpperCase()]}` : ` ${d.material_params?.color}`}
                         </span>
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-light)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '2px' }}>
                       {new Date(d.updated_at || d.created_at).toLocaleDateString()}
                     </div>
                   </div>
@@ -215,14 +215,14 @@ export default function SavedDesignsModal({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                     <button
                       onClick={() => { setRenamingId(d.id); setRenameValue(d.name); }}
-                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.68rem', color: 'var(--text-muted)' }}
+                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
                       title="Rename"
                     >
                       &#9998;
                     </button>
                     <button
                       onClick={() => handleDelete(d.id)}
-                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.68rem', color: 'var(--text-muted)' }}
+                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
                       title="Delete"
                     >
                       &#128465;

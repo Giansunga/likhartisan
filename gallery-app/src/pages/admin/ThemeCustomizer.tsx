@@ -92,7 +92,7 @@ export default function ThemeCustomizer() {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-dark)' }}>{t.label}</div>
                     {name === 'default' && (
-                      <div style={{ fontSize: '0.72rem', color: '#929090', fontWeight: 500 }}>Current default</div>
+                      <div style={{ fontSize: '0.75rem', color: '#929090', fontWeight: 500 }}>Current default</div>
                     )}
                   </div>
                 </div>

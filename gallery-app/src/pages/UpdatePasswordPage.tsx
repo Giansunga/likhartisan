@@ -122,7 +122,7 @@ export default function UpdatePasswordPage() {
                 <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
               </svg>
             </div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1E1E1E', marginBottom: '12px', fontFamily: 'var(--font-serif)' }}>Password Updated!</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1E1E1E', marginBottom: '12px', fontFamily: 'var(--font-serif)' }}>Password Updated!</h2>
             <p style={{ fontSize: '0.95rem', color: '#666', marginBottom: '24px', lineHeight: 1.5 }}>
               Your password has been changed successfully.<br/>You will be redirected shortly.
             </p>

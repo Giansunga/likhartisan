@@ -285,7 +285,7 @@ export default function ArtisanDashboardPage() {
         }}>
           {/* Brand mark */}
           <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #F0EBE4' }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: '#B8A89A', textTransform: 'uppercase' }}>Seller Portal</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#B8A89A', textTransform: 'uppercase' }}>Seller Portal</div>
           </div>
 
           {/* Nav items */}
@@ -713,7 +713,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                         position: 'absolute', bottom: '-4px', right: '-4px',
                         width: '18px', height: '18px', borderRadius: '50%',
                         background: rankColors[i] ?? '#A89688',
-                        color: '#fff', fontSize: '0.6rem', fontWeight: 800,
+                        color: '#fff', fontSize: '0.75rem', fontWeight: 700,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid #fff',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
@@ -774,7 +774,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
                     <span style={{ fontWeight: 700, color: 'var(--accent-color)', fontSize: '0.875rem' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString()}</span>
                     <span style={{
-                      fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                      fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                       padding: '2px 7px', borderRadius: '999px',
                       background: item.status === 'active' ? '#ECFDF5' : '#FEF9C3',
                       color: item.status === 'active' ? '#065F46' : '#854D0E',
@@ -985,7 +985,7 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                   <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--accent-color)', marginBottom: '6px' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <span style={{
                     display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-                    fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize',
+                    fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
                     background: item.status === 'active' ? '#E8F5E9' : '#FFF3E0',
                     color: item.status === 'active' ? '#2E7D32' : '#E65100'
                   }}>{item.status}</span>
@@ -1096,7 +1096,7 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <span style={{
-                            fontSize: '0.72rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
+                            fontSize: '0.75rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
                             letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
                             borderRadius: '6px',
                           }}>Variation {i + 1}</span>
@@ -1297,7 +1297,7 @@ export function VaultPanel({ products, productPrices, onProductsUpdated }: { pro
                   <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--accent-color)', marginBottom: '6px' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <span style={{
                     display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-                    fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize',
+                    fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
                     background: '#FFF3E0', color: '#E65100'
                   }}>archived</span>
                 </div>
@@ -1465,13 +1465,13 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
       cancelled: { bg: '#FFEBEE', color: '#C62828' },
     };
     const s = styles[status] || styles.pending;
-    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color, textTransform: 'capitalize' }}>{status}</span>;
+    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: s.bg, color: s.color, textTransform: 'capitalize' }}>{status}</span>;
   };
 
   const paymentBadge = (status: string) => {
     const bg = status === 'Paid' ? '#E8F5E9' : status === 'Cancelled' ? '#FFEBEE' : '#FFF3E0';
     const color = status === 'Paid' ? '#2E7D32' : status === 'Cancelled' ? '#C62828' : '#E65100';
-    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: bg, color: color }}>{status}</span>;
+    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: bg, color: color }}>{status}</span>;
   };
 
   const filtered = orders
@@ -1658,7 +1658,7 @@ return (
 
             {/* Buyer Info */}
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E0D8', background: '#FDF8F4' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Buyer Information</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Buyer Information</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <span style={{ fontSize: '0.82rem', color: '#8C7B6E', width: '60px', flexShrink: 0 }}>Name</span>
@@ -1677,7 +1677,7 @@ return (
 
             {/* Item Summary */}
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E0D8' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Item Summary</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Item Summary</div>
               <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                 <img src={selectedOrder.item_image} alt="" style={{ width: '56px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1698,7 +1698,7 @@ return (
             {/* Status Row */}
             <div style={{ padding: '20px 28px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</div>
                 {(() => {
                   const bg = selectedOrder.payment_status === 'Paid' ? '#E8F5E9' : selectedOrder.payment_status === 'Cancelled' ? '#FFEBEE' : '#FFF3E0';
                   const color = selectedOrder.payment_status === 'Paid' ? '#2E7D32' : selectedOrder.payment_status === 'Cancelled' ? '#C62828' : '#E65100';
@@ -1706,7 +1706,7 @@ return (
                 })()}
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</div>
                 {(() => {
                   const styles: Record<string, { bg: string; color: string }> = {
                     pending: { bg: '#FFF3E0', color: '#E65100' }, preparing: { bg: '#E3F2FD', color: '#1565C0' },
@@ -1718,7 +1718,7 @@ return (
                 })()}
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Order Total</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Order Total</div>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>{'\u20B1'}{selectedOrder.total?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '—'}</span>
               </div>
             </div>
@@ -2063,7 +2063,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
                        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.buyer_name || FALLBACK_BUYER_NAME}</span>
-                      <span style={{ fontSize: '0.68rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#A89688', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '20px' }}>
                       {conv.last_message || 'Start a conversation'}
@@ -2071,7 +2071,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                   </div>
 
                   {conv.artisan_unread > 0 && (
-                    <span style={{ position: 'absolute', top: '12px', right: '40px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.artisan_unread > 99 ? '99+' : conv.artisan_unread}</span>
+                    <span style={{ position: 'absolute', top: '12px', right: '40px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.artisan_unread > 99 ? '99+' : conv.artisan_unread}</span>
                   )}
 
                   {/* Delete button */}
@@ -2122,7 +2122,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
               <div>
                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || FALLBACK_BUYER_NAME}</div>
                 {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
-                  <div style={{ fontSize: '0.72rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
+                  <div style={{ fontSize: '0.75rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
                 ); })()}
               </div>
             </div>
@@ -2647,7 +2647,7 @@ export function NotificationsPanel({ userId }: { userId: string }) {
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.88rem', fontWeight: filter === t.key ? 700 : 500, color: filter === t.key ? 'var(--primary-color)' : 'var(--text-light)', borderBottom: `2px solid ${filter === t.key ? 'var(--accent-color)' : 'transparent'}`, marginBottom: '-1px', transition: 'color 0.15s' }}>
             {t.label}
             {t.count > 0 && (
-              <span style={{ minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: filter === t.key ? 'var(--accent-color)' : '#E0A06A', color: '#fff', fontSize: '0.66rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.count}</span>
+              <span style={{ minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: filter === t.key ? 'var(--accent-color)' : '#E0A06A', color: '#fff', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.count}</span>
             )}
           </button>
         ))}
@@ -2689,11 +2689,11 @@ export function NotificationsPanel({ userId }: { userId: string }) {
                     {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                  <span style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}{n.order_id ? '  ·  View order →' : ''}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}{n.order_id ? '  ·  View order →' : ''}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                   {!n.read && (
-                    <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>Read</button>
+                    <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>Read</button>
                   )}
                   <button onClick={() => deleteNotif(n.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', padding: '4px', borderRadius: '4px', transition: 'color 0.15s' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#d32f2f')}

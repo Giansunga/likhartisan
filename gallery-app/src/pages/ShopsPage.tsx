@@ -30,7 +30,6 @@ export default function ShopsPage() {
     <div className="seasonal-pattern-page">
       <header
         className="gallery-header-banner"
-        style={isMobile ? { height: 'auto', minHeight: '240px', paddingTop: 'calc(var(--nav-height) + 28px)', paddingBottom: '28px' } : undefined}
       >
         <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/shops-hero.PNG)' }} />
         <div className="gallery-banner-overlay" />
@@ -39,12 +38,12 @@ export default function ShopsPage() {
           style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
         >
           <div className="gallery-banner-content">
-            <div className="breadcrumbs" style={isMobile ? { marginBottom: '20px' } : undefined}>
+            <div className="breadcrumbs">
               <Link to="/">Home</Link>
               <span className="separator">/</span>
               <span className="current">Shops</span>
             </div>
-            <h1 className="gallery-title" style={isMobile ? { margin: 0 } : undefined}>Explore Our Shops</h1>
+            <h1 className="gallery-title system-hero-title system-hero-title--banner">Explore Our Shops</h1>
             <p
               className="text-[1.2rem] text-white/85 mt-4 max-w-[600px] leading-[1.6]"
               style={isMobile ? { marginTop: '18px', maxWidth: '34ch' } : undefined}

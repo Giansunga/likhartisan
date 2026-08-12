@@ -79,7 +79,7 @@ export default function ArtisansPage() {
               <span className="separator">/</span>
               <span className="current">Artisans</span>
             </div>
-            <h1 className="gallery-title">Meet the Artisans of Santo Tomas</h1>
+            <h1 className="gallery-title system-hero-title system-hero-title--banner">Meet the Artisans of Santo Tomas</h1>
             <p className="text-[1.2rem] text-white/85 mt-4 max-w-[600px] leading-[1.6]">
               Preserving the tradition of pottery making through generations of skill, passion, and dedication to the craft.
             </p>

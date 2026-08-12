@@ -88,12 +88,13 @@ function AppShell() {
   
   // Hide dock on mobile for product, checkout, and cart pages
   const isProductPage = location.pathname.startsWith('/product/');
+  const isShopPage = location.pathname.startsWith('/shop/');
   const isCheckoutPage = location.pathname === '/checkout';
   const isCartPage = location.pathname === '/cart';
   const isChatPage = location.pathname === '/chat';
   const isDashboardPage = location.pathname === '/dashboard';
   const isArtisanPage = location.pathname.startsWith('/artisan-dashboard');
-  const shouldHideDock = isArtisanPage || (isMobile && (isProductPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
+  const shouldHideDock = isArtisanPage || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
 
   return (
     <>

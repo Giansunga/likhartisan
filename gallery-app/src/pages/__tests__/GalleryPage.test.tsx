@@ -86,12 +86,12 @@ describe('GalleryPage category artwork', () => {
     });
 
     const standardImages = [
-      'pottery-collage.png',
-      'vases_collection.png',
-      'planters_collection.png',
-      'jars_collection.png',
-      'amphoras_collection.png',
-      'tealights_collection.png',
+      'gallery-category-all-crafts-v2.webp',
+      'gallery-category-vases-v2.webp',
+      'gallery-category-planters-v2.webp',
+      'gallery-category-jars-v2.webp',
+      'gallery-category-amphoras-v2.webp',
+      'gallery-category-tea-lights-v2.webp',
     ];
     Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
       expect(image).toHaveStyle({ backgroundImage: `url(/images/${standardImages[index]})` });

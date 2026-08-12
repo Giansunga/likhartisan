@@ -285,7 +285,7 @@ export default function Navbar() {
       : { position: 'absolute', right: 0, top: 'calc(100% + 10px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 110px)', zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
-          Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
+          Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {unreadNotifications > 0 && (
@@ -346,7 +346,7 @@ export default function Navbar() {
                   ? <><p style={{ fontSize: '0.85rem', fontWeight: n.read ? 500 : 700, color: 'var(--text-dark)', lineHeight: 1.35, margin: 0 }}>{n.title}</p>
                       {n.message && <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', lineHeight: 1.35, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</p>}</>
                   : <p style={{ fontSize: '0.85rem', color: 'var(--text-dark)', lineHeight: 1.4, margin: 0 }}>{n.text}</p>}
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-light)', marginTop: '4px', marginBottom: 0 }}>{timeAgo(n.time)}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '4px', marginBottom: 0 }}>{timeAgo(n.time)}</p>
               </div>
               {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E53935', flexShrink: 0, marginTop: '6px' }} />}
             </button>
@@ -369,7 +369,7 @@ export default function Navbar() {
         <div className="h-full flex items-center justify-between" style={{ padding: '0 24px' }}>
           <Link to="/" className="logo flex items-center gap-2">
             <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
-            <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
+            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
           <div className="flex items-center gap-4">
             <div ref={notifDropdownRef} className="relative">
@@ -378,7 +378,7 @@ export default function Navbar() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.65rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                  <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
@@ -411,7 +411,7 @@ export default function Navbar() {
 
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
             <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
-            <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
+            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
 
           {/* Desktop nav links */}

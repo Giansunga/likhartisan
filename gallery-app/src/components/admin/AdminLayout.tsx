@@ -94,7 +94,7 @@ export default function AdminLayout() {
         paddingLeft: '24px', paddingRight: '24px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: '180px', width: 'auto', objectFit: 'contain' }} />
+          <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: '44px', width: 'auto', objectFit: 'contain' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {/* Notification bell */}
@@ -106,7 +106,7 @@ export default function AdminLayout() {
               position: 'absolute', top: '-4px', right: '-6px',
               width: '16px', height: '16px', borderRadius: '50%',
               background: '#DC2626', color: '#fff',
-              fontSize: '0.6rem', fontWeight: 700,
+              fontSize: '0.75rem', fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>8</span>
           </div>
@@ -114,7 +114,7 @@ export default function AdminLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1F1F1F', lineHeight: 1.2 }}>Admin</p>
-              <p style={{ fontSize: '0.7rem', color: '#77716B' }}>Super Administrator</p>
+              <p style={{ fontSize: '0.75rem', color: '#77716B' }}>Super Administrator</p>
             </div>
             <div style={{
               width: '36px', height: '36px', borderRadius: '50%',
@@ -148,7 +148,7 @@ export default function AdminLayout() {
                 return (
                   <div key={`section-${link.section}`}>
                     {link.section !== 'main' && <div style={{ height: '1px', background: '#E9DED2', margin: '12px 0 8px' }} />}
-                    <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#A89688', letterSpacing: '0.08em', textTransform: 'uppercase' as const, padding: '8px 12px 4px' }}>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A89688', letterSpacing: '0.08em', textTransform: 'uppercase' as const, padding: '8px 12px 4px' }}>
                       {section?.label}
                     </p>
                     <SidebarLink link={link} isActive={isActiveRoute(link.to, link.exact)} />

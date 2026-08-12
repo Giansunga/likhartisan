@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -125,7 +126,7 @@ export default function HomePage() {
         </video>
         <div className="hero-video-overlay"></div>
         <div className="hero-video-content">
-          <h1 className="hero-video-title hero-fade-up" style={{ animationDelay: '0.3s' }}>
+          <h1 className="hero-video-title system-hero-title system-hero-title--display hero-fade-up" style={{ animationDelay: '0.3s' }}>
             Explore the Local Pottery<br />Industry in Santo Tomas
           </h1>
           <Link to="/gallery" className="hero-video-btn hero-fade-up" style={{ animationDelay: '0.6s' }}>
@@ -138,14 +139,26 @@ export default function HomePage() {
       <section className="history-section py-16 md:py-[100px] bg-[var(--bg-primary)]">
         <div className="max-w-[var(--container-width)] mx-auto px-6">
           <div className="history-section-grid grid grid-cols-1 md:grid-cols-[1fr_1.1fr] gap-10 md:gap-x-20 md:gap-y-6 items-center">
-            <div className="history-copy-block order-1 md:col-start-1 md:row-start-1 flex flex-col gap-5 md:gap-6">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="history-copy-block order-1 md:col-start-1 md:row-start-1 flex flex-col gap-5 md:gap-6"
+            >
               <h2 className="section-title max-md:text-[2rem] max-md:leading-[1.12] max-md:mb-0">A Tradition Shaped<br /><span>Through Generations</span></h2>
               <p className="text-[1rem] md:text-[1.125rem] text-brown-dark leading-[1.65] md:leading-[1.6]">
                 Santo Tomas, Pampanga is known as the <span className="font-bold text-primary">Pottery Capital of the Philippines</span>. For centuries, local artisans have turned simple clay into remarkable works of art – preserving techniques passed down through generations and shaping a legacy of craftsmanship that continues to thrive today.
               </p>
-            </div>
+            </motion.div>
 
-            <div className="history-feature-list order-3 md:order-none md:col-start-1 md:row-start-2 grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6 md:mt-4">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+              className="history-feature-list order-3 md:order-none md:col-start-1 md:row-start-2 grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6 md:mt-4"
+            >
               <div className="flex flex-row md:flex-col gap-4 md:gap-3 items-start">
                 <div className="w-[52px] h-[52px] md:w-[70px] md:h-[70px] rounded-full bg-cream-tertiary flex items-center justify-center text-primary shrink-0">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 md:w-8 md:h-8">
@@ -171,9 +184,15 @@ export default function HomePage() {
                   <p className="text-[0.88rem] md:text-[0.95rem] text-brown-medium leading-[1.5]">Pottery reflects the identity, creativity, and heritage of the Kapampangans.</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="history-collage order-2 md:order-none md:col-start-2 md:row-start-1 md:row-span-2 grid grid-cols-12 grid-rows-12 h-[min(78vw,420px)] min-h-[300px] md:h-[640px] gap-2 md:gap-0 relative">
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="history-collage order-2 md:order-none md:col-start-2 md:row-start-1 md:row-span-2 grid grid-cols-12 grid-rows-12 h-[min(78vw,420px)] min-h-[300px] md:h-[640px] gap-2 md:gap-0 relative"
+            >
               <div className="col-span-6 row-span-12 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
                 <img src="/images/hero_1.jpg" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" style={{ transform: 'scaleX(-1)' }} />
               </div>
@@ -183,7 +202,7 @@ export default function HomePage() {
               <div className="col-span-6 row-span-6 col-start-7 row-start-7 md:ml-5 md:mt-2.5 rounded-[8px] md:rounded-[10px] overflow-hidden shadow-[var(--shadow-md)] transition-all duration-[0.6s] md:hover:-translate-y-2 md:hover:scale-[1.02] md:hover:shadow-[var(--shadow-lg)] md:hover:z-10">
                 <img src="/images/artisan_1.jpg" alt="" className="w-full h-full object-cover transition-all duration-[0.6s] md:hover:scale-105" />
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -418,7 +437,7 @@ export default function HomePage() {
           <div className="relative z-[5] max-w-[900px] mx-auto px-6 text-cream-secondary flex flex-col items-center gap-5">
             <h2 className="font-serif text-[3rem] font-medium text-cream-secondary max-md:text-[2.15rem]">Ready to Explore Santo Tomas?</h2>
             <p className="text-[1.25rem] leading-[1.6] opacity-90 max-md:text-[1.1rem]">Discover local artisans, browse handcrafted pottery collections, and experience the town's rich pottery heritage through LikhArtisan.</p>
-            <p className="text-[0.9rem] font-light opacity-80 mb-4">Create your free account and start exploring today.</p>
+            <p className="text-[0.9rem] font-normal opacity-80 mb-4">Create your free account and start exploring today.</p>
             <button onClick={() => window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signup' } }))}
               className="bg-cream-secondary text-primary text-[1.1rem] font-semibold tracking-[0.05em] py-3.5 px-11 rounded-[10px] shadow-[0_4px_15px_rgba(0,0,0,0.3)] hover:bg-white hover:text-accent hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)] transition-all">
               CREATE ACCOUNT
