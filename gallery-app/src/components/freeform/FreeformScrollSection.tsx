@@ -230,79 +230,77 @@ export default function FreeformScrollSection() {
             {/* Slide 1: Intro */}
             <motion.div 
               style={{ opacity: introOpacity, y: introY, willChange: 'opacity, transform' }}
-              className="freeform-landing-intro-slide absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
+              className="freeform-landing-caption freeform-landing-caption--intro freeform-landing-intro-slide absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
-              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
-                Design Pottery.<br />
-                <span className="text-[#823E0B]">Your Way.</span><br />
-                In 3D.
+              <p className="freeform-landing-caption__kicker">Design Studio · Live 3D preview</p>
+              <h2 className="freeform-landing-caption__title">
+                Start with a form. <span>Make it yours.</span>
               </h2>
-              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px]">
-                Customize handcrafted pottery in real time using our interactive 3D Freeform Designer.
-                Experiment with variations, dimensions, and decorative details before placing your order.
+              <p className="freeform-landing-caption__body">
+                Shape a pottery concept in real time, then refine its finish, pattern, and sculpted details before sharing it with a participating shop.
               </p>
             </motion.div>
 
             {/* Slide 2: Shape */}
             <motion.div 
               style={{ opacity: shapeOpacity, y: shapeY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
-                Shape <br />
-                <span className="text-[#823E0B]">Your Vision.</span>
+              <p className="freeform-landing-caption__kicker">01 · Shape</p>
+              <h2 className="freeform-landing-caption__title">
+                Shape the <span>silhouette.</span>
               </h2>
-              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px]">
-                Mold the perfect piece. Adjust the height, widen the base, or refine the curves seamlessly—just like a master potter at the wheel.
+              <p className="freeform-landing-caption__body">
+                Adjust the height, body width, neck, rim, and curvature. Every change appears instantly on the 3D piece.
               </p>
             </motion.div>
 
             {/* Slide 3: Finish */}
             <motion.div 
               style={{ opacity: finishOpacity, y: finishY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
-                Find Your <br />
-                <span className="text-[#823E0B]">Perfect Finish.</span>
+              <p className="freeform-landing-caption__kicker">02 · Finish</p>
+              <h2 className="freeform-landing-caption__title">
+                Choose the <span>surface.</span>
               </h2>
-              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
-                Choose from raw clay, elegant ceramic, or brilliant glazed finishes to perfectly match your aesthetic.
+              <p className="freeform-landing-caption__body">
+                Compare raw clay, ceramic, and glazed finishes to find the tone and texture that suit your piece.
               </p>
             </motion.div>
 
             {/* Slide 4: Decor */}
             <motion.div
               style={{ opacity: decorOpacity, y: decorY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
-                Bring It <br />
-                <span className="text-[#823E0B]">To Life.</span>
+              <p className="freeform-landing-caption__kicker">03 · Decorate</p>
+              <h2 className="freeform-landing-caption__title">
+                Give it a <span>signature.</span>
               </h2>
-              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
-                Add original patterns, choose where they wrap, and finish them painted or engraved for a piece with your own signature.
+              <p className="freeform-landing-caption__body">
+                Place a pattern, tune its scale and color, then choose a painted or engraved treatment.
               </p>
             </motion.div>
 
             {/* Slide 5: 3D Attachments */}
             <motion.div
               style={{ opacity: attachmentOpacity, y: attachmentY, willChange: 'opacity, transform' }}
-              className="absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
+              className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
-              <h2 className="font-serif text-[2rem] sm:text-[2.5rem] lg:text-[3.2rem] leading-[1.15] font-bold mb-3 sm:mb-5">
-                Add The <br />
-                <span className="text-[#A95A20]">Finishing Touch.</span>
+              <p className="freeform-landing-caption__kicker">04 · Details</p>
+              <h2 className="freeform-landing-caption__title">
+                Complete the <span>form.</span>
               </h2>
-              <p className="text-[0.85rem] sm:text-[1rem] leading-[1.6] sm:leading-[1.7] opacity-80 max-w-[460px] mb-5 sm:mb-8">
-                Complete your piece with sculpted handles and dimensional accents. Preview every attachment directly on your pottery in real time.
+              <p className="freeform-landing-caption__body">
+                Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.
               </p>
               <div className="flex gap-4">
                 <button
                   onClick={goToFreeform}
                   className="flex items-center gap-2.5 text-white font-semibold text-[0.85rem] sm:text-[0.95rem] py-3 sm:py-3.5 px-6 sm:px-8 rounded-[10px] transition-all bg-[#A95A20] shadow-[0_4px_16px_rgba(169,90,32,0.35)] hover:bg-[#8F4818] hover:scale-105 cursor-pointer"
                 >
-                  Start Designing Now
+                  Open Design Studio
                 </button>
               </div>
             </motion.div>

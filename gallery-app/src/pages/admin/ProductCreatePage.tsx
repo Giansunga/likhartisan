@@ -201,7 +201,7 @@ export default function ProductCreatePage() {
   const isValid = form.name && form.category && form.shopId;
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+    <div>
 
       {submitted ? (
         <div style={{
@@ -216,12 +216,6 @@ export default function ProductCreatePage() {
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
-
-          {/* Header */}
-          <div style={{ marginBottom: '28px' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#2C1810', margin: '0 0 4px' }}>Upload New 3D Product</h2>
-            <p style={{ fontSize: '0.85rem', color: '#8C7B6E', margin: 0 }}>Assign a pottery product to an artisan shop</p>
-          </div>
 
           {/* Section: Product Information */}
           <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E8E0D8', padding: '28px 32px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
@@ -277,7 +271,7 @@ export default function ProductCreatePage() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <span style={{
-                        fontSize: '0.72rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
+                        fontSize: '0.75rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
                         letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
                         borderRadius: '6px',
                       }}>Variation {i + 1}</span>
@@ -362,7 +356,7 @@ export default function ProductCreatePage() {
                   <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
                     {imageFile ? imageFile.name : 'Choose Image'}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
+                  <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
                   <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
                 </label>
                 {imagePreview && <img src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
@@ -383,7 +377,7 @@ export default function ProductCreatePage() {
                   <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
                     {glbFile ? glbFile.name : 'Choose 3D Model'}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
+                  <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
                   <input type="file" accept=".glb" onChange={handleGlbChange} style={{ display: 'none' }} />
                 </label>
                 {glbFile && (

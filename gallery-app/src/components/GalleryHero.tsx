@@ -7,20 +7,15 @@ interface GalleryHeroProps {
 }
 
 export default function GalleryHero({ currentTheme, isMobile }: GalleryHeroProps) {
-  const isChristmasTheme = currentTheme === 'christmas';
-  const backgroundImage = isChristmasTheme
+  const backgroundImage = currentTheme === 'christmas'
     ? '/images/christmas-gallery-hero.webp'
-    : '/images/hero_1.jpg';
+    : currentTheme === 'valentines'
+      ? '/images/valentines-gallery-hero.webp'
+      : '/images/hero_1.jpg';
 
   return (
     <header
       className="gallery-header-banner"
-      style={isMobile ? {
-        height: 'auto',
-        minHeight: '220px',
-        paddingTop: 'calc(var(--nav-height) + 12px)',
-        paddingBottom: '24px',
-      } : undefined}
     >
       <div className="gallery-banner-bg" style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className="gallery-banner-overlay" />
@@ -29,12 +24,12 @@ export default function GalleryHero({ currentTheme, isMobile }: GalleryHeroProps
         style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
       >
         <div className="gallery-banner-content">
-          <div className="breadcrumbs" style={isMobile ? { marginBottom: '18px' } : undefined}>
+          <div className="breadcrumbs">
             <Link to="/">Home</Link>
             <span className="separator">/</span>
             <span className="current">Gallery</span>
           </div>
-          <h1 className="gallery-title" style={isMobile ? { margin: 0, maxWidth: '34ch' } : undefined}>
+          <h1 className="gallery-title system-hero-title system-hero-title--banner">
             Explore the beauty and craftsmanship of Santo Tomas pottery through curated collections.
           </h1>
         </div>

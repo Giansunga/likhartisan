@@ -34,8 +34,8 @@ export default function Layout() {
   const isFreeform = location.pathname === '/freeform';
   const isChat = location.pathname === '/chat';
   const hideNavPadding = isAdmin || isArtisan || isFreeform;
-  // Hide footer and bottom nav on chat/freeform to prevent mobile layout conflicts/flash
-  const hideFooterAndBottom = isFreeform;
+  const hideFooter = isFreeform || isArtisan;
+  const hideBottomNav = isArtisan;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -43,7 +43,7 @@ export default function Layout() {
 
   return (
     <LayoutErrorBoundary>
-      <div className="min-h-screen bg-cream">
+      <div className="seasonal-storefront-shell min-h-screen bg-cream">
         <a href="#main-content" style={{
           position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden',
         }} onFocus={(e) => {
@@ -73,8 +73,8 @@ export default function Layout() {
         <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} layout-main${isChat ? ' layout-main--chat' : ''}`}>
           <Outlet />
         </main>
-        {!hideFooterAndBottom && <Footer />}
-        {!hideFooterAndBottom && <BottomNav />}
+        {!hideFooter && <Footer />}
+        {!hideBottomNav && <BottomNav />}
       </div>
     </LayoutErrorBoundary>
   );

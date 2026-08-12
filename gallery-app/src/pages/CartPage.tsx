@@ -1,545 +1,488 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useJsApiLoader } from '@react-google-maps/api';
-import { getCart, removeFromCart, setCart } from '../data/store';
+import { toast } from 'sonner';
+import { ArrowLeft, Info, Trash2 } from 'lucide-react';
+import { getCart, setCart } from '../data/store';
 import { supabase } from '../lib/supabase';
-import type { CartItem } from '../types';
-import { fmt } from '../lib/utils';
+import type { CartCheckoutDraft, CartItem } from '../types';
 import { geocodeAddress } from '../lib/geocoder';
-import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
-const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
+import {
+  getCartLineKey,
+  getCartShopKey,
+  markCartCheckoutAuthPending,
+  writeCartCheckoutDraft,
+} from '../lib/cartCheckout';
+import {
+  CartSummary,
+  EmptyCartState,
+  ShopCartGroup,
+  type CartLineAvailability,
+} from '../components/cart/CartComponents';
+import { fmt } from '../lib/utils';
+import './CartPage.css';
 
-// Lalamove vehicle tiers (smallest to largest) for PH market
 const VEHICLE_TIERS = [
   { serviceType: 'MOTORCYCLE', label: 'Motorcycle', maxL: 50, maxW: 40, maxH: 50, maxKg: 20 },
   { serviceType: 'SEDAN', label: 'Sedan', maxL: 100, maxW: 60, maxH: 70, maxKg: 200 },
   { serviceType: 'MPV', label: 'Subcompact SUV', maxL: 150, maxW: 120, maxH: 100, maxKg: 300 },
-  { serviceType: 'SMALL_VAN', label: '7-Seater SUV / Small Van', maxL: 210, maxW: 120, maxH: 110, maxKg: 600 },
+  { serviceType: 'SMALL_VAN', label: 'Small Van', maxL: 210, maxW: 120, maxH: 110, maxKg: 600 },
   { serviceType: 'PICKUP', label: 'Pickup', maxL: 270, maxW: 150, maxH: 50, maxKg: 800 },
-  { serviceType: 'VAN', label: 'L300 / Cargo Van', maxL: 210, maxW: 120, maxH: 120, maxKg: 1000 },
+  { serviceType: 'VAN', label: 'Cargo Van', maxL: 210, maxW: 120, maxH: 120, maxKg: 1000 },
   { serviceType: '1000KG_FB', label: 'FB Van', maxL: 300, maxW: 170, maxH: 170, maxKg: 2000 },
-  { serviceType: '2000KG_ALUMINUM', label: 'Aluminum Van', maxL: 300, maxW: 170, maxH: 170, maxKg: 2000 },
   { serviceType: '3000KG', label: '3-Ton Truck', maxL: 430, maxW: 180, maxH: 210, maxKg: 3000 },
   { serviceType: '5000KG', label: '5-Ton Truck', maxL: 430, maxW: 180, maxH: 210, maxKg: 5000 },
   { serviceType: '7000KG', label: '7-Ton Truck', maxL: 640, maxW: 200, maxH: 240, maxKg: 7000 },
   { serviceType: '12000KG', label: '10-Wheel Truck', maxL: 1000, maxW: 240, maxH: 230, maxKg: 12000 },
-];
+] as const;
 
-function parseDimensionToCm(dim: string): number {
-  if (!dim) return 0;
-  const s = dim.toLowerCase().trim();
-  const xMatch = s.match(/([\d.]+)\s*x\s*([\d.]+)/);
-  if (xMatch) return parseFloat(xMatch[1]) * 2.54;
-  const cmMatch = s.match(/([\d.]+)\s*cm/);
-  if (cmMatch) return parseFloat(cmMatch[1]);
-  const inMatch = s.match(/([\d.]+)\s*(?:\"|in)/);
-  if (inMatch) return parseFloat(inMatch[1]) * 2.54;
-  const num = parseFloat(s);
-  return isNaN(num) ? 0 : num;
+interface CatalogLineState extends CartLineAvailability {
+  dimensions: string;
+  height: string;
 }
 
-function estimateWeight(lCm: number, wCm: number, hCm: number): number {
-  if (lCm <= 0 || wCm <= 0 || hCm <= 0) return 2;
-  const volumeCm3 = lCm * wCm * hCm * 0.6;
-  return Math.max(1, (volumeCm3 * 2.5) / 1000);
+interface DeliveryEstimate {
+  quotationId?: string;
+  fee: number;
+  serviceType: string;
+  vehicleLabel: string;
+  coordinates: { lat: number; lng: number };
+  quotedAt: string;
 }
 
-function groupByShop(items: CartItem[]): Record<string, CartItem[]> {
-  return items.reduce((acc, item) => {
-    (acc[item.shopName] = acc[item.shopName] || []).push(item);
-    return acc;
-  }, {} as Record<string, CartItem[]>);
+interface ProductCatalogRow {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  shop_id?: string;
+  shop_name?: string;
+  stock: number;
+  status: string;
+  dimensions?: string;
+  height?: string;
+}
+
+interface VariationCatalogRow {
+  id: string;
+  product_id: string;
+  price?: number | null;
+  stock: number;
+  dimensions?: string;
+  height?: string;
+}
+
+interface ShopLocationRow {
+  id: string;
+  location?: string;
+}
+
+function parseDimensionToCm(value: string): number {
+  if (!value) return 0;
+  const normalized = value.toLowerCase().trim();
+  const cm = normalized.match(/([\d.]+)\s*cm/);
+  if (cm) return Number(cm[1]);
+  const inches = normalized.match(/([\d.]+)\s*(?:"|in)/);
+  if (inches) return Number(inches[1]) * 2.54;
+  const number = Number.parseFloat(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function initialShopSelection(items: CartItem[]): { shopKey: string | null; lineKeys: Set<string> } {
+  if (items.length === 0) return { shopKey: null, lineKeys: new Set() };
+  const shopKey = getCartShopKey(items[0]);
+  return {
+    shopKey,
+    lineKeys: new Set(items.filter(item => getCartShopKey(item) === shopKey).map(getCartLineKey)),
+  };
 }
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
+  const { user } = useAuth();
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+  });
   const [items, setItems] = useState<CartItem[]>(getCart);
-  const [selected, setSelected] = useState<Set<string>>(new Set(items.map(i => `${i.productId}\v${i.variationId || ''}`)));
+  const [initialSelection] = useState(() => initialShopSelection(items));
+  const [activeShopKey, setActiveShopKey] = useState<string | null>(initialSelection.shopKey);
+  const [selected, setSelected] = useState<Set<string>>(initialSelection.lineKeys);
+  const [catalog, setCatalog] = useState<Record<string, CatalogLineState>>({});
+  const [validationStatus, setValidationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [shopAddresses, setShopAddresses] = useState<Record<string, string>>({});
   const [deliveryOption, setDeliveryOption] = useState<'pickup' | 'courier' | null>(null);
-  const [lalamoveQuote, setLalamoveQuote] = useState<any>(null);
-  const [lalamoveLoading, setLalamoveLoading] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState(VEHICLE_TIERS[0]);
-  const [userAddress, setUserAddress] = useState('');
-  const [shopAddress, setShopAddress] = useState(DEFAULT_PICKUP_ADDRESS);
-  const [stockMap, setStockMap] = useState<Record<string, number>>({});
-  const { user, loading: authLoading } = useAuth();
+  const [address, setAddress] = useState<string | null>(null);
+  const [estimate, setEstimate] = useState<DeliveryEstimate | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState('');
 
-  // Fetch stock for cart items
+  const effectiveAddress = address ?? user?.user_metadata?.address ?? '';
+
+  const cartIdentity = useMemo(() => items.map(getCartLineKey).sort().join('|'), [items]);
+
   useEffect(() => {
-    async function fetchStock() {
-      if (items.length === 0) return;
-      const variationIds = items.filter(i => i.variationId).map(i => i.variationId!);
-      const productIds = items.filter(i => !i.variationId).map(i => i.productId);
-      const map: Record<string, number> = {};
+    let cancelled = false;
 
-      if (variationIds.length > 0) {
-        const { data } = await supabase.from('product_variations').select('id, stock').in('id', variationIds);
-        if (data) data.forEach((v: any) => { map[`v:${v.id}`] = Number(v.stock) || 0; });
+    async function validateCart() {
+      if (items.length === 0) {
+        setCatalog({});
+        setValidationStatus('ready');
+        return;
       }
-      if (productIds.length > 0) {
-        const { data } = await supabase.from('products').select('id, stock').in('id', productIds);
-        if (data) data.forEach((p: any) => { map[`p:${p.id}`] = Number(p.stock) || 0; });
+      setValidationStatus('loading');
+
+      const productIds = [...new Set(items.map(item => item.productId))];
+      const variationIds = [...new Set(items.map(item => item.variationId).filter(Boolean) as string[])];
+      const shopIds = [...new Set(items.map(item => item.shopId).filter(Boolean) as string[])];
+
+      try {
+        const [productsResult, variationsResult, shopsResult] = await Promise.all([
+          supabase.from('products')
+            .select('id, name, price, image, shop_id, shop_name, stock, status, dimensions, height')
+            .in('id', productIds),
+          variationIds.length
+            ? supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height').in('id', variationIds)
+            : Promise.resolve({ data: [], error: null }),
+          shopIds.length
+            ? supabase.from('shops').select('id, location').in('id', shopIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        if (productsResult.error || variationsResult.error || shopsResult.error) throw new Error('Cart validation failed');
+        if (cancelled) return;
+
+        const productRows = (productsResult.data || []) as ProductCatalogRow[];
+        const variationRows = (variationsResult.data || []) as VariationCatalogRow[];
+        const shopRows = (shopsResult.data || []) as ShopLocationRow[];
+        const productMap = new Map(productRows.map(product => [product.id, product]));
+        const variationMap = new Map(variationRows.map(variation => [variation.id, variation]));
+        const nextCatalog: Record<string, CatalogLineState> = {};
+        let pricesChanged = false;
+
+        const revisedItems = items.map(item => {
+          const product = productMap.get(item.productId);
+          const variation = item.variationId ? variationMap.get(item.variationId) : null;
+          const stock = Number(item.variationId ? variation?.stock : product?.stock) || 0;
+          const price = Number(variation?.price ?? product?.price ?? item.price);
+          const priceChanged = Boolean(product) && price !== item.price;
+          const available = Boolean(product)
+            && product?.status === 'active'
+            && (!item.variationId || Boolean(variation))
+            && stock > 0;
+          const key = getCartLineKey(item);
+
+          nextCatalog[key] = {
+            status: 'ready',
+            stock,
+            available,
+            priceChanged,
+            dimensions: variation?.dimensions || product?.dimensions || '',
+            height: variation?.height || product?.height || '',
+          };
+
+          if (!priceChanged) return item;
+          pricesChanged = true;
+          return { ...item, price };
+        });
+
+        setCatalog(nextCatalog);
+        setShopAddresses(Object.fromEntries(shopRows.map(shop => [shop.id, shop.location || ''])));
+        setValidationStatus('ready');
+        if (pricesChanged) {
+          setCart(revisedItems);
+          setItems(revisedItems);
+        }
+      } catch {
+        if (!cancelled) setValidationStatus('error');
       }
-      setStockMap(map);
     }
-    fetchStock();
+
+    validateCart();
+    return () => { cancelled = true; };
+    // Revalidate when lines enter or leave the cart; quantity and price changes do not need another catalog request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartIdentity]);
+
+  const groups = useMemo(() => {
+    const grouped = new Map<string, { key: string; name: string; items: CartItem[] }>();
+    for (const item of items) {
+      const key = getCartShopKey(item);
+      const group = grouped.get(key) || { key, name: item.shopName, items: [] };
+      group.items.push(item);
+      grouped.set(key, group);
+    }
+    return [...grouped.values()];
   }, [items]);
 
-  function getStock(item: CartItem): number {
-    if (item.variationId) return stockMap[`v:${item.variationId}`] ?? -1;
-    return stockMap[`p:${item.productId}`] ?? -1;
+  const getAvailability = (item: CartItem): CatalogLineState => {
+    const state = catalog[getCartLineKey(item)];
+    if (state) return state;
+    return {
+      status: validationStatus,
+      stock: null,
+      available: validationStatus !== 'ready',
+      dimensions: '',
+      height: '',
+    };
+  };
+
+  const resolvedActiveShopKey = activeShopKey && groups.some(group => group.key === activeShopKey)
+    ? activeShopKey
+    : groups[0]?.key || null;
+  const effectiveSelected = useMemo(() => {
+    if (validationStatus !== 'ready') return selected;
+    return new Set([...selected].filter(key => catalog[key]?.available));
+  }, [catalog, selected, validationStatus]);
+  const activeGroup = groups.find(group => group.key === resolvedActiveShopKey);
+  const selectedItems = useMemo(
+    () => items.filter(item => getCartShopKey(item) === resolvedActiveShopKey && effectiveSelected.has(getCartLineKey(item))),
+    [effectiveSelected, items, resolvedActiveShopKey],
+  );
+  const itemCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  const selectedVehicle = useMemo(() => {
+    let volume = 0;
+    let weight = 0;
+    for (const item of selectedItems) {
+      const info = catalog[getCartLineKey(item)];
+      const parts = (info?.dimensions || '').split(/x/i).map(part => parseDimensionToCm(part));
+      const length = parts[0] || 30;
+      const width = parts[1] || length;
+      const height = parseDimensionToCm(info?.height || '') || 30;
+      volume += length * width * height * item.qty;
+      // Finished pottery is hollow; approximate clay as 5% of its bounding volume.
+      weight += Math.max(1, (length * width * height * 0.05 * 2.5) / 1000) * item.qty;
+    }
+    return VEHICLE_TIERS.find(tier => volume <= tier.maxL * tier.maxW * tier.maxH && weight <= tier.maxKg)
+      || VEHICLE_TIERS[VEHICLE_TIERS.length - 1];
+  }, [catalog, selectedItems]);
+
+  function invalidateEstimate() {
+    setEstimate(null);
+    setEstimateError('');
   }
 
-  const shops = groupByShop(items);
-  const selectedItems = useMemo(() => items.filter(i => selected.has(`${i.productId}\v${i.variationId || ''}`)), [items, selected]);
-  const itemCount = selectedItems.reduce((s, i) => s + i.qty, 0);
-  const subtotal = selectedItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const shippingFee = deliveryOption === 'courier' ? (lalamoveQuote?.priceBreakdown?.total ? parseFloat(lalamoveQuote.priceBreakdown.total) : 0) : 0;
-  const shipping = deliveryOption === 'pickup' ? 0 : shippingFee;
-  const total = subtotal + shipping;
-  const allSelected = items.length > 0 && items.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
+  function commitItems(nextItems: CartItem[]) {
+    setCart(nextItems);
+    setItems(nextItems);
+    invalidateEstimate();
+    if (resolvedActiveShopKey && nextItems.some(item => getCartShopKey(item) === resolvedActiveShopKey)) return;
+    const next = initialShopSelection(nextItems);
+    setActiveShopKey(next.shopKey);
+    setSelected(next.lineKeys);
+  }
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) navigate('/', { replace: true });
-    else {
-      const meta = user.user_metadata || {};
-      if (meta.address) setUserAddress(meta.address);
+  function toggleShop(shopKey: string) {
+    const group = groups.find(candidate => candidate.key === shopKey);
+    if (!group) return;
+    const availableKeys = group.items.filter(item => getAvailability(item).available).map(getCartLineKey);
+    const allSelected = resolvedActiveShopKey === shopKey && availableKeys.length > 0 && availableKeys.every(key => effectiveSelected.has(key));
+    if (resolvedActiveShopKey && resolvedActiveShopKey !== shopKey) toast.info('Checkout is limited to one shop at a time. Your selection has been switched.');
+    invalidateEstimate();
+    setActiveShopKey(shopKey);
+    setSelected(new Set(allSelected ? [] : availableKeys));
+  }
+
+  function toggleItem(item: CartItem) {
+    if (!getAvailability(item).available) return;
+    const shopKey = getCartShopKey(item);
+    const key = getCartLineKey(item);
+    invalidateEstimate();
+    if (shopKey !== resolvedActiveShopKey) {
+      setActiveShopKey(shopKey);
+      setSelected(new Set([key]));
+      toast.info('Checkout is limited to one shop at a time. Your selection has been switched.');
+      return;
     }
-  }, [navigate, user, authLoading]);
-
-  // Fetch shop address from DB
-  useEffect(() => {
-    async function fetchShopAddress() {
-      if (items.length === 0) return;
-      const shopId = items[0].shopId;
-      if (!shopId) return;
-      const { data } = await supabase.from('shops').select('location').eq('id', shopId).single();
-      if (data?.location) setShopAddress(data.location);
-    }
-    fetchShopAddress();
-  }, [items]);
-
-  // Auto-select vehicle based on cart dimensions
-  useEffect(() => {
-    async function calcVehicle() {
-      if (selectedItems.length === 0) return;
-      const varIds = selectedItems.filter(i => i.variationId).map(i => i.variationId!);
-      let variations: Record<string, { dimensions: string; height: string }> = {};
-      if (varIds.length > 0) {
-        const { data } = await supabase.from('product_variations').select('id, dimensions, height').in('id', varIds);
-        if (data) data.forEach((v: any) => { variations[v.id] = { dimensions: v.dimensions || '', height: v.height || '' }; });
-      }
-      let totalVolumeCm3 = 0, totalKg = 0;
-      selectedItems.forEach(item => {
-        const v = item.variationId ? variations[item.variationId] : null;
-        const parts = (v?.dimensions || '').toLowerCase().split('x').map(s => parseDimensionToCm(s.trim()));
-        const l = parts[0] || 0, w = parts[1] || parts[0] || 0;
-        const h = parseDimensionToCm(v?.height || '') || 30;
-        totalVolumeCm3 += l * w * h * item.qty;
-        totalKg += estimateWeight(l, w, h) * item.qty;
-      });
-      const sel = VEHICLE_TIERS.find(v => totalVolumeCm3 <= v.maxL * v.maxW * v.maxH && totalKg <= v.maxKg) || VEHICLE_TIERS[VEHICLE_TIERS.length - 1];
-      setSelectedVehicle(sel);
-    }
-    calcVehicle();
-  }, [selectedItems]);
-
-  // Fetch Lalamove quote when courier selected
-  useEffect(() => {
-    async function fetchQuote() {
-      if (deliveryOption !== 'courier' || !userAddress || !shopAddress) { setLalamoveQuote(null); return; }
-      setLalamoveLoading(true);
-      try {
-        // Geocode pickup and dropoff addresses via frontend
-        let pickupCoords = null;
-        let dropoffCoords = null;
-        try {
-          const [pickupGeo, dropoffGeo] = await Promise.all([
-            geocodeAddress(shopAddress),
-            geocodeAddress(userAddress),
-          ]);
-          if (pickupGeo) pickupCoords = pickupGeo;
-          if (dropoffGeo) dropoffCoords = dropoffGeo;
-        } catch (err) {
-          console.error('Geocoding error:', err);
-        }
-
-        const res = await fetch(`${API_BASE}/api/lalamove/quote`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pickupAddress: shopAddress, dropoffAddress: userAddress, serviceType: selectedVehicle.serviceType, pickupCoords, dropoffCoords }),
-        });
-        const data = await res.json();
-        if (res.ok) setLalamoveQuote(data);
-        else setLalamoveQuote(null);
-      } catch { setLalamoveQuote(null); }
-      finally { setLalamoveLoading(false); }
-    }
-    fetchQuote();
-  }, [deliveryOption, userAddress, shopAddress, selectedVehicle]);
-
-  function toggleProduct(productId: string, variationId?: string) {
-    const key = `${productId}\v${variationId || ''}`;
-    setSelected(prev => {
-      const next = new Set(prev);
+    setSelected(current => {
+      const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
   }
 
-  function toggleShop(shopName: string) {
-    const shopItems = shops[shopName] || [];
-    const shopAllSelected = shopItems.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
-    setSelected(prev => {
-      const next = new Set(prev);
-      shopItems.forEach(i => {
-        const key = `${i.productId}\v${i.variationId || ''}`;
-        if (shopAllSelected) next.delete(key);
-        else next.add(key);
-      });
-      return next;
-    });
+  function changeQuantity(item: CartItem, delta: number) {
+    const info = getAvailability(item);
+    const nextQuantity = item.qty + delta;
+    if (nextQuantity < 1 || (info.stock !== null && nextQuantity > info.stock)) return;
+    commitItems(items.map(current => getCartLineKey(current) === getCartLineKey(item) ? { ...current, qty: nextQuantity } : current));
   }
 
-  function toggleSelectAll() {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(items.map(i => `${i.productId}\v${i.variationId || ''}`)));
-    }
-  }
-
-  function handleQty(productId: string, variationId: string | undefined, delta: number) {
-    const updated = items.map(i => {
-      if (i.productId === productId && (i.variationId || '') === (variationId || '')) {
-        const newQty = i.qty + delta;
-        const maxStock = getStock(i);
-        if (maxStock >= 0 && newQty > maxStock) return i;
-        return newQty <= 0 ? null : { ...i, qty: newQty };
-      }
-      return i;
-    }).filter(Boolean) as CartItem[];
-    setCart(updated);
-    setItems(updated);
-  }
-
-  function handleRemove(productId: string, variationId?: string) {
-    removeFromCart(productId, variationId);
-    const updated = getCart();
-    setItems(updated);
-    const key = `${productId}\v${variationId || ''}`;
-    setSelected(prev => {
-      const next = new Set(prev);
+  function removeItem(item: CartItem) {
+    const key = getCartLineKey(item);
+    commitItems(items.filter(current => getCartLineKey(current) !== key));
+    setSelected(current => {
+      const next = new Set(current);
       next.delete(key);
       return next;
     });
+    toast.success(`${item.productName} removed from your cart.`);
   }
 
-  function handleRemoveSelected() {
-    selectedItems.forEach(i => removeFromCart(i.productId, i.variationId));
-    const updated = getCart();
-    setItems(updated);
+  function removeSelectedItems() {
+    const keys = [...effectiveSelected];
+    if (keys.length === 0) return;
+    const keySet = new Set(keys);
+    commitItems(items.filter(item => !keySet.has(getCartLineKey(item))));
     setSelected(new Set());
+    toast.success(`${keys.length} ${keys.length === 1 ? 'item' : 'items'} removed from your cart.`);
   }
+
+  async function requestEstimate() {
+    if (deliveryOption !== 'courier' || !activeGroup || selectedItems.length === 0) return;
+    const shopAddress = activeGroup.items[0]?.shopId ? shopAddresses[activeGroup.items[0].shopId!] : '';
+    if (!shopAddress) {
+      setEstimateError('This artisan has not provided a pickup address yet. Delivery can still be arranged at checkout.');
+      return;
+    }
+    if (!mapsLoaded) {
+      setEstimateError('The address service is still loading. Please try again in a moment.');
+      return;
+    }
+
+    setEstimateLoading(true);
+    setEstimateError('');
+    try {
+      const [pickupCoords, dropoffCoords] = await Promise.all([
+        geocodeAddress(shopAddress),
+        geocodeAddress(effectiveAddress.trim()),
+      ]);
+      if (!pickupCoords || !dropoffCoords) throw new Error('Address not found');
+
+      const response = await fetch(`${API_BASE}/api/lalamove/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickupAddress: shopAddress,
+          dropoffAddress: effectiveAddress.trim(),
+          serviceType: selectedVehicle.serviceType,
+          pickupCoords,
+          dropoffCoords,
+        }),
+      });
+      const result = await response.json();
+      const fee = Number.parseFloat(result?.priceBreakdown?.total);
+      if (!response.ok || !Number.isFinite(fee)) throw new Error('Quote unavailable');
+      setEstimate({
+        quotationId: result.quotationId,
+        fee,
+        serviceType: selectedVehicle.serviceType,
+        vehicleLabel: selectedVehicle.label,
+        coordinates: dropoffCoords,
+        quotedAt: new Date().toISOString(),
+      });
+    } catch {
+      setEstimateError('A courier estimate is unavailable right now. You can continue and try again at checkout.');
+    } finally {
+      setEstimateLoading(false);
+    }
+  }
+
+  function beginCheckout() {
+    if (!resolvedActiveShopKey || selectedItems.length === 0) return;
+    const draft: CartCheckoutDraft = {
+      version: 1,
+      source: 'cart',
+      shopId: resolvedActiveShopKey,
+      lineKeys: selectedItems.map(getCartLineKey),
+      ...(deliveryOption ? { deliveryOption } : {}),
+      ...(effectiveAddress.trim() ? {
+        destination: {
+          address: effectiveAddress.trim(),
+          ...(estimate ? { coordinates: estimate.coordinates } : {}),
+        },
+      } : {}),
+      ...(estimate ? {
+        estimate: {
+          quotationId: estimate.quotationId,
+          fee: estimate.fee,
+          serviceType: estimate.serviceType,
+          quotedAt: estimate.quotedAt,
+        },
+      } : {}),
+    };
+    writeCartCheckoutDraft(draft);
+    if (user) {
+      navigate('/checkout', { state: { checkoutDraft: draft } });
+      return;
+    }
+    markCartCheckoutAuthPending();
+    window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
+  }
+
+  if (items.length === 0) {
+    return <main className="cart-page cart-page--empty"><EmptyCartState /></main>;
+  }
+
+  const estimatedShipping = deliveryOption === 'pickup' ? 0 : estimate?.fee || 0;
 
   return (
-    <div style={{ background: '#f7f5f2', minHeight: '100vh', paddingTop: 'calc(var(--nav-height) + 20px)', paddingBottom: '100px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
-        {/* Header */}
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '18px 24px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>Shopping Cart</h1>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>{items.length} item(s) in cart</span>
+    <main className="cart-page" id="main-content">
+      <div className="cart-shell">
+        <header className="cart-header">
+          <button type="button" className="cart-header__back" onClick={() => navigate('/gallery')}>
+            <ArrowLeft size={17} aria-hidden="true" /> Continue shopping
+          </button>
+          <div>
+            <h1>Shopping cart</h1>
+            <p>{items.reduce((sum, item) => sum + item.qty, 0)} pieces from {groups.length} {groups.length === 1 ? 'artisan' : 'artisans'}</p>
+          </div>
+        </header>
+
+        <div className="cart-layout">
+          <div className="cart-content">
+            <div className="cart-selection-bar">
+              <div><Info size={17} aria-hidden="true" /><span>Choose pieces from one artisan for each checkout.</span></div>
+              {effectiveSelected.size > 0 ? (
+                <button type="button" onClick={removeSelectedItems}><Trash2 size={16} aria-hidden="true" /> Remove selected</button>
+              ) : null}
+            </div>
+
+            {groups.map(group => (
+              <ShopCartGroup
+                key={group.key}
+                shopKey={group.key}
+                shopName={group.name}
+                items={group.items}
+                activeShopKey={resolvedActiveShopKey}
+                selected={effectiveSelected}
+                getAvailability={getAvailability}
+                onToggleShop={toggleShop}
+                onToggleItem={toggleItem}
+                onQuantityChange={changeQuantity}
+                onRemove={removeItem}
+              />
+            ))}
+          </div>
+
+          <div className="cart-sidebar">
+            <CartSummary
+              shopName={activeGroup?.name}
+              itemCount={itemCount}
+              subtotal={subtotal}
+              deliveryOption={deliveryOption}
+              address={effectiveAddress}
+              estimateFee={estimate?.fee ?? null}
+              estimateVehicle={estimate?.vehicleLabel}
+              estimateLoading={estimateLoading}
+              estimateError={estimateError}
+              onDeliveryOptionChange={option => { invalidateEstimate(); setDeliveryOption(option); }}
+              onAddressChange={value => { invalidateEstimate(); setAddress(value); }}
+              onEstimate={requestEstimate}
+              onCheckout={beginCheckout}
+            />
+          </div>
         </div>
-
-        {items.length === 0 ? (
-          <div style={{ background: '#fff', borderRadius: '12px', padding: '80px 20px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: 64, height: 64, margin: '0 auto 16px', opacity: 0.55 }}>
-              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-              <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
-            </svg>
-            <p style={{ fontSize: '1rem', color: 'var(--text-light)', marginBottom: '24px' }}>Your cart is empty</p>
-            <Link to="/gallery" style={{
-              display: 'inline-block', background: 'var(--accent-color)', color: '#fff',
-              padding: '12px 40px', borderRadius: '12px', fontWeight: 600, fontSize: '0.95rem',
-              textDecoration: 'none', transition: 'background 0.2s'
-            }}>
-              Continue Shopping
-            </Link>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: '12px', alignItems: 'flex-start' }}>
-            {/* Left: Cart Items */}
-            <div>
-              {/* Select All Bar */}
-              <div style={{
-                background: '#fff', borderRadius: '12px', padding: '14px 20px', marginBottom: '12px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }} />
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)' }}>Select All ({items.length} items)</span>
-                </div>
-                {selectedItems.length > 0 && (
-                  <button onClick={handleRemoveSelected} style={{
-                    background: 'none', border: 'none', color: 'var(--text-light)', fontSize: '0.85rem',
-                    cursor: 'pointer', padding: '4px 8px'
-                  }}>
-                    Delete
-                  </button>
-                )}
-              </div>
-
-              {/* Shop Groups */}
-              {Object.entries(shops).map(([shopName, shopItems]) => {
-                const shopAllChecked = shopItems.every(i => selected.has(`${i.productId}\v${i.variationId || ''}`));
-                return (
-                  <div key={shopName} style={{ background: '#fff', borderRadius: '12px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                    {/* Shop Header */}
-                    <div style={{
-                      padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px',
-                      borderBottom: '1px solid var(--bg-secondary)'
-                    }}>
-                      <input type="checkbox" checked={shopAllChecked} onChange={() => toggleShop(shopName)}
-                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)' }} />
-                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                      </svg>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopName}</span>
-                    </div>
-
-                    {/* Product Rows */}
-                    {shopItems.map(item => (
-                      <div key={`${item.productId}\v${item.variationId || ''}`} style={{
-                        padding: isMobile ? '12px' : '16px 20px',
-                        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-                        alignItems: isMobile ? 'stretch' : 'center',
-                        gap: isMobile ? '10px' : '16px',
-                        borderBottom: '1px solid var(--bg-secondary)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
-                          {/* Checkbox */}
-                          <input type="checkbox" checked={selected.has(`${item.productId}\v${item.variationId || ''}`)}
-                            onChange={() => toggleProduct(item.productId, item.variationId)}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--primary-color)', flexShrink: 0, marginTop: '4px' }} />
-
-                          {/* Product Image */}
-                          <Link to={`/product/${item.productId}`} style={{ flexShrink: 0 }}>
-                            <img src={item.image} alt={item.productName}
-                              style={{ width: isMobile ? '80px' : '90px', height: isMobile ? '80px' : '90px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--bg-secondary)' }} />
-                          </Link>
-
-                          {/* Product Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none' }}>
-                              <p style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.92rem', marginBottom: '4px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                {item.productName}
-                              </p>
-                            </Link>
-                            {item.variation && (
-                              <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', marginBottom: '2px' }}>{item.variation}</p>
-                            )}
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{item.shopName}</p>
-                            
-                            {isMobile && (
-                              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent-color)', marginTop: '4px' }}>
-                                {fmt(item.price)}
-                              </div>
-                            )}
-
-                            {(() => {
-                              const stock = getStock(item);
-                              if (stock === 0) return <p style={{ fontSize: '0.78rem', color: '#d32f2f', fontWeight: 600, marginTop: 4 }}>Out of Stock</p>;
-                              if (stock > 0 && stock <= 3) return <p style={{ fontSize: '0.78rem', color: '#E67E22', fontWeight: 600, marginTop: 4 }}>Only {stock} left</p>;
-                              return null;
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Right/Bottom side: price (desktop), qty, subtotal (desktop), delete */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-end', gap: '12px', flexShrink: 0, paddingLeft: isMobile ? '30px' : '0' }}>
-                          {!isMobile && (
-                            <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                              <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)' }}>{fmt(item.price)}</span>
-                            </div>
-                          )}
-
-                          {/* Quantity Controls */}
-                          <div style={{
-                            display: 'flex', alignItems: 'center', border: '1px solid var(--bg-tertiary)', borderRadius: '8px',
-                            flexShrink: 0, overflow: 'hidden', height: isMobile ? '28px' : '32px'
-                          }}>
-                            <button onClick={() => handleQty(item.productId, item.variationId, -1)} style={{
-                              width: isMobile ? '28px' : '32px', height: '100%', border: 'none', background: 'var(--bg-secondary)',
-                              cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center'
-                            }}>−</button>
-                            <span style={{ width: isMobile ? '36px' : '40px', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)', borderLeft: '1px solid var(--bg-tertiary)', borderRight: '1px solid var(--bg-tertiary)' }}>
-                              {item.qty}
-                            </span>
-                            <button onClick={() => handleQty(item.productId, item.variationId, 1)}
-                              disabled={getStock(item) >= 0 && item.qty >= getStock(item)}
-                              style={{
-                              width: isMobile ? '28px' : '32px', height: '100%', border: 'none', background: 'var(--bg-secondary)',
-                              cursor: getStock(item) >= 0 && item.qty >= getStock(item) ? 'not-allowed' : 'pointer',
-                              fontSize: '1rem', color: 'var(--text-muted)', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center',
-                              opacity: getStock(item) >= 0 && item.qty >= getStock(item) ? 0.4 : 1,
-                            }}>+</button>
-                          </div>
-
-                          {!isMobile && (
-                            <div style={{ width: '100px', textAlign: 'right', flexShrink: 0 }}>
-                              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(item.price * item.qty)}</span>
-                            </div>
-                          )}
-
-                          {/* Delete */}
-                          <button onClick={() => handleRemove(item.productId, item.variationId)} style={{
-                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-                            fontSize: '1.1rem', padding: '4px 8px', flexShrink: 0
-                          }}>
-                            X
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right: Order Summary */}
-            <div style={{ position: isMobile ? 'static' : 'sticky', top: isMobile ? 'auto' : 'calc(var(--nav-height) + 20px)' }}>
-              <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--bg-secondary)' }}>
-                  Order Summary
-                </h3>
-
-                {/* Delivery Options */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.78rem', color: '#999', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivery Method</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
-                    <button onClick={() => setDeliveryOption('pickup')} style={{
-                      padding: '10px', borderRadius: '10px', border: deliveryOption === 'pickup' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
-                      background: deliveryOption === 'pickup' ? '#FFF8F0' : '#fff', cursor: 'pointer', textAlign: 'left',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.78rem', color: deliveryOption === 'pickup' ? 'var(--primary-color)' : 'var(--text-dark)' }}>Pickup</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#16A34A' }}>Free</span>
-                      </div>
-                    </button>
-                    <button onClick={() => setDeliveryOption('courier')} style={{
-                      padding: '10px', borderRadius: '10px', border: deliveryOption === 'courier' ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
-                      background: deliveryOption === 'courier' ? '#FFF8F0' : '#fff', cursor: 'pointer', textAlign: 'left',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.78rem', color: deliveryOption === 'courier' ? 'var(--primary-color)' : 'var(--text-dark)' }}>Courier</span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-dark)' }}>
-                          {lalamoveLoading ? '...' : lalamoveQuote ? fmt(shippingFee) : '---'}
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-                  {deliveryOption === 'courier' && (
-                    <div style={{ marginTop: '8px', padding: '6px 10px', background: '#F0FDF4', borderRadius: '6px', border: '1px solid #BBF7D0', fontSize: '0.72rem', color: '#16A34A', fontWeight: 500 }}>
-                      {selectedVehicle.label}{lalamoveQuote?.distance ? ` · ${(parseInt(lalamoveQuote.distance.value) / 1000).toFixed(1)} km` : ''}
-                    </div>
-                  )}
-                </div>
-
-                {/* Summary Rows */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.88rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Subtotal ({itemCount} item/s)</span>
-                  <span style={{ color: 'var(--text-dark)', fontWeight: 500 }}>{fmt(subtotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.88rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Shipping Fee</span>
-                  <span style={{ color: deliveryOption === 'pickup' ? '#16A34A' : 'var(--text-dark)', fontWeight: 500 }}>
-                    {deliveryOption === 'pickup' ? 'Free' : deliveryOption === 'courier' ? (lalamoveLoading ? 'Calculating...' : lalamoveQuote ? fmt(shippingFee) : '---') : '---'}
-                  </span>
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--bg-secondary)', marginTop: '12px', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-dark)', fontWeight: 600 }}>Total</span>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Checkout Button */}
-              {!isMobile && (() => {
-                const anyOutOfStock = selectedItems.some(i => getStock(i) === 0);
-                return (
-                  <button onClick={() => !anyOutOfStock && navigate('/checkout', { state: { deliveryOption } })} style={{
-                    width: '100%', marginTop: '12px', background: selectedItems.length > 0 && !anyOutOfStock ? 'var(--accent-color)' : 'var(--bg-tertiary)',
-                    color: '#fff', border: 'none', padding: '14px', borderRadius: '12px',
-                    fontWeight: 700, fontSize: '1rem', cursor: selectedItems.length > 0 && !anyOutOfStock ? 'pointer' : 'not-allowed',
-                    transition: 'background 0.2s', boxShadow: selectedItems.length > 0 && !anyOutOfStock ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
-                  }}>
-                    {anyOutOfStock ? 'Remove out-of-stock items' : `Checkout (${itemCount})`}
-                  </button>
-                );
-              })()}
-
-              {/* Trust Badges */}
-              <div style={{ marginTop: '16px', padding: '16px', background: '#fff', borderRadius: '12px', border: '1px solid var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                {[
-                  { icon: '/images/secure_checkout.png', title: 'Secure Checkout', desc: 'Your payment information is safe with us' },
-                  { icon: '/images/authentic_artisan.png', title: 'Authentic Artisan Products', desc: 'Every pottery piece is handcrafted by local artisans.' },
-                  { icon: '/images/flexible_fulfillment.png', title: 'Flexible Order Fulfillment', desc: 'Choose delivery at your convenience.' },
-                ].map((t, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: i < 2 ? '14px' : 0 }}>
-                    <div style={{ flexShrink: 0 }}>
-                      <img src={t.icon} alt={t.title} style={{ width: '36px', height: '36px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)', margin: 0 }}>{t.title}</p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', margin: 0, lineHeight: 1.4 }}>{t.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Sticky Mobile Checkout Bar */}
-      {isMobile && items.length > 0 && (
-        <div style={{
-          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
-          background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 40,
-          boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
-        }}>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Total</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-color)' }}>{fmt(total)}</div>
-          </div>
-          {(() => {
-            const anyOutOfStock = selectedItems.some(i => getStock(i) === 0);
-            return (
-              <button onClick={() => !anyOutOfStock && navigate('/checkout', { state: { deliveryOption } })} style={{
-                background: selectedItems.length > 0 && !anyOutOfStock ? 'var(--accent-color)' : 'var(--bg-tertiary)',
-                color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px',
-                fontWeight: 700, fontSize: '0.95rem', cursor: selectedItems.length > 0 && !anyOutOfStock ? 'pointer' : 'not-allowed',
-                boxShadow: selectedItems.length > 0 && !anyOutOfStock ? '0 2px 8px rgba(193,87,13,0.25)' : 'none'
-              }}>
-                {anyOutOfStock ? 'Invalid Items' : `Checkout (${itemCount})`}
-              </button>
-            );
-          })()}
-        </div>
-      )}
-    </div>
+      <div className="cart-mobile-bar" aria-label="Cart checkout summary">
+        <div><span>Estimated total</span><strong>{fmt(subtotal + estimatedShipping)}</strong></div>
+        <button type="button" disabled={itemCount === 0} onClick={beginCheckout}>Checkout ({itemCount})</button>
+      </div>
+    </main>
   );
 }

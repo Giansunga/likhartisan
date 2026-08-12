@@ -45,7 +45,7 @@ export default function MaterialTab({
       <h3 className="freeform-tab-heading">Color &amp; Material</h3>
 
       <h4 className="freeform-tab-subheading">Finish</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+      <div className="freeform-material-finishes" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
         {availableFinishes.map((f) => (
           <button
             key={f.id}
@@ -60,7 +60,7 @@ export default function MaterialTab({
       </div>
 
       <h4 className="freeform-tab-subheading">Color</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px', marginBottom: '16px' }}>
+      <div className="freeform-material-colors" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px', marginBottom: '16px' }}>
         {MATERIAL_COLORS.map((c) => (
           <button
             key={c}
@@ -81,7 +81,7 @@ export default function MaterialTab({
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+      <div className="freeform-material-custom" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
         <label className="freeform-tab-subheading" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Custom</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
           <input

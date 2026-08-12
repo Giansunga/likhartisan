@@ -75,7 +75,7 @@ export default function ModelTab({
               </div>
               <div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)', display: 'block' }}>{model.name}</span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{model.category}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{model.category}</span>
               </div>
             </button>
           ))}

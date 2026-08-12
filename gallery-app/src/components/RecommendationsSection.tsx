@@ -226,7 +226,7 @@ export default function RecommendationsSection({
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                       </svg>
-                      <span style={{ fontSize: '0.7rem', color: '#999' }}>({p.ratingCount})</span>
+                      <span style={{ fontSize: '0.75rem', color: '#999' }}>({p.ratingCount})</span>
                     </div>
                   )}
                 </div>

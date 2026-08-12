@@ -35,7 +35,7 @@ describe('GalleryPage category artwork', () => {
     });
   });
 
-  it('uses Christmas category images only while the Christmas theme is active', async () => {
+  it('uses the category image set for the active seasonal theme', async () => {
     const { container, rerender } = render(
       <MemoryRouter>
         <GalleryPage />
@@ -64,13 +64,34 @@ describe('GalleryPage category artwork', () => {
       );
     });
 
+    const valentinesImages = [
+      'valentines-all-crafts.webp',
+      'valentines-vases.webp',
+      'valentines-planters.webp',
+      'valentines-jars.webp',
+      'valentines-amphoras.webp',
+      'valentines-tealights.webp',
+    ];
+    Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
+      expect(image).toHaveStyle({ backgroundImage: `url(/images/${valentinesImages[index]})` });
+    });
+
+    mocks.currentTheme = 'default';
+    await act(async () => {
+      rerender(
+        <MemoryRouter>
+          <GalleryPage />
+        </MemoryRouter>,
+      );
+    });
+
     const standardImages = [
-      'pottery-collage.png',
-      'vases_collection.png',
-      'planters_collection.png',
-      'jars_collection.png',
-      'amphoras_collection.png',
-      'tealights_collection.png',
+      'gallery-category-all-crafts-v2.webp',
+      'gallery-category-vases-v2.webp',
+      'gallery-category-planters-v2.webp',
+      'gallery-category-jars-v2.webp',
+      'gallery-category-amphoras-v2.webp',
+      'gallery-category-tea-lights-v2.webp',
     ];
     Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
       expect(image).toHaveStyle({ backgroundImage: `url(/images/${standardImages[index]})` });

@@ -268,7 +268,7 @@ export default function ChatbotPage() {
                   </div>
                 )}
                 <div style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.75rem',
                   color: 'var(--text-light)',
                   marginTop: '4px',
                   paddingLeft: msg.role === 'user' ? '0' : '4px',
@@ -385,7 +385,7 @@ export default function ChatbotPage() {
               </svg>
             </button>
           </form>
-          <p style={{ fontSize: '0.68rem', color: 'var(--text-light)', textAlign: 'center', marginTop: '8px', margin: '8px 0 0' }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', textAlign: 'center', marginTop: '8px', margin: '8px 0 0' }}>
             LikhAI may produce inaccurate information. Always verify important details.
           </p>
         </div>

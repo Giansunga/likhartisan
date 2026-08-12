@@ -36,13 +36,13 @@ export default function ChatProductCard({ product }: { product: ChatProduct }) {
           {product.name}
         </div>
         {product.category && (
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-light)', margin: '2px 0' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', margin: '2px 0' }}>
             {product.category}{product.material ? ` · ${product.material}` : ''}
           </div>
         )}
         <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary-color)' }}>{fmtPrice}</div>
       </div>
-      <span style={{ fontSize: '0.72rem', color: 'var(--text-light)', flexShrink: 0 }}>View →</span>
+      <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', flexShrink: 0 }}>View →</span>
     </a>
   );
 }

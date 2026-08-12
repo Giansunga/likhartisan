@@ -336,16 +336,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      {/* ── HEADER ── */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '16px' : 0 }}
-      >
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1F1F1F', marginBottom: '4px' }}>
-            Dashboard Overview
-          </h1>
-          <p style={{ fontSize: '0.88rem', color: '#77716B' }}>Monitor your marketplace performance and activity in real time.</p>
-        </div>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="portal-action-bar">
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
             <select

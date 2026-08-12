@@ -3,6 +3,8 @@ import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
+import '../portal.css';
+import './admin.css';
 
 interface NavLinkItem {
   to: string;
@@ -16,7 +18,6 @@ const navLinks: NavLinkItem[] = [
   { to: '/admin', label: 'Dashboard', exact: true, section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg> },
   { to: '/admin/orders', label: 'Orders', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg> },
   { to: '/admin/products', label: 'Products', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg> },
-  { to: '#', label: 'Shops', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5" /><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" /><path d="M5 21v-8a7 7 0 0 1 14 0v8" /><path d="M9 21v-6h6v6" /></svg> },
   { to: '/admin/artisans', label: 'Artisans', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> },
   { to: '/admin/models', label: '3D Models', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg> },
   { to: '/admin/theme', label: 'Theme Customizer', section: 'main', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg> },
@@ -84,16 +85,16 @@ export default function AdminLayout() {
   let lastSection = '';
 
   return (
-    <div style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
+    <div className="admin-shell" style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
       {/* ── HEADER ── */}
-      <header style={{
+      <header className="admin-header" style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: `${HEADER_HEIGHT}px`,
         background: '#fff', borderBottom: '1px solid #E9DED2',
         zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         paddingLeft: '24px', paddingRight: '24px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: '180px', width: 'auto', objectFit: 'contain' }} />
+          <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: '44px', width: 'auto', objectFit: 'contain' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {/* Notification bell */}
@@ -105,7 +106,7 @@ export default function AdminLayout() {
               position: 'absolute', top: '-4px', right: '-6px',
               width: '16px', height: '16px', borderRadius: '50%',
               background: '#DC2626', color: '#fff',
-              fontSize: '0.6rem', fontWeight: 700,
+              fontSize: '0.75rem', fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>8</span>
           </div>
@@ -113,7 +114,7 @@ export default function AdminLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1F1F1F', lineHeight: 1.2 }}>Admin</p>
-              <p style={{ fontSize: '0.7rem', color: '#77716B' }}>Super Administrator</p>
+              <p style={{ fontSize: '0.75rem', color: '#77716B' }}>Super Administrator</p>
             </div>
             <div style={{
               width: '36px', height: '36px', borderRadius: '50%',
@@ -128,9 +129,9 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <div style={{ display: 'flex', marginTop: `${HEADER_HEIGHT}px`, minHeight: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
+      <div className="admin-content-frame" style={{ display: 'flex', marginTop: `${HEADER_HEIGHT}px`, minHeight: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
         {/* ── SIDEBAR ── */}
-        <aside style={{
+        <aside className="admin-sidebar" style={{
           width: `${SIDEBAR_WIDTH}px`, minWidth: `${SIDEBAR_WIDTH}px`,
           background: '#fff', borderRight: '1px solid #E9DED2',
           position: 'fixed', top: `${HEADER_HEIGHT}px`, left: 0,
@@ -147,7 +148,7 @@ export default function AdminLayout() {
                 return (
                   <div key={`section-${link.section}`}>
                     {link.section !== 'main' && <div style={{ height: '1px', background: '#E9DED2', margin: '12px 0 8px' }} />}
-                    <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#A89688', letterSpacing: '0.08em', textTransform: 'uppercase' as const, padding: '8px 12px 4px' }}>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A89688', letterSpacing: '0.08em', textTransform: 'uppercase' as const, padding: '8px 12px 4px' }}>
                       {section?.label}
                     </p>
                     <SidebarLink link={link} isActive={isActiveRoute(link.to, link.exact)} />
@@ -197,11 +198,11 @@ export default function AdminLayout() {
         </aside>
 
         {/* ── MAIN CONTENT ── */}
-        <main style={{
-          flex: 1, padding: '28px 32px', background: '#FAF7F2',
-          minWidth: 0, marginLeft: `${SIDEBAR_WIDTH}px`,
+        <main className="admin-main" style={{
+          flex: 1, padding: 0, background: '#FAF7F2',
+          minWidth: 0, marginLeft: `${SIDEBAR_WIDTH}px`, height: `calc(100vh - ${HEADER_HEIGHT}px)`, overflow: 'hidden',
         }}>
-          <Outlet />
+          <div className="admin-route-workspace"><Outlet /></div>
         </main>
       </div>
     </div>

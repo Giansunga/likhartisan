@@ -69,12 +69,13 @@ describe('automatic attachment socket placement', () => {
     const socket = analyzeAttachmentSockets(scene).find((candidate) => candidate.family === 'body')!;
     const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.family === 'body')!;
     const limits = getSocketTransformLimits(recipe, socket)!;
-    const clamped = clampAttachmentTransform({ horizontalDegrees: 100, verticalRatio: -2, surfaceOffsetRatio: 1, twistDegrees: 300, scaleMultiplier: 5 }, limits);
+    const clamped = clampAttachmentTransform({ horizontalDegrees: 100, verticalRatio: -2, surfaceOffsetRatio: 1, twistDegrees: 300, scaleMultiplier: 5, thicknessMultiplier: 5 }, limits);
     expect(clamped.horizontalDegrees).toBe(limits.horizontalDegrees.max);
     expect(clamped.verticalRatio).toBe(limits.verticalRatio.min);
     expect(clamped.surfaceOffsetRatio).toBe(0.08);
     expect(clamped.twistDegrees).toBe(180);
     expect(clamped.scaleMultiplier).toBe(limits.scaleMultiplier.max);
+    expect(clamped.thicknessMultiplier).toBe(1);
     const resolved = resolveAttachmentPlacement(scene, socket, { ...DEFAULT_ATTACHMENT_TRANSFORM, horizontalDegrees: 20, verticalRatio: 0.05 });
     expect(resolved?.azimuth).toBeCloseTo(socket.azimuth + 20);
     expect(resolved?.height).toBeCloseTo(socket.height + 0.05);

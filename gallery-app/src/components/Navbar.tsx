@@ -6,6 +6,23 @@ import { supabase } from '../lib/supabase';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { consumeCartCheckoutAuthPending } from '../lib/cartCheckout';
+
+function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
+  return (
+    <Link to="/cart" aria-label={`Shopping cart with ${count} ${count === 1 ? 'item' : 'items'}`} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" aria-hidden="true">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+      </svg>
+      {count > 0 ? (
+        <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.6rem' : '0.7rem' }}>
+          {count > 99 ? '99+' : count}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
 
 export default function Navbar() {
   const location = useLocation();
@@ -28,7 +45,7 @@ export default function Navbar() {
   const [shopInitials, setShopInitials] = useState('SN');
   const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [cartCount, setCartCount] = useState(getCartCount());
+  const [cartCount, setCartCount] = useState(getCartCount);
   const [hasShopRole, setHasShopRole] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { user } = useAuth();
@@ -43,7 +60,12 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setCartCount(getCartCount());
+    if (!user) return;
+    const draft = consumeCartCheckoutAuthPending();
+    if (draft) navigate('/checkout', { state: { checkoutDraft: draft } });
+  }, [navigate, user]);
+
+  useEffect(() => {
     const unsubscribe = onCartUpdate(() => setCartCount(getCartCount()));
     return unsubscribe;
   }, []);
@@ -285,13 +307,13 @@ export default function Navbar() {
       : { position: 'absolute', right: 0, top: 'calc(100% + 10px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 110px)', zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
-          Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
+          Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
         </span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {unreadNotifications > 0 && (
             <button onClick={markAllRead} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
           )}
-          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
+          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard/notifications'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
         </div>
       </div>
       <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
@@ -315,7 +337,7 @@ export default function Navbar() {
                   markNotificationRead(n.id); 
                   setShowNotifications(false); 
                   if (n.order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
-                    navigate(`/artisan-dashboard?panel=orders&orderId=${n.order_id}`);
+                    navigate(`/artisan-dashboard/orders?orderId=${n.order_id}`);
                   } else if (n.order_id) {
                     navigate('/dashboard?tab=purchases');
                     window.dispatchEvent(new CustomEvent('deep-link-order', { detail: { orderId: n.order_id } }));
@@ -346,7 +368,7 @@ export default function Navbar() {
                   ? <><p style={{ fontSize: '0.85rem', fontWeight: n.read ? 500 : 700, color: 'var(--text-dark)', lineHeight: 1.35, margin: 0 }}>{n.title}</p>
                       {n.message && <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', lineHeight: 1.35, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</p>}</>
                   : <p style={{ fontSize: '0.85rem', color: 'var(--text-dark)', lineHeight: 1.4, margin: 0 }}>{n.text}</p>}
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-light)', marginTop: '4px', marginBottom: 0 }}>{timeAgo(n.time)}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '4px', marginBottom: 0 }}>{timeAgo(n.time)}</p>
               </div>
               {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E53935', flexShrink: 0, marginTop: '6px' }} />}
             </button>
@@ -359,10 +381,17 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]" id="main-navbar" aria-label="Main navigation">
+      <div className="christmas-navbar-snowflakes" aria-hidden="true">
+        <span>❄</span>
+        <span>❄</span>
+        <span>❄</span>
+        <span>❄</span>
+      </div>
       {isArtisanDashboard ? (
         <div className="h-full flex items-center justify-between" style={{ padding: '0 24px' }}>
           <Link to="/" className="logo flex items-center gap-2">
-            <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
+            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
+            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
           <div className="flex items-center gap-4">
             <div ref={notifDropdownRef} className="relative">
@@ -371,7 +400,7 @@ export default function Navbar() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.65rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+                  <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
@@ -403,7 +432,8 @@ export default function Navbar() {
 
 
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
-            <img src="/images/Orange.png" alt="LikhArtisan" style={{ height: isMobile ? '100px' : '180px', width: 'auto' }} />
+            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
+            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
 
           {/* Desktop nav links */}
@@ -424,18 +454,9 @@ export default function Navbar() {
 
           {/* Action icons */}
           <div className="flex items-center" style={{ gap: isMobile ? '4px' : '20px' }}>
+            <CartAction count={cartCount} isMobile={isMobile} />
             {loggedIn ? (
               <>
-                <Link to="/cart" aria-label="Shopping cart" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                  </svg>
-                  <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.6rem' : '0.7rem' }}>
-                    {cartCount}
-                  </span>
-                </Link>
-
                 <div ref={notifDropdownRef} className="relative">
                   <button onClick={() => setShowNotifications(!showNotifications)} aria-label="Notifications" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">

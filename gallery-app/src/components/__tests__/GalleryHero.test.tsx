@@ -25,7 +25,7 @@ describe('GalleryHero', () => {
     expect(container.querySelector('.christmas-snowflake')).not.toBeInTheDocument();
   });
 
-  it('restores the standard gallery hero outside Christmas', () => {
+  it('renders Valentine artwork with the same standard gallery copy', () => {
     const { container, rerender } = renderHero('christmas');
 
     rerender(
@@ -36,6 +36,16 @@ describe('GalleryHero', () => {
 
     expect(screen.queryByText('Christmas Collection')).not.toBeInTheDocument();
     expect(screen.getByText(/Explore the beauty and craftsmanship/)).toBeInTheDocument();
+    expect(container.querySelector('.gallery-banner-bg')).toHaveStyle({
+      backgroundImage: 'url(/images/valentines-gallery-hero.webp)',
+    });
+
+    rerender(
+      <MemoryRouter>
+        <GalleryHero currentTheme="default" isMobile={false} />
+      </MemoryRouter>,
+    );
+
     expect(container.querySelector('.gallery-banner-bg')).toHaveStyle({
       backgroundImage: 'url(/images/hero_1.jpg)',
     });

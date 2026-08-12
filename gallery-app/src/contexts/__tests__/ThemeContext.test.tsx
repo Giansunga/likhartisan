@@ -41,6 +41,7 @@ describe('ThemeProvider', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     document.documentElement.className = '';
     document.getElementById('theme-dynamic-vars')?.remove();
   });
@@ -66,6 +67,30 @@ describe('ThemeProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use Valentine' }));
     expect(document.documentElement).not.toHaveClass('theme-christmas');
     expect(document.documentElement).toHaveClass('theme-valentines');
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'current',
+      theme_name: 'valentines',
+      auto_detect: false,
+    })));
+  });
+
+  it('auto-detects Valentine\'s Day during the first half of February', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-10T12:00:00'));
+    supabaseMocks.single.mockResolvedValue({
+      data: { theme_name: 'default', auto_detect: true },
+      error: null,
+    });
+
+    render(
+      <ThemeProvider>
+        <ThemeHarness />
+      </ThemeProvider>,
+    );
+
+    await vi.waitFor(() => expect(screen.getByText('valentines')).toBeInTheDocument());
+    expect(document.documentElement).toHaveClass('theme-valentines');
+    expect(document.documentElement).not.toHaveClass('theme-christmas');
   });
 
   it('falls back to the default theme for a legacy stored value', async () => {

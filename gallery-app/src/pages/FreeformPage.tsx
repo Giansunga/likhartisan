@@ -3,8 +3,6 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE } from '../lib/api';
-import { FALLBACK_BUYER_NAME } from '../lib/constants';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
 import ShapeTab from '../components/freeform/ShapeTab';
@@ -15,17 +13,20 @@ import AttachmentTab from '../components/freeform/AttachmentTab';
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
 import SavedDesignsModal from '../components/freeform/SavedDesignsModal';
+import SendDesignRequestModal, { type RequestShop } from '../components/freeform/SendDesignRequestModal';
 import { type SavedDesign } from '../hooks/useSavedDesigns';
 import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../components/freeform/decor';
 import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
+import { createDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
 /* ─── Types ─── */
 
 type Step = 'model' | 'shape' | 'material' | 'decor' | 'attachment' | 'review';
+type ViewerControls = { target?: THREE.Vector3; update?: () => void; reset?: () => void };
 
 /* ─── Constants ─── */
 
@@ -88,9 +89,11 @@ export default function FreeformPage() {
 
   /* Modals */
   const [showShopModal, setShowShopModal] = useState(false);
-  const [shops, setShops] = useState<any[]>([]);
+  const [shops, setShops] = useState<RequestShop[]>([]);
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
+  const [requestConversationId, setRequestConversationId] = useState<string | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [designName, setDesignName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -101,8 +104,13 @@ export default function FreeformPage() {
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAttachmentSockets, setShowAttachmentSockets] = useState(true);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<any>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const stepButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const hasMountedStepEffectRef = useRef(false);
+  const controlsRef = useRef<ViewerControls | null>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
   const shopModalShownRef = useRef(false);
   const { user } = useAuth();
@@ -284,12 +292,14 @@ function applyDesign(design: {
   }, [user]);
 
   useEffect(() => {
+    // Design updates originate in several child editors, so dirty-state tracking is centralized here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selectedModel) setHasUnsavedChanges(true);
   }, [selectedModel, shapeParams, materialParams, decorationParams, attachmentParams]);
 
   /* ─── Viewport controls ─── */
 
-  function handleControlsReady(controls: any, camera: THREE.Camera) {
+  function handleControlsReady(controls: ViewerControls | null, camera: THREE.Camera) {
     controlsRef.current = controls;
     cameraRef.current = camera;
   }
@@ -311,6 +321,31 @@ function applyDesign(design: {
       document.exitFullscreen();
       setIsFullscreen(false);
     }
+  }
+
+  function goToStep(index: number) {
+    if (!canGoTo(index)) return;
+    setMobileToolsOpen(false);
+    setActiveStep(STEPS[index].key);
+  }
+
+  function goToAdjacentStep(direction: -1 | 1) {
+    const nextIndex = Math.min(STEPS.length - 1, Math.max(0, stepIndex + direction));
+    if (!canGoTo(nextIndex)) return;
+    setMobileToolsOpen(false);
+    setActiveStep(STEPS[nextIndex].key);
+  }
+
+  function handleResetDesign() {
+    const shouldReset = !selectedModel || window.confirm('Reset all shape, material, pattern, and attachment changes?');
+    if (!shouldReset) return;
+    setShapeParams(DEFAULT_SHAPE);
+    setMaterialParams(DEFAULT_MATERIAL);
+    setDecorationParams(DEFAULT_DECORATION);
+    setAttachmentParams([]);
+    setAttachmentSockets([]);
+    setAttachmentPlacementLimits({});
+    setMobileToolsOpen(false);
   }
 
   function captureScreenshot(): string | null {
@@ -394,122 +429,39 @@ function applyDesign(design: {
       return;
     }
 
-    // Default to the design's associated shop if available
-    if (selectedShopId) {
-      const { data: shop } = await supabase.from('shops').select('*').eq('id', selectedShopId).maybeSingle();
-      if (shop) {
-        setShops([shop]);
-        setSelectedShop(shop.id);
-        setShowShopModal(true);
-        return;
-      }
-    }
-
     const { data } = await supabase.from('shops').select('*').order('created_at', { ascending: false });
     if (data && data.length > 0) {
       setShops(data);
-      setSelectedShop(null);
+      setSelectedShop(data.some(shop => shop.id === selectedShopId) ? selectedShopId : null);
+      setRequestToken(crypto.randomUUID());
+      setRequestConversationId(null);
       setShowShopModal(true);
     } else {
       toast.error('No shops available yet.');
     }
   }
 
-  async function handleSubmitToShop() {
+  async function handleSubmitToShop(quantity: number, buyerNote: string) {
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
-
-    if (!user) { setSubmitting(false); return; }
-
-    const shop = shops.find((s) => s.id === selectedShop);
-    if (!shop) { setSubmitting(false); return; }
-
-    const payload = JSON.stringify({
-      type: 'design_submission',
-      message: 'I designed a custom pottery piece and would like to submit it for creation.',
-      design: {
-        model: modelName,
-        model_file: selectedModel,
-        shape: shapeParams,
-        material: materialParams,
-        decor: decorationParams,
-        attachments: attachmentParams,
-      },
-    });
-
-    // Find or create conversation
-    const { data: existing } = await supabase
-      .from('conversations')
-      .select('id')
-      .eq('buyer_id', user.id)
-      .eq('shop_id', shop.id)
-      .maybeSingle();
-
-    let convId = existing?.id;
-    if (!convId) {
-      const meta = user.user_metadata || {};
-      const { data: newConv, error } = await supabase
-        .from('conversations')
-        .insert({
-          buyer_id: user.id,
-          shop_id: shop.id,
-          shop_name: shop.name,
-          buyer_name: meta.name || user.email || FALLBACK_BUYER_NAME,
-          buyer_avatar: meta.avatar_url || '',
-          last_message: payload,
-          last_message_at: new Date().toISOString(),
-          buyer_unread: 0,
-          artisan_unread: 1,
-        })
-        .select('id')
-        .single();
-      if (error) {
-        toast.error('Could not start conversation. Please try again.');
-        setSubmitting(false);
-        return;
-      }
-      convId = newConv?.id;
-    }
-
-    // Send message
-    if (convId) {
-      await supabase.from('messages').insert({
-        conversation_id: convId,
-        sender_id: user.id,
-        text: payload,
+    if (!user || quantity < 1 || quantity > 100) { setSubmitting(false); return; }
+    try {
+      const { data, error } = await supabase.rpc('submit_design_request', {
+        p_shop_id: selectedShop,
+        p_client_token: requestToken,
+        p_design_snapshot: requestSnapshot,
+        p_quantity: quantity,
+        p_buyer_note: buyerNote.trim(),
       });
-      await supabase
-        .from('conversations')
-        .update({ last_message: payload, last_message_at: new Date().toISOString(), artisan_unread: 1 })
-        .eq('id', convId);
-      // Create real notification for shop owner via backend API to bypass RLS
-      try {
-        const { data: shopOwner } = await supabase.from('shops').select('owner_id').eq('id', shop.id).single();
-        if (shopOwner?.owner_id) {
-          const meta = user?.user_metadata || {};
-          const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
-          const { data: { session } } = await supabase.auth.getSession();
-          await fetch(`${API_BASE}/api/notifications`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
-            },
-            body: JSON.stringify({
-              user_id: shopOwner.owner_id,
-              type: 'message',
-              title: 'Design Inquiry',
-              message: `${buyerName}: ${payload.substring(0, 80)}`,
-              product_image: '',
-            })
-          });
-        }
-      } catch (e) { console.error('Failed to create message notification:', e); }
+      if (error) throw error;
+      setRequestConversationId(data?.conversation_id || null);
+      toast.success('Your design request was sent.');
+    } catch (error) {
+      console.error('Design request submission failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Could not send the design request. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
-    setShowShopModal(false);
-    navigate('/chat');
   }
 
   /* ─── Derived state ─── */
@@ -526,6 +478,23 @@ function applyDesign(design: {
   const attachmentEstimate = attachmentTotals(attachmentParams);
   const estimatedPrice = basePrice + attachmentEstimate.price;
   const estimatedDays = baseDays + attachmentEstimate.productionDays;
+  const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
+    model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
+    shape: { ...shapeParams },
+    material: { ...materialParams },
+    decoration: { ...decorationParams },
+    attachments: attachmentParams,
+    dimensions: { heightCm: shapeParams.height, widthCm: shapeParams.bodyWidth },
+    estimate: { price: estimatedPrice, productionDays: estimatedDays },
+  });
+
+  useEffect(() => {
+    stepButtonRefs.current[stepIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (hasMountedStepEffectRef.current && window.matchMedia('(max-width: 767px)').matches) {
+      window.requestAnimationFrame(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+    hasMountedStepEffectRef.current = true;
+  }, [stepIndex]);
 
   /* ─── Render ─── */
 
@@ -534,6 +503,17 @@ function applyDesign(design: {
 
       {/* ── STEPPER ── */}
       <div className="freeform-stepper">
+        <div className="freeform-mobile-progress" aria-live="polite">
+          <div>
+            <span>Step {stepIndex + 1} of {STEPS.length}</span>
+            <strong>{STEPS[stepIndex].label}</strong>
+          </div>
+          <div className="freeform-mobile-progress-dots" aria-hidden="true">
+            {STEPS.map((step, index) => (
+              <span key={step.key} className={index <= stepIndex ? 'filled' : ''} />
+            ))}
+          </div>
+        </div>
         <div className="freeform-stepper-track">
           {STEPS.map((step, i) => {
             const isActive = step.key === activeStep;
@@ -541,11 +521,12 @@ function applyDesign(design: {
             return (
               <div key={step.key} style={{ display: 'flex', alignItems: 'center' }}>
                 <button
-                  onClick={() => {
-                    if (!canGoTo(i)) return;
-                    setActiveStep(step.key);
-                  }}
+                  ref={(node) => { stepButtonRefs.current[i] = node; }}
+                  onClick={() => goToStep(i)}
                   className={`freeform-step-btn${isActive ? ' active' : ''}`}
+                  aria-current={isActive ? 'step' : undefined}
+                  aria-disabled={!canGoTo(i)}
+                  disabled={!canGoTo(i)}
                 >
                   <div className={`freeform-step-circle${isActive ? ' active' : isCompleted ? ' completed' : ' upcoming'}`}>
                     {isCompleted && !isActive ? (
@@ -573,7 +554,7 @@ function applyDesign(design: {
       <div className="freeform-main">
 
         {/* ── LEFT SIDEBAR ── */}
-        <div className="freeform-sidebar">
+        <div ref={sidebarRef} className="freeform-sidebar">
           <div className="freeform-sidebar-inner">
             <div className="freeform-sidebar-upper">
               <div className="freeform-sidebar-header">
@@ -639,7 +620,7 @@ function applyDesign(design: {
           <div className="freeform-instruction-pill">
             {[
               { icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5', label: 'Drag to rotate' },
-              { icon: 'M12 5v14M5 12l7 7 7-7', label: 'Scroll to zoom' },
+              { icon: 'M12 5v14M5 12l7 7 7-7', label: 'Pinch or scroll to zoom' },
             ].map((item, i) => (
               <div key={i} className="freeform-instruction-item">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" style={{ width: '14px', height: '14px' }}>
@@ -671,7 +652,7 @@ function applyDesign(design: {
             />
           </div>
 
-          <div className="freeform-toolbar">
+          <div className={`freeform-toolbar${mobileToolsOpen ? ' mobile-open' : ''}`}>
             {activeStep === 'attachment' && (
               <button
                 type="button"
@@ -679,7 +660,7 @@ function applyDesign(design: {
                 title={showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}
                 aria-label={showAttachmentSockets ? 'Hide socket places' : 'Show socket places'}
                 aria-pressed={showAttachmentSockets}
-                className="freeform-toolbar-btn"
+                className="freeform-toolbar-btn freeform-toolbar-secondary"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
                   {showAttachmentSockets ? (
@@ -691,19 +672,41 @@ function applyDesign(design: {
                 <span className="freeform-toolbar-label">{showAttachmentSockets ? 'Hide Sockets' : 'Show Sockets'}</span>
               </button>
             )}
-{[
-              { icon: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 100 6 3 3 0 000-6z', label: 'Reset View', action: handleResetView },
-              { icon: 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15', label: 'Reset Design', action: () => { setShapeParams(DEFAULT_SHAPE); setMaterialParams(DEFAULT_MATERIAL); setDecorationParams(DEFAULT_DECORATION); setAttachmentParams([]); } },
-              { icon: isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3', label: 'Fullscreen', action: handleToggleFullscreen },
-              { icon: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a5 5 0 100-10 5 5 0 000 10z', label: 'Screenshot', action: handleScreenshot },
-            ].map((btn) => (
-              <button key={btn.label} onClick={btn.action} title={btn.label} className="freeform-toolbar-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
-                  <path d={btn.icon} />
-                </svg>
-                <span className="freeform-toolbar-label">{btn.label}</span>
-              </button>
-            ))}
+            <button onClick={handleResetView} title="Reset View" className="freeform-toolbar-btn freeform-toolbar-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 100 6 3 3 0 000-6z" />
+              </svg>
+              <span className="freeform-toolbar-label">Reset View</span>
+            </button>
+            <button onClick={handleResetDesign} title="Reset Design" className="freeform-toolbar-btn freeform-toolbar-secondary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
+                <path d="M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+              <span className="freeform-toolbar-label">Reset Design</span>
+            </button>
+            <button onClick={handleToggleFullscreen} title="Fullscreen" className="freeform-toolbar-btn freeform-toolbar-secondary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
+                <path d={isFullscreen ? 'M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3'} />
+              </svg>
+              <span className="freeform-toolbar-label">Fullscreen</span>
+            </button>
+            <button onClick={handleScreenshot} title="Screenshot" className="freeform-toolbar-btn freeform-toolbar-secondary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dark)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z M12 17a5 5 0 100-10 5 5 0 000 10z" />
+              </svg>
+              <span className="freeform-toolbar-label">Screenshot</span>
+            </button>
+            <button
+              type="button"
+              className="freeform-toolbar-btn freeform-toolbar-more"
+              aria-label={mobileToolsOpen ? 'Hide viewer tools' : 'Show viewer tools'}
+              aria-expanded={mobileToolsOpen}
+              onClick={() => setMobileToolsOpen((open) => !open)}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ width: '22px', height: '22px' }}>
+                <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -835,9 +838,44 @@ function applyDesign(design: {
 
       </div>
 
+      <nav className="freeform-mobile-actions" aria-label="Design step navigation">
+        <button
+          type="button"
+          className="freeform-mobile-back"
+          onClick={() => goToAdjacentStep(-1)}
+          disabled={stepIndex === 0}
+        >
+          <span aria-hidden="true">&#8592;</span> Back
+        </button>
+        <button type="button" className="freeform-mobile-estimate" onClick={() => setMobileSummaryOpen(true)}>
+          <strong>&#8369;{estimatedPrice.toLocaleString()}</strong>
+          <span>{estimatedDays} days · Summary</span>
+        </button>
+        {activeStep === 'review' ? (
+          <div className="freeform-mobile-review-actions">
+            <button type="button" className="freeform-mobile-save" onClick={openSaveModal}>Save</button>
+            <button type="button" className="freeform-mobile-next" onClick={handleCheckout}>Send</button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="freeform-mobile-next"
+            onClick={() => goToAdjacentStep(1)}
+            disabled={!selectedModel || stepIndex === STEPS.length - 1}
+          >
+            Continue <span aria-hidden="true">&#8594;</span>
+          </button>
+        )}
+      </nav>
+
       {/* ── BOTTOM SUMMARY BAR ── */}
-      <div className="freeform-bottom-wrap">
+      <div className={`freeform-bottom-wrap${mobileSummaryOpen ? ' open' : ''}`} aria-hidden={!mobileSummaryOpen} inert={!mobileSummaryOpen}>
+        <button className="freeform-bottom-scrim" type="button" aria-label="Close design summary" onClick={() => setMobileSummaryOpen(false)} />
         <div className="freeform-summary-bar">
+          <div className="freeform-mobile-summary-heading">
+            <div><span>Design summary</span><strong>{modelName || 'No model selected'}</strong></div>
+            <button type="button" aria-label="Close design summary" onClick={() => setMobileSummaryOpen(false)}>&times;</button>
+          </div>
           <div className="freeform-summary-details">
             <div className="freeform-summary-field">
               <div className="freeform-summary-product">
@@ -987,64 +1025,18 @@ function applyDesign(design: {
         </div>
       )}
 
-      {/* ── SHOP SELECTION MODAL ── */}
-      {showShopModal && (
-        <div className="freeform-modal-overlay" onClick={() => setShowShopModal(false)}>
-          <div className="freeform-modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setShowShopModal(false)}
-              style={{
-                position: 'absolute', top: '16px', right: '16px',
-                width: '28px', height: '28px', borderRadius: '50%',
-                border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
-              aria-label="Close"
-            >
-              &times;
-            </button>
-            <div style={{ padding: '28px 28px 0' }}>
-              <h3 className="freeform-modal-title">Select a Shop</h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px' }}>Choose who to send your design to</p>
-            </div>
-            <div style={{ padding: '16px 28px', maxHeight: '320px', overflowY: 'auto' }}>
-              {shops.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedShop(s.id)}
-                  className={`freeform-tab-option${selectedShop === s.id ? ' selected' : ''}`}
-                  style={{ marginBottom: '8px' }}
-                >
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                    {s.image ? (
-                      <img src={s.image} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--primary-color)' }}>{s.name.charAt(0)}</span>
-                    )}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.name}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div style={{ padding: '16px 28px 28px', display: 'flex', gap: '12px' }}>
-              <button onClick={() => setShowShopModal(false)} className="freeform-tab-btn-outline" style={{ flex: 1 }}>Cancel</button>
-              <button
-                onClick={handleSubmitToShop}
-                disabled={!selectedShop || submitting}
-                className="freeform-save-btn"
-                style={{ flex: 1, marginBottom: 0, opacity: !selectedShop || submitting ? 0.5 : 1 }}
-              >
-                {submitting ? 'Sending...' : 'Send Design'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SendDesignRequestModal
+        open={showShopModal}
+        shops={shops}
+        selectedShopId={selectedShop}
+        snapshot={selectedModel ? requestSnapshot : null}
+        submitting={submitting}
+        successConversationId={requestConversationId}
+        onSelectShop={(shop) => { setSelectedShop(shop.id); setSelectedShopId(shop.id); setSelectedShopName(shop.name); }}
+        onSubmit={(quantity, note) => void handleSubmitToShop(quantity, note)}
+        onClose={() => { if (!submitting) setShowShopModal(false); }}
+        onOpenMessages={() => navigate(requestConversationId ? `/chat?conversation=${encodeURIComponent(requestConversationId)}` : '/chat')}
+      />
 
       {/* ── SHOP SELECT MODAL (freeform entry) ── */}
       <ShopSelectModal

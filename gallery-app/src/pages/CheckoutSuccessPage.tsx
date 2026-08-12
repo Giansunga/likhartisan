@@ -1,8 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { clearCart } from '../data/store';
+import { clearCart, removeCartLines } from '../data/store';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
+import {
+  clearCartCheckoutDraft,
+  clearPendingPurchase,
+  readPendingPurchase,
+} from '../lib/cartCheckout';
 
 export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -83,9 +88,16 @@ export default function CheckoutSuccessPage() {
         // Success — payment confirmed and order updated
         if (res.ok && result.success) {
           finishedRef.current = true;
-          // Buy Now keeps the real cart intact; only clear it for a normal cart checkout.
+          // Buy Now keeps the real cart intact. Cart checkout removes only the
+          // purchased draft lines so pieces from other artisans remain saved.
           const isBuyNow = sessionStorage.getItem('lk_buy_now') === '1';
-          if (!isBuyNow) clearCart();
+          if (!isBuyNow) {
+            const purchasedLineKeys = readPendingPurchase(checkoutSessionId);
+            if (purchasedLineKeys.length > 0) removeCartLines(purchasedLineKeys);
+            else clearCart(); // Backward compatibility for sessions created before scoped drafts.
+            clearPendingPurchase(checkoutSessionId);
+            clearCartCheckoutDraft();
+          }
           sessionStorage.removeItem('lk_buy_now');
           localStorage.removeItem('likhartisan_checkout_session_id');
           sessionStorage.removeItem('likhartisan_checkout_session_id');

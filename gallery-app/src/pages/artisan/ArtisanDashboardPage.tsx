@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { SellerConfirmDialog } from '../../components/artisan/Overlay';
+import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -283,7 +285,7 @@ export default function ArtisanDashboardPage() {
         }}>
           {/* Brand mark */}
           <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #F0EBE4' }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: '#B8A89A', textTransform: 'uppercase' }}>Seller Portal</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#B8A89A', textTransform: 'uppercase' }}>Seller Portal</div>
           </div>
 
           {/* Nav items */}
@@ -711,7 +713,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                         position: 'absolute', bottom: '-4px', right: '-4px',
                         width: '18px', height: '18px', borderRadius: '50%',
                         background: rankColors[i] ?? '#A89688',
-                        color: '#fff', fontSize: '0.6rem', fontWeight: 800,
+                        color: '#fff', fontSize: '0.75rem', fontWeight: 700,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         border: '2px solid #fff',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
@@ -772,7 +774,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
                     <span style={{ fontWeight: 700, color: 'var(--accent-color)', fontSize: '0.875rem' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString()}</span>
                     <span style={{
-                      fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                      fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                       padding: '2px 7px', borderRadius: '999px',
                       background: item.status === 'active' ? '#ECFDF5' : '#FEF9C3',
                       color: item.status === 'active' ? '#065F46' : '#854D0E',
@@ -787,13 +789,27 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
     </div>
   );
 }
-function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProducts }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void; loadingProducts: boolean }) {
+export function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProducts }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void; loadingProducts: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<{ materials: string; technique: string }>({ materials: '', technique: '' });
   const [saving, setSaving] = useState(false);
   const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
   const [editError, setEditError] = useState('');
   const [archiveError, setArchiveError] = useState('');
+  const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [listingSearch, setListingSearch] = useState('');
+  const [listingStatus, setListingStatus] = useState<'all' | 'active' | 'inactive' | 'low-stock'>('all');
+  const editPanelRef = useOverlayA11y(Boolean(editing), () => setEditing(null), saving);
+
+  const visibleProducts = products.filter(product => {
+    if (product.status === 'archived') return false;
+    const query = listingSearch.trim().toLowerCase();
+    if (query && !`${product.name} ${product.category}`.toLowerCase().includes(query)) return false;
+    if (listingStatus === 'low-stock') return product.stock > 0 && product.stock <= 3;
+    if (listingStatus !== 'all') return product.status === listingStatus;
+    return true;
+  });
 
   async function openEdit(p: Product) {
     setEditing(p);
@@ -831,6 +847,11 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
   async function saveEdit() {
     if (!editing) return;
+    const invalidVariation = variations.find(v => Number(v.price) < 0 || Number(v.stock) < 0 || !Number.isInteger(Number(v.stock || 0)));
+    if (invalidVariation) {
+      setEditError('Variation price must be zero or more, and stock must be a whole number of zero or more.');
+      return;
+    }
     setSaving(true);
     setEditError('');
     const { error } = await supabase
@@ -842,8 +863,8 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
       .eq('id', editing.id);
     if (error) { setEditError('Failed to save: ' + error.message); setSaving(false); return; }
 
-    for (const v of variations) {
-      if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) continue;
+    await Promise.all(variations.map(async (v) => {
+      if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) return;
       if (v.id) {
         await supabase.from('product_variations').update({
           dimensions: v.dimensions.trim() || 'N/A',
@@ -861,7 +882,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
           sort_order: variations.indexOf(v),
         });
       }
-    }
+    }));
 
     const existingIds = variations.filter(v => v.id).map(v => v.id);
     if (existingIds.length > 0) {
@@ -882,14 +903,16 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
   }
 
   async function archiveProduct(p: Product) {
-    if (!confirm(`Archive "${p.name}"? It will be hidden from the gallery.`)) return;
+    setArchiving(true);
     setArchiveError('');
     const { error } = await supabase
       .from('products')
       .update({ status: 'archived' })
       .eq('id', p.id);
-    if (error) { setArchiveError('Failed to archive: ' + error.message); return; }
+    if (error) { setArchiveError('Failed to archive: ' + error.message); setArchiving(false); return; }
     onProductsUpdated(products.filter(item => item.id !== p.id));
+    setArchiving(false);
+    setArchiveTarget(null);
   }
 
   return (
@@ -904,6 +927,16 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
           {editError || archiveError}
         </div>
       )}
+
+      <div className="seller-toolbar">
+        <input type="search" value={listingSearch} onChange={event => setListingSearch(event.target.value)} placeholder="Search listings…" aria-label="Search listings" />
+        <select value={listingStatus} onChange={event => setListingStatus(event.target.value as typeof listingStatus)} aria-label="Filter listings">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="low-stock">Low stock</option>
+        </select>
+      </div>
 
       {loadingProducts ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -922,12 +955,12 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
             </div>
           ))}
         </div>
-      ) : products.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--text-light)', padding: '48px 20px' }}>No listings yet.</p>
+      ) : visibleProducts.length === 0 ? (
+        <div className="seller-empty-panel"><Package size={34} /><h2>No listings found</h2><p>Try changing your search or status filter.</p></div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {products.map((item) => (
-            <div key={item.id} style={{
+        <div className="seller-listings-stack" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {visibleProducts.map((item) => (
+            <div className="seller-listing-row" key={item.id} style={{
               display: 'flex', alignItems: 'center', gap: '18px',
               padding: '16px 18px', border: '1px solid #eee', borderRadius: '10px',
               background: '#fff'
@@ -952,7 +985,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
                   <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--accent-color)', marginBottom: '6px' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <span style={{
                     display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-                    fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize',
+                    fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
                     background: item.status === 'active' ? '#E8F5E9' : '#FFF3E0',
                     color: item.status === 'active' ? '#2E7D32' : '#E65100'
                   }}>{item.status}</span>
@@ -962,7 +995,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
                   background: 'transparent', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: 600,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                 }}>Edit</button>
-                <button onClick={() => archiveProduct(item)} style={{
+                <button onClick={() => setArchiveTarget(item)} style={{
                   padding: '8px 16px', border: '1.5px solid #d32f2f', borderRadius: '8px',
                   background: 'transparent', color: '#d32f2f', fontSize: '0.8rem', fontWeight: 600,
                   cursor: 'pointer', whiteSpace: 'nowrap',
@@ -975,11 +1008,11 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
       {/* Edit Modal */}
       {editing && (
-        <div style={{
+        <div className="seller-overlay" role="presentation" style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-        }} onClick={() => setEditing(null)}>
-          <div style={{
+        }} onClick={() => { if (!saving) setEditing(null); }}>
+          <div ref={editPanelRef} className="seller-overlay__panel" role="dialog" aria-modal="true" aria-label={`Edit listing ${editing.name}`} tabIndex={-1} style={{
             background: '#fff', borderRadius: '16px', width: '900px', maxWidth: '100%',
             maxHeight: '90vh', display: 'flex', flexDirection: 'column',
             boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
@@ -994,7 +1027,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
                 <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#2C1810', margin: 0 }}>Edit Listing</h2>
                 <p style={{ fontSize: '0.82rem', color: '#8C7B6E', margin: '4px 0 0' }}>{editing.name}</p>
               </div>
-              <button onClick={() => setEditing(null)} style={{
+              <button onClick={() => setEditing(null)} disabled={saving} style={{
                 width: '36px', height: '36px', borderRadius: '10px', border: '1.5px solid #E8E0D8',
                 background: '#fff', fontSize: '1.2rem', cursor: 'pointer', color: '#8C7B6E',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
@@ -1006,6 +1039,8 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
 
             {/* Scrollable Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+
+              {editError && <div role="alert" style={{ padding: '11px 14px', marginBottom: '18px', border: '1px solid #FECACA', borderRadius: '9px', color: '#991B1B', background: '#FEF2F2', fontSize: '0.82rem' }}>{editError}</div>}
 
               {/* Section: Product Specifications */}
               <div style={{ marginBottom: '28px' }}>
@@ -1061,7 +1096,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                           <span style={{
-                            fontSize: '0.72rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
+                            fontSize: '0.75rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
                             letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
                             borderRadius: '6px',
                           }}>Variation {i + 1}</span>
@@ -1168,7 +1203,7 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
               borderTop: '1px solid #E8E0D8', background: '#fff', flexShrink: 0,
               borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px',
             }}>
-              <button onClick={() => setEditing(null)} style={{
+              <button onClick={() => setEditing(null)} disabled={saving} style={{
                 padding: '11px 24px', border: '1.5px solid #D4C8BB', borderRadius: '10px',
                 background: '#fff', color: '#5A4A3E', fontSize: '0.88rem', fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -1189,11 +1224,20 @@ function ListingsPanel({ products, productPrices, onProductsUpdated, loadingProd
           </div>
         </div>
       )}
+      <SellerConfirmDialog
+        open={Boolean(archiveTarget)}
+        title="Archive listing?"
+        description={archiveTarget ? `“${archiveTarget.name}” will be hidden from the gallery and moved to Design Vault.` : ''}
+        confirmLabel="Archive listing"
+        busy={archiving}
+        onClose={() => { if (!archiving) setArchiveTarget(null); }}
+        onConfirm={() => { if (archiveTarget) void archiveProduct(archiveTarget); }}
+      />
     </div>
   );
 }
 
-function VaultPanel({ products, productPrices, onProductsUpdated }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void }) {
+export function VaultPanel({ products, productPrices, onProductsUpdated }: { products: Product[]; productPrices: Record<string, number>; onProductsUpdated: (updated: Product[]) => void }) {
   const archived = products.filter(p => p.status === 'archived');
   const [restoreError, setRestoreError] = useState('');
 
@@ -1253,7 +1297,7 @@ function VaultPanel({ products, productPrices, onProductsUpdated }: { products: 
                   <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--accent-color)', marginBottom: '6px' }}>₱{(productPrices[item.id] ?? item.price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <span style={{
                     display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-                    fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize',
+                    fontSize: '0.75rem', fontWeight: 600, textTransform: 'capitalize',
                     background: '#FFF3E0', color: '#E65100'
                   }}>archived</span>
                 </div>
@@ -1271,19 +1315,20 @@ function VaultPanel({ products, productPrices, onProductsUpdated }: { products: 
   );
 }
 
-function RequestsPanel() {
+export function RequestsPanel() {
   return (
-    <div>
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Requests</h1>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Custom order requests from buyers</p>
+    <div className="seller-requests-page">
+      <div className="seller-empty-panel seller-empty-panel--large">
+        <div className="seller-empty-panel__icon"><Inbox size={34} /></div>
+        <h2>No custom requests yet</h2>
+        <p>When buyers submit a personalized or made-to-order request, it will appear here with its specifications and deadline.</p>
+        <span>Request management is coming soon.</span>
       </div>
-      <p style={{ textAlign: 'center', color: 'var(--text-light)', padding: '48px 20px' }}>No requests yet.</p>
     </div>
   );
 }
 
-function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { shopId: string | null; shopName?: string; loadingOrders: boolean; setLoadingOrders: (v: boolean) => void }) {
+export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { shopId: string | null; shopName?: string; loadingOrders: boolean; setLoadingOrders: (v: boolean) => void }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -1291,6 +1336,9 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
   const [sortOrder, setSortOrder] = useState('newest');
   const [updateError, setUpdateError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const orderPanelRef = useOverlayA11y(Boolean(selectedOrder), () => setSelectedOrder(null));
   const [searchParams, setSearchParams] = useSearchParams();
 
   function formatRelativeTime(dateStr: string) {
@@ -1315,22 +1363,9 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
     if (!shopId || !shopName) return;
 
     const channel = supabase
-          .channel(`shop-orders:${shopId}`)
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
-            (payload) => {
-              setOrders(prev => [payload.new, ...prev]);
-            }
-          )
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
-            (payload) => {
-              setOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
-            }
-          )
-          .subscribe();
+      .channel(`shop-orders:${shopId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void fetchOrders(); })
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -1430,13 +1465,13 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
       cancelled: { bg: '#FFEBEE', color: '#C62828' },
     };
     const s = styles[status] || styles.pending;
-    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color, textTransform: 'capitalize' }}>{status}</span>;
+    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: s.bg, color: s.color, textTransform: 'capitalize' }}>{status}</span>;
   };
 
   const paymentBadge = (status: string) => {
     const bg = status === 'Paid' ? '#E8F5E9' : status === 'Cancelled' ? '#FFEBEE' : '#FFF3E0';
     const color = status === 'Paid' ? '#2E7D32' : status === 'Cancelled' ? '#C62828' : '#E65100';
-    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600, background: bg, color: color }}>{status}</span>;
+    return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: bg, color: color }}>{status}</span>;
   };
 
   const filtered = orders
@@ -1465,10 +1500,6 @@ function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders }: { sh
 
 return (
     <div>
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>Shop Orders</h1>
-      </div>
-
       {updateError && (
         <div style={{ padding: '12px 18px', borderRadius: '8px', marginBottom: '20px', background: '#FEE2E2', color: '#991B1B', fontSize: '0.9rem', fontWeight: 500, border: '1px solid #FECACA' }}>
           {updateError}
@@ -1573,7 +1604,7 @@ return (
                                     )}
                                     {/* Payment cancelled but delivery not yet cancelled: show Cancel Order button */}
                                     {order.delivery_status !== 'cancelled' && (order.payment_status === 'Cancelled' || order.status === 'cancelled') && (
-                                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Are you sure you want to cancel this order? This will cancel both payment and delivery status.')) { updateDeliveryStatus(order.id, 'cancelled'); } }}
+                                      <button onClick={(e) => { e.stopPropagation(); setCancelTarget(order); }}
                                         style={{ padding: '5px 12px', border: '1.5px solid #d32f2f', borderRadius: '6px', background: '#d32f2f', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Cancel Order</button>
                                     )}
                                     {/* Active orders: show action buttons based on delivery status */}
@@ -1610,9 +1641,9 @@ return (
 
       {/* Buyer Detail Modal */}
       {selectedOrder && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        <div className="seller-overlay seller-overlay--drawer" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'stretch', justifyContent: 'flex-end', padding: 0 }}
           onClick={() => setSelectedOrder(null)}>
-          <div style={{ background: '#fff', borderRadius: '16px', width: '420px', maxWidth: '100%', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}
+          <div ref={orderPanelRef} className="seller-overlay__panel" role="dialog" aria-modal="true" aria-label={`Order ${selectedOrder.id.slice(0, 8)}`} tabIndex={-1} style={{ background: '#fff', borderRadius: 0, width: 'min(520px, 100%)', maxWidth: '100%', height: '100%', maxHeight: 'none', overflow: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}
             onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid #E8E0D8' }}>
@@ -1627,7 +1658,7 @@ return (
 
             {/* Buyer Info */}
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E0D8', background: '#FDF8F4' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Buyer Information</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Buyer Information</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <span style={{ fontSize: '0.82rem', color: '#8C7B6E', width: '60px', flexShrink: 0 }}>Name</span>
@@ -1646,7 +1677,7 @@ return (
 
             {/* Item Summary */}
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E0D8' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Item Summary</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Item Summary</div>
               <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
                 <img src={selectedOrder.item_image} alt="" style={{ width: '56px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1667,7 +1698,7 @@ return (
             {/* Status Row */}
             <div style={{ padding: '20px 28px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Payment</div>
                 {(() => {
                   const bg = selectedOrder.payment_status === 'Paid' ? '#E8F5E9' : selectedOrder.payment_status === 'Cancelled' ? '#FFEBEE' : '#FFF3E0';
                   const color = selectedOrder.payment_status === 'Paid' ? '#2E7D32' : selectedOrder.payment_status === 'Cancelled' ? '#C62828' : '#E65100';
@@ -1675,7 +1706,7 @@ return (
                 })()}
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Delivery</div>
                 {(() => {
                   const styles: Record<string, { bg: string; color: string }> = {
                     pending: { bg: '#FFF3E0', color: '#E65100' }, preparing: { bg: '#E3F2FD', color: '#1565C0' },
@@ -1687,7 +1718,7 @@ return (
                 })()}
               </div>
               <div>
-                <div style={{ fontSize: '0.72rem', color: '#8C7B6E', marginBottom: '4px' }}>Order Total</div>
+                <div style={{ fontSize: '0.75rem', color: '#8C7B6E', marginBottom: '4px' }}>Order Total</div>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-dark)' }}>{'\u20B1'}{selectedOrder.total?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '—'}</span>
               </div>
             </div>
@@ -1697,7 +1728,7 @@ return (
               <button onClick={() => setSelectedOrder(null)}
                 style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Close</button>
               {selectedOrder.delivery_status !== 'cancelled' && (selectedOrder.payment_status === 'Cancelled' || selectedOrder.status === 'cancelled') && (
-                <button onClick={() => { if (confirm('Are you sure you want to cancel this order? This will cancel both payment and delivery status.')) { updateDeliveryStatus(selectedOrder.id, 'cancelled'); setSelectedOrder(null); } }}
+                <button onClick={() => setCancelTarget(selectedOrder)}
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#d32f2f', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel Order</button>
               )}
               {selectedOrder.delivery_status === 'pending' && selectedOrder.payment_status !== 'Cancelled' && selectedOrder.status !== 'cancelled' && (
@@ -1720,11 +1751,28 @@ return (
           </div>
         </div>
       )}
+      <SellerConfirmDialog
+        open={Boolean(cancelTarget)}
+        title="Cancel this order?"
+        description="This changes both payment and delivery status to cancelled and notifies the buyer."
+        confirmLabel="Cancel order"
+        busy={cancelling}
+        onClose={() => { if (!cancelling) setCancelTarget(null); }}
+        onConfirm={() => {
+          if (!cancelTarget) return;
+          setCancelling(true);
+          void updateDeliveryStatus(cancelTarget.id, 'cancelled').finally(() => {
+            setCancelling(false);
+            setCancelTarget(null);
+            setSelectedOrder(null);
+          });
+        }}
+      />
     </div>
   );
 }
 
-function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiveMap }: { shopId: string | null; loadingMessages: boolean; setLoadingMessages: (v: boolean) => void; buyerActiveMap: Record<string, boolean> }) {
+export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiveMap }: { shopId: string | null; loadingMessages: boolean; setLoadingMessages: (v: boolean) => void; buyerActiveMap: Record<string, boolean> }) {
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -1734,6 +1782,8 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
   const [uploading, setUploading] = useState(false);
   const [artisanUserId, setArtisanUserId] = useState<string | null>(null);
   const [convSearch, setConvSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -1895,11 +1945,13 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
   }
 
   async function deleteConversation(convId: string) {
-    if (!confirm('Delete this conversation? This cannot be undone.')) return;
+    setDeletingConversation(true);
     await supabase.from('messages').delete().eq('conversation_id', convId);
     await supabase.from('conversations').delete().eq('id', convId);
     setConversations(prev => prev.filter(c => c.id !== convId));
     if (selectedConv?.id === convId) { setSelectedConv(null); setMessages([]); }
+    setDeletingConversation(false);
+    setDeleteTarget(null);
   }
 
 
@@ -2011,7 +2063,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
                        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.buyer_name || FALLBACK_BUYER_NAME}</span>
-                      <span style={{ fontSize: '0.68rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#A89688', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '20px' }}>
                       {conv.last_message || 'Start a conversation'}
@@ -2019,12 +2071,12 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
                   </div>
 
                   {conv.artisan_unread > 0 && (
-                    <span style={{ position: 'absolute', top: '12px', right: '40px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.artisan_unread > 99 ? '99+' : conv.artisan_unread}</span>
+                    <span style={{ position: 'absolute', top: '12px', right: '40px', minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, zIndex: 1 }}>{conv.artisan_unread > 99 ? '99+' : conv.artisan_unread}</span>
                   )}
 
                   {/* Delete button */}
                   <button
-                    onClick={e => { e.stopPropagation(); deleteConversation(conv.id); }}
+                    onClick={e => { e.stopPropagation(); setDeleteTarget(conv); }}
                     title="Delete conversation"
                     style={{ position: 'absolute', top: '10px', right: '10px', width: '22px', height: '22px', borderRadius: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#A89688', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s, color 0.15s, background 0.15s', padding: 0, zIndex: 1 }}
                     onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#d32f2f'; e.currentTarget.style.background = '#fdecea'; }}
@@ -2070,7 +2122,7 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
               <div>
                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{selectedConv.buyer_name || FALLBACK_BUYER_NAME}</div>
                 {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
-                  <div style={{ fontSize: '0.72rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
+                  <div style={{ fontSize: '0.75rem', color: bs.active ? '#2E7D32' : '#8C7B6E', fontWeight: 500 }}>{bs.text || ''}</div>
                 ); })()}
               </div>
             </div>
@@ -2293,10 +2345,19 @@ function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buyerActiv
         )}
       </div>
       )}
+      <SellerConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete conversation?"
+        description="The conversation and its messages will be permanently removed. This cannot be undone."
+        confirmLabel="Delete conversation"
+        busy={deletingConversation}
+        onClose={() => { if (!deletingConversation) setDeleteTarget(null); }}
+        onConfirm={() => { if (deleteTarget) void deleteConversation(deleteTarget.id); }}
+      />
     </div>
   );
 }
-function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopUpdated: (d: any) => void }) {
+export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopUpdated: (d: any) => void }) {
   const [name, setName] = useState(shopData?.name || '');
   const [description, setDescription] = useState(shopData?.description || '');
   const [about, setAbout] = useState(shopData?.about || '');
@@ -2308,11 +2369,15 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  async function uploadImage(file: File, folder: string): Promise<string | null> {
+  async function uploadImage(file: File, folder: string): Promise<string> {
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `shop/${folder}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from('products').upload(fileName, file);
-    if (error) { console.error('Upload error:', error); return null; }
+    const { error } = await supabase.storage.from('products').upload(fileName, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
     const { data: urlData } = supabase.storage.from('products').getPublicUrl(fileName);
     return urlData.publicUrl;
   }
@@ -2320,6 +2385,11 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
   function handleProfileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setMessage('Error: Profile photo must be an image no larger than 5MB.');
+      e.target.value = '';
+      return;
+    }
     setProfileFile(file);
     setProfilePreview(URL.createObjectURL(file));
   }
@@ -2327,6 +2397,11 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setMessage('Error: Cover photo must be an image no larger than 5MB.');
+      e.target.value = '';
+      return;
+    }
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   }
@@ -2336,27 +2411,33 @@ function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; onShopU
     setSaving(true);
     setMessage('');
 
-    let imageUrl = shopData.image || '';
-    let bannerUrl = shopData.banner || '';
+    try {
+      let imageUrl = shopData.image || '';
+      let bannerUrl = shopData.banner || '';
 
-    if (profileFile) {
-      const url = await uploadImage(profileFile, 'profile');
-      if (url) imageUrl = url;
+      const [profileUrl, coverUrl] = await Promise.all([
+        profileFile ? uploadImage(profileFile, 'profile') : Promise.resolve(null),
+        coverFile ? uploadImage(coverFile, 'banner') : Promise.resolve(null),
+      ]);
+      if (profileUrl) imageUrl = profileUrl;
+      if (coverUrl) bannerUrl = coverUrl;
+
+      const { error } = await supabase
+        .from('shops')
+        .update({ name, description, about, image: imageUrl, banner: bannerUrl, location })
+        .eq('id', shopData.id);
+
+      if (error) throw error;
+      setProfileFile(null);
+      setCoverFile(null);
+      setMessage('Shop profile updated successfully!');
+      onShopUpdated({ ...shopData, name, description, about, image: imageUrl, banner: bannerUrl, location });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unable to update the shop profile.';
+      setMessage(`Error: ${detail}`);
+    } finally {
+      setSaving(false);
     }
-    if (coverFile) {
-      const url = await uploadImage(coverFile, 'banner');
-      if (url) bannerUrl = url;
-    }
-
-    const { error } = await supabase
-      .from('shops')
-      .update({ name, description, about, image: imageUrl, banner: bannerUrl, location })
-      .eq('id', shopData.id);
-
-    setSaving(false);
-    if (error) { setMessage('Error: ' + error.message); return; }
-    setMessage('Shop profile updated successfully!');
-    onShopUpdated({ ...shopData, name, description, about, image: imageUrl, banner: bannerUrl, location });
   }
 
   return (
@@ -2480,7 +2561,7 @@ async function createBuyerNotification(orderId: string, status: string) {
   if (!res.ok) throw new Error(`Notification failed: ${res.status}`);
 }
 
-function NotificationsPanel({ userId }: { userId: string }) {
+export function NotificationsPanel({ userId }: { userId: string }) {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2578,7 +2659,7 @@ function NotificationsPanel({ userId }: { userId: string }) {
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '0.88rem', fontWeight: filter === t.key ? 700 : 500, color: filter === t.key ? 'var(--primary-color)' : 'var(--text-light)', borderBottom: `2px solid ${filter === t.key ? 'var(--accent-color)' : 'transparent'}`, marginBottom: '-1px', transition: 'color 0.15s' }}>
             {t.label}
             {t.count > 0 && (
-              <span style={{ minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: filter === t.key ? 'var(--accent-color)' : '#E0A06A', color: '#fff', fontSize: '0.66rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.count}</span>
+              <span style={{ minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '9px', background: filter === t.key ? 'var(--accent-color)' : '#E0A06A', color: '#fff', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{t.count}</span>
             )}
           </button>
         ))}
@@ -2620,11 +2701,11 @@ function NotificationsPanel({ userId }: { userId: string }) {
                     {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
                   </div>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                  <span style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}{n.order_id ? '  ·  View order →' : ''}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#aaa', marginTop: '4px', display: 'block' }}>{timeAgo(n.created_at)}{n.order_id ? '  ·  View order →' : ''}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                   {!n.read && (
-                    <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600 }}>Read</button>
+                    <button onClick={() => markRead(n.id)} title="Mark as read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)', padding: '4px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>Read</button>
                   )}
                   <button onClick={() => deleteNotif(n.id)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', padding: '4px', borderRadius: '4px', transition: 'color 0.15s' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#d32f2f')}

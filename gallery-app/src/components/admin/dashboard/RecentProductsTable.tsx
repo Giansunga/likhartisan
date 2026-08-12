@@ -17,7 +17,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-block', padding: '3px 10px', borderRadius: '20px',
-      fontSize: '0.72rem', fontWeight: 600, background: s.bg, color: s.color,
+      fontSize: '0.75rem', fontWeight: 600, background: s.bg, color: s.color,
       textTransform: 'capitalize' as const,
     }}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -62,7 +62,7 @@ export default function RecentProductsTable({ products }: RecentProductsTablePro
         <thead>
           <tr style={{ borderBottom: '1px solid #F0EBE4' }}>
             {['PRODUCT', 'SHOP', 'CATEGORY', 'PRICE', 'STATUS', 'ACTION'].map(h => (
-              <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#77716B', fontSize: '0.7rem', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{h}</th>
+              <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#77716B', fontSize: '0.75rem', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{h}</th>
             ))}
           </tr>
         </thead>

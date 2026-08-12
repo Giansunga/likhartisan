@@ -69,7 +69,7 @@ export default function OrderStatusChart({ data, total, updatedAt }: OrderStatus
           </ResponsiveContainer>
           <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
             <p style={{ fontSize: '1.55rem', fontWeight: 700, color: '#1F1F1F', lineHeight: 1 }}>{total}</p>
-            <p style={{ fontSize: '0.68rem', color: '#A89688', marginTop: '3px' }}>Total Orders</p>
+            <p style={{ fontSize: '0.75rem', color: '#A89688', marginTop: '3px' }}>Total Orders</p>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 32px 58px', columnGap: '14px', rowGap: '8px', alignItems: 'center', minWidth: 0 }}>
@@ -83,13 +83,13 @@ export default function OrderStatusChart({ data, total, updatedAt }: OrderStatus
                   <span style={{ fontSize: '0.82rem', color: '#1F1F1F', whiteSpace: 'nowrap' }}>{item.name}</span>
                 </div>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1F1F1F', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{item.value}</span>
-                <span style={{ fontSize: '0.74rem', color: '#A89688', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+                <span style={{ fontSize: '0.75rem', color: '#A89688', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
               </div>
             );
           })}
         </div>
       </div>
-      <p style={{ fontSize: '0.72rem', color: '#A89688', margin: '12px 0 0', alignSelf: 'flex-end' }}>
+      <p style={{ fontSize: '0.75rem', color: '#A89688', margin: '12px 0 0', alignSelf: 'flex-end' }}>
         Updated: {formatUpdated(updatedAt ? new Date(updatedAt) : undefined)}
       </p>
     </div>

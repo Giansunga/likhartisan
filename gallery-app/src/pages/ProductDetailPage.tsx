@@ -245,10 +245,6 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    if (!user) {
-      window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
-      return;
-    }
     addToCart({
       productId: product.id,
       productName: product.name,
@@ -486,12 +482,12 @@ export default function ProductDetailPage() {
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                       <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-dark)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span>{shopProductCount}</span>
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-light)', fontWeight: 500 }}>Products</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 500 }}>Products</span>
                       </div>
                       <div style={{ width: '1px', height: '24px', background: '#E8E0D8' }} />
                       <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
-                        <span style={{ fontSize: '0.62rem', color: 'var(--text-light)', fontWeight: 500 }}>Ratings</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 500 }}>Ratings</span>
                       </div>
                     </div>
                   )}

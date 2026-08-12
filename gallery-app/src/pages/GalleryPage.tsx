@@ -5,8 +5,16 @@ import type { Product } from '../types';
 import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
 import Pagination from '../components/Pagination';
 import GalleryHero from '../components/GalleryHero';
+import GallerySearchFilters from '../components/GallerySearchFilters';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useGalleryAiSearch } from '../hooks/useGalleryAiSearch';
+import {
+  AI_GALLERY_SEARCH_ENABLED,
+  recordGallerySearchClick,
+  resetGallerySearchHistory,
+  type GallerySearchProduct,
+} from '../lib/gallerySearch';
 import {
   createVisitSeed,
   normalizeSearchQuery,
@@ -18,23 +26,25 @@ import {
 const PAGE_SIZE = 24;
 
 const categories = [
-  { name: 'All Crafts', bg: '/images/pottery-collage.png', christmasBg: '/images/christmas-all-crafts.webp' },
-  { name: 'Vases', bg: '/images/vases_collection.png', christmasBg: '/images/christmas-vases.webp' },
-  { name: 'Planters', bg: '/images/planters_collection.png', christmasBg: '/images/christmas-planters.webp' },
-  { name: 'Jars', bg: '/images/jars_collection.png', christmasBg: '/images/christmas-jars.webp' },
-  { name: 'Amphoras', bg: '/images/amphoras_collection.png', christmasBg: '/images/christmas-amphoras.webp' },
-  { name: 'Tea Light Vases', bg: '/images/tealights_collection.png', christmasBg: '/images/christmas-tealights.webp' },
+  { name: 'All Crafts', bg: '/images/gallery-category-all-crafts-v2.webp', christmasBg: '/images/christmas-all-crafts.webp', valentinesBg: '/images/valentines-all-crafts.webp' },
+  { name: 'Vases', bg: '/images/gallery-category-vases-v2.webp', christmasBg: '/images/christmas-vases.webp', valentinesBg: '/images/valentines-vases.webp' },
+  { name: 'Planters', bg: '/images/gallery-category-planters-v2.webp', christmasBg: '/images/christmas-planters.webp', valentinesBg: '/images/valentines-planters.webp' },
+  { name: 'Jars', bg: '/images/gallery-category-jars-v2.webp', christmasBg: '/images/christmas-jars.webp', valentinesBg: '/images/valentines-jars.webp' },
+  { name: 'Amphoras', bg: '/images/gallery-category-amphoras-v2.webp', christmasBg: '/images/christmas-amphoras.webp', valentinesBg: '/images/valentines-amphoras.webp' },
+  { name: 'Tea Light Vases', bg: '/images/gallery-category-tea-lights-v2.webp', christmasBg: '/images/christmas-tealights.webp', valentinesBg: '/images/valentines-tealights.webp' },
 ];
 
 export default function GalleryPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentTheme } = useTheme();
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
-  const [search, setSearch] = useState('');
+  const initialSearch = AI_GALLERY_SEARCH_ENABLED ? (searchParams.get('q') ?? '') : '';
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
   const [sort, setSort] = useState('recommended');
   const [showFavorites, setShowFavorites] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
@@ -46,11 +56,11 @@ export default function GalleryPage() {
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+  const shopFilter = searchParams.get('shop');
   
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -58,16 +68,56 @@ export default function GalleryPage() {
   const { user, loading: authLoading } = useAuth();
   const loggedIn = !!user;
   const isChristmasTheme = currentTheme === 'christmas';
-
-  useEffect(() => {
-    const cat = searchParams.get('category');
-    setActiveCategory(cat);
-  }, [searchParams]);
-
+  const isValentinesTheme = currentTheme === 'valentines';
+  const aiSearchActive = AI_GALLERY_SEARCH_ENABLED && normalizeSearchQuery(submittedSearch).length >= 2;
+  const aiSearch = useGalleryAiSearch({
+    enabled: aiSearchActive,
+    query: submittedSearch,
+    page,
+    sort,
+    category: activeCategory,
+    shopId: shopFilter,
+    favoritesOnly: showFavorites,
+    favoriteProductIds: favorites,
+  });
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed]);
+  function selectCategory(category: string | null) {
+    setActiveCategory(category);
+    setPage(1);
+  }
+
+  function changeSort(nextSort: string) {
+    setSort(nextSort);
+    setPage(1);
+  }
+
+  function toggleFavoritesFilter() {
+    setShowFavorites(value => !value);
+    setPage(1);
+  }
+
+  function submitSearch(event: React.FormEvent) {
+    event.preventDefault();
+    if (!AI_GALLERY_SEARCH_ENABLED) return;
+    const query = searchInput.trim().slice(0, 200);
+    const nextParams = new URLSearchParams(searchParams);
+    if (query.length >= 2) nextParams.set('q', query);
+    else nextParams.delete('q');
+    setSearchParams(nextParams, { replace: true });
+    setSubmittedSearch(query);
+    setSort('recommended');
+    setPage(1);
+  }
+
+  function clearSearch() {
+    setSearchInput('');
+    setSubmittedSearch('');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('q');
+    setSearchParams(nextParams, { replace: true });
+    setPage(1);
+  }
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
@@ -89,7 +139,9 @@ export default function GalleryPage() {
       return () => { active = false; };
     }
 
-    setLoadingSignals(true);
+    Promise.resolve().then(() => {
+      if (active) setLoadingSignals(true);
+    });
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     supabase
       .from('user_product_signals')
@@ -122,7 +174,7 @@ export default function GalleryPage() {
         }
 
         if (data) {
-          const products = data.map((p: any) => mapSupabaseProduct(p));
+          const products = data.map(mapSupabaseProduct);
           setAllProducts(products);
 
           const productIds = products.map(p => p.id);
@@ -175,6 +227,9 @@ export default function GalleryPage() {
 
   const eligibleProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
+    if (shopFilter) {
+      list = list.filter(p => p.shopId === shopFilter);
+    }
     if (showFavorites) {
       list = list.filter(p => favorites.includes(p.id));
     }
@@ -182,17 +237,34 @@ export default function GalleryPage() {
       list = list.filter(p => p.category === activeCategory);
     }
     return list;
-  }, [allProducts, activeCategory, showFavorites, favorites]);
+  }, [allProducts, activeCategory, showFavorites, favorites, shopFilter]);
+
+  const shopFilterName = useMemo(
+    () => shopFilter ? allProducts.find(product => product.shopId === shopFilter)?.shopName : undefined,
+    [allProducts, shopFilter],
+  );
+
+  function clearShopFilter() {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('shop');
+    setSearchParams(nextParams);
+    setPage(1);
+  }
+
+  const localSearchQuery = AI_GALLERY_SEARCH_ENABLED
+    ? (aiSearchActive && aiSearch.error ? submittedSearch : '')
+    : searchInput;
 
   const searchFilteredProducts = useMemo(() => {
-    const normalizedQuery = normalizeSearchQuery(search);
+    const normalizedQuery = normalizeSearchQuery(localSearchQuery);
     if (normalizedQuery.length < 2) return eligibleProducts;
     return eligibleProducts.filter(product => productMatchesSearch(product, normalizedQuery));
-  }, [eligibleProducts, search]);
+  }, [eligibleProducts, localSearchQuery]);
 
   useEffect(() => {
     if (!user) return;
-    const normalizedQuery = normalizeSearchQuery(search);
+    if (aiSearchActive) return;
+    const normalizedQuery = normalizeSearchQuery(localSearchQuery);
     if (normalizedQuery.length < 2 || searchFilteredProducts.length === 0 || recordedSearches.current.has(normalizedQuery)) return;
 
     let active = true;
@@ -221,11 +293,16 @@ export default function GalleryPage() {
       active = false;
       window.clearTimeout(timeoutId);
     };
-  }, [search, searchFilteredProducts.length, user]);
+  }, [aiSearchActive, localSearchQuery, searchFilteredProducts.length, user]);
 
   function trackProductClick(productId: string) {
+    if (aiSearchActive && aiSearch.searchId) {
+      void recordGallerySearchClick(aiSearch.searchId, productId)
+        .catch(error => console.error('AI search click tracking error:', error));
+      return;
+    }
     if (!user) return;
-    const queryText = normalizeSearchQuery(search) || null;
+    const queryText = normalizeSearchQuery(localSearchQuery) || null;
     void supabase
       .from('user_product_signals')
       .insert({
@@ -243,17 +320,18 @@ export default function GalleryPage() {
     if (!user || resettingRecommendations) return;
     if (!window.confirm('Reset your recommendation history? This cannot be undone.')) return;
     setResettingRecommendations(true);
-    const { error } = await supabase
-      .from('user_product_signals')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Recommendation reset error:', error);
-    } else {
+    try {
+      if (AI_GALLERY_SEARCH_ENABLED) {
+        await resetGallerySearchHistory();
+      } else {
+        const { error } = await supabase.from('user_product_signals').delete().eq('user_id', user.id);
+        if (error) throw error;
+      }
       setSignals([]);
       recordedSearches.current.clear();
       setPage(1);
+    } catch (error) {
+      console.error('Recommendation reset error:', error);
     }
     setResettingRecommendations(false);
   }
@@ -277,16 +355,26 @@ export default function GalleryPage() {
           signals: loggedIn ? signals : [],
           catalog: allProducts,
           seed: visitSeed,
-          query: search,
+          query: localSearchQuery,
         });
     }
-  }, [searchFilteredProducts, sort, productRatings, variantPrices, loggedIn, signals, allProducts, visitSeed, search]);
+  }, [searchFilteredProducts, sort, productRatings, variantPrices, loggedIn, signals, allProducts, visitSeed, localSearchQuery]);
 
-  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
-  const products = useMemo(() => {
+  const localTotalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
+  const localProducts = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return filteredProducts.slice(start, start + PAGE_SIZE);
   }, [filteredProducts, page]);
+  const usingAiResults = aiSearchActive && !aiSearch.error;
+  const products = usingAiResults ? aiSearch.products : localProducts;
+  const totalPages = usingAiResults ? aiSearch.totalPages : localTotalPages;
+  const totalResults = usingAiResults ? aiSearch.total : filteredProducts.length;
+  const initialResultsLoading = loadingProducts || loadingSignals
+    || (usingAiResults && aiSearch.loading && products.length === 0);
+  const canResetRecommendations = signals.length > 0 || aiSearchActive;
+  const hasDetectedFilters = Boolean(
+    aiSearch.searchPlan && Object.values(aiSearch.searchPlan.filters).some(value => value !== null),
+  );
 
   return (
     <div className="gallery-page">
@@ -303,7 +391,7 @@ export default function GalleryPage() {
             }}>
               <button
                 className={`gallery-mobile-category-pill ${activeCategory === null ? 'active' : ''}`}
-                onClick={() => setActiveCategory(null)}
+                 onClick={() => selectCategory(null)}
                 style={{
                   flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
                   fontWeight: 600, border: `1.5px solid ${activeCategory === null ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
@@ -320,7 +408,7 @@ export default function GalleryPage() {
                   <button
                     className={`gallery-mobile-category-pill ${isActive ? 'active' : ''}`}
                     key={cat.name}
-                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
+                     onClick={() => selectCategory(isActive ? null : cat.name)}
                     style={{
                       flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
                       fontWeight: 600, border: `1.5px solid ${isActive ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
@@ -338,11 +426,11 @@ export default function GalleryPage() {
             <div className="category-zoom-grid">
               {categories.map(cat => (
                 <div key={cat.name}
-                  onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
+                  onClick={() => selectCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
                   className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
                   <div
                     className="zoom-card-bg"
-                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : cat.bg})` }}
+                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : isValentinesTheme ? cat.valentinesBg : cat.bg})` }}
                   />
                   <div className="zoom-card-overlay" />
                   <div className="zoom-card-content">
@@ -361,17 +449,30 @@ export default function GalleryPage() {
           <div className="control-bar">
             <div className="control-title-group">
               <h2 className="control-section-title" id="control-active-title">
-                {activeCategory || 'All Crafts'}
+                {shopFilter ? `${shopFilterName || 'Shop'} Collection` : activeCategory || 'All Crafts'}
               </h2>
+              {shopFilter ? <button className="gallery-shop-filter-clear" type="button" onClick={clearShopFilter}>Clear shop filter</button> : null}
             </div>
 
             <div className="control-action-group">
-              <div className="search-bar-wrapper">
+              <form className={`search-bar-wrapper ${AI_GALLERY_SEARCH_ENABLED ? 'gallery-search-form' : ''}`} onSubmit={submitSearch} role="search">
                 <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
-                <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
+                <input
+                  type="search"
+                  placeholder={AI_GALLERY_SEARCH_ENABLED ? 'Describe what you are looking for...' : 'Search here...'}
+                  value={searchInput}
+                  maxLength={200}
+                  onChange={event => setSearchInput(event.target.value)}
+                  aria-label="Search gallery products"
+                />
+                {AI_GALLERY_SEARCH_ENABLED ? (
+                  <button type="submit" className="gallery-ai-search-submit" disabled={searchInput.trim().length < 2}>
+                    Search
+                  </button>
+                ) : null}
+              </form>
               {isMobile ? (
                 <button
                   className="gallery-filter-button"
@@ -397,7 +498,7 @@ export default function GalleryPage() {
                   {loggedIn && (
                   <button
                     className={`gallery-favorites-button ${showFavorites ? 'active' : ''}`}
-                    onClick={() => setShowFavorites(!showFavorites)}
+                    onClick={toggleFavoritesFilter}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
                       border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
@@ -417,21 +518,21 @@ export default function GalleryPage() {
                       className="gallery-reset-button"
                       type="button"
                       onClick={resetRecommendations}
-                      disabled={signals.length === 0 || resettingRecommendations}
+                      disabled={!canResetRecommendations || resettingRecommendations}
                       title="Delete your saved search and product-click recommendation history"
                       style={{
                         padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
                         background: '#fff', color: '#666', fontSize: '0.8rem', fontWeight: 600,
-                        cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
-                        opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
+                        cursor: !canResetRecommendations || resettingRecommendations ? 'default' : 'pointer',
+                        opacity: !canResetRecommendations || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
                       }}
                     >
                       {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
                     </button>
                   )}
                   <div className="sort-select-wrapper">
-                    <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
-                      <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
+                    <select value={sort} onChange={e => changeSort(e.target.value)} aria-label="Sort products">
+                      <option value="recommended">{aiSearchActive ? 'Relevance' : loggedIn ? 'For You' : 'Discover'}</option>
                       <option value="popularity">Popularity</option>
                       <option value="price-asc">Price: Low to High</option>
                       <option value="price-desc">Price: High to Low</option>
@@ -445,13 +546,34 @@ export default function GalleryPage() {
               )}
             </div>
           </div>
+          {aiSearchActive && aiSearch.searchPlan ? (
+            <GallerySearchFilters
+              plan={aiSearch.searchPlan}
+              options={aiSearch.options}
+              parserFallback={aiSearch.parserFallback}
+              onChange={plan => {
+                setPage(1);
+                aiSearch.updateSearchPlan(plan);
+              }}
+            />
+          ) : null}
+          {aiSearchActive && (aiSearch.mode === 'keyword_fallback' || aiSearch.error) ? (
+            <p className="gallery-ai-fallback" role="status">
+              {aiSearch.error
+                ? 'AI search is temporarily unavailable. Showing local keyword results.'
+                : 'Showing keyword results while semantic search is unavailable.'}
+            </p>
+          ) : null}
         </div>
       </section>
 
       {/* Product Grid */}
       <section className="gallery-products-section" style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          {loadingProducts || loadingSignals ? (
+          {usingAiResults && aiSearch.loading && products.length > 0 ? (
+            <p className="gallery-ai-updating" role="status">Updating results…</p>
+          ) : null}
+          {initialResultsLoading ? (
             /* Shimmer skeleton grid */
             <div style={isMobile ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' } : { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
               {Array.from({ length: isMobile ? 6 : 12 }).map((_, i) => (
@@ -473,11 +595,42 @@ export default function GalleryPage() {
               </svg>
               <h3>No crafts found</h3>
               <p>Try adjusting your search keywords, clearing active filters, or exploring a different category.</p>
-              <button className="btn-reset-filters" onClick={() => { setActiveCategory(null); setSearch(''); }}>Clear All Filters</button>
+              {aiSearchActive ? (
+                <div className="gallery-empty-actions">
+                  {hasDetectedFilters && aiSearch.searchPlan ? (
+                    <button
+                      className="btn-reset-filters gallery-empty-secondary"
+                      onClick={() => aiSearch.updateSearchPlan({
+                        ...aiSearch.searchPlan!,
+                        filters: {
+                          category: null,
+                          shopId: null,
+                          minPrice: null,
+                          maxPrice: null,
+                          material: null,
+                          technique: null,
+                        },
+                      })}
+                    >
+                      Remove Detected Filters
+                    </button>
+                  ) : null}
+                  <button className="btn-reset-filters" onClick={clearSearch}>Clear Search</button>
+                </div>
+              ) : (
+                <button className="btn-reset-filters" onClick={() => { selectCategory(null); clearSearch(); }}>Clear All Filters</button>
+              )}
             </div>
           ) : (
             <div className="product-grid">
-              {products.map(p => (
+              {products.map(p => {
+                const rating = usingAiResults && p.ratingCount > 0
+                  ? { avg: p.ratingAvg, count: p.ratingCount }
+                  : productRatings[p.id];
+                const displayedPrice = usingAiResults
+                  ? (p as GallerySearchProduct).effectivePrice
+                  : (variantPrices[p.id] ?? p.price);
+                return (
                 <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
                     <img src={p.image} alt={p.name} />
@@ -510,12 +663,12 @@ export default function GalleryPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                       <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>
-                      {productRatings[p.id] && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.7rem', color: '#999' }}>
+                      {rating && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: '0.75rem', color: '#999' }}>
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                           </svg>
-                          {productRatings[p.id].avg.toFixed(1)} ({productRatings[p.id].count})
+                          {rating.avg.toFixed(1)} ({rating.count})
                         </span>
                       )}
                     </div>
@@ -523,17 +676,18 @@ export default function GalleryPage() {
                       <span className="product-card-shop">{p.shopName}</span>
                     </div>
                     <div className="product-card-footer">
-                      <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
+                      <div className="product-card-price">₱{displayedPrice.toLocaleString()}</div>
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           )}
           <Pagination
             page={page}
             totalPages={totalPages}
-            total={filteredProducts.length}
+            total={totalResults}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
           />
@@ -609,8 +763,8 @@ export default function GalleryPage() {
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label style={{ fontWeight: 600 }}>Sort By</label>
             <div className="sort-select-wrapper" style={{ width: '100%', maxWidth: 'none', background: '#f9f8f6' }}>
-              <select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort products">
-                <option value="recommended">{loggedIn ? 'For You' : 'Discover'}</option>
+              <select value={sort} onChange={e => changeSort(e.target.value)} aria-label="Sort products">
+                <option value="recommended">{aiSearchActive ? 'Relevance' : loggedIn ? 'For You' : 'Discover'}</option>
                 <option value="popularity">Popularity</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
@@ -626,7 +780,7 @@ export default function GalleryPage() {
             <div className="form-group" style={{ marginBottom: '30px' }}>
               <label style={{ fontWeight: 600 }}>Filters</label>
               <button
-                onClick={() => setShowFavorites(!showFavorites)}
+                 onClick={toggleFavoritesFilter}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', width: '100%',
                   border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
@@ -643,12 +797,12 @@ export default function GalleryPage() {
               <button
                 type="button"
                 onClick={resetRecommendations}
-                disabled={signals.length === 0 || resettingRecommendations}
+                disabled={!canResetRecommendations || resettingRecommendations}
                 style={{
                   marginTop: '10px', padding: '12px', width: '100%', border: '1.5px solid #E8E0D8',
                   borderRadius: '10px', background: '#fff', color: '#666', fontSize: '0.88rem', fontWeight: 600,
-                  cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
-                  opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1,
+                  cursor: !canResetRecommendations || resettingRecommendations ? 'default' : 'pointer',
+                  opacity: !canResetRecommendations || resettingRecommendations ? 0.5 : 1,
                 }}
               >
                 {resettingRecommendations ? 'Resetting...' : 'Reset recommendations'}
@@ -659,7 +813,7 @@ export default function GalleryPage() {
           <button onClick={() => setFilterModalOpen(false)} style={{
             width: '100%', background: 'var(--primary-color)', color: '#fff', 
             padding: '16px', borderRadius: '12px', fontWeight: 600, fontSize: '1rem', border: 'none'
-          }}>View {filteredProducts.length} Results</button>
+          }}>View {totalResults} Results</button>
         </div>
       </div>
     </div>

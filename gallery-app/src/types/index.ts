@@ -86,6 +86,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  design_request_id?: string;
   user_id?: string;
   user_name: string;
   user_phone?: string;
@@ -154,6 +155,26 @@ export interface CartItem {
   shopName: string;
   variationId?: string;
   variation?: string;
+}
+
+export type CartLineKey = string;
+
+export interface CartCheckoutDraft {
+  version: 1;
+  source: 'cart';
+  shopId: string;
+  lineKeys: CartLineKey[];
+  deliveryOption?: 'pickup' | 'courier';
+  destination?: {
+    address: string;
+    coordinates?: { lat: number; lng: number };
+  };
+  estimate?: {
+    quotationId?: string;
+    fee: number;
+    serviceType: string;
+    quotedAt: string;
+  };
 }
 
 export interface Conversation {

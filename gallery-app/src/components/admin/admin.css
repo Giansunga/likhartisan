@@ -1,0 +1,12 @@
+.admin-route-workspace {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.admin-route-workspace > * { min-height: 100%; }
+
+@media (max-width: 768px) {
+  .admin-main { height: calc(100dvh - 64px) !important; padding: 0 !important; }
+}

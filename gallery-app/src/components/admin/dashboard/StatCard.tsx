@@ -35,7 +35,7 @@ export default function StatCard({ label, value, icon, trend, trendUp = true, su
         }}>
           {icon}
         </div>
-        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#77716B', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#77716B', letterSpacing: '0.04em', textTransform: 'uppercase' as const }}>
           {label}
         </div>
       </div>
@@ -45,7 +45,7 @@ export default function StatCard({ label, value, icon, trend, trendUp = true, su
         </span>
         {trend && (
           <span style={{
-            fontSize: '0.72rem', fontWeight: 700,
+            fontSize: '0.75rem', fontWeight: 700,
             color: trendUp ? '#16A34A' : '#DC2626',
             background: trendUp ? '#F0FDF4' : '#FEF2F2',
             padding: '2px 7px', borderRadius: '999px',

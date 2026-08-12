@@ -45,7 +45,7 @@ export default function ChatOrderCard({ order }: { order: ChatOrder }) {
         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-dark)', fontFamily: 'var(--font-sans)' }}>
           Order #{order.shortId}
         </span>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: meta.color, background: meta.bg, padding: '3px 10px', borderRadius: '10px' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: meta.color, background: meta.bg, padding: '3px 10px', borderRadius: '10px' }}>
           {meta.label}
         </span>
       </div>
@@ -57,7 +57,7 @@ export default function ChatOrderCard({ order }: { order: ChatOrder }) {
           <span style={{ fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.85rem', lineHeight: 1.2 }}>
             {order.productName || 'Order Items'}
           </span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-light)' }}>{order.itemCount} item{order.itemCount !== 1 ? 's' : ''} · {fmtDate}</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{order.itemCount} item{order.itemCount !== 1 ? 's' : ''} · {fmtDate}</span>
           <span style={{ fontWeight: 700, color: 'var(--text-dark)', fontSize: '0.85rem', marginTop: '2px' }}>{fmtTotal}</span>
         </div>
       </div>

@@ -105,7 +105,7 @@ export default function LikhAIDock() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#fff', fontFamily: 'var(--font-serif)' }}>LikhAI</div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.75)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />
                   Online
                 </div>
@@ -289,10 +289,10 @@ export default function LikhAIDock() {
         }
         .likhai-dock-launcher-label {
           font-weight: 700;
-          font-size: 0.72rem;
+          font-size: .75rem;
         }
         .likhai-dock-launcher-sub {
-          font-size: 0.56rem;
+          font-size: .75rem;
           opacity: 0.8;
         }
 
@@ -394,7 +394,7 @@ export default function LikhAIDock() {
         }
 
         .likhai-dock-time {
-          font-size: 0.62rem;
+          font-size: .75rem;
           color: var(--text-light);
           padding: 0 2px;
         }

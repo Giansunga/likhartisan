@@ -3,7 +3,7 @@ import { useTheme, THEMES, type ThemeName } from '../../contexts/ThemeContext';
 const THEME_DESCRIPTIONS: Record<ThemeName, string> = {
   default: 'The classic LikhArtisan earthy tones',
   christmas: 'Festive reds and greens for the holiday season',
-  valentines: 'Romantic reds and pinks for love season',
+  valentines: 'Burgundy, blush, and candlelit pottery for love season',
 };
 
 export default function ThemeCustomizer() {
@@ -17,15 +17,6 @@ export default function ThemeCustomizer() {
 
   return (
     <div>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '4px' }}>
-          Theme Customizer
-        </h1>
-        <p style={{ fontSize: '0.9rem', color: '#929090' }}>
-          Customize the look and feel of the entire site for different occasions.
-        </p>
-      </div>
-
       {/* Auto-detect Toggle */}
       <div style={{
         background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px',
@@ -101,7 +92,7 @@ export default function ThemeCustomizer() {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-dark)' }}>{t.label}</div>
                     {name === 'default' && (
-                      <div style={{ fontSize: '0.72rem', color: '#929090', fontWeight: 500 }}>Current default</div>
+                      <div style={{ fontSize: '0.75rem', color: '#929090', fontWeight: 500 }}>Current default</div>
                     )}
                   </div>
                 </div>

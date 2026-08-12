@@ -93,7 +93,7 @@ export default function ShapeTab({
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.label}</label>
                 <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{val.toFixed(0)} cm</span>
               </div>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
               <input
                 type="range"
                 min={s.min}
