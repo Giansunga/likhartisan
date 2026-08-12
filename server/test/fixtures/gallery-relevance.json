@@ -1,0 +1,22 @@
+[
+  { "query": "terracotta vase below ₱2,000", "expectedCategory": "Vases", "maxPrice": 2000 },
+  { "query": "small handmade planter", "expectedCategory": "Planters" },
+  { "query": "traditional clay jar", "expectedCategory": "Jars" },
+  { "query": "decorative amphora for the living room", "expectedCategory": "Amphoras" },
+  { "query": "tea light vase gift", "expectedCategory": "Tea Light Vases" },
+  { "query": "affordable red vase", "expectedCategory": "Vases" },
+  { "query": "large planter under ₱3,000", "expectedCategory": "Planters", "maxPrice": 3000 },
+  { "query": "rustic jar between ₱1,000 and ₱2,500", "expectedCategory": "Jars", "minPrice": 1000, "maxPrice": 2500 },
+  { "query": "modern amphora", "expectedCategory": "Amphoras" },
+  { "query": "handcrafted candle holder vase", "expectedCategory": "Tea Light Vases" },
+  { "query": "plorera na terracotta below ₱2,000", "expectedCategory": "Vases", "maxPrice": 2000 },
+  { "query": "maliit na paso para sa halaman", "expectedCategory": "Planters" },
+  { "query": "tradisyonal na banga", "expectedCategory": "Jars" },
+  { "query": "amphora na pang-regalo", "expectedCategory": "Amphoras" },
+  { "query": "tea light vase na mura", "expectedCategory": "Tea Light Vases" },
+  { "query": "pulang plorera para sa bahay", "expectedCategory": "Vases" },
+  { "query": "paso na hindi lalampas sa ₱3,000", "expectedCategory": "Planters", "maxPrice": 3000 },
+  { "query": "banga mula ₱1,000 hanggang ₱2,500", "expectedCategory": "Jars", "minPrice": 1000, "maxPrice": 2500 },
+  { "query": "malaking amphora na handmade", "expectedCategory": "Amphoras" },
+  { "query": "regalong tea light vase", "expectedCategory": "Tea Light Vases" }
+]
