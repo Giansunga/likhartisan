@@ -12,6 +12,7 @@ import { initChatbotController } from './controllers/chatbotController.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
+import { createGallerySearchRouter } from './routes/gallerySearch.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -95,6 +96,14 @@ const proxyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const gallerySearchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  message: { error: 'Too many gallery searches, please wait a moment' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(helmet());
 // CORS: Allow dev origins (localhost) + production frontend (Vercel) + configured FRONTEND_URL
 const devOrigins = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
@@ -125,6 +134,10 @@ initChatbotController(supabase);
 
 // Chatbot routes
 app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
+
+// Authentication is optional here: guests can search, while a verified token
+// enables account-level recommendations and privacy-preserving analytics.
+app.use('/api/gallery', createGallerySearchRouter({ supabase, searchLimiter: gallerySearchLimiter }));
 
 // Lalamove routes
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
