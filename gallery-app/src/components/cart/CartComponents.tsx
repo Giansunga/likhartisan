@@ -284,7 +284,6 @@ export function EmptyCartState() {
       <div className="cart-empty__icon"><ShoppingBag size={42} aria-hidden="true" /></div>
       <span className="cart-empty__eyebrow">Your collection starts here</span>
       <h1 id="empty-cart-title">Your cart is waiting for something handmade.</h1>
-      <p>Explore one-of-a-kind pottery shaped by local artisans in Santo Tomas.</p>
       <Link to="/gallery" className="cart-empty__action">Explore the gallery</Link>
     </section>
   );
