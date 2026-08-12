@@ -69,21 +69,17 @@ export default function ProductCreatePage() {
   const [glbFile, setGlbFile] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
-    fetchShops();
-  }, []);
-
-  async function fetchShops() {
-    const { data } = await supabase
+    let active = true;
+    void supabase
       .from('shops')
       .select('id, name, email')
-      .order('name');
-
-    if (data) {
-      setShops(data);
-    }
-  }
+      .order('name')
+      .then(({ data }) => { if (active && data) setShops(data); });
+    return () => { active = false; };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -116,14 +112,10 @@ export default function ProductCreatePage() {
     setVariations(prev => prev.filter((_, i) => i !== index));
   }
 
-  async function uploadFile(file: File): Promise<string | null> {
-    try {
-      const folder = file.name.endsWith('.glb') || file.name.endsWith('.gltf') ? 'models' : 'products';
-      return await uploadToR2(file, folder);
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+  async function uploadFile(file: File): Promise<string> {
+    const normalizedName = file.name.toLowerCase();
+    const folder = normalizedName.endsWith('.glb') || normalizedName.endsWith('.gltf') ? 'models' : 'products';
+    return uploadToR2(file, folder);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,70 +124,64 @@ export default function ProductCreatePage() {
     if (!shop) return;
 
     setLoading(true);
+    setSubmitError('');
 
-    let imageUrl = '/placeholder.svg';
-    if (imageFile) {
-      const uploadedUrl = await uploadFile(imageFile);
-      if (uploadedUrl) imageUrl = uploadedUrl;
-    }
+    try {
+      const imageUrl = imageFile ? await uploadFile(imageFile) : '/placeholder.svg';
+      const model3dUrl = glbFile ? await uploadFile(glbFile) : null;
+      const totalStock = variations.reduce((s, v) => s + (Number(v.stock) || 0), 0);
 
-    let model3dUrl: string | null = null;
-    if (glbFile) {
-      model3dUrl = await uploadFile(glbFile);
-    }
+      const { data: productData, error } = await supabase
+        .from('products')
+        .insert({
+          name: form.name,
+          description: '',
+          category: form.category,
+          price: 0,
+          stock: totalStock,
+          image: imageUrl,
+          model3d: model3dUrl,
+          materials: form.materials,
+          dimensions: '',
+          height: '',
+          opening_diameter: '',
+          technique: form.technique || 'Handcrafted & Kiln-Fired',
+          shop_id: form.shopId,
+          shop_name: shop.name,
+          status: 'active',
+        })
+        .select('id')
+        .single();
 
-    const totalStock = variations.reduce((s, v) => s + (Number(v.stock) || 0), 0);
+      if (error) throw new Error(error.message || 'Could not save the product.');
 
-    const { data: productData, error } = await supabase
-      .from('products')
-      .insert({
-        name: form.name,
-        description: '',
-        category: form.category,
-        price: 0,
-        stock: totalStock,
-        image: imageUrl,
-        model3d: model3dUrl,
-        materials: form.materials,
-        dimensions: '',
-        height: '',
-        opening_diameter: '',
-        technique: form.technique || 'Handcrafted & Kiln-Fired',
-        shop_id: form.shopId,
-        shop_name: shop.name,
-        status: 'active',
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error saving product:', error);
-      setLoading(false);
-      return;
-    }
-
-    if (productData && variations.length > 0) {
-      const variationRows = variations
-        .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim())
-        .map((v, i) => ({
-          product_id: productData.id,
-          dimensions: v.dimensions.trim() || 'N/A',
-          height: v.height.trim() || 'N/A',
-          opening_diameter: v.openingDiameter.trim() || 'N/A',
-          price: v.price ? Number(v.price) : null,
-          stock: Number(v.stock) || 0,
-          sort_order: i,
-        }));
-      if (variationRows.length > 0) {
-        await supabase.from('product_variations').insert(variationRows);
-        // Recompute in case some variations were filtered out
-        await recomputeProductStock(productData.id);
+      if (productData && variations.length > 0) {
+        const variationRows = variations
+          .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim())
+          .map((v, i) => ({
+            product_id: productData.id,
+            dimensions: v.dimensions.trim() || 'N/A',
+            height: v.height.trim() || 'N/A',
+            opening_diameter: v.openingDiameter.trim() || 'N/A',
+            price: v.price ? Number(v.price) : null,
+            stock: Number(v.stock) || 0,
+            sort_order: i,
+          }));
+        if (variationRows.length > 0) {
+          const { error: variationError } = await supabase.from('product_variations').insert(variationRows);
+          if (variationError) throw new Error(variationError.message || 'Could not save product variations.');
+          await recomputeProductStock(productData.id);
+        }
       }
-    }
 
-    setLoading(false);
-    setSubmitted(true);
-    setTimeout(() => navigate('/admin/products'), 1500);
+      setSubmitted(true);
+      setTimeout(() => navigate('/admin/products'), 1500);
+    } catch (error) {
+      console.error('Product upload error:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Could not upload the product. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isValid = form.name && form.category && form.shopId;
@@ -229,7 +215,7 @@ export default function ProductCreatePage() {
               <div>
                 <label style={labelStyle}>Category</label>
                 <select name="category" value={form.category} onChange={handleChange} required
-                  style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' as any }}>
+                  style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }}>
                   <option value="">Select category</option>
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -247,7 +233,7 @@ export default function ProductCreatePage() {
               <div>
                 <label style={labelStyle}>Assign to Shop</label>
                 <select name="shopId" value={form.shopId} onChange={handleChange} required
-                  style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' as any }}>
+                  style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }}>
                   <option value="">Select artisan shop</option>
                   {shops.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -396,6 +382,11 @@ export default function ProductCreatePage() {
           </div>
 
           {/* Footer */}
+          {submitError && (
+            <div role="alert" style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '0.85rem' }}>
+              {submitError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
             <button type="button" onClick={() => navigate('/admin/products')} style={{
               padding: '11px 24px', border: '1.5px solid #D4C8BB', borderRadius: '10px',
