@@ -91,7 +91,7 @@ function ReturnDialog({ order, detail, onClose, onDone }: { order: PurchaseSumma
 }
 
 export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PRODUCTS, onRate }: Props) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const restored = parsePurchaseFilters(params);
@@ -104,7 +104,7 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
   const [confirm, setConfirm] = useState<{ order: PurchaseSummary; action: 'cancel' | 'receive' } | null>(null);
   const [returnOrder, setReturnOrder] = useState<PurchaseSummary | null>(null);
   const query = useMemo(() => { const next = new URLSearchParams(); next.set('status', status); next.set('sort', 'newest'); next.set('page', String(page)); if (submittedQ) next.set('q', submittedQ); return next.toString(); }, [page, status, submittedQ]);
-  const { data, loading, refreshing, error, reload } = usePurchases(user?.id, query);
+  const { data, loading, refreshing, error, reload } = usePurchases(user?.id, query, authLoading);
   function update(values: Record<string, string | null>) { const next = new URLSearchParams(params); next.set('tab', 'purchases'); Object.entries(values).forEach(([key, value]) => value ? next.set(key, value) : next.delete(key)); setParams(next); }
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(id);

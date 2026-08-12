@@ -5,7 +5,11 @@ async function getPurchaseAccessToken(forceRefresh = false) {
   const sessionResult = forceRefresh
     ? await supabase.auth.refreshSession()
     : await supabase.auth.getSession();
-  const token = sessionResult.data.session?.access_token;
+  let token = sessionResult.data.session?.access_token;
+  if (!token && !forceRefresh) {
+    const refreshResult = await supabase.auth.refreshSession();
+    token = refreshResult.data.session?.access_token;
+  }
   if (!token) throw new Error('Please sign in to view your purchases.');
   return token;
 }
