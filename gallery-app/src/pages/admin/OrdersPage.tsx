@@ -16,7 +16,9 @@ import {
 } from '../../components/admin/orders/OrderManagementUI';
 import { formatCurrency, matchesQueue } from '../../components/admin/orders/orderManagementUtils';
 import { exportToCsv } from '../../lib/csvExport';
+import { purchaseApi } from '../../lib/purchaseApi';
 import type { Order, OrderActivityLog } from '../../types';
+import type { ReturnRequest } from '../../types/purchases';
 import '../../components/admin/orders/orders.css';
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -76,6 +78,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [activityLogs, setActivityLogs] = useState<OrderActivityLog[]>([]);
+  const [returnRequest, setReturnRequest] = useState<ReturnRequest | null>(null);
   const [sellerNotes, setSellerNotes] = useState('');
   const [buyerNotes, setBuyerNotes] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -426,6 +429,24 @@ export default function OrdersPage() {
     })();
   }, [selectedOrder?.id]);
 
+  useEffect(() => {
+    if (!selectedOrder) { setReturnRequest(null); return; }
+    let active = true;
+    purchaseApi<{ returnRequest: ReturnRequest | null }>(`/admin/returns/order/${selectedOrder.id}`)
+      .then(result => { if (active) setReturnRequest(result.returnRequest); })
+      .catch(() => { if (active) setReturnRequest(null); });
+    return () => { active = false; };
+  }, [selectedOrder]);
+
+  async function updateReturn(status: ReturnRequest['status']) {
+    if (!returnRequest) return;
+    try {
+      const updated = await purchaseApi<ReturnRequest>(`/admin/returns/${returnRequest.id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setReturnRequest(updated);
+      showToast(`Return marked ${status.replaceAll('_', ' ')}`, 'success');
+    } catch (error) { showToast((error as Error).message, 'error'); }
+  }
+
   /* ── sync notes when selecting order ── */
   useEffect(() => {
     if (!selectedOrder) return;
@@ -674,6 +695,22 @@ export default function OrdersPage() {
                 {/* ── OVERVIEW TAB ── */}
                 {detailTab === 'overview' && (
                   <div className="orders-detail-summary-grid">
+
+                    {returnRequest && (
+                      <SectionCard title="Return Request" className="orders-detail-span-2">
+                        <InfoRow label="Status" value={returnRequest.status.replaceAll('_', ' ')} />
+                        <InfoRow label="Reason" value={returnRequest.reason.replaceAll('_', ' ')} />
+                        <InfoRow label="Requested resolution" value={returnRequest.requested_resolution} />
+                        <InfoRow label="Buyer description" value={returnRequest.description || '--'} />
+                        {returnRequest.order_return_evidence?.length ? <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>{returnRequest.order_return_evidence.map(evidence => evidence.signedUrl ? <a key={evidence.id} href={evidence.signedUrl} target="_blank" rel="noreferrer"><img src={evidence.signedUrl} alt="Return evidence" style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover' }} /></a> : null)}</div> : null}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+                          {returnRequest.status === 'submitted' ? <button className="orders-secondary-action" onClick={() => void updateReturn('under_review')}>Start review</button> : null}
+                          {['submitted', 'under_review'].includes(returnRequest.status) ? <><button className="orders-secondary-action" onClick={() => void updateReturn('approved')}>Approve</button><button className="orders-secondary-action" onClick={() => void updateReturn('rejected')}>Reject</button></> : null}
+                          {returnRequest.status === 'approved' && returnRequest.requested_resolution === 'refund' ? <button className="orders-secondary-action" onClick={() => void updateReturn('refunded')}>Mark refund complete</button> : null}
+                          {['approved', 'rejected', 'refunded'].includes(returnRequest.status) ? <button className="orders-secondary-action" onClick={() => void updateReturn('closed')}>Close request</button> : null}
+                        </div>
+                      </SectionCard>
+                    )}
 
                     {/* customer info */}
                     <SectionCard title="Customer Information">

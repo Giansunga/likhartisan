@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { displayVariation } from '../lib/utils';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { API_BASE } from '../lib/api';
 import AccountPanel from '../components/account/AccountPanel';
+import PurchasePanel from '../components/purchases/PurchasePanel';
+import type { PurchaseSummary } from '../types/purchases';
 
 interface OrderItem {
   productId: string;
@@ -29,25 +29,6 @@ interface DashboardOrder {
   checkoutSessionId?: string;
   deliveryStatus: string;
 }
-
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  'to-pay': { label: 'To Pay', color: '#C1570D', bg: '#FFF3E0' },
-  'to-ship': { label: 'To Ship', color: '#823E0B', bg: '#FFF3E0' },
-  'to-receive': { label: 'To Receive', color: '#C1570D', bg: '#FFF3E0' },
-  'completed': { label: 'Completed', color: '#C1570D', bg: '#FFF3E0' },
-  'return-refund': { label: 'Return Refund', color: '#C1570D', bg: '#FFF3E0' },
-  'cancelled': { label: 'Cancelled', color: '#DC2626', bg: '#FEF2F2' },
-};
-
-const ORDER_TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'to-pay', label: 'To Pay' },
-  { key: 'to-ship', label: 'To Ship' },
-  { key: 'to-receive', label: 'To Receive' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'return-refund', label: 'Return Refund' },
-  { key: 'cancelled', label: 'Cancelled' },
-];
 
 const SIDEBAR_ITEMS = [
   {
@@ -84,17 +65,12 @@ const SIDEBAR_ITEMS = [
 
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [activePanel, setActivePanel] = useState<string>(() => {
     const tab = searchParams.get('tab');
     return tab === 'purchases' || tab === 'notifications' || tab === 'account' ? tab : 'account';
   });
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [orders, setOrders] = useState<DashboardOrder[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
-  const [confirmOrderId, setConfirmOrderId] = useState<string | null>(null);
   const [rateOrder, setRateOrder] = useState<DashboardOrder | null>(null);
   const [rateItemIndex, setRateItemIndex] = useState(0);
   const [rateForm, setRateForm] = useState({ rating: 0, body: '', showName: true, sellerService: 0 });
@@ -106,204 +82,36 @@ export default function DashboardPage() {
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [deleteReviewId, setDeleteReviewId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [userReviews, setUserReviews] = useState<Record<string, any>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
   const rateFileInputRef = useRef<HTMLInputElement>(null);
-  const orderCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { user } = useAuth();
 
-  // Map raw Supabase order to DashboardOrder format (for realtime updates)
-  const mapOrderToDashboard = (o: any): DashboardOrder => {
-    const paymentStatus = o.status || 'pending';
-    const deliveryStatus = o.delivery_status || 'pending';
-    let status: DashboardOrder['status'] = 'to-ship';
-    if (o.status === 'completed' || deliveryStatus === 'completed') {
-      status = 'completed';
-    } else if (o.status === 'cancelled') {
-      status = 'cancelled';
-    } else if (paymentStatus === 'refunded') {
-      status = 'return-refund';
-    } else if (paymentStatus === 'pending') {
-      status = 'to-pay';
-    } else if (deliveryStatus === 'delivered') {
-      status = 'to-receive';
-    } else {
-      status = 'to-ship';
-    }
-
-    const items: OrderItem[] = (o.items || []).map((i: any) => ({
-      productId: i.product_id || i.productId || '',
-      productName: i.product_name || i.productName || '',
-      image: i.image || '',
-      qty: i.qty || 1,
-      price: i.price || 0,
-      shop_name: i.shop_name || o.user_name || 'LikhArtisan Shop',
-      dimensions: i.dimensions || '',
-      variation: i.variation || '',
-    }));
-
-    const shop = items[0]?.shop_name || 'LikhArtisan Shop';
-
-    return {
-      id: o.id,
-      items,
-      total: o.total,
-      status,
-      shop,
-      date: o.created_at,
-      checkoutSessionId: o.checkout_session_id || undefined,
-      deliveryStatus,
-    };
-  };
-
   useEffect(() => {
-    loadOrders();
     loadUserReviews();
     loadNotifications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Realtime: listen for order updates (buyer sees their own orders)
   useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel(`buyer-orders:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
-        (payload) => setOrders(prev => [mapOrderToDashboard(payload.new), ...prev])
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
-        (payload) => setOrders(prev => prev.map(o => o.id === payload.new.id ? mapOrderToDashboard(payload.new) : o))
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-      }, [user, mapOrderToDashboard]);
-
-      useEffect(() => {
-        const tab = searchParams.get('tab');
-    const status = searchParams.get('status');
-    const orderId = searchParams.get('order');
-    if (tab === 'purchases') {
-      setActivePanel('purchases');
-      if (status && ORDER_TABS.some(t => t.key === status)) {
-        setActiveTab(status);
-      } else if (orderId) {
-        // Deep-link from chat "View Order": show all orders so the order is visible.
-        setActiveTab('all');
-      }
-      // Deep-link from chat "View Order": auto-expand the specific order.
-      if (orderId) setExpandedOrderId(orderId);
-    } else if (tab === 'notifications') setActivePanel('notifications');
+    const tab = searchParams.get('tab');
+    if (tab === 'purchases') setActivePanel('purchases');
+    else if (tab === 'notifications') setActivePanel('notifications');
     else if (tab === 'account') setActivePanel('account');
   }, [searchParams]);
 
-  // Handle deep-link from navbar notification click (when already on purchases page)
   useEffect(() => {
-    function handleDeepLink(e: Event) {
-      const { orderId } = (e as CustomEvent).detail;
-      if (orderId) {
-        setActivePanel('purchases');
-        setActiveTab('all');
-        setExpandedOrderId(orderId);
-      }
+    function handleDeepLink(event: Event) {
+      const { orderId } = (event as CustomEvent).detail;
+      if (orderId) setSearchParams({ tab: 'purchases', order: orderId });
     }
     window.addEventListener('deep-link-order', handleDeepLink);
     return () => window.removeEventListener('deep-link-order', handleDeepLink);
-  }, []);
+  }, [setSearchParams]);
 
-  // Reset scroll to top on in-page panel switches so a shorter panel
-  // doesn't leave the viewport clamped on the footer (matches Layout's
-  // scroll-to-top on route change). Skipped for the order deep-link,
-  // which intentionally scrolls to the expanded card instead.
   useEffect(() => {
     if (!searchParams.get('order')) window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activePanel]);
-
-  // Once orders have loaded and we have a deep-linked order ID, scroll to it.
-  useEffect(() => {
-    const orderId = searchParams.get('order');
-    if (!orderId || orders.length === 0) return;
-    // Give the DOM a tick to render the expanded card, then scroll to it.
-    const timer = setTimeout(() => {
-      const el = orderCardRefs.current[orderId];
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 150);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, expandedOrderId]);
-
-  async function loadOrders() {
-    if (!user) { setLoadingOrders(false); return; }
-
-    try {
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!data) return;
-
-      const mapped: DashboardOrder[] = data.map((o: any) => {
-      const paymentStatus = o.status || 'pending';
-      const deliveryStatus = o.delivery_status || 'pending';
-      let status: DashboardOrder['status'] = 'to-ship';
-      if (o.status === 'completed' || deliveryStatus === 'completed') {
-        status = 'completed';
-      } else if (o.status === 'cancelled') {
-        status = 'cancelled';
-      } else if (paymentStatus === 'refunded') {
-        status = 'return-refund';
-      } else if (paymentStatus === 'pending') {
-        status = 'to-pay';
-      } else if (deliveryStatus === 'delivered') {
-        status = 'to-receive';
-      } else if (paymentStatus === 'paid' || paymentStatus === 'to-ship') {
-        status = 'to-ship';
-      } else {
-        status = 'to-ship';
-      }
-
-      const items: OrderItem[] = (o.items || []).map((i: any) => ({
-        productId: i.product_id || i.productId || '',
-        productName: i.product_name || i.productName || '',
-        image: i.image || '',
-        qty: i.qty || 1,
-        price: i.price || 0,
-        shop_name: i.shop_name || o.user_name || 'LikhArtisan Shop',
-        dimensions: i.dimensions || '',
-        variation: i.variation || '',
-      }));
-
-      const shop = items[0]?.shop_name || 'LikhArtisan Shop';
-
-      return {
-        id: o.id,
-        items,
-        total: o.total,
-        status,
-        shop,
-        date: o.created_at,
-        checkoutSessionId: o.checkout_session_id || undefined,
-        deliveryStatus: deliveryStatus,
-      };
-    });
-
-    setOrders(mapped);
-    } catch (e) {
-      console.error('Load orders error:', e);
-    } finally {
-      setLoadingOrders(false);
-    }
-  }
+  }, [activePanel, searchParams]);
 
   async function loadUserReviews() {
     try {
@@ -474,62 +282,6 @@ export default function DashboardPage() {
     setDeleteReviewId(null);
   }
 
-  async function markAsReceived(orderId: string) {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: 'completed', delivery_status: 'completed' })
-      .eq('id', orderId);
-    if (error) { toast.error('Failed to update: ' + error.message); return; }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'completed' as const } : o));
-  }
-
-  async function handlePayNow(order: DashboardOrder) {
-    if (!order.checkoutSessionId) {
-      toast.error('No payment session found for this order. Please contact support.');
-      return;
-    }
-
-    try {
-      // Always redirect to PayMongo checkout — never auto-confirm here.
-      // Confirmation only happens via the webhook / return-URL flow.
-      const res = await fetch(`${API_BASE}/api/session/${order.checkoutSessionId}`);
-      if (res.ok) {
-        const sessionData = await res.json();
-        // If the session is already paid, just refresh orders
-        if (sessionData.status === 'paid') {
-          toast.info('This order has already been paid. Refreshing your orders.');
-          loadOrders();
-          return;
-        }
-        if (sessionData.checkout_url) {
-          localStorage.setItem('likhartisan_checkout_session_id', order.checkoutSessionId);
-          window.location.href = sessionData.checkout_url;
-          return;
-        }
-      }
-      toast.info('Payment session has expired. Please place a new order.');
-    } catch (err) {
-      console.error('Pay Now error:', err);
-      toast.error('Something went wrong. Please try again.');
-    }
-  }
-
-  async function handleCancelOrder(orderId: string) {
-    if (!confirm('Are you sure you want to cancel this order?')) return;
-    try {
-      const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
-      if (error) throw error;
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
-    } catch (err) {
-      console.error('Cancel order error:', err);
-      toast.error('Failed to cancel order. Please try again.');
-    }
-  }
-
-  const filteredOrders =
-    activeTab === 'all'
-      ? orders
-      : orders.filter(o => o.status === activeTab);
   const unreadNotificationCount = notifications.filter(n => !n.read).length;
   const accountSummaryName = String(user?.user_metadata?.name || 'Customer Name');
   const accountSummaryImage = String(user?.user_metadata?.avatar_url || '');
@@ -594,26 +346,6 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </button>
-                    {item.key === 'purchases' && activePanel === 'purchases' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', margin: '2px 0 8px 32px' }}>
-                        {ORDER_TABS.filter(tab => tab.key !== 'all').map(tab => (
-                          <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              textAlign: 'left',
-                              padding: '5px 0',
-                              color: activeTab === tab.key ? 'var(--accent-color)' : '#666',
-                              fontSize: '0.78rem',
-                              fontWeight: activeTab === tab.key ? 600 : 500,
-                              fontFamily: 'var(--font-sans)',
-                              cursor: 'pointer',
-                            }}>
-                            {tab.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </nav>
@@ -685,23 +417,10 @@ export default function DashboardPage() {
                         const days = Math.floor(hrs / 24);
                         return `${days}d ago`;
                       })();
-                      const typeConfig: Record<string, { bg: string; color: string; label: string; status: string }> = {
-                        preparing: { bg: '#E3F2FD', color: '#1565C0', label: 'P', status: 'to-ship' },
-                        shipped: { bg: '#F3E5F5', color: '#6A1B9A', label: 'S', status: 'to-receive' },
-                        delivered: { bg: '#E8F5E9', color: '#2E7D32', label: 'D', status: 'to-receive' },
-                        completed: { bg: '#FFF3E0', color: '#C1570D', label: 'C', status: 'completed' },
-                        refund: { bg: '#FFEBEE', color: '#D32F2F', label: 'R', status: 'return-refund' },
-                        payment: { bg: '#FFF9C4', color: '#F57F17', label: 'Pay', status: 'to-pay' },
-                        message: { bg: '#F5F5F5', color: '#616161', label: 'M', status: 'all' },
-                      };
-                      const tc = typeConfig[n.type] || { bg: '#F5F5F5', color: '#666', label: 'N', status: 'all' };
                       const handleNotificationClick = () => {
                         markNotificationRead(n.id);
-                        const status = tc.status;
                         setActivePanel('purchases');
-                        if (status !== 'all') setActiveTab(status);
                         if (n.order_id) {
-                          setExpandedOrderId(n.order_id);
                           setSearchParams({ tab: 'purchases', order: n.order_id });
                         } else {
                           setSearchParams({ tab: 'purchases' });
@@ -756,331 +475,28 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="purchase-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                {/* Mobile-only status tabs (sidebar hidden on mobile) */}
-                {isMobile && (
-                  <div style={{
-                    display: 'flex', overflowX: 'auto', gap: '8px', minWidth: 0, padding: '4px 0 14px', marginBottom: '4px',
-                    scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
-                  }}>
-                    {ORDER_TABS.map(tab => {
-                      const isActive = activeTab === tab.key;
-                      return (
-                        <button key={tab.key} onClick={() => setSearchParams({ tab: 'purchases', status: tab.key })}
-                          style={{
-                            flexShrink: 0, padding: '10px 16px', borderRadius: '24px', fontSize: '0.82rem',
-                            fontWeight: isActive ? 600 : 500, fontFamily: 'var(--font-sans)',
-                            border: `1.5px solid ${isActive ? 'var(--accent-color)' : '#E8E0D8'}`,
-                            background: isActive ? 'var(--accent-color)' : '#fff',
-                            color: isActive ? '#fff' : '#666',
-                            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-                          }}>
-                          {tab.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {/* Orders */}
-                <div className="purchase-orders-list">
-                  {loadingOrders ? (
-                    /* Order skeleton cards */
-                    [1, 2, 3].map(i => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', border: '1px solid #EDE8E2', borderRadius: '12px', background: '#fff' }}>
-                        <div className="shimmer-skeleton" style={{ width: '64px', height: '64px', borderRadius: '10px', flexShrink: 0 }} />
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div className="shimmer-skeleton" style={{ height: '14px', width: '60%', borderRadius: '4px' }} />
-                          <div className="shimmer-skeleton" style={{ height: '12px', width: '40%', borderRadius: '4px' }} />
-                        </div>
-                        <div className="shimmer-skeleton" style={{ height: '26px', width: '90px', borderRadius: '8px' }} />
-                      </div>
-                    ))
-                  ) : filteredOrders.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '64px 20px' }}>
-                      <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.3" style={{ width: 38, height: 38, opacity: 0.6 }}>
-                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                          <path d="M3.3 7 12 12l8.7-5M12 22V12" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                      <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '6px' }}>No orders yet</h3>
-                      <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '20px' }}>When you buy crafts, they'll show up here.</p>
-                      <Link to="/gallery" style={{ display: 'inline-block', padding: '10px 22px', borderRadius: '8px', background: 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.85rem', textDecoration: 'none' }}>Browse Products</Link>
-                    </div>
-                  ) : (
-                    filteredOrders.map(order => {
-                      const s = STATUS_LABELS[order.status] || { label: order.status, color: '#888', bg: '#f5f5f5' };
-                      const isExpanded = expandedOrderId === order.id;
-                      const orderDate = new Date(order.date);
-                      const shortId = order.id.replace(/-/g, '').slice(0, 8).toUpperCase();
-                      const placedDate = orderDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
-                      const isToPay = order.status === 'to-pay';
-                      const isToShip = order.status === 'to-ship';
-                      const isToReceive = order.status === 'to-receive';
-                      const isCompleted = order.status === 'completed';
-                      const isReturn = order.status === 'return-refund';
-                      const isCancelled = order.status === 'cancelled';
-
-                      const placedTime = orderDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                      const placedDateTime = `${placedDate} \u2022 ${placedTime}`;
-                      const ds = order.deliveryStatus;
-                      const isPreparing = ds === 'preparing';
-                      const isShipped = ds === 'shipped';
-                      const isDelivered = ds === 'delivered';
-
-                      const statusHeadline = isCancelled
-                        ? 'Order Cancelled'
-                        : isToPay
-                        ? 'Awaiting Payment'
-                        : isToShip
-                        ? isPreparing
-                          ? 'Your Order Is Being Prepared'
-                          : 'Your Order Has Been Confirmed'
-                        : isToReceive
-                        ? 'Your Order Has Been Shipped'
-                        : isCompleted
-                        ? 'Order Completed'
-                        : isReturn
-                        ? 'Return / Refund in Progress'
-                        : s.label;
-
-                      const timelineSteps = isCancelled ? [
-                        { title: 'Order Placed', desc: 'Your order has been successfully placed.', date: placedDateTime, done: true },
-                        { title: 'Order Cancelled', desc: 'This order has been cancelled.', date: placedDateTime, done: true, active: true },
-                      ] : [
-                        { title: 'Order Placed', desc: 'Your order has been successfully placed.', date: placedDateTime, done: true },
-                        { title: 'Payment Verified', desc: 'Payment has been successfully confirmed.', date: !isToPay ? placedDateTime : '', done: !isToPay },
-                        { title: 'Seller Confirmed Order', desc: 'The seller has accepted your order.', date: isPreparing || isShipped || isDelivered || isCompleted ? placedDateTime : '', done: isPreparing || isShipped || isDelivered || isCompleted },
-                        { title: 'Seller is Preparing Your Order', desc: 'Your pottery is currently being prepared.', date: isShipped || isDelivered || isCompleted ? placedDateTime : '', done: isShipped || isDelivered || isCompleted },
-                        { title: 'Product Handed to Courier', desc: 'Your package has been handed over to the courier.', date: isToReceive || isCompleted ? placedDateTime : '', done: isToReceive || isCompleted },
-                        { title: 'In Transit', desc: isToReceive ? 'Your package is currently on the way.' : 'Expected delivery in 3\u20135 days.', date: isToReceive || isCompleted ? placedDateTime : '', done: isToReceive || isCompleted, active: isToReceive },
-                        { title: 'Delivered', desc: isCompleted ? 'Package has been delivered.' : 'Waiting for delivery confirmation.', date: isCompleted ? placedDateTime : '', done: isCompleted },
-                        { title: 'Order Completed', desc: isCompleted ? 'Thank you for your purchase!' : 'Waiting for buyer confirmation.', date: '', done: isCompleted },
-                      ];
-
-                      return (
-                          <div
-                            className="order-card"
-                            key={order.id}
-                            ref={el => { orderCardRefs.current[order.id] = el; }}
-                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                            style={{ cursor: 'pointer', marginBottom: '16px', scrollMarginTop: '100px' }}
-                          >
-                          {/* ── Header ── */}
-                          <div className="order-card-header" style={{ marginBottom: isExpanded ? '8px' : undefined }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="1.8" style={{ width: 16, height: 16, flexShrink: 0 }}>
-                                  <path d="M4 10h16l-1 10H5L4 10z" />
-                                  <path d="M8 10V7a4 4 0 018 0v3" />
-                                </svg>
-                                <span className="order-shop-name">{order.shop}</span>
-                                {isMobile && (
-                                  <span style={{ padding: '3px 10px', borderRadius: '999px', background: s.bg, color: s.color, fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)', flexShrink: 0 }}>
-                                    {s.label}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)', paddingLeft: '24px' }}>
-                                Order #{shortId}
-                                <span style={{ margin: '0 6px', color: '#ccc' }}>|</span>
-                                Placed on {placedDate}
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', alignSelf: isMobile ? 'flex-start' : 'center' }}>
-                              {!isMobile && (
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: s.color, letterSpacing: '0.5px', textTransform: 'uppercase', fontFamily: 'var(--font-sans)' }}>
-                                  {s.label}
-                                </span>
-                              )}
-                              <div
-                                style={{
-                                  width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                  transition: 'transform 0.25s ease',
-                                }}
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* ── Product Items ── */}
-                          {order.items.map((item, idx) => (
-                            <div className="order-product-row" key={idx}>
-                              <img src={item.image} alt={item.productName} className="order-product-img" />
-                              <div className="order-product-info">
-                                <h5 style={{ fontFamily: 'var(--font-sans)' }}>{item.productName}</h5>
-                                {(item.dimensions || item.variation) && <p style={{ fontFamily: 'var(--font-sans)', color: '#888', fontSize: '0.78rem' }}>{displayVariation(item.dimensions || item.variation || '')}</p>}
-                                <p style={{ fontFamily: 'var(--font-sans)', color: '#888', fontSize: '0.78rem' }}>Qty: {item.qty}</p>
-                              </div>
-                              <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#C1570D', flexShrink: 0, fontFamily: 'var(--font-sans)', textAlign: 'right' }}>
-                                {'\u20B1'}{(item.price * item.qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* ── Footer: Total + Actions ── */}
-                          <div className="order-card-footer">
-                            <div style={{ flex: 1 }}>
-                              <div className="order-total" style={{ fontFamily: 'var(--font-sans)', textAlign: 'right', marginBottom: '10px' }}>
-                                Order Total: <span style={{ color: '#C1570D', fontWeight: 700, fontSize: '1.05rem' }}>{'\u20B1'}{order.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="order-actions">
-                                <button className="order-action-btn order-contact-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Contact Seller</button>
-                                {isToPay && (
-                                  <>
-                                    <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handlePayNow(order); }}>Pay Now</button>
-                                    <button className="order-action-btn" style={{ color: '#DC2626', borderColor: '#FECACA' }} onClick={e => { e.stopPropagation(); handleCancelOrder(order.id); }}>Cancel</button>
-                                  </>
-                                )}
-                                {isToReceive && (
-                                  <button className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setConfirmOrderId(order.id); }}>Order Received</button>
-                                )}
-                                {isToReceive && (
-                                  <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/chat'); }}>Return/Refund</button>
-                                )}
-                                {isCompleted && order.items.map((item, idx) => {
-                                  const hasReview = userReviews[item.productId];
-                                  return hasReview ? (
-                                    <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); handleEditReview(order, idx); }}>Edit Review</button>
-                                  ) : (
-                                    <button key={idx} className="order-action-btn order-action-btn--filled" onClick={e => { e.stopPropagation(); setRateOrder(order); setRateItemIndex(idx); setRateSubmitted(false); }}>Rate</button>
-                                  );
-                                })}
-                                {isCompleted && (
-                                  <button className="order-action-btn" onClick={e => { e.stopPropagation(); navigate('/gallery'); }}>Buy Again</button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* ── Expanded Tracking Section ── */}
-                          <div style={{
-                            maxHeight: isExpanded ? '900px' : '0',
-                            opacity: isExpanded ? 1 : 0,
-                            overflow: 'hidden',
-                            transition: 'max-height 0.4s ease, opacity 0.3s ease',
-                          }}>
-                            <div style={{ borderTop: '1px solid #E8E0D8', marginTop: '14px', paddingTop: '20px' }} onClick={e => e.stopPropagation()}>
-
-                              {/* ── Horizontal Stepper (hidden on mobile) ── */}
-                              {!isMobile && (
-                              <div style={{ position: 'relative', marginBottom: '20px', padding: '0 8px' }}>
-                                {/* Background track */}
-                                <div style={{ position: 'absolute', top: '14px', left: '8px', right: '8px', height: '3px', background: '#E8E0D8', borderRadius: '2px', zIndex: 0 }} />
-                                {/* Filled progress track */}
-                                {(() => {
-                                  const doneCount = timelineSteps.filter(s => s.done).length;
-                                  const pct = timelineSteps.length > 1
-                                    ? Math.max(0, ((doneCount - 1) / (timelineSteps.length - 1)) * 100)
-                                    : 0;
-                                  return (
-                                    <div style={{ position: 'absolute', top: '14px', left: '8px', height: '3px', background: '#C1570D', borderRadius: '2px', zIndex: 0, width: `${pct}%`, transition: 'width 0.5s ease' }} />
-                                  );
-                                })()}
-
-                                {/* Step nodes */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
-                                  {timelineSteps.map((step, i) => {
-                                    const isActive = step.done && (i === timelineSteps.length - 1 || !timelineSteps[i + 1]?.done);
-                                    return (
-                                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 }}>
-                                        {/* Node */}
-                                        <div style={{
-                                          width: '28px', height: '28px', borderRadius: '50%',
-                                          background: step.done ? '#C1570D' : '#fff',
-                                          border: step.done ? 'none' : '2px solid #D1D5DB',
-                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                          flexShrink: 0,
-                                          boxShadow: isActive ? '0 0 0 4px rgba(193,87,13,0.18)' : step.done ? '0 1px 4px rgba(193,87,13,0.25)' : 'none',
-                                          transition: 'all 0.2s',
-                                        }}>
-                                          {step.done
-                                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            : <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#D1D5DB' }} />
-                                          }
-                                        </div>
-                                        {/* Label */}
-                                        <span style={{
-                                          fontSize: '0.75rem', textAlign: 'center', lineHeight: 1.2, maxWidth: '52px',
-                                          color: step.done ? '#C1570D' : '#B0B0B0',
-                                          fontWeight: step.done ? 600 : 400,
-                                          fontFamily: 'var(--font-sans)',
-                                        }}>
-                                          {step.title}
-                                        </span>
-                                      </div>
-                                    );
-                                   })}
-                                 </div>
-                               </div>
-                              )}
-
-                               {/* ── Current Status Pill ── */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', padding: '10px 14px', background: '#FFF7F0', border: '1px solid #F5D9C0', borderRadius: '10px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="#C1570D" strokeWidth="2" style={{ width: 16, height: 16, flexShrink: 0 }}>
-                                  <rect x="2" y="7" width="15" height="13" rx="2"/><path d="M17 11h3l2 2v5h-5v-7z"/><circle cx="6.5" cy="20" r="1.5"/><circle cx="19" cy="20" r="1.5"/>
-                                </svg>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#C1570D', fontFamily: 'var(--font-sans)', flex: 1 }}>{statusHeadline}</span>
-                                <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>{placedDate}</span>
-                              </div>
-
-
-                              {/* ── Compact Step Log (completed steps only) ── */}
-
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                                {timelineSteps.filter(s => s.done).map((step, i, arr) => (
-                                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px dashed #EDE8E2' : 'none' }}>
-                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#C1570D', flexShrink: 0, marginTop: '5px' }} />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#222', fontFamily: 'var(--font-sans)' }}>{step.title}</span>
-                                      <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)', marginLeft: '6px' }}>{step.desc}</span>
-                                    </div>
-                                    {step.date && (
-                                      <span style={{ fontSize: '0.75rem', color: '#bbb', fontFamily: 'var(--font-sans)', flexShrink: 0, whiteSpace: 'nowrap' }}>{step.date}</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              <PurchasePanel
+                reviewedProductIds={new Set(Object.keys(userReviews))}
+                onRate={(purchase: PurchaseSummary, itemIndex, editing) => {
+                  const legacy: DashboardOrder = {
+                    id: purchase.id,
+                    items: purchase.items.map(item => ({ productId: item.productId, productName: item.productName, image: item.image, qty: item.quantity, price: item.price, shop_name: item.shopName, dimensions: item.dimensions, variation: item.variation })),
+                    total: purchase.total,
+                    status: purchase.status,
+                    shop: purchase.shops.length > 1 ? 'Multiple shops' : purchase.shops[0]?.name || 'LikhArtisan Shop',
+                    date: purchase.createdAt,
+                    checkoutSessionId: purchase.checkoutSessionId,
+                    deliveryStatus: purchase.deliveryStatus,
+                  };
+                  if (editing) handleEditReview(legacy, itemIndex);
+                  else { setRateOrder(legacy); setRateItemIndex(itemIndex); setRateSubmitted(false); }
+                }}
+              />
             )}
           </div>
         </div>
       </div>
 
-
-      {confirmOrderId && (
-
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }} onClick={() => setConfirmOrderId(null)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '32px 36px', maxWidth: '480px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
-            <p style={{ fontSize: '0.95rem', color: '#333', lineHeight: 1.7, marginBottom: '24px' }}>
-              Check that you received all items in satisfactory condition before confirming receipt. Once you confirm, the order is completed and we will release the payment to seller.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button onClick={() => setConfirmOrderId(null)}
-                style={{ padding: '10px 24px', border: '1.5px solid #ccc', borderRadius: '8px', background: '#fff', color: '#666', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', letterSpacing: '0.5px' }}>
-                NOT NOW
-              </button>
-              <button onClick={() => { markAsReceived(confirmOrderId); setConfirmOrderId(null); }}
-                style={{ padding: '10px 24px', border: 'none', borderRadius: '8px', background: '#C1570D', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', letterSpacing: '0.5px' }}>
-                CONFIRM
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Review Confirmation */}
       {deleteReviewId && (

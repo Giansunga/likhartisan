@@ -13,6 +13,7 @@ import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
 import { createGallerySearchRouter } from './routes/gallerySearch.js';
+import { createPurchasesRouter } from './routes/purchases.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -138,6 +139,9 @@ app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);
 // Authentication is optional here: guests can search, while a verified token
 // enables account-level recommendations and privacy-preserving analytics.
 app.use('/api/gallery', createGallerySearchRouter({ supabase, searchLimiter: gallerySearchLimiter }));
+
+// Buyer purchase center (JWT-derived identity; no body-supplied user IDs).
+app.use('/api/orders', createPurchasesRouter({ supabase, verifyAuth, requireSuperAdmin }));
 
 // Lalamove routes
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
