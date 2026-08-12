@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { displayVariation } from '../lib/utils';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { API_BASE } from '../lib/api';
+import AccountPanel from '../components/account/AccountPanel';
 
 interface OrderItem {
   productId: string;
@@ -90,29 +91,9 @@ export default function DashboardPage() {
     return tab === 'purchases' || tab === 'notifications' || tab === 'account' ? tab : 'account';
   });
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [username, setUsername] = useState('Customer Name');
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
-  const [saved, setSaved] = useState(false);
-  const [profileImage, setProfileImage] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [showEmail, setShowEmail] = useState(false);
-  const [showPhone, setShowPhone] = useState(false);
-  const [editingAddress, setEditingAddress] = useState(false);
-  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordLoading, setPasswordLoading] = useState(false);
   const [confirmOrderId, setConfirmOrderId] = useState<string | null>(null);
   const [rateOrder, setRateOrder] = useState<DashboardOrder | null>(null);
   const [rateItemIndex, setRateItemIndex] = useState(0);
@@ -177,11 +158,6 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    return () => { if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current); };
-  }, []);
-
-  useEffect(() => {
-    loadProfile();
     loadOrders();
     loadUserReviews();
     loadNotifications();
@@ -263,106 +239,6 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, expandedOrderId]);
-
-  async function loadProfile() {
-    if (!user) return;
-
-    const meta = user.user_metadata || {};
-    const fullName = meta.name || '';
-    const userEmail = user.email || '';
-    const userPhone = meta.phone || '';
-    const userAddress = meta.address || '';
-    const userImage = meta.avatar_url || '';
-
-    const parts = fullName.split(' ');
-    setFirstName(parts[0] || '');
-    setLastName(parts.slice(1).join(' ') || '');
-    setEmail(userEmail);
-    setPhone(userPhone);
-    setAddress(userAddress);
-    setUsername(fullName || 'Customer Name');
-    setProfileImage(userImage);
-  }
-
-  async function saveProfile() {
-    if (!user) return;
-
-    const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'Customer Name';
-
-    const { error } = await supabase.auth.updateUser({
-      data: { name: fullName, phone, address, avatar_url: profileImage },
-    });
-
-    if (error) { toast.error('Failed to save: ' + error.message); return; }
-
-    setUsername(fullName);
-    setSaved(true);
-    setEditingAddress(false);
-    if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
-    savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000);
-  }
-
-  async function handleChangePassword() {
-    setPasswordError('');
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError('All fields are required');
-      return;
-    }
-    if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
-    setPasswordLoading(true);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email!,
-        password: currentPassword,
-      });
-      if (signInError) {
-        setPasswordError('Current password is incorrect');
-        return;
-      }
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      setShowPasswordModal(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      toast.success('Password updated successfully');
-    } catch (err: any) {
-      setPasswordError(err.message || 'Failed to update password');
-    } finally {
-      setPasswordLoading(false);
-    }
-  }
-
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
-
-    setUploading(true);
-    try {
-      if (!user) return;
-      const ext = file.name.split('.').pop();
-      const path = `avatars/${user.id}.${ext}`;
-      const { error } = await supabase.storage.from('products').upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from('products').getPublicUrl(path);
-      const imageUrl = urlData.publicUrl;
-      setProfileImage(imageUrl);
-      await supabase.auth.updateUser({ data: { avatar_url: imageUrl } });
-    } catch (err: any) {
-      toast.error('Upload failed: ' + err.message);
-    } finally {
-      setUploading(false);
-    }
-  }
 
   async function loadOrders() {
     if (!user) { setLoadingOrders(false); return; }
@@ -655,9 +531,9 @@ export default function DashboardPage() {
       ? orders
       : orders.filter(o => o.status === activeTab);
   const unreadNotificationCount = notifications.filter(n => !n.read).length;
-
-  const maskedEmail = email ? email.substring(0, 3) + '****' + email.substring(email.indexOf('@')) : '';
-  const maskedPhone = phone ? phone.substring(0, 2) + '****' + phone.substring(phone.length - 2) : '';
+  const accountSummaryName = String(user?.user_metadata?.name || 'Customer Name');
+  const accountSummaryImage = String(user?.user_metadata?.avatar_url || '');
+  const accountSummaryInitial = accountSummaryName.charAt(0).toUpperCase() || 'U';
 
   return (
     <div className="dashboard-page" style={{ minHeight: '100vh' }}>
@@ -670,16 +546,16 @@ export default function DashboardPage() {
             <aside className="dashboard-sidebar" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', padding: '28px 20px', position: 'sticky', top: 'calc(var(--nav-height) + 12px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
-                  {profileImage ? (
-                    <img src={profileImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {accountSummaryImage ? (
+                    <img src={accountSummaryImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-sans)' }}>
-                      {firstName?.charAt(0) || 'U'}
+                      {accountSummaryInitial}
                     </div>
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#333', fontFamily: 'var(--font-sans)' }}>{username}</span>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 600, color: '#333', fontFamily: 'var(--font-sans)' }}>{accountSummaryName}</span>
                   <span style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'var(--font-sans)' }}>Edit Profile</span>
                 </div>
               </div>
@@ -746,112 +622,7 @@ export default function DashboardPage() {
 
             {/* Main Content */}
             {activePanel === 'account' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* My Account Card */}
-                <div className="dashboard-main" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-                  <div className="account-panel" style={{ padding: '32px 28px' }}>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--primary-color)', marginBottom: '4px', paddingBottom: '14px', borderBottom: '1px solid #E8E0D8' }}>My Account</h3>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginBottom: '24px', fontFamily: 'var(--font-sans)' }}>View and update your account details.</p>
-
-                    {/* Profile Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', padding: '16px', background: '#FAF5EF', borderRadius: 'var(--radius-md)' }}>
-                      <div onClick={() => fileInputRef.current?.click()} style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', border: '3px solid #E8E0D8', flexShrink: 0, position: 'relative' }}>
-                        {profileImage ? (
-                          <img src={profileImage} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ width: '100%', height: '100%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1.3rem', fontFamily: 'var(--font-sans)' }}>
-                            {firstName?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = '0')}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
-                        </div>
-                      </div>
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                      <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: '2px', fontFamily: 'var(--font-sans)' }}>{username}</div>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--text-light)', fontFamily: 'var(--font-sans)' }}>{email}</div>
-                        {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--accent-color)', marginTop: '4px', fontFamily: 'var(--font-sans)' }}>Uploading...</div>}
-                      </div>
-                    </div>
-
-                    {/* Account Info */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                      {[
-                        { label: 'Name', value: username },
-                        { label: 'Email', value: showEmail ? email : maskedEmail, toggle: () => setShowEmail(!showEmail), showLabel: showEmail ? 'Hide' : 'Show' },
-                        { label: 'Phone', value: showPhone ? phone : maskedPhone, toggle: () => setShowPhone(!showPhone), showLabel: showPhone ? 'Hide' : 'Show' },
-                      ].map((row, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: i < 2 ? '1px solid #E8E0D8' : 'none' }}>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', width: '80px', flexShrink: 0, fontFamily: 'var(--font-sans)' }}>{row.label}</span>
-                          <span style={{ fontSize: '0.9rem', color: 'var(--text-dark)', flex: 1, fontFamily: 'var(--font-sans)' }}>{row.value}</span>
-                          {row.toggle && (
-                            <button onClick={row.toggle} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                              {row.showLabel}
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <button onClick={() => setShowPasswordModal(true)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', marginTop: '16px', fontFamily: 'var(--font-sans)' }}>
-                      Create New Password
-                    </button>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E8E0D8', paddingTop: '20px', marginTop: '20px' }}>
-                      <button onClick={saveProfile}
-                        style={{
-                          padding: '10px 28px', borderRadius: 'var(--radius-sm)', border: 'none',
-                          background: saved ? '#2e7d32' : 'var(--primary-color)', color: '#fff',
-                          fontSize: '0.88rem', fontWeight: 600, fontFamily: 'var(--font-sans)',
-                          cursor: 'pointer', transition: 'var(--transition-fast)',
-                        }}>
-                        {saved ? 'Saved!' : 'Save Changes'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* My Address Card */}
-                <div className="dashboard-main" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-                  <div style={{ padding: '32px 28px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid #E8E0D8' }}>
-                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--primary-color)', margin: 0 }}>My Address</h3>
-                      <button onClick={() => setEditingAddress(!editingAddress)}
-                        style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-                        {editingAddress ? 'Cancel' : 'Edit'}
-                      </button>
-                    </div>
-                    {editingAddress ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {[
-                          { val: firstName, set: setFirstName, ph: 'First Name' },
-                          { val: lastName, set: setLastName, ph: 'Last Name' },
-                          { val: phone, set: setPhone, ph: 'Phone Number' },
-                          { val: address, set: setAddress, ph: 'Full Address' },
-                        ].map((input, i) => (
-                          <input key={i} type="text" value={input.val} onChange={e => input.set(e.target.value)} placeholder={input.ph}
-                            style={{ padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', outline: 'none' }}
-                            onFocus={e => (e.target.style.borderColor = 'var(--primary-color)')}
-                            onBlur={e => (e.target.style.borderColor = '#E8E0D8')} />
-                        ))}
-                        <button onClick={saveProfile}
-                          style={{ padding: '10px 28px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--primary-color)', color: '#fff', fontSize: '0.88rem', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', alignSelf: 'flex-end' }}>
-                          Save Address
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px', fontFamily: 'var(--font-sans)' }}>{username}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '2px', fontFamily: 'var(--font-sans)' }}>{phone || 'No phone number'}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontFamily: 'var(--font-sans)' }}>{address || 'No address set'}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <AccountPanel />
             ) : activePanel === 'notifications' ? (
               <div className="dashboard-main" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
                 <div style={{ padding: '32px 28px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1450,42 +1221,6 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Change Password Modal */}
-      {showPasswordModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }} onClick={() => setShowPasswordModal(false)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '28px 24px', width: '90%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--primary-color)', marginBottom: '20px', textAlign: 'center' }}>Create New Password</h3>
-
-            {passwordError && <div style={{ background: '#fdecea', color: '#d32f2f', padding: '10px 14px', borderRadius: '8px', fontSize: '0.82rem', marginBottom: '16px' }}>{passwordError}</div>}
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>Current Password</label>
-              <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>New Password</label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '6px', display: 'block' }}>Confirm New Password</label>
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E8E0D8', fontSize: '0.88rem', fontFamily: 'var(--font-sans)', boxSizing: 'border-box' }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowPasswordModal(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleChangePassword} disabled={passwordLoading} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, cursor: passwordLoading ? 'not-allowed' : 'pointer', opacity: passwordLoading ? 0.7 : 1 }}>
-                {passwordLoading ? 'Updating...' : 'Update Password'}
-              </button>
-            </div>
           </div>
         </div>
       )}
