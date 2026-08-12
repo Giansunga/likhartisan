@@ -136,7 +136,7 @@ async function parseWithGateway(query, taxonomy) {
   };
   const { text } = await generateText({
     model: gateway(modelId),
-    abortSignal: AbortSignal.timeout(5000),
+    abortSignal: AbortSignal.timeout(15000),
     providerOptions: { gateway: gatewayOptions },
     system: 'Convert a pottery marketplace query into an English semantic query and exact catalog filters. Return only one valid JSON object with this exact shape: {"semanticQuery":"English text","filters":{"category":null,"shopId":null,"minPrice":null,"maxPrice":null,"material":null,"technique":null}}. Never use markdown. Never invent catalog values. Use null when a constraint is absent or is not an exact catalog value. Interpret Philippine peso amounts as numbers.',
     prompt: JSON.stringify({ query, catalog: {
