@@ -6,6 +6,23 @@ import { supabase } from '../lib/supabase';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { consumeCartCheckoutAuthPending } from '../lib/cartCheckout';
+
+function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
+  return (
+    <Link to="/cart" aria-label={`Shopping cart with ${count} ${count === 1 ? 'item' : 'items'}`} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" aria-hidden="true">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+      </svg>
+      {count > 0 ? (
+        <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.6rem' : '0.7rem' }}>
+          {count > 99 ? '99+' : count}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
 
 export default function Navbar() {
   const location = useLocation();
@@ -28,7 +45,7 @@ export default function Navbar() {
   const [shopInitials, setShopInitials] = useState('SN');
   const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [cartCount, setCartCount] = useState(getCartCount());
+  const [cartCount, setCartCount] = useState(getCartCount);
   const [hasShopRole, setHasShopRole] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { user } = useAuth();
@@ -43,7 +60,12 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setCartCount(getCartCount());
+    if (!user) return;
+    const draft = consumeCartCheckoutAuthPending();
+    if (draft) navigate('/checkout', { state: { checkoutDraft: draft } });
+  }, [navigate, user]);
+
+  useEffect(() => {
     const unsubscribe = onCartUpdate(() => setCartCount(getCartCount()));
     return unsubscribe;
   }, []);
@@ -432,18 +454,9 @@ export default function Navbar() {
 
           {/* Action icons */}
           <div className="flex items-center" style={{ gap: isMobile ? '4px' : '20px' }}>
+            <CartAction count={cartCount} isMobile={isMobile} />
             {loggedIn ? (
               <>
-                <Link to="/cart" aria-label="Shopping cart" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                  </svg>
-                  <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.6rem' : '0.7rem' }}>
-                    {cartCount}
-                  </span>
-                </Link>
-
                 <div ref={notifDropdownRef} className="relative">
                   <button onClick={() => setShowNotifications(!showNotifications)} aria-label="Notifications" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">

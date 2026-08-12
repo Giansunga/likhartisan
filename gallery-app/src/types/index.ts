@@ -157,6 +157,26 @@ export interface CartItem {
   variation?: string;
 }
 
+export type CartLineKey = string;
+
+export interface CartCheckoutDraft {
+  version: 1;
+  source: 'cart';
+  shopId: string;
+  lineKeys: CartLineKey[];
+  deliveryOption?: 'pickup' | 'courier';
+  destination?: {
+    address: string;
+    coordinates?: { lat: number; lng: number };
+  };
+  estimate?: {
+    quotationId?: string;
+    fee: number;
+    serviceType: string;
+    quotedAt: string;
+  };
+}
+
 export interface Conversation {
   id: string;
   buyerId: string;

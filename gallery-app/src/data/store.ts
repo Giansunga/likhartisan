@@ -1,4 +1,5 @@
-import type { CartItem } from '../types';
+import type { CartItem, CartLineKey } from '../types';
+import { getCartLineKey } from '../lib/cartCheckout';
 
 const CART_EVENT = 'lk_cart_update';
 
@@ -25,6 +26,10 @@ export function removeFromCart(productId: string, variationId?: string) {
   } else {
     setCart(getCart().filter(i => i.productId !== productId));
   }
+}
+export function removeCartLines(lineKeys: CartLineKey[]) {
+  const keys = new Set(lineKeys);
+  setCart(getCart().filter(item => !keys.has(getCartLineKey(item))));
 }
 export function clearCart() { setCart([]); }
 export function getCartCount(): number { return getCart().reduce((s, i) => s + i.qty, 0); }

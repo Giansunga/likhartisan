@@ -245,10 +245,6 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    if (!user) {
-      window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
-      return;
-    }
     addToCart({
       productId: product.id,
       productName: product.name,

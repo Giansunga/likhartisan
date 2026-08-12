@@ -2369,11 +2369,15 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  async function uploadImage(file: File, folder: string): Promise<string | null> {
+  async function uploadImage(file: File, folder: string): Promise<string> {
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `shop/${folder}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage.from('products').upload(fileName, file);
-    if (error) { console.error('Upload error:', error); return null; }
+    const { error } = await supabase.storage.from('products').upload(fileName, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw new Error(`Upload failed: ${error.message}`);
     const { data: urlData } = supabase.storage.from('products').getPublicUrl(fileName);
     return urlData.publicUrl;
   }
@@ -2407,25 +2411,33 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
     setSaving(true);
     setMessage('');
 
-    let imageUrl = shopData.image || '';
-    let bannerUrl = shopData.banner || '';
+    try {
+      let imageUrl = shopData.image || '';
+      let bannerUrl = shopData.banner || '';
 
-    const [profileUrl, coverUrl] = await Promise.all([
-      profileFile ? uploadImage(profileFile, 'profile') : Promise.resolve(null),
-      coverFile ? uploadImage(coverFile, 'banner') : Promise.resolve(null),
-    ]);
-    if (profileUrl) imageUrl = profileUrl;
-    if (coverUrl) bannerUrl = coverUrl;
+      const [profileUrl, coverUrl] = await Promise.all([
+        profileFile ? uploadImage(profileFile, 'profile') : Promise.resolve(null),
+        coverFile ? uploadImage(coverFile, 'banner') : Promise.resolve(null),
+      ]);
+      if (profileUrl) imageUrl = profileUrl;
+      if (coverUrl) bannerUrl = coverUrl;
 
-    const { error } = await supabase
-      .from('shops')
-      .update({ name, description, about, image: imageUrl, banner: bannerUrl, location })
-      .eq('id', shopData.id);
+      const { error } = await supabase
+        .from('shops')
+        .update({ name, description, about, image: imageUrl, banner: bannerUrl, location })
+        .eq('id', shopData.id);
 
-    setSaving(false);
-    if (error) { setMessage('Error: ' + error.message); return; }
-    setMessage('Shop profile updated successfully!');
-    onShopUpdated({ ...shopData, name, description, about, image: imageUrl, banner: bannerUrl, location });
+      if (error) throw error;
+      setProfileFile(null);
+      setCoverFile(null);
+      setMessage('Shop profile updated successfully!');
+      onShopUpdated({ ...shopData, name, description, about, image: imageUrl, banner: bannerUrl, location });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unable to update the shop profile.';
+      setMessage(`Error: ${detail}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
