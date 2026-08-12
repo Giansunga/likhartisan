@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Output, gateway, generateText } from 'ai';
+import { gateway, generateText } from 'ai';
 import { z } from 'zod';
 
 export const GALLERY_PAGE_SIZE = 24;
@@ -134,18 +134,20 @@ async function parseWithGateway(query, taxonomy) {
   const gatewayOptions = {
     tags: ['feature:gallery-search', `env:${process.env.NODE_ENV || 'development'}`],
   };
-  const { output } = await generateText({
+  const { text } = await generateText({
     model: gateway(modelId),
-    output: Output.object({ schema: SEARCH_PLAN_SCHEMA, name: 'gallery_search_plan' }),
-    abortSignal: AbortSignal.timeout(2500),
+    abortSignal: AbortSignal.timeout(5000),
     providerOptions: { gateway: gatewayOptions },
-    system: 'Convert a pottery marketplace query into an English semantic query and exact catalog filters. Never invent catalog values. Use null when a constraint is absent or is not an exact catalog value. Interpret Philippine peso amounts as numbers.',
+    system: 'Convert a pottery marketplace query into an English semantic query and exact catalog filters. Return only one valid JSON object with this exact shape: {"semanticQuery":"English text","filters":{"category":null,"shopId":null,"minPrice":null,"maxPrice":null,"material":null,"technique":null}}. Never use markdown. Never invent catalog values. Use null when a constraint is absent or is not an exact catalog value. Interpret Philippine peso amounts as numbers.',
     prompt: JSON.stringify({ query, catalog: {
       categories: taxonomy.categories, shops: taxonomy.shops,
       materials: taxonomy.materials.slice(0, 100), techniques: taxonomy.techniques.slice(0, 100),
     } }),
   });
-  return validateSearchPlan(output, taxonomy, query);
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+  if (jsonStart < 0 || jsonEnd <= jsonStart) throw new Error('Gateway returned no JSON search plan');
+  return validateSearchPlan(JSON.parse(text.slice(jsonStart, jsonEnd + 1)), taxonomy, query);
 }
 
 function parseEmbedding(value) {
