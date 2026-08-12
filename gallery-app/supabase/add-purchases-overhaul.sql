@@ -148,6 +148,7 @@ CREATE POLICY "orders_update_shop_or_admin" ON public.orders
     )
   );
 
+DROP POLICY IF EXISTS "return_requests_participants_select" ON public.order_return_requests;
 CREATE POLICY "return_requests_participants_select" ON public.order_return_requests
   FOR SELECT TO authenticated
   USING (
@@ -159,6 +160,7 @@ CREATE POLICY "return_requests_participants_select" ON public.order_return_reque
     )
   );
 
+DROP POLICY IF EXISTS "return_items_participants_select" ON public.order_return_items;
 CREATE POLICY "return_items_participants_select" ON public.order_return_items
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -172,6 +174,7 @@ CREATE POLICY "return_items_participants_select" ON public.order_return_items
     )
   ));
 
+DROP POLICY IF EXISTS "return_evidence_participants_select" ON public.order_return_evidence;
 CREATE POLICY "return_evidence_participants_select" ON public.order_return_evidence
   FOR SELECT TO authenticated
   USING (EXISTS (
