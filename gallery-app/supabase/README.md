@@ -27,13 +27,6 @@ OPTIONAL / INCREMENTAL FILES (for existing databases, column additions):
   add-review-seller-ratings.sql    Seller/delivery ratings (in master)
   add-review-images.sql            Review images array (in master)
 
-  add-gallery-ai-search.sql        Private hybrid-search index, cache, analytics, and RPC
-
-GALLERY AI SEARCH TEST:
-
-  Run tests/gallery-ai-search.test.sql against a disposable/local database
-  after add-gallery-ai-search.sql. It rolls back all fixture writes.
-
 FIX / RESET FILES (run only when troubleshooting):
 
   FIX-ALL.sql     Fixes constraints, adds missing columns
