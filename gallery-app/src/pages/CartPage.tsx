@@ -428,7 +428,6 @@ export default function CartPage() {
             <ArrowLeft size={17} aria-hidden="true" /> Continue shopping
           </button>
           <div>
-            <span className="cart-header__eyebrow">Your artisan collection</span>
             <h1>Shopping cart</h1>
             <p>{items.reduce((sum, item) => sum + item.qty, 0)} pieces from {groups.length} {groups.length === 1 ? 'artisan' : 'artisans'}</p>
           </div>

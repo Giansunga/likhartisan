@@ -43,7 +43,6 @@ export function CheckoutHeader({ itemCount, shopName, isBuyNow, onBack }: Checko
       </button>
       <div className="checkout-header__row">
         <div>
-          <span className="checkout-eyebrow">Secure artisan checkout</span>
           <h1>Review and pay</h1>
           <p>{itemCount} {itemCount === 1 ? 'piece' : 'pieces'} from {shopName}</p>
         </div>
