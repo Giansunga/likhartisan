@@ -51,12 +51,12 @@ describe('cart checkout contract', () => {
     expect(readCartCheckoutDraft()).toBeNull();
   });
 
-  it('associates purchased line keys with a payment session', () => {
+  it('associates purchased line keys with the server-created order', () => {
     const keys = cart.slice(0, 2).map(getCartLineKey);
-    savePendingPurchase('cs_test', keys);
-    expect(readPendingPurchase('cs_test')).toEqual(keys);
-    clearPendingPurchase('cs_test');
-    expect(readPendingPurchase('cs_test')).toEqual([]);
+    savePendingPurchase('order_test', keys);
+    expect(readPendingPurchase('order_test')).toEqual(keys);
+    clearPendingPurchase('order_test');
+    expect(readPendingPurchase('order_test')).toEqual([]);
   });
 
   it('removes only purchased lines and preserves the rest of the cart', () => {

@@ -431,9 +431,11 @@ export default function CheckoutPage() {
 
     setPlacing(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Please sign in again before continuing to payment.');
       const response = await fetch(`${API_BASE}/api/create-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           items: items.map(item => ({
             productId: item.productId,
@@ -445,13 +447,11 @@ export default function CheckoutPage() {
             qty: item.qty,
             variation: item.variation || '',
           })),
-          shippingFee,
           userName,
           userPhone,
           userAddress,
           userEmail: user?.email || '',
           deliveryOption,
-          userId,
           lalamoveQuoteId: lalamoveQuote?.quotationId || null,
           pickupCoords: mapCoords.pickup,
           dropoffCoords: mapCoords.dropoff,
@@ -462,39 +462,11 @@ export default function CheckoutPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || data.error || 'Payment could not be prepared');
 
-      const { error: orderError } = await supabase.from('orders').insert({
-        user_id: userId,
-        user_name: userName,
-        user_phone: userPhone,
-        user_address: userAddress,
-        buyer_email: user?.email || '',
-        items: items.map(item => ({
-          product_id: item.productId,
-          product_name: item.productName,
-          qty: item.qty,
-          price: item.price,
-          image: item.image,
-          shop_id: item.shopId || null,
-          shop_name: item.shopName,
-          variation_id: item.variationId || null,
-          variation: item.variation || '',
-        })),
-        subtotal,
-        shipping_fee: shippingFee,
-        total: data.total || total,
-        delivery_option: deliveryOption,
-        delivery_status: 'pending',
-        status: 'pending',
-        payment_reference: data.referenceNumber,
-        checkout_session_id: data.sessionId,
-        lalamove_quote_id: lalamoveQuote?.quotationId || null,
-      });
-      if (orderError) throw orderError;
-
-      localStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
-      sessionStorage.setItem('likhartisan_checkout_session_id', data.sessionId);
+      if (!data.orderId) throw new Error('Payment order was not created. Please try again.');
+      localStorage.setItem('likhartisan_checkout_order_id', data.orderId);
+      sessionStorage.setItem('likhartisan_checkout_order_id', data.orderId);
       if (buyNowItem) sessionStorage.setItem('lk_buy_now', '1');
-      else savePendingPurchase(data.sessionId, cartDraft?.lineKeys || items.map(getCartLineKey));
+      else savePendingPurchase(data.orderId, cartDraft?.lineKeys || items.map(getCartLineKey));
       window.location.assign(data.checkoutUrl);
     } catch (error) {
       console.error('Checkout error:', error);

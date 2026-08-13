@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "payments:reconcile": "node scripts/reconcile-payments.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

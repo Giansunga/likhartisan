@@ -4,6 +4,8 @@ import { buyerOrderStatus, mapPurchase, normalizePurchaseQuery, returnEligibilit
 
 test('derives buyer-facing statuses from real payment and delivery state', () => {
   assert.equal(buyerOrderStatus({ status: 'pending', payment_status: 'pending' }), 'to-pay');
+  assert.equal(buyerOrderStatus({ status: 'paid', payment_status: 'failed' }), 'to-pay');
+  assert.equal(buyerOrderStatus({ status: 'pending', payment_status: 'paid', delivery_status: 'pending' }), 'to-ship');
   assert.equal(buyerOrderStatus({ status: 'paid', payment_status: 'paid', delivery_status: 'preparing' }), 'to-ship');
   assert.equal(buyerOrderStatus({ status: 'paid', payment_status: 'paid', delivery_status: 'delivered' }), 'to-receive');
   assert.equal(buyerOrderStatus({ status: 'completed', delivery_status: 'completed' }), 'completed');

@@ -106,8 +106,11 @@ CREATE TABLE IF NOT EXISTS orders (
   delivery_status TEXT DEFAULT 'pending',
   status TEXT DEFAULT 'pending',
   payment_reference TEXT DEFAULT '',
-  checkout_session_id TEXT DEFAULT '',
+  checkout_session_id TEXT,
   payment_status TEXT DEFAULT 'pending',
+  payment_provider_id TEXT,
+  payment_verification_source TEXT,
+  payment_verified_at TIMESTAMP WITH TIME ZONE,
   lalamove_quote_id TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -123,6 +126,8 @@ ALTER TABLE orders ADD CONSTRAINT orders_delivery_status_check
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_checkout_session_id ON orders(checkout_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_checkout_session_id_unique ON orders(checkout_session_id) WHERE checkout_session_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_provider_id_unique ON orders(payment_provider_id) WHERE payment_provider_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
 -- ── 6. ARTISANS ────────────────────────────────────────────────────────────

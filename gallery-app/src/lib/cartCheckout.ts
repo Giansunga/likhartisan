@@ -59,19 +59,19 @@ export function consumeCartCheckoutAuthPending(): CartCheckoutDraft | null {
   }
 }
 
-export function savePendingPurchase(sessionId: string, lineKeys: CartLineKey[]): void {
-  try { localStorage.setItem(`${PURCHASE_KEYS_PREFIX}${sessionId}`, JSON.stringify(lineKeys)); } catch { /* unavailable storage */ }
+export function savePendingPurchase(purchaseKey: string, lineKeys: CartLineKey[]): void {
+  try { localStorage.setItem(`${PURCHASE_KEYS_PREFIX}${purchaseKey}`, JSON.stringify(lineKeys)); } catch { /* unavailable storage */ }
 }
 
-export function readPendingPurchase(sessionId: string): CartLineKey[] {
+export function readPendingPurchase(purchaseKey: string): CartLineKey[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(`${PURCHASE_KEYS_PREFIX}${sessionId}`) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(`${PURCHASE_KEYS_PREFIX}${purchaseKey}`) || '[]');
     return Array.isArray(parsed) ? parsed.filter(key => typeof key === 'string') : [];
   } catch {
     return [];
   }
 }
 
-export function clearPendingPurchase(sessionId: string): void {
-  try { localStorage.removeItem(`${PURCHASE_KEYS_PREFIX}${sessionId}`); } catch { /* unavailable storage */ }
+export function clearPendingPurchase(purchaseKey: string): void {
+  try { localStorage.removeItem(`${PURCHASE_KEYS_PREFIX}${purchaseKey}`); } catch { /* unavailable storage */ }
 }

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { clearCart, removeCartLines } from '../data/store';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import {
   clearCartCheckoutDraft,
   clearPendingPurchase,
@@ -40,20 +41,15 @@ export default function CheckoutSuccessPage() {
         if (!user) {
           finishedRef.current = true;
           setMessage('You are not logged in. Please log in and check your orders.');
-          setStatus('success'); // Payment likely went through; user just needs to sign in
+          setStatus('error');
           return;
         }
 
-        // Resolve the session id from (in order):
-        // 1. URL ?session_id (PayMongo-substituted — but PayMongo does NOT
-        //    substitute the {checkout_session.id} placeholder, so this is
-        //    usually the literal placeholder and we fall through)
-        // 2. localStorage / sessionStorage fallback (holds the real cs_... id
-        //    saved by CheckoutPage before redirect)
-        // NOTE: ?ref is the reference number (LA-...), NOT a checkout session
-        // id, so it must never be used here — PayMongo can't look it up.
         const refParam = searchParams.get('ref');
-        let checkoutSessionId = searchParams.get('session_id');
+        const orderId = searchParams.get('order_id') ||
+          localStorage.getItem('likhartisan_checkout_order_id') ||
+          sessionStorage.getItem('likhartisan_checkout_order_id') || '';
+        let checkoutSessionId = searchParams.get('session_id') || '';
         if (!checkoutSessionId || !checkoutSessionId.startsWith('cs_')) {
           checkoutSessionId =
             localStorage.getItem('likhartisan_checkout_session_id') ||
@@ -61,25 +57,28 @@ export default function CheckoutSuccessPage() {
             '';
         }
 
-        if (!checkoutSessionId) {
+        if (!orderId && !checkoutSessionId) {
           finishedRef.current = true;
           setStatus('error');
           setMessage(
-            `No checkout session ID found. Please check your orders in the dashboard.` +
+            `No payment order was found. Please check your orders in the dashboard.` +
             (refParam ? ` (Reference: ${refParam})` : '')
           );
           return;
         }
 
-        console.log(`[CheckoutSuccess] Attempt ${attempt}/${MAX_ATTEMPTS} — session: ${checkoutSessionId}`);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Your sign-in expired. Please sign in and check your orders.');
+        const legacy = !orderId;
+        const endpoint = legacy
+          ? `${API_BASE}/api/confirm-payment`
+          : `${API_BASE}/api/orders/${encodeURIComponent(orderId)}/payment/verify`;
+        console.log(`[CheckoutSuccess] Attempt ${attempt}/${MAX_ATTEMPTS} — ${legacy ? 'legacy session' : `order ${orderId}`}`);
 
-        const res = await fetch(`${API_BASE}/api/confirm-payment`, {
+        const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: checkoutSessionId,
-            userId: user.id,
-          }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify(legacy ? { sessionId: checkoutSessionId } : {}),
         });
 
         const result = await res.json();
@@ -90,15 +89,18 @@ export default function CheckoutSuccessPage() {
           finishedRef.current = true;
           // Buy Now keeps the real cart intact. Cart checkout removes only the
           // purchased draft lines so pieces from other artisans remain saved.
+          const purchaseKey = orderId || checkoutSessionId;
           const isBuyNow = sessionStorage.getItem('lk_buy_now') === '1';
           if (!isBuyNow) {
-            const purchasedLineKeys = readPendingPurchase(checkoutSessionId);
+            const purchasedLineKeys = readPendingPurchase(purchaseKey);
             if (purchasedLineKeys.length > 0) removeCartLines(purchasedLineKeys);
             else clearCart(); // Backward compatibility for sessions created before scoped drafts.
-            clearPendingPurchase(checkoutSessionId);
+            clearPendingPurchase(purchaseKey);
             clearCartCheckoutDraft();
           }
           sessionStorage.removeItem('lk_buy_now');
+          localStorage.removeItem('likhartisan_checkout_order_id');
+          sessionStorage.removeItem('likhartisan_checkout_order_id');
           localStorage.removeItem('likhartisan_checkout_session_id');
           sessionStorage.removeItem('likhartisan_checkout_session_id');
           setStatus('success');
@@ -106,33 +108,21 @@ export default function CheckoutSuccessPage() {
           return;
         }
 
-        // 402 = PayMongo hasn't marked payment as paid yet — retry after delay
-        if (res.status === 402 && attempt < MAX_ATTEMPTS) {
+        // The server returns 202 only while PayMongo still reports the payment pending.
+        if (res.status === 202 && attempt < MAX_ATTEMPTS) {
           console.log(`[CheckoutSuccess] Payment not verified yet, retrying in ${RETRY_DELAY / 1000}s...`);
           scheduleRetry(confirmPayment, RETRY_DELAY);
           return;
         }
 
-        // Other server errors — retry if attempts remain
-        if (!res.ok && attempt < MAX_ATTEMPTS) {
-          console.log(`[CheckoutSuccess] Server error ${res.status}, retrying...`);
-          scheduleRetry(confirmPayment, RETRY_DELAY);
-          return;
-        }
-
-        // All retries exhausted
         finishedRef.current = true;
         setStatus('error');
-        setMessage(result.error || 'Payment verification timed out. Please check your orders in the dashboard.');
+        setMessage(res.status === 202
+          ? 'Payment verification is still pending. Please check your orders for the latest status.'
+          : result.error || 'Unable to verify payment. Please check your orders in the dashboard.');
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[CheckoutSuccess] Error on attempt ${attempt}:`, err);
-
-        // Network error — retry if attempts remain
-        if (attempt < MAX_ATTEMPTS) {
-          scheduleRetry(confirmPayment, RETRY_DELAY);
-          return;
-        }
 
         finishedRef.current = true;
         setStatus('error');
@@ -146,7 +136,6 @@ export default function CheckoutSuccessPage() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, searchParams]);
 
   return (

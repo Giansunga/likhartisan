@@ -13,6 +13,12 @@ import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
 import { createPurchasesRouter } from './routes/purchases.js';
+import {
+  retrieveCheckoutSession,
+  verifyCheckoutSession,
+  verifyPayMongoSignature as verifyPayMongoWebhookSignature,
+} from './services/paymongoService.js';
+import { createOrderNotifications, decrementStockForItems } from './services/orderFulfillmentService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -161,14 +167,12 @@ app.post('/api/designs/upload-model', apiLimiter, async (req, res) => {
 // Create PayMongo Checkout Session
 app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
-    const { items, shippingFee, userName, userPhone, userAddress, userEmail, deliveryOption, userId, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+    const { items, userName, userPhone, userAddress, userEmail, deliveryOption, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
-    }
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
     }
 
     if (!userName || typeof userName !== 'string' || userName.trim().length < 2) {
@@ -345,7 +349,8 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       });
     }
 
-    const referenceNumber = `LA-${Date.now()}`;
+    const orderId = crypto.randomUUID();
+    const referenceNumber = `LA-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
       method: 'POST',
@@ -358,12 +363,13 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
           attributes: {
             line_items: lineItems,
             payment_method_types: ['gcash', 'paymaya', 'qrph', 'card'],
-            success_url: `${FRONTEND_URL}/checkout/success?session_id={checkout_session.id}&ref=${referenceNumber}`,
+            success_url: `${FRONTEND_URL}/checkout/success?order_id=${encodeURIComponent(orderId)}&ref=${encodeURIComponent(referenceNumber)}`,
             cancel_url: `${FRONTEND_URL}/checkout?cancelled=true`,
             reference_number: referenceNumber,
             description: `LikhArtisan Order - ${verifiedItems.length} item(s)`,
             metadata: {
-              userId: userId || '',
+              orderId,
+              userId: authUserId,
               userName: userName || '',
               userPhone: userPhone || '',
               userAddress: userAddress || '',
@@ -390,157 +396,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const checkoutUrl = data.data.attributes.checkout_url;
     const sessionId = data.data.id;
 
-    // Order NOT inserted here — it will be created in /api/confirm-payment
-    // after PayMongo verifies the payment succeeded, to avoid ghost orders.
-
-    res.json({ checkoutUrl, sessionId, referenceNumber, total: serverTotal });
-  } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Retrieve Checkout Session status
-app.get('/api/session/:sessionId', paymongoLimiter, async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-
-    const response = await fetch(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString('base64')}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.errors || 'Failed to retrieve session' });
-    }
-
-    res.json(data.data.attributes);
-  } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Confirm payment and update order status (called by success page only)
-app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
-  try {
-    const { sessionId, userId } = req.body;
-
-    if (!sessionId) {
-      return res.status(400).json({ error: 'sessionId is required' });
-    }
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    console.log(`[confirm-payment] sessionId=${sessionId}, userId=${userId}`);
-
-    // Step 1: Verify payment with PayMongo — MUST be paid before updating DB
-    let paymongoVerified = false;
-    let pmData = null;
-    try {
-      const pmResponse = await fetch(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`, {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString('base64')}`,
-        },
-      });
-      pmData = await pmResponse.json();
-      if (pmResponse.ok) {
-        const attrs = pmData.data?.attributes || {};
-        const pmStatus = attrs.status;                                   // session status: active/expired
-        const piStatus = attrs.payment_intent?.attributes?.status;       // card payments only
-        // Paid payment records can live in two places depending on method:
-        //   attrs.payments[]                          (some flows)
-        //   attrs.payment_intent.attributes.payments[] (gcash/maya/qrph)
-        const paymentRecords = [
-          ...(Array.isArray(attrs.payments) ? attrs.payments : []),
-          ...(Array.isArray(attrs.payment_intent?.attributes?.payments) ? attrs.payment_intent.attributes.payments : []),
-        ];
-        const paymentStatuses = paymentRecords.map(p => p?.attributes?.status).filter(Boolean);
-        console.log(`[confirm-payment] PayMongo session=${pmStatus}, intent=${piStatus}, payments=[${paymentStatuses.join(',')}]`);
-        const PAID_SESSION = ['paid', 'completed'];
-        const PAID_INTENT = ['succeeded', 'paid', 'captured'];
-        if (
-          PAID_SESSION.includes(pmStatus) ||
-          PAID_INTENT.includes(piStatus) ||
-          paymentStatuses.includes('paid')
-        ) {
-          paymongoVerified = true;
-        } else {
-          // Not verified — dump the raw shape so logs reveal where the paid status actually is
-          console.warn('[confirm-payment] NOT verified. Raw attributes:', JSON.stringify(attrs));
-        }
-      } else {
-        console.warn(`[confirm-payment] PayMongo fetch not ok: ${pmResponse.status}`, pmData?.errors);
-      }
-    } catch (e) {
-      console.warn('[confirm-payment] PayMongo check failed:', e.message);
-    }
-
-    // Step 2: Look up any existing order for this session first.
-    // The webhook (checkout_session.payment.paid) may have already marked it paid.
-    const { data: existingOrders } = await supabase
-      .from('orders')
-      .select('id, status')
-      .eq('checkout_session_id', sessionId)
-      .limit(1);
-
-    if (existingOrders && existingOrders.length > 0 && existingOrders[0].status === 'paid') {
-      console.log(`[confirm-payment] Order ${existingOrders[0].id} already paid (webhook) — skipping`);
-      return res.json({ success: true, verified: true });
-    }
-
-    // ✅ Only proceed if PayMongo confirms payment is actually paid
-    if (!paymongoVerified) {
-      console.warn(`[confirm-payment] Payment NOT verified for session ${sessionId}. Aborting.`);
-      return res.status(402).json({ success: false, error: 'Payment not verified by PayMongo', verified: false });
-    }
-
-    // Step 3: Update existing pending order or create one from session metadata
-    if (existingOrders && existingOrders.length > 0) {
-      const order = existingOrders[0];
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'paid' })
-        .eq('id', order.id);
-
-      if (updateError) {
-        console.error('[confirm-payment] Order update failed:', updateError.message);
-        return res.status(500).json({ success: false, error: 'Failed to update order status' });
-      }
-
-      console.log(`[confirm-payment] Updated order ${order.id} from pending to paid`);
-
-      // Decrement stock for each item (non-blocking)
-      (async () => {
-        try {
-          const { data: fullOrder } = await supabase.from('orders').select('items, user_name').eq('id', order.id).single();
-          if (!fullOrder?.items) return;
-          await decrementStockForItems(fullOrder.items);
-          await createOrderNotifications(order.id, fullOrder.items, fullOrder.user_name);
-        } catch (e) { console.error('[stock] Decrement failed:', e.message); }
-      })();
-
-      return res.json({ success: true, verified: true });
-    }
-
-    // Fallback: Order not created by frontend — create from PayMongo metadata
-    console.warn(`[confirm-payment] No existing order for session ${sessionId} — creating from metadata`);
-    const meta = pmData.data?.attributes?.metadata || {};
-    const referenceNumber = pmData.data?.attributes?.reference_number || `LA-${Date.now()}`;
-
-    let orderItems = [];
-    try {
-      orderItems = JSON.parse(meta.items || '[]');
-    } catch {
-      return res.status(500).json({ success: false, error: 'Invalid order data in payment metadata' });
-    }
-
-    const mappedItems = orderItems.map(item => ({
+    const mappedItems = verifiedItems.map(item => ({
       product_id: item.productId,
       product_name: item.productName,
       qty: item.qty,
@@ -551,109 +407,150 @@ app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
       variation_id: item.variationId || null,
       variation: item.variation || '',
     }));
-
-    const subtotal = parseFloat(meta.verifiedSubtotal) || 0;
-    const shippingFee = parseFloat(meta.verifiedShippingFee) || 0;
-    const total = subtotal + shippingFee;
-
-    const { data: newOrder, error: insertError } = await supabase
-      .from('orders')
-      .insert({
-        user_id: userId,
-        user_name: meta.userName || '',
-        user_phone: meta.userPhone || '',
-        user_address: meta.userAddress || '',
-        buyer_email: meta.userEmail || '',
-        items: mappedItems,
-        subtotal,
-        shipping_fee: shippingFee,
-        total,
-        delivery_option: meta.deliveryOption || 'pickup',
-        delivery_status: 'pending',
-        status: 'paid',
-        payment_reference: referenceNumber,
-        checkout_session_id: sessionId,
-        lalamove_quote_id: meta.lalamoveQuoteId || null,
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      console.error('[confirm-payment] Fallback order insert failed:', insertError.message);
-      return res.status(500).json({ success: false, error: 'Failed to create order after payment' });
+    const { error: orderError } = await supabase.from('orders').insert({
+      id: orderId,
+      user_id: authUserId,
+      user_name: userName.trim(),
+      user_phone: userPhone.trim(),
+      user_address: (userAddress || '').trim(),
+      buyer_email: userEmail || '',
+      items: mappedItems,
+      subtotal: verifiedSubtotal,
+      shipping_fee: verifiedShippingFee,
+      total: serverTotal,
+      delivery_option: deliveryOption,
+      delivery_status: 'pending',
+      status: 'pending',
+      payment_status: 'pending',
+      payment_reference: referenceNumber,
+      checkout_session_id: sessionId,
+      lalamove_quote_id: lalamoveQuoteId || null,
+    });
+    if (orderError) {
+      console.error('[create-checkout] Pending order insert failed:', orderError.message);
+      return res.status(500).json({ error: 'Unable to save the order before payment. Please try again.' });
     }
 
-    console.log(`[confirm-payment] Created fallback order ${newOrder.id} for session ${sessionId}`);
-
-    // Decrement stock for each item (non-blocking)
-    (async () => {
-      try {
-        await decrementStockForItems(mappedItems);
-      } catch (e) { console.error('[stock] Decrement failed:', e.message); }
-    })();
-
-    return res.json({ success: true, verified: true });
-
+    res.json({ checkoutUrl, orderId, referenceNumber, total: serverTotal });
   } catch (error) {
-    console.error('[confirm-payment] Server error:', error);
+    console.error('Server error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Retrieve Checkout Session status
+app.get('/api/session/:sessionId', paymongoLimiter, async (req, res) => {
+  try {
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+    const { sessionId } = req.params;
+    if (!/^cs_[A-Za-z0-9_-]+$/.test(sessionId)) return res.status(400).json({ error: 'Invalid checkout session ID' });
+    const { data: order, error } = await supabase.from('orders').select('id')
+      .eq('checkout_session_id', sessionId).eq('user_id', authUserId).maybeSingle();
+    if (error) throw error;
+    if (!order) return res.status(404).json({ error: 'Checkout session not found' });
+    const session = await retrieveCheckoutSession(sessionId, PAYMONGO_SECRET_KEY);
+    res.json({ checkout_url: session.attributes?.checkout_url, status: session.attributes?.status });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+const PAYMENT_ORDER_FIELDS = 'id, user_id, user_name, items, total, status, payment_status, payment_reference, checkout_session_id';
+
+async function finalizeVerifiedOrder(order, verification, source) {
+  if (order.payment_status === 'paid' && order.status === 'paid') return { transitioned: false, alreadyPaid: true };
+  if (['cancelled', 'refunded'].includes(order.status) || order.payment_status === 'refunded') {
+    const error = new Error('A cancelled or refunded order cannot be marked paid');
+    error.status = 409;
+    throw error;
+  }
+  const verifiedAt = new Date().toISOString();
+  const { data, error } = await supabase.from('orders').update({
+    status: 'paid',
+    payment_status: 'paid',
+    payment_verified_at: verifiedAt,
+    payment_provider_id: verification.providerPaymentId,
+    payment_verification_source: source,
+  }).eq('id', order.id).or('payment_status.is.null,payment_status.neq.paid,status.eq.pending').select('id').maybeSingle();
+  if (error) throw error;
+  if (!data) return { transitioned: false, alreadyPaid: true };
+
+  try {
+    await decrementStockForItems(supabase, order.items || []);
+    await createOrderNotifications(supabase, order.id, order.items || [], order.user_name || '');
+  } catch (error) {
+    console.error(`[payment] Fulfillment initialization failed for ${order.id}:`, error.message);
+  }
+  return { transitioned: true, alreadyPaid: false, verifiedAt };
+}
+
+async function reconcileOrderPayment(order, { source, requireOrderMetadata = true, paidEvent = false } = {}) {
+  if (order.payment_status === 'paid' && order.status === 'paid') return { state: 'paid', alreadyPaid: true };
+  const session = await retrieveCheckoutSession(order.checkout_session_id, PAYMONGO_SECRET_KEY);
+  const verification = verifyCheckoutSession(session, order, {
+    expectedUserId: order.user_id,
+    secretKey: PAYMONGO_SECRET_KEY,
+    requireOrderMetadata,
+    paidEvent,
+  });
+  if (verification.state === 'pending') return { state: 'pending' };
+  if (!verification.ok) {
+    const error = new Error(`Payment verification failed: ${verification.errors.join('; ')}`);
+    error.status = 422;
+    throw error;
+  }
+  const finalized = await finalizeVerifiedOrder(order, verification, source);
+  return { state: 'paid', ...finalized };
+}
+
+app.post('/api/orders/:orderId/payment/verify', paymongoLimiter, async (req, res) => {
+  try {
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+    const { data: order, error } = await supabase.from('orders').select(PAYMENT_ORDER_FIELDS)
+      .eq('id', req.params.orderId).eq('user_id', authUserId).maybeSingle();
+    if (error) throw error;
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const result = await reconcileOrderPayment(order, { source: 'return_page' });
+    if (result.state === 'pending') return res.status(202).json({ success: false, state: 'pending' });
+    return res.json({ success: true, verified: true, state: 'paid' });
+  } catch (error) {
+    console.error('[verify-payment] Error:', error.message);
+    res.status(error.status || 500).json({ success: false, state: 'error', error: error.message || 'Payment verification failed' });
+  }
+});
+
+// Compatibility endpoint for checkout sessions created before order-id correlation.
+app.post('/api/confirm-payment', paymongoLimiter, async (req, res) => {
+  try {
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+    const sessionId = String(req.body?.sessionId || '');
+    if (!/^cs_[A-Za-z0-9_-]+$/.test(sessionId)) return res.status(400).json({ error: 'Valid sessionId is required' });
+    const { data: order, error } = await supabase.from('orders').select(PAYMENT_ORDER_FIELDS)
+      .eq('checkout_session_id', sessionId).eq('user_id', authUserId).maybeSingle();
+    if (error) throw error;
+    if (!order) return res.status(404).json({ error: 'Order not found for this checkout session' });
+    const result = await reconcileOrderPayment(order, { source: 'legacy_return_page', requireOrderMetadata: false });
+    if (result.state === 'pending') return res.status(202).json({ success: false, state: 'pending' });
+    return res.json({ success: true, verified: true, state: 'paid' });
+  } catch (error) {
+    console.error('[confirm-payment] Error:', error.message);
+    res.status(error.status || 500).json({ success: false, state: 'error', error: error.message || 'Payment verification failed' });
   }
 });
 
 
 // PayMongo Webhook Signature Verification
 function verifyPayMongoSignature(req) {
-  const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('PAYMONGO_WEBHOOK_SECRET not set — rejecting webhook');
-    return false;
-  }
-
-  const signatureHeader = req.headers['paymongo-signature'];
-  if (!signatureHeader) {
-    console.error('Missing PayMongo-Signature header');
-    return false;
-  }
-
-  // Parse header: "ts=<timestamp>,v1=<signature>"
-  const parts = {};
-  signatureHeader.split(',').forEach(part => {
-    const [key, value] = part.split('=');
-    parts[key] = value;
+  return verifyPayMongoWebhookSignature({
+    rawBody: req.rawBody,
+    signatureHeader: req.headers['paymongo-signature'],
+    webhookSecret: process.env.PAYMONGO_WEBHOOK_SECRET,
+    liveMode: PAYMONGO_SECRET_KEY.startsWith('sk_live_'),
   });
-
-  const ts = parts.ts;
-  const v1 = parts.v1;
-  if (!ts || !v1) {
-    console.error('Invalid PayMongo-Signature format');
-    return false;
-  }
-
-  // Reject if timestamp is older than 5 minutes (replay protection)
-  const timestampAge = Math.floor(Date.now() / 1000) - parseInt(ts);
-  if (timestampAge > 300) {
-    console.error('Webhook timestamp too old:', timestampAge, 'seconds');
-    return false;
-  }
-
-  // Compute HMAC-SHA256(secret, timestamp.body) using raw body bytes
-  const rawBody = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body);
-  const signedPayload = `${ts}.${rawBody}`;
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(signedPayload)
-    .digest('hex');
-
-  // Use constant-time comparison to prevent timing attacks
-  const expectedBuf = Buffer.from(expectedSignature, 'hex');
-  const receivedBuf = Buffer.from(v1, 'hex');
-
-  if (expectedBuf.length !== receivedBuf.length || !crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
-    console.error('Webhook signature mismatch');
-    return false;
-  }
-
-  return true;
 }
 
 // PayMongo Webhook
@@ -661,176 +558,70 @@ app.post('/api/webhooks/paymongo', async (req, res) => {
   let logId = null;
   let eventId = null;
   try {
-    // Verify signature
     if (!verifyPayMongoSignature(req)) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
-
-    // PayMongo wraps the event: req.body.data is the "event" resource, and the
-    // real event type + payload live under .attributes (.type / .data).
     const eventResource = req.body.data;
     const eventType = eventResource?.attributes?.type;
-    eventId = eventResource?.id || `unknown_${Date.now()}`; // Unique event ID for idempotency
+    eventId = eventResource?.id;
+    if (!eventId || !eventType) return res.status(400).json({ error: 'Malformed webhook event' });
 
-    // AUDIT LOG: Log raw payload BEFORE processing (even if it fails)
-    const { data: logEntry, error: logError } = await supabase
-      .from('webhook_logs')
-      .insert({
-        event_id: eventId,
-        event_type: eventType,
-        payload: req.body,
-        processed: false,
-      })
-      .select('id')
-      .single();
-
-    if (logError) {
-      console.error('[WEBHOOK] Failed to create audit log:', logError.message);
+    const { data: insertedLog, error: insertLogError } = await supabase.from('webhook_logs').upsert({
+      event_id: eventId,
+      event_type: eventType,
+      payload: req.body,
+      processed: false,
+      error_message: null,
+    }, { onConflict: 'event_id', ignoreDuplicates: true }).select('id, processed').maybeSingle();
+    if (insertLogError) throw insertLogError;
+    if (insertedLog) {
+      logId = insertedLog.id;
     } else {
-      logId = logEntry.id;
-      console.log(`[WEBHOOK] Logged event ${eventId} (log_id=${logId})`);
+      const { data: existingLog, error: existingLogError } = await supabase.from('webhook_logs')
+        .select('id, processed').eq('event_id', eventId).single();
+      if (existingLogError) throw existingLogError;
+      logId = existingLog.id;
+      if (existingLog.processed) return res.sendStatus(200);
     }
-
-    // IDEMPOTENCY CHECK: Skip if already processed
-    const { data: existingLog } = await supabase
-      .from('webhook_logs')
-      .select('processed, error_message')
-      .eq('event_id', eventId)
-      .neq('id', logId) // Ignore the entry we just created
-      .limit(1);
-
-    if (existingLog) {
-      if (existingLog.processed) {
-        console.log(`[WEBHOOK] Event ${eventId} already processed — skipping (idempotency)`);
-        return res.sendStatus(200);
-      } else {
-        console.warn(`[WEBHOOK] Event ${eventId} is logged but not yet marked processed — re-processing`);
-      }
-    }
-
-    console.log('[WEBHOOK] Received (verified):', eventType);
 
     if (eventType === 'checkout_session.payment.paid') {
-      const session = eventResource.attributes.data;
-      const sessionId = session.id;
-      const referenceNumber = session.attributes.reference_number;
-      const meta = session.attributes.metadata || {};
-
-      console.log(`Payment paid for session: ${sessionId}, ref: ${referenceNumber}`);
-
-      // Check if order already exists (idempotent — webhook may fire after confirm-payment)
-      const { data: existingOrders } = await supabase
-        .from('orders')
-        .select('id, status')
-        .eq('checkout_session_id', sessionId)
-        .limit(1);
-
-      if (existingOrders && existingOrders.length > 0) {
-        if (existingOrders[0].status !== 'paid') {
-          const { error: updateError } = await supabase
-            .from('orders')
-            .update({ status: 'paid' })
-            .eq('id', existingOrders[0].id);
-          if (updateError) {
-            console.error('Error updating order:', updateError.message);
-          } else {
-            console.log(`Order ${existingOrders[0].id} marked as paid (webhook)`);
-            // Decrement stock (non-blocking)
-            (async () => {
-              try {
-                const { data: fullOrder } = await supabase.from('orders').select('items, user_name').eq('id', existingOrders[0].id).single();
-                if (!fullOrder?.items) return;
-                await decrementStockForItems(fullOrder.items);
-                await createOrderNotifications(existingOrders[0].id, fullOrder.items, fullOrder.user_name);
-              } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
-            })();
-          }
-        } else {
-          console.log(`Order ${existingOrders[0].id} already paid — skipping`);
-        }
-        return res.sendStatus(200);
+      const webhookSession = eventResource.attributes.data;
+      const sessionId = webhookSession?.id;
+      const orderId = webhookSession?.attributes?.metadata?.orderId;
+      let query = supabase.from('orders').select(PAYMENT_ORDER_FIELDS);
+      query = orderId ? query.eq('id', orderId) : query.eq('checkout_session_id', sessionId);
+      const { data: order, error: orderError } = await query.maybeSingle();
+      if (orderError) throw orderError;
+      if (!order) {
+        const error = new Error(`Order not found for paid checkout session ${sessionId || 'unknown'}`);
+        error.status = 503;
+        throw error;
       }
-
-      // Insert order from session metadata (order not yet created)
-      let orderItems = [];
-      try {
-        orderItems = JSON.parse(meta.items || '[]');
-      } catch {
-        console.error('Invalid order items in webhook metadata');
-        return res.sendStatus(200);
+      if (order.checkout_session_id !== sessionId) {
+        const error = new Error('Webhook checkout session does not match the order');
+        error.status = 422;
+        throw error;
       }
+      await reconcileOrderPayment(order, { source: 'webhook', paidEvent: true, requireOrderMetadata: Boolean(orderId) });
+    }
 
-      const mappedItems = orderItems.map(item => ({
-        product_id: item.productId,
-        product_name: item.productName,
-        qty: item.qty,
-        price: item.price,
-        image: item.image || '',
-        shop_id: item.shopId || null,
-        shop_name: item.shopName || '',
-        variation_id: item.variationId || null,
-        variation: item.variation || '',
-      }));
+    const { error: completeError } = await supabase.from('webhook_logs').update({
+      processed: true,
+      processed_at: new Date().toISOString(),
+      error_message: null,
+    }).eq('id', logId);
+    if (completeError) throw completeError;
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error('[WEBHOOK] Processing failed:', error.message);
+    if (logId) {
+      await supabase.from('webhook_logs').update({ processed: false, error_message: error.message }).eq('id', logId);
+    }
+    return res.status(error.status && error.status < 500 ? error.status : 500).json({ error: 'Webhook processing failed' });
+  }
+});
 
-      const subtotal = parseFloat(meta.verifiedSubtotal) || 0;
-      const shippingFee = parseFloat(meta.verifiedShippingFee) || 0;
-      const total = subtotal + shippingFee;
-
-      const firstItem = mappedItems[0];
-      
-            const { data: newOrder, error: insertError } = await supabase.from('orders').insert({
-              user_id: meta.userId || '',
-              user_name: meta.userName || '',
-              user_phone: meta.userPhone || '',
-              user_address: meta.userAddress || '',
-              buyer_email: meta.userEmail || '',
-              shop_id: firstItem?.shop_id || null,
-              items: mappedItems,
-              subtotal,
-              shipping_fee: shippingFee,
-              total,
-              delivery_option: meta.deliveryOption || 'pickup',
-              delivery_status: 'pending',
-              status: 'paid',
-              payment_reference: referenceNumber,
-              checkout_session_id: sessionId,
-              lalamove_quote_id: meta.lalamoveQuoteId || null,
-            }).select().single();
-
-      if (insertError) {
-        console.error('Error creating order from webhook:', insertError.message);
-      } else {
-        console.log(`Order created from webhook for session ${sessionId}`);
-        // Decrement stock (non-blocking)
-        (async () => {
-          try {
-            await decrementStockForItems(mappedItems);
-            if (newOrder) {
-              await createOrderNotifications(newOrder.id, mappedItems, meta.userName || '');
-            }
-          } catch (e) { console.error('[stock] Webhook decrement failed:', e.message); }
-        })();
-      }
-          }
-
-          // Mark webhook as successfully processed
-          if (logId) {
-            await supabase.from('webhook_logs').update({ processed: true }).eq('id', logId);
-            console.log(`[WEBHOOK] Marked event ${eventId} as processed`);
-          }
-
-          res.sendStatus(200);
-        } catch (error) {
-          console.error('[WEBHOOK] Error processing event:', error);
-          // Log error to audit trail if we have a logId
-          if (logId) {
-            await supabase.from('webhook_logs').update({ processed: true, error_message: error.message }).eq('id', logId);
-          }
-          res.sendStatus(200); // Always return 200 to PayMongo to prevent retries
-        }
-      });
-
-      // Create notification for buyer
+// Create notification for buyer
 app.post('/api/notifications', async (req, res) => {
   try {
     const authUserId = await verifyAuth(req, res);
@@ -889,86 +680,6 @@ async function verifyAuth(req, res) {
     return null;
   }
   return user.id;
-}
-
-// Decrement stock for ordered items and recompute product-level stock.
-//   Variation-based product → decrement the variation row (rpc exists in DB),
-//     then recompute the product stock as the SUM of its variation stocks.
-//   Variation-less product  → decrement the product row directly. There are no
-//     product_variations rows to sum, so the recompute step below is GUARDED to
-//     skip these — the old code ran the recompute for every product and wrongly
-//     zeroed variation-less stock on every sale.
-// No custom migrations required: only standard select/update + the existing
-// decrement_stock rpc are used.
-async function createOrderNotifications(orderId, items, buyerName) {
-  try {
-    const shopIds = [...new Set(items.map(i => i.shop_id).filter(Boolean))];
-    for (const shopId of shopIds) {
-      const { data: shop } = await supabase.from('shops').select('owner_id, email').eq('id', shopId).single();
-      let ownerId = shop?.owner_id;
-      // Fallback: look up owner by shop email if owner_id is not set
-      if (!ownerId && shop?.email) {
-        const { data: authUser } = await supabase.auth.admin.getUserByEmail(shop.email);
-        ownerId = authUser?.user?.id;
-        if (ownerId) {
-          await supabase.from('shops').update({ owner_id: ownerId }).eq('id', shopId);
-        }
-      }
-      if (ownerId) {
-        await supabase.from('notifications').insert({
-          user_id: ownerId,
-          type: 'order',
-          title: 'New Order Received',
-          message: `${buyerName || 'A buyer'} placed an order (ID: ${orderId.substring(0, 8)})`,
-          order_id: orderId,
-        });
-      }
-    }
-  } catch (e) {
-    console.error('Failed to create order notifications:', e.message);
-  }
-}
-
-async function decrementStockForItems(items) {
-  if (!items || items.length === 0) return;
-
-  // 1) Decrement each ordered variation.
-  const variationItems = items.filter(i => i.variation_id);
-  for (const item of variationItems) {
-    try {
-      await supabase.rpc('decrement_stock', { p_variation_id: item.variation_id, p_qty: item.qty });
-    } catch (e) {
-      console.error('[stock] decrement_stock failed:', e.message);
-    }
-  }
-
-  // 2) Decrement variation-less products directly on the product row.
-  const variationless = items.filter(i => !i.variation_id && i.product_id);
-  for (const item of variationless) {
-    try {
-      const { data: p } = await supabase.from('products').select('stock').eq('id', item.product_id).single();
-      const current = Number(p?.stock) || 0;
-      const next = Math.max(0, current - (Number(item.qty) || 0));
-      await supabase.from('products').update({ stock: next }).eq('id', item.product_id);
-    } catch (e) {
-      console.error('[stock] product decrement failed:', e.message);
-    }
-  }
-
-  // 3) Recompute product stock ONLY for products that have variations, so a
-  //    variation-less product's direct decrement above is never overwritten.
-  const productIdsWithVariations = [...new Set(
-    items.filter(i => i.variation_id && i.product_id).map(i => i.product_id)
-  )];
-  for (const pid of productIdsWithVariations) {
-    try {
-      const { data: vars } = await supabase.from('product_variations').select('stock').eq('product_id', pid);
-      const totalStock = (vars || []).reduce((s, v) => s + (Number(v.stock) || 0), 0);
-      await supabase.from('products').update({ stock: totalStock }).eq('id', pid);
-    } catch (e) {
-      console.error('[stock] recompute failed:', e.message);
-    }
-  }
 }
 
 // ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────

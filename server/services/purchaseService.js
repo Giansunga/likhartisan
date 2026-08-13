@@ -13,7 +13,8 @@ export function buyerOrderStatus(order) {
   if (order.status === 'cancelled') return 'cancelled';
   if (order.status === 'refunded' || order.payment_status === 'refunded') return 'return-refund';
   if (order.status === 'completed' || order.delivery_status === 'completed') return 'completed';
-  if (order.status === 'pending' || (order.payment_status ?? 'pending') === 'pending') return 'to-pay';
+  if (order.payment_status === 'paid') return order.delivery_status === 'delivered' ? 'to-receive' : 'to-ship';
+  if (order.status === 'pending' || (order.payment_status ?? 'pending') !== 'paid') return 'to-pay';
   if (order.delivery_status === 'delivered') return 'to-receive';
   return 'to-ship';
 }
