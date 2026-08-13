@@ -141,33 +141,50 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     injectThemeStyle(name);
   }, []);
 
-  useEffect(() => {
-    async function loadTheme() {
-      try {
-        const { data } = await supabase
-          .from('theme_settings')
-          .select('theme_name, auto_detect')
-          .eq('id', 'current')
-          .single();
+  const loadTheme = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('theme_settings')
+        .select('theme_name, auto_detect')
+        .eq('id', 'current')
+        .single();
 
-        if (data) {
-          setAutoDetectState(data.auto_detect ?? true);
-          if (data.auto_detect) {
-            applyTheme(getAutoDetectTheme());
-          } else {
-            applyTheme(isThemeName(data.theme_name) ? data.theme_name : 'default');
-          }
-        } else {
+      if (data) {
+        setAutoDetectState(data.auto_detect ?? true);
+        if (data.auto_detect) {
           applyTheme(getAutoDetectTheme());
+        } else {
+          applyTheme(isThemeName(data.theme_name) ? data.theme_name : 'default');
         }
-      } catch {
+      } else {
         applyTheme(getAutoDetectTheme());
-      } finally {
-        setLoading(false);
       }
+    } catch {
+      applyTheme(getAutoDetectTheme());
+    } finally {
+      setLoading(false);
     }
-    loadTheme();
   }, [applyTheme]);
+
+  useEffect(() => { queueMicrotask(() => { void loadTheme(); }); }, [loadTheme]);
+
+  useEffect(() => {
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    void (async () => {
+      if (!supabase.realtime?.setAuth) return;
+      await supabase.realtime.setAuth();
+      if (!active) return;
+      channel = supabase
+        .channel('app:theme', { config: { private: true } })
+        .on('broadcast', { event: 'db_change' }, () => { void loadTheme(); })
+        .subscribe();
+    })().catch(() => undefined);
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [loadTheme]);
 
   useEffect(() => {
     if (!autoDetect) return;

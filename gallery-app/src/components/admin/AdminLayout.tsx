@@ -3,6 +3,7 @@ import { NavLink, Link, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_EMAILS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
+import { PortalRealtimeProvider } from '../../realtime/PortalRealtimeProvider';
 import '../portal.css';
 import './admin.css';
 
@@ -85,6 +86,7 @@ export default function AdminLayout() {
   let lastSection = '';
 
   return (
+    <PortalRealtimeProvider topics={['admin:portal']}>
     <div className="admin-shell" style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh' }}>
       {/* ── HEADER ── */}
       <header className="admin-header" style={{
@@ -206,6 +208,7 @@ export default function AdminLayout() {
         </main>
       </div>
     </div>
+    </PortalRealtimeProvider>
   );
 }
 

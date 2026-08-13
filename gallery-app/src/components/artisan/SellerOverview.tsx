@@ -99,12 +99,14 @@ export default function SellerOverview() {
 
   useEffect(() => {
     queueMicrotask(() => { void fetchOverview(); });
-    const channel = supabase.channel(`seller-overview:${shop.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void fetchOverview(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shop.id}` }, () => { void fetchOverview(); })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [fetchOverview, shop.id]);
+    const interval = window.setInterval(() => { void fetchOverview(); }, 45_000);
+    const handleFocus = () => { void fetchOverview(); };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchOverview]);
 
   const shopOrders = useMemo(() => filterShopOrders(orders, shop.id, shop.name), [orders, shop.id, shop.name]);
   const rangedOrders = useMemo(() => shopOrders.filter(order => inDateRange(order, range)), [shopOrders, range]);

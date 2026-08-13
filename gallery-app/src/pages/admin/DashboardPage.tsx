@@ -160,24 +160,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
-    const ordersChannel = supabase
-      .channel('dashboard-orders-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, fetchDashboard)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, fetchDashboard)
-      .subscribe();
-    return () => { supabase.removeChannel(ordersChannel); };
+    const interval = window.setInterval(fetchDashboard, 45_000);
+    const handleFocus = () => { void fetchDashboard(); };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {
     fetchActiveUsers();
     const interval = setInterval(fetchActiveUsers, 30000);
-    const channel = supabase
-      .channel('dashboard-active-users')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_roles' }, () => fetchActiveUsers())
-      .subscribe();
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(channel);
     };
   }, []);
 

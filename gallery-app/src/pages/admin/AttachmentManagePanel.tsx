@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FreeformViewer from '../../components/freeform/FreeformViewer';
 import {
   createAttachmentSelection,
@@ -9,6 +9,7 @@ import {
 } from '../../components/freeform/attachments';
 import { GENERATED_ATTACHMENT_RECIPES } from '../../components/freeform/generatedAttachmentCatalog';
 import { supabase } from '../../lib/supabase';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 type Shop = { id: string; name: string };
 type Model = { id: string; name: string; file_url: string; status: string };
@@ -30,8 +31,9 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
   const [savingKey, setSavingKey] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const dirtyRef = useRef(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError('');
     const [settingsResult, shopsResult, modelsResult] = await Promise.all([
       supabase.from('generated_attachment_catalog_settings').select('*').order('recipe_key'),
@@ -50,28 +52,33 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
     setModels(nextModels);
     setPreviewModelId((current) => current || nextModels[0]?.id || '');
     setLoading(false);
-  }
+  }, []);
 
   // Loading the settings collections is the mount effect's purpose.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    let alive = true;
-    async function loadOverrides() {
-      if (!selectedShopId) { setOverrides({}); return; }
-      const { data, error: overrideError } = await supabase.from('generated_attachment_shop_overrides').select('*').eq('shop_id', selectedShopId);
-      if (!alive) return;
-      if (overrideError) { setError(overrideError.message); return; }
-      const byKey = new Map(((data || []) as ShopOverrideRecord[]).map((row) => [row.recipe_key, row]));
-      setOverrides(Object.fromEntries(GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
-        const row = byKey.get(recipe.key);
-        return [recipe.key, row ? { mode: row.enabled ? 'enabled' : 'disabled', price: row.price_adjustment == null ? '' : String(row.price_adjustment), days: row.production_days_adjustment == null ? '' : String(row.production_days_adjustment) } : { mode: 'inherit', price: '', days: '' }];
-      })));
-    }
-    void loadOverrides();
-    return () => { alive = false; };
+  const loadOverrides = useCallback(async () => {
+    if (!selectedShopId) { setOverrides({}); return; }
+    const { data, error: overrideError } = await supabase.from('generated_attachment_shop_overrides').select('*').eq('shop_id', selectedShopId);
+    if (overrideError) { setError(overrideError.message); return; }
+    const byKey = new Map(((data || []) as ShopOverrideRecord[]).map((row) => [row.recipe_key, row]));
+    setOverrides(Object.fromEntries(GENERATED_ATTACHMENT_RECIPES.map((recipe) => {
+      const row = byKey.get(recipe.key);
+      return [recipe.key, row ? { mode: row.enabled ? 'enabled' : 'disabled', price: row.price_adjustment == null ? '' : String(row.price_adjustment), days: row.production_days_adjustment == null ? '' : String(row.production_days_adjustment) } : { mode: 'inherit', price: '', days: '' }];
+    })));
   }, [selectedShopId]);
+
+  useEffect(() => { queueMicrotask(() => { void loadOverrides(); }); }, [loadOverrides]);
+
+  const refreshIfClean = useCallback(async () => {
+    if (dirtyRef.current) return;
+    await Promise.all([load(), loadOverrides()]);
+  }, [load, loadOverrides]);
+  usePortalRealtimeRefresh(
+    ['generated_attachment_catalog_settings', 'generated_attachment_shop_overrides', 'models_3d', 'shops'],
+    refreshIfClean,
+  );
 
   async function saveGlobal(recipeKey: string) {
     const draft = globals[recipeKey];
@@ -84,7 +91,7 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
       default_production_days: Math.max(0, Math.round(draft.days)),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'recipe_key' });
-    if (saveError) setError(saveError.message); else setMessage('Global settings saved.');
+    if (saveError) setError(saveError.message); else { dirtyRef.current = false; setMessage('Global settings saved.'); }
     setSavingKey('');
   }
 
@@ -102,7 +109,7 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
           production_days_adjustment: draft.days === '' ? null : Math.max(0, Math.round(Number(draft.days))),
           updated_at: new Date().toISOString(),
         }, { onConflict: 'recipe_key,shop_id' });
-    if (result.error) setError(result.error.message); else setMessage('Shop override saved.');
+    if (result.error) setError(result.error.message); else { dirtyRef.current = false; setMessage('Shop override saved.'); }
     setSavingKey('');
   }
 
@@ -117,7 +124,7 @@ export default function AttachmentManagePanel({ onBack }: { onBack: () => void }
 
   if (loading) return <div className="py-16 text-center text-brown-medium">Loading generated catalog…</div>;
 
-  return <div className="space-y-7">
+  return <div className="space-y-7" onChangeCapture={() => { dirtyRef.current = true; }}>
     <div className="portal-action-bar portal-action-bar--between"><button onClick={onBack} className="text-sm text-brown-medium hover:text-primary">← Base models</button><span className="px-3 py-2 rounded-xl bg-cream-secondary text-xs font-semibold text-brown-medium whitespace-nowrap">{GENERATED_ATTACHMENT_RECIPES.length} code-owned recipes</span></div>
     {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>}
     {message && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">{message}</div>}

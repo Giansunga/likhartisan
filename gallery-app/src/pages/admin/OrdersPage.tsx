@@ -20,6 +20,7 @@ import { purchaseApi } from '../../lib/purchaseApi';
 import type { Order, OrderActivityLog } from '../../types';
 import type { ReturnRequest } from '../../types/purchases';
 import '../../components/admin/orders/orders.css';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 const INPUT_STYLE: React.CSSProperties = {
   padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
@@ -113,7 +114,9 @@ export default function OrdersPage() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setOrders((data || []) as Order[]);
+      const nextOrders = (data || []) as Order[];
+      setOrders(nextOrders);
+      setSelectedOrder(current => current ? nextOrders.find(order => order.id === current.id) || null : null);
     } catch (e: any) {
       console.error('Failed to fetch orders:', e);
       setLoadError(e?.message || 'Check your connection and try again.');
@@ -125,38 +128,10 @@ export default function OrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
+  usePortalRealtimeRefresh(['orders'], fetchOrders);
+
   /* ── realtime ── */
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin-orders')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        setOrders(prev => [payload.new as Order, ...prev]);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
-        const nextOrder = payload.new as Order;
-        setOrders(prev => prev.map(o => o.id === nextOrder.id ? nextOrder : o));
-        setSelectedOrder(prev => prev?.id === nextOrder.id ? nextOrder : prev);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
-        setOrders(prev => prev.filter(o => o.id !== payload.old.id));
-        setSelectedOrder(prev => prev?.id === payload.old.id ? null : prev);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
   /* ── realtime activity log ── */
-  useEffect(() => {
-    if (!selectedOrder) return;
-    const channel = supabase
-      .channel(`order-activity:${selectedOrder.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_activity_log', filter: `order_id=eq.${selectedOrder.id}` }, (payload) => {
-        setActivityLogs(prev => [payload.new as OrderActivityLog, ...prev]);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedOrder?.id]);
-
   /* ── toast helper ── */
   function showToast(message: string, type: 'success' | 'error') {
     setToast({ message, type });
@@ -417,17 +392,18 @@ export default function OrdersPage() {
   }
 
   /* ── load activity logs for selected order ── */
-  useEffect(() => {
+  const fetchActivityLogs = useCallback(async () => {
     if (!selectedOrder) { setActivityLogs([]); return; }
-    (async () => {
-      const { data } = await supabase
-        .from('order_activity_log')
-        .select('*')
-        .eq('order_id', selectedOrder.id)
-        .order('created_at', { ascending: false });
-      setActivityLogs((data || []) as OrderActivityLog[]);
-    })();
-  }, [selectedOrder?.id]);
+    const { data } = await supabase
+      .from('order_activity_log')
+      .select('*')
+      .eq('order_id', selectedOrder.id)
+      .order('created_at', { ascending: false });
+    setActivityLogs((data || []) as OrderActivityLog[]);
+  }, [selectedOrder]);
+
+  useEffect(() => { queueMicrotask(() => { void fetchActivityLogs(); }); }, [fetchActivityLogs]);
+  usePortalRealtimeRefresh(['order_activity_log'], fetchActivityLogs);
 
   useEffect(() => {
     if (!selectedOrder) { setReturnRequest(null); return; }

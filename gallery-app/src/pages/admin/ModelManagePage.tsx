@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
 import AttachmentManagePanel from './AttachmentManagePanel';
 
@@ -55,6 +56,9 @@ export default function ModelManagePage() {
     const { data } = await supabase.from('shops').select('id, name').order('name');
     if (data) setShops(data);
   }
+
+  usePortalRealtimeRefresh(['models_3d'], fetchModels);
+  usePortalRealtimeRefresh(['shops'], fetchShops);
 
   const filtered = models.filter(m => {
     if (showArchived ? m.status !== 'archived' : m.status === 'archived') return false;

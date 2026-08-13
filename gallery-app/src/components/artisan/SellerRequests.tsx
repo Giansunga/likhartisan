@@ -10,6 +10,7 @@ import type { DesignRequest, DesignRequestStatus } from '../../types/designReque
 import { REQUEST_STATUS_LABELS } from '../../types/designRequest';
 import { useArtisanPortal } from './artisanContextValue';
 import { useOverlayA11y } from './useOverlayA11y';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 type Filter = 'all' | Exclude<DesignRequestStatus, 'approved'>;
 type ResponseAction = 'quote' | 'request_changes' | 'decline';
@@ -54,10 +55,7 @@ export default function SellerRequests() {
   }, [requestedRequestId, shop.id]);
 
   useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
-  useEffect(() => {
-    const channel = supabase.channel(`design-requests:${shop.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'design_requests', filter: `shop_id=eq.${shop.id}` }, () => { void load(true); }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [load, shop.id]);
+  usePortalRealtimeRefresh(['design_requests'], () => load(true));
   const visible = useMemo(() => filter === 'all' ? requests : requests.filter(item => item.status === filter), [filter, requests]);
 
   function openRequest(request: RequestRow) {

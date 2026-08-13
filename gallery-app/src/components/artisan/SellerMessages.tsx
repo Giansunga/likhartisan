@@ -21,6 +21,7 @@ import type { ArtisanConversationSummary, ArtisanMessage } from '../../types/art
 import { SellerConfirmDialog } from './Overlay';
 import { useArtisanPortal } from './artisanContextValue';
 import { filterConversations, groupMessages, parseMessageContent, type ConversationFilter } from './messageUtils';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -95,37 +96,21 @@ export default function SellerMessages() {
 
   useEffect(() => { queueMicrotask(() => { void loadConversations(); }); }, [loadConversations]);
 
-  useEffect(() => {
-    const channel = supabase.channel(`seller-inbox:${shop.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shop.id}` }, () => { void loadConversations(true); })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [loadConversations, shop.id]);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let active = true;
-    supabase.from('messages').select('*').eq('conversation_id', selectedId).order('created_at', { ascending: true })
-      .then(({ data, error: messageError }) => {
-        if (!active) return;
-        if (messageError) setError(messageError.message);
-        else setMessages((data || []) as ArtisanMessage[]);
-        setMessagesLoading(false);
-      });
-    return () => { active = false; };
+  const loadMessages = useCallback(async () => {
+    if (!selectedId) { setMessages([]); return; }
+    const { data, error: messageError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', selectedId)
+      .order('created_at', { ascending: true });
+    if (messageError) setError(messageError.message);
+    else setMessages((data || []) as ArtisanMessage[]);
+    setMessagesLoading(false);
   }, [selectedId]);
 
-  useEffect(() => {
-    if (!selectedId) return;
-    const channel = supabase.channel(`seller-messages:${selectedId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedId}` }, payload => {
-        const incoming = payload.new as ArtisanMessage;
-        setMessages(current => current.some(message => message.id === incoming.id) ? current : [...current, incoming]);
-        if (incoming.sender_id !== userId) void supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedId).select('id').maybeSingle();
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [selectedId, userId]);
+  useEffect(() => { queueMicrotask(() => { void loadMessages(); }); }, [loadMessages]);
+  usePortalRealtimeRefresh(['conversations', 'orders'], () => loadConversations(true));
+  usePortalRealtimeRefresh(['messages'], loadMessages);
 
   useEffect(() => {
     const area = messageAreaRef.current;

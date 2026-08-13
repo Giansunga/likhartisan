@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { uploadToR2 } from '../../lib/r2';
 import { recomputeProductStock } from '../../lib/stockSync';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
 
@@ -80,6 +81,13 @@ export default function ProductCreatePage() {
       .then(({ data }) => { if (active && data) setShops(data); });
     return () => { active = false; };
   }, []);
+
+  async function refreshShops() {
+    const { data } = await supabase.from('shops').select('id, name, email').order('name');
+    if (data) setShops(data);
+  }
+
+  usePortalRealtimeRefresh(['shops'], refreshShops);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));

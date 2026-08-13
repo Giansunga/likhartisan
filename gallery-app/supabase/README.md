@@ -9,6 +9,7 @@ MIGRATION ORDER (run in this sequence on a fresh Supabase project):
 
 OPTIONAL / INCREMENTAL FILES (for existing databases, column additions):
 
+  enable-portal-realtime-broadcast.sql  Secure admin/shop portal live invalidations
   enable-realtime.sql              Enable Supabase Realtime for chat
   add-shop-followers.sql           Shop followers table (included in master)
   add-theme-settings.sql           Theme settings table (included in master)

@@ -6,6 +6,7 @@ import type { ArtisanNotification } from '../../types/artisan';
 import { SellerConfirmDialog } from './Overlay';
 import { useArtisanPortal } from './artisanContextValue';
 import { filterNotifications, groupNotifications, notificationCategory, notificationCounts, relativeNotificationTime, type NotificationFilter } from './notificationUtils';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 const tabs: Array<{ key: NotificationFilter; label: string }> = [
   { key: 'all', label: 'All' }, { key: 'unread', label: 'Unread' }, { key: 'orders', label: 'Orders' }, { key: 'messages', label: 'Messages' }, { key: 'system', label: 'System' },
@@ -33,10 +34,7 @@ export default function SellerNotifications() {
   }, [userId]);
 
   useEffect(() => { queueMicrotask(() => { void loadNotifications(); }); }, [loadNotifications]);
-  useEffect(() => {
-    const channel = supabase.channel(`seller-notifications:${userId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => { void loadNotifications(true); }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [loadNotifications, userId]);
+  usePortalRealtimeRefresh(['notifications'], () => loadNotifications(true));
 
   async function setRead(notification: ArtisanNotification, read: boolean) {
     const { data, error: updateError } = await supabase.from('notifications').update({ read }).eq('id', notification.id).eq('user_id', userId).select('*').single();

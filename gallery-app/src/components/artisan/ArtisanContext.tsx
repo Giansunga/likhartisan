@@ -4,7 +4,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import { SHOP_EMAILS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import type { ArtisanProduct, ArtisanShop } from '../../types/artisan';
-import { ArtisanContext, type ArtisanContextValue } from './artisanContextValue';
+import { PortalRealtimeProvider } from '../../realtime/PortalRealtimeProvider';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { ArtisanContext, useArtisanPortal, type ArtisanContextValue } from './artisanContextValue';
+
+function ArtisanRealtimeBridge({ refreshProducts }: { refreshProducts: () => Promise<void> }) {
+  const { shop, setShop } = useArtisanPortal();
+  const refreshShop = useCallback(async () => {
+    const { data } = await supabase.from('shops').select('*').eq('id', shop.id).maybeSingle();
+    if (data) setShop(data as ArtisanShop);
+  }, [setShop, shop.id]);
+  usePortalRealtimeRefresh(['products', 'product_variations'], refreshProducts);
+  usePortalRealtimeRefresh(['shops'], refreshShop);
+  return null;
+}
 
 export default function ArtisanProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -147,5 +160,12 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
 
   if (!checked || authLoading) return <div className="seller-route-loader">Loading your shop…</div>;
   if (!value) return <Navigate to="/" replace />;
-  return <ArtisanContext.Provider value={value}>{children}</ArtisanContext.Provider>;
+  return (
+    <PortalRealtimeProvider topics={[`shop:${value.shop.id}`, `user:${value.userId}`]}>
+      <ArtisanContext.Provider value={value}>
+        <ArtisanRealtimeBridge refreshProducts={fetchProducts} />
+        {children}
+      </ArtisanContext.Provider>
+    </PortalRealtimeProvider>
+  );
 }

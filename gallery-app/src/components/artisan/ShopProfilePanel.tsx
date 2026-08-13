@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase';
 import type { ArtisanShop } from '../../types/artisan';
 import { useArtisanPortal } from './artisanContextValue';
 import { getShopProfileCompletion, makeShopProfileDraft, SHOP_PROFILE_LIMITS, validateShopProfile, type ShopProfileDraft } from './shopProfile';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 type MediaKind = 'profile' | 'cover';
@@ -54,6 +55,19 @@ export default function ShopProfilePanel() {
   useEffect(() => () => {
     objectUrls.current.forEach(url => URL.revokeObjectURL(url));
   }, []);
+
+  const refreshShop = useCallback(async () => {
+    const { data, error } = await supabase.from('shops').select('*').eq('id', shop.id).single();
+    if (error || !data) return;
+    const updatedShop = data as ArtisanShop;
+    setShop(updatedShop);
+    if (!isDirty) {
+      const nextDraft = makeShopProfileDraft(updatedShop);
+      setSaved(nextDraft);
+      setDraft(nextDraft);
+    }
+  }, [isDirty, setShop, shop.id]);
+  usePortalRealtimeRefresh(['shops'], refreshShop);
 
   function updateField(field: 'name' | 'description' | 'about' | 'location', value: string) {
     setDraft(current => ({ ...current, [field]: value }));

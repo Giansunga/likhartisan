@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { SUPER_ADMIN_MANAGER_EMAILS } from '../../lib/constants';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 type RoleRow = { role: string; shop_id: string | null };
 type AppUser = {
@@ -57,6 +58,7 @@ export default function RoleAssignationPage() {
   useEffect(() => {
     load();
   }, [load]);
+  usePortalRealtimeRefresh(['user_roles', 'shops'], load);
 
   const promoteShopOwner = async (u: AppUser) => {
     setActionId(u.id);

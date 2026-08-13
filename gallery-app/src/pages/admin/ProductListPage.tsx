@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
 import ProductTable from '../../components/admin/ProductTable';
 import type { Product } from '../../types';
@@ -78,6 +79,8 @@ export default function ProductListPage() {
     }
     setLoading(false);
   }
+
+  usePortalRealtimeRefresh(['products', 'product_variations'], fetchProducts);
 
   const handleDelete = async (id: string) => {
     if (confirm('Delete this product?')) {

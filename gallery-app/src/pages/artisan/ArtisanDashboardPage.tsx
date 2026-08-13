@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component, type ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { SellerConfirmDialog } from '../../components/artisan/Overlay';
 import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -1357,20 +1358,7 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
   }
 
   useEffect(() => { if (shopId) fetchOrders(); }, [shopId, shopName]);
-
-  // Realtime: listen for new/updated orders for this shop
-  useEffect(() => {
-    if (!shopId || !shopName) return;
-
-    const channel = supabase
-      .channel(`shop-orders:${shopId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void fetchOrders(); })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [shopId, shopName]);
+  usePortalRealtimeRefresh(['orders'], fetchOrders);
 
   useEffect(() => {
     const orderId = searchParams.get('orderId');
@@ -1811,25 +1799,15 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
   }, [messages]);
 
   // Real-time: subscribe to messages for active conversation
-  useEffect(() => {
+  usePortalRealtimeRefresh(['messages'], async () => {
+    await init();
     if (!selectedConv) return;
-    const channel = supabase
-      .channel(`artisan-messages:${selectedConv.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, async (payload) => {
-        const newMsg = payload.new as any;
-        setMessages(prev => {
-          if (prev.some((m: any) => m.id === newMsg.id)) return prev;
-          return [...prev, newMsg];
-        });
-        // Conversation is actively viewed — keep artisan_unread at 0 in DB
-        if (artisanUserId && newMsg.sender_id !== artisanUserId) {
-          await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
-        }
-        setConversations(prev => prev.map((c: any) => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedConv?.id]);
+    await fetchMessages(selectedConv.id);
+    // Conversation is actively viewed, so reconcile its unread count after refetching.
+    if (artisanUserId) {
+      await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', selectedConv.id);
+    }
+  });
 
   // When a conversation is opened, mark it read for the artisan.
     useEffect(() => {
@@ -1866,6 +1844,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                 return { ...c, buyer_name: fallback };
               });
               setConversations(enriched);
+              setSelectedConv((current: any) => current ? enriched.find((conversation: any) => conversation.id === current.id) || null : null);
             }
           }
         } catch (e) {
@@ -1876,24 +1855,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
       }
 
     // Realtime: listen for new conversations for this shop
-    useEffect(() => {
-      if (!shopId) return;
-      const channel = supabase
-        .channel(`shop-conversations:${shopId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
-          const newConv = payload.new as any;
-          setConversations(prev => {
-            if (prev.some((c: any) => c.id === newConv.id)) return prev;
-            return [newConv, ...prev];
-          });
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `shop_id=eq.${shopId}` }, (payload) => {
-          const updated = payload.new as any;
-          setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at, artisan_unread: updated.artisan_unread, buyer_unread: updated.buyer_unread } : c));
-        })
-        .subscribe();
-      return () => { supabase.removeChannel(channel); };
-    }, [shopId]);
+    usePortalRealtimeRefresh(['conversations'], init);
 
   async function fetchMessages(convId: string) {
     const { data } = await supabase
@@ -2566,25 +2528,19 @@ export function NotificationsPanel({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchNotifications = useCallback(async () => {
     if (!userId) { setLoading(false); return; }
-    let cancelled = false;
-    async function fetchNotifications() {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      if (!cancelled && data) setNotifications(data);
-      if (!cancelled) setLoading(false);
-    }
-    fetchNotifications();
-    const channel = supabase
-      .channel(`artisan-notifs:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, fetchNotifications)
-      .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (data) setNotifications(data);
+    setLoading(false);
   }, [userId]);
+
+  useEffect(() => { queueMicrotask(() => { void fetchNotifications(); }); }, [fetchNotifications]);
+  usePortalRealtimeRefresh(['notifications'], fetchNotifications);
 
   async function markRead(id: string) {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
