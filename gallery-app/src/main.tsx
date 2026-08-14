@@ -4,14 +4,17 @@ import './index.css'
 import App from './App'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
+import { LikhAIProvider } from './contexts/LikhAIContext'
 import { Toaster } from 'sonner'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <App />
-        <Toaster position="bottom-right" richColors closeButton />
+        <LikhAIProvider>
+          <App />
+          <Toaster position="bottom-right" richColors closeButton />
+        </LikhAIProvider>
       </AuthProvider>
     </ThemeProvider>
   </StrictMode>,

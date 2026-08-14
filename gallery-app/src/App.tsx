@@ -38,6 +38,7 @@ import {
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
+const ChatbotPage = lazy(() => import('./pages/ChatbotPage'));
 const FreeformPage = lazy(() => import('./pages/FreeformPage'));
 // Admin lazy pages
 const AdminOrdersPage = lazy(() => import('./pages/admin/OrdersPage'));
@@ -92,9 +93,10 @@ function AppShell() {
   const isCheckoutPage = location.pathname === '/checkout';
   const isCartPage = location.pathname === '/cart';
   const isChatPage = location.pathname === '/chat';
+  const isLikhAIPage = location.pathname === '/likhai';
   const isDashboardPage = location.pathname === '/dashboard';
   const isArtisanPage = location.pathname.startsWith('/artisan-dashboard');
-  const shouldHideDock = isArtisanPage || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
+  const shouldHideDock = isLikhAIPage || isArtisanPage || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
 
   return (
     <>
@@ -119,6 +121,7 @@ function AppShell() {
             <Route path="signup" element={<SignUpPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
+            <Route path="likhai" element={<ChatbotPage />} />
             <Route path="freeform" element={<FreeformPage />} />
           </Route>
           <Route path="artisan-dashboard" element={<Layout />}>

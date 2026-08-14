@@ -1,0 +1,64 @@
+@keyframes likhai-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .35; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes likhai-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.likhai-conversation { display: flex; flex-direction: column; min-height: 0; flex: 1; font-family: var(--font-sans); background: #faf8f5; }
+.likhai-messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px; }
+.likhai-welcome { max-width: 560px; margin: 0 auto; padding: 30px 10px; text-align: center; }
+.likhai-welcome > img { width: 64px; height: 64px; border-radius: 18px; object-fit: cover; }
+.likhai-welcome h2 { margin: 14px 0 6px; color: var(--text-dark); font-family: var(--font-serif); }
+.likhai-welcome p { color: var(--text-muted); line-height: 1.55; font-size: .9rem; }
+.likhai-quick-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.likhai-quick-actions button, .likhai-suggestions button { border: 1px solid #e2d6ca; background: #fff; color: var(--text-dark); border-radius: 999px; padding: 8px 12px; cursor: pointer; font: inherit; font-size: .78rem; }
+.likhai-quick-actions button:hover, .likhai-suggestions button:hover { border-color: #823e0b; color: #823e0b; }
+.likhai-human-link { display: inline-block; margin-top: 18px; color: #823e0b; font-weight: 700; }
+.likhai-message { display: flex; gap: 9px; max-width: 760px; margin: 0 auto 16px; align-items: flex-start; }
+.likhai-message--user { justify-content: flex-end; }
+.likhai-avatar { width: 30px; height: 30px; border-radius: 9px; object-fit: cover; flex: 0 0 auto; }
+.likhai-message__content { min-width: 0; max-width: min(82%, 640px); }
+.likhai-message__content time { display: block; color: var(--text-light); font-size: .68rem; margin: 4px 3px; }
+.likhai-message--user time { text-align: right; }
+.likhai-bubble { padding: 11px 14px; border-radius: 16px 16px 16px 4px; border: 1px solid #e8e0d8; background: #fff; color: var(--text-dark); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; font-size: .86rem; }
+.likhai-message--user .likhai-bubble { background: #823e0b; border-color: #823e0b; color: #fff; border-radius: 16px 16px 4px 16px; }
+.likhai-bubble--error { border-color: #e2b8a9; background: #fff7f3; }
+.likhai-grounding-note { color: #8a5a22; font-size: .72rem; margin: 5px 4px; }
+.likhai-results { margin-top: 8px; }
+.likhai-card { box-sizing: border-box; border: 1px solid #e8e0d8; border-radius: 12px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.05); margin-bottom: 8px; color: var(--text-dark); text-decoration: none; overflow: hidden; }
+.likhai-card__header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #eee5dc; font-size: .8rem; }
+.likhai-status { padding: 3px 8px; border-radius: 999px; font-size: .7rem; white-space: nowrap; }
+.likhai-card__body, .likhai-product-card, .likhai-shop-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.likhai-card__image { width: 54px; height: 54px; border-radius: 8px; object-fit: cover; background: #f2eae1; flex: 0 0 auto; }
+.likhai-card__image--small { width: 44px; height: 44px; }
+.likhai-card__content { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; font-size: .8rem; }
+.likhai-card__content span { color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.likhai-card__price { color: #823e0b; }
+.likhai-card__actions { display: flex; gap: 7px; padding: 0 12px 10px; }
+.likhai-card__actions a, .likhai-actions a { border: 1px solid #823e0b; border-radius: 8px; padding: 7px 10px; color: #823e0b; text-decoration: none; font-size: .75rem; font-weight: 700; text-align: center; }
+.likhai-card__actions a { flex: 1; }
+.likhai-card__actions .likhai-card__secondary { border-color: #e2d6ca; color: var(--text-dark); }
+.likhai-shop-card__icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #f2eae1; color: #823e0b; }
+.likhai-shop-card__description { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.likhai-actions, .likhai-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.likhai-suggestions button { text-align: left; }
+.likhai-feedback { display: flex; align-items: center; gap: 4px; color: var(--text-light); font-size: .7rem; margin-top: 7px; }
+.likhai-feedback button { border: 0; background: transparent; opacity: .55; cursor: pointer; border-radius: 5px; padding: 2px 4px; }
+.likhai-feedback button:hover, .likhai-feedback button.is-selected { opacity: 1; background: #f2eae1; }
+.likhai-typing { display: flex; gap: 4px; padding: 13px 17px; border: 1px solid #e8e0d8; border-radius: 16px; background: #fff; }
+.likhai-typing span { width: 6px; height: 6px; border-radius: 50%; background: #823e0b; animation: likhai-bounce 1.4s infinite; }
+.likhai-typing span:nth-child(2) { animation-delay: .2s; } .likhai-typing span:nth-child(3) { animation-delay: .4s; }
+.likhai-composer { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #e8e0d8; background: #fff; }
+.likhai-composer input { flex: 1; min-width: 0; border: 1px solid #e2d6ca; border-radius: 999px; background: #faf8f5; padding: 11px 14px; color: var(--text-dark); font: inherit; outline: none; }
+.likhai-composer input:focus { border-color: #823e0b; }
+.likhai-send { width: 38px; height: 38px; border: 0; border-radius: 50%; background: #823e0b; color: #fff; cursor: pointer; }
+.likhai-send:disabled { background: #e2d6ca; cursor: default; }
+.likhai-clear { border: 0; background: transparent; color: var(--text-light); cursor: pointer; font-size: .72rem; }
+.likhai-conversation--compact .likhai-messages { padding: 13px; }
+.likhai-conversation--compact .likhai-welcome { padding: 18px 4px; }
+.likhai-conversation--compact .likhai-welcome > img { width: 50px; height: 50px; }
+.likhai-conversation--compact .likhai-welcome p { font-size: .78rem; }
+.likhai-conversation--compact .likhai-quick-actions { flex-direction: column; }
+.likhai-conversation--compact .likhai-quick-actions button { width: 100%; border-radius: 9px; text-align: left; }
+.likhai-conversation--compact .likhai-message__content { max-width: 86%; }
+.likhai-conversation--compact .likhai-bubble { font-size: .8rem; padding: 9px 12px; }
+.likhai-conversation--compact .likhai-actions a, .likhai-conversation--compact .likhai-suggestions button { width: 100%; box-sizing: border-box; }
+
+@media (max-width: 600px) { .likhai-message__content { max-width: 88%; } .likhai-messages { padding: 14px; } }
