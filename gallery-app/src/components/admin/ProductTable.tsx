@@ -1,5 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { Product } from '../../types';
+
+const PRODUCT_PAGE_STORAGE_KEY = 'admin-products-page';
+
+function getInitialPage() {
+  if (typeof window === 'undefined') return 1;
+
+  const savedPage = Number.parseInt(window.sessionStorage.getItem(PRODUCT_PAGE_STORAGE_KEY) ?? '', 10);
+  return Number.isInteger(savedPage) && savedPage > 0 ? savedPage : 1;
+}
 
 interface ProductTableProps {
   products: Product[];
@@ -20,7 +29,7 @@ export default function ProductTable({ products, onDelete, onArchive, onEdit }: 
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock' | 'createdAt'>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [page, setPage] = useState(1);
+  const [requestedPage, setPage] = useState(getInitialPage);
   const perPage = 6;
 
   const shopNames = useMemo(() => [...new Set(products.map(p => p.shopName))], [products]);
@@ -46,7 +55,12 @@ export default function ProductTable({ products, onDelete, onArchive, onEdit }: 
   }, [products, search, shopFilter, categoryFilter, statusFilter, sortBy, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / perPage);
+  const page = Math.min(requestedPage, Math.max(1, totalPages));
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(PRODUCT_PAGE_STORAGE_KEY, String(page));
+  }, [page]);
 
   const toggleSort = (col: typeof sortBy) => {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -147,13 +161,13 @@ export default function ProductTable({ products, onDelete, onArchive, onEdit }: 
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-6">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+          <button disabled={page === 1} onClick={() => setPage(page - 1)}
             className="px-4 py-2 rounded-xl text-sm border border-cream-tertiary disabled:opacity-30 hover:bg-cream-secondary transition-colors">Previous</button>
           {Array.from({ length: totalPages }, (_, i) => (
             <button key={i} onClick={() => setPage(i + 1)}
               className={`w-10 h-10 rounded-xl text-sm font-medium transition-colors ${page === i + 1 ? 'bg-primary text-white' : 'hover:bg-cream-secondary text-brown-medium'}`}>{i + 1}</button>
           ))}
-          <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
+          <button disabled={page === totalPages} onClick={() => setPage(page + 1)}
             className="px-4 py-2 rounded-xl text-sm border border-cream-tertiary disabled:opacity-30 hover:bg-cream-secondary transition-colors">Next</button>
         </div>
       )}
