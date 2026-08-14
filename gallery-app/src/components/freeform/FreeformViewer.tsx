@@ -44,7 +44,7 @@ function LoadingIndicator() {
 }
 
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
-type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void };
+type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
 
 type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
 type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
@@ -319,6 +319,7 @@ function Scene({
         orbitControls.target.copy(target);
         orbitControls.update?.();
       }
+      orbitControls?.saveState?.();
 
       initialized.current = true;
       onControlsReady?.(controls as unknown as OrbitControlsApi | null, camera);

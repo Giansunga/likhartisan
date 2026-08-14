@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownUp, CheckCircle2, ChevronRight, Clock3, Eye, Inbox, LoaderCircle,
   MessageCircle, PackageCheck, Search, Send, SlidersHorizontal, X, XCircle,
@@ -6,8 +6,6 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
-import { getPattern } from '../freeform/decor';
-import { getFinishDefinition } from '../freeform/materials';
 import type {
   DesignRequest, DesignRequestEvent, DesignRequestQueueItem, DesignRequestRevision,
   DesignRequestStage,
@@ -19,8 +17,7 @@ import {
 } from './designRequestWorkflow';
 import { useOverlayA11y } from './useOverlayA11y';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
-
-const FreeformViewer = lazy(() => import('../freeform/FreeformViewer'));
+import SellerDesignDetails from './SellerDesignDetails';
 
 type ResponseAction = 'quote' | 'request_changes' | 'decline';
 type StageFilter = 'all' | DesignRequestStage;
@@ -238,18 +235,23 @@ export default function SellerRequests() {
       <div ref={panelRef} className="seller-overlay__panel seller-request-drawer" role="dialog" aria-modal="true" aria-labelledby="request-drawer-title" tabIndex={-1}>
         <header className="seller-request-drawer__header"><div><b className={`seller-request-stage is-${selected.stage}`}>{DESIGN_REQUEST_STAGE_LABELS[selected.stage]}</b><h2 id="request-drawer-title">{selected.design_snapshot.model.name}</h2><p>Request #{selected.id.slice(0, 8).toUpperCase()} · Revision {selected.current_revision || 1}</p></div><button type="button" onClick={closeRequest} disabled={saving} aria-label="Close request"><X /></button></header>
         <div className="seller-request-drawer__content">
-          <section className="seller-request-preview-card">
-            <div className="seller-request-viewer" aria-label="Interactive 3D design"><Suspense fallback={<div className="seller-request-viewer__loading"><LoaderCircle className="seller-spin" /> Loading 3D preview…</div>}><FreeformViewer modelFile={selected.design_snapshot.model.file} shapeParams={selected.design_snapshot.shape} materialParams={selected.design_snapshot.material} decorationParams={selected.design_snapshot.decoration} attachmentParams={selected.design_snapshot.attachments} showAttachmentSockets={false} onMorphDetected={() => {}} /></Suspense></div>
-            <div className="seller-request-preview-card__caption"><span>Submitted by <strong>{selected.buyer_name}</strong></span><span>{new Date(selected.created_at).toLocaleString()}</span></div>
-          </section>
-
-          <section className="seller-request-info-card"><h3>Design specifications</h3><dl><div><dt>Quantity</dt><dd>{selected.quantity}</dd></div><div><dt>Finish</dt><dd><i style={{ background: selected.design_snapshot.material.color }} />{getFinishDefinition(selected.design_snapshot.material.finish).label}</dd></div><div><dt>Pattern</dt><dd>{getPattern(selected.design_snapshot.decoration.patternId)?.name || 'None'}</dd></div><div><dt>Attachments</dt><dd>{selected.design_snapshot.attachments.map(item => `${item.name} × ${item.placements.length}`).join(', ') || 'None'}</dd></div><div><dt>Dimensions</dt><dd>H {selected.design_snapshot.dimensions.heightCm} cm · W {selected.design_snapshot.dimensions.widthCm} cm</dd></div><div><dt>Buyer estimate</dt><dd>{money(selected.design_snapshot.estimate.price)} · {selected.design_snapshot.estimate.productionDays} days</dd></div></dl><div className="seller-request-note"><strong>Buyer note</strong><p>{selected.buyer_note || 'No additional note.'}</p></div></section>
+          <SellerDesignDetails
+            snapshot={selected.design_snapshot}
+            requestId={selected.id}
+            buyerName={selected.buyer_name}
+            revision={selected.current_revision || 1}
+            quantity={selected.quantity}
+            buyerNote={selected.buyer_note}
+            createdAt={selected.created_at}
+            updatedAt={selected.updated_at}
+          >
 
           {selected.status === 'approved' && selected.order ? <section className="seller-request-order-card"><div><span>Linked custom order</span><h3>#{selected.order.id.slice(0, 8).toUpperCase()}</h3></div><dl><div><dt>Payment</dt><dd className={`is-${selected.order.payment_status}`}>{selected.order.payment_status}</dd></div><div><dt>Production</dt><dd>{selected.order.delivery_status}</dd></div><div><dt>Total</dt><dd>{money(selected.order.total)}</dd></div></dl>{selected.stage === 'payment_pending' ? <p><Clock3 /> Production unlocks after verified payment.</p> : null}<div className="seller-request-order-card__actions">{['ready_for_production', 'in_production', 'shipped', 'delivered'].includes(selected.stage) ? <button className="seller-button seller-button--primary" type="button" disabled={saving} onClick={() => void advanceOrder()}>{saving ? <LoaderCircle className="seller-spin" /> : <PackageCheck />}{requestNextAction(selected)}</button> : null}<button className="seller-button seller-button--secondary" type="button" onClick={() => navigate(`/artisan-dashboard/orders?orderId=${encodeURIComponent(selected.order!.id)}`)}><Eye /> Open order</button></div></section> : null}
 
           {selected.status === 'declined' ? <section className="seller-request-final is-declined"><strong><XCircle /> Request declined</strong><p>{selected.shop_response}</p></section> : selected.status === 'approved' ? <section className="seller-request-final"><strong><CheckCircle2 /> Quote approved</strong><p>The approved request is now tracked through its linked custom order.</p></section> : <section className="seller-request-response-card"><h3>Respond to buyer</h3><div className="seller-request-action-tabs">{([{ id: 'quote', label: 'Send Quote' }, { id: 'request_changes', label: 'Request Changes' }, { id: 'decline', label: 'Decline' }] as { id: ResponseAction; label: string }[]).map(item => <button type="button" className={action === item.id ? 'is-active' : ''} onClick={() => setAction(item.id)} key={item.id}>{item.label}</button>)}</div>{action === 'quote' ? <div className="seller-request-quote-fields"><label><span>Total quote</span><div className="seller-money-input"><b>₱</b><input type="number" min="1" step="0.01" value={quote} onChange={event => setQuote(event.target.value)} placeholder="0.00" /></div></label><label><span>Lead time (days)</span><input type="number" min="1" max="365" value={leadDays} onChange={event => setLeadDays(event.target.value)} placeholder="7" /></label></div> : null}<label className="seller-request-response-note"><span>{action === 'quote' ? 'Reply note (optional)' : action === 'decline' ? 'Reason' : 'Changes needed'}</span><textarea rows={4} maxLength={2000} value={response} onChange={event => setResponse(event.target.value)} /><small>{response.length}/2000</small></label><button className={`seller-button ${action === 'decline' ? 'seller-button--danger' : 'seller-button--primary'}`} type="button" disabled={saving} onClick={() => void submitResponse()}>{saving ? <LoaderCircle className="seller-spin" /> : action === 'quote' ? <Send /> : action === 'request_changes' ? <Clock3 /> : <XCircle />}{saving ? 'Saving…' : action === 'quote' ? 'Send quote' : action === 'request_changes' ? 'Request changes' : 'Decline request'}</button></section>}
 
-          <section className="seller-request-history"><h3>Request history</h3>{detailLoading ? <div className="seller-request-history__loading"><LoaderCircle className="seller-spin" /> Loading history…</div> : events.length ? <ol>{events.map(event => <li key={event.id}><span className={`is-${event.event_type}`} /><div><strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong><p>{eventDescription(event)}</p><time>{new Date(event.created_at).toLocaleString()}</time></div></li>)}</ol> : <p>No history is available for this request yet.</p>}{revisions.length > 1 ? <small>{revisions.length} immutable design revisions preserved.</small> : null}</section>
+          <section className="seller-request-history"><h3>Request history</h3>{detailLoading ? <div className="seller-request-history__loading"><LoaderCircle className="seller-spin" /> Loading history…</div> : events.length ? <ol>{events.map(event => <li key={event.id}><span className={`is-${event.event_type}`} /><div><strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong><p>{eventDescription(event)}</p><time>{new Date(event.created_at).toLocaleString()}</time></div></li>)}</ol> : <p>No history is available for this request yet.</p>}{revisions.length > 1 ? <small>{revisions.length} immutable design revisions preserved. The current revision is shown above.</small> : null}</section>
+          </SellerDesignDetails>
         </div>
         <footer className="seller-request-drawer__footer">{selected.conversation_id ? <button type="button" onClick={() => navigate(`/artisan-dashboard/messages?conversation=${encodeURIComponent(selected.conversation_id!)}`)}><MessageCircle /> Open conversation</button> : null}<span>Last updated {formatAge(selected.updated_at, now)}</span></footer>
       </div>
