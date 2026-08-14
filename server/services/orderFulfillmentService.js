@@ -1,11 +1,11 @@
 export async function createOrderNotifications(supabase, orderId, items, buyerName) {
   const shopIds = [...new Set((items || []).map(item => item.shop_id).filter(Boolean))];
   for (const shopId of shopIds) {
-    const { data: shop } = await supabase.from('shops').select('owner_id, email').eq('id', shopId).single();
+    const { data: shop } = await supabase.from('shops').select('id, owner_id').eq('id', shopId).single();
     let ownerId = shop?.owner_id;
-    if (!ownerId && shop?.email) {
-      const { data: authUser } = await supabase.auth.admin.getUserByEmail(shop.email);
-      ownerId = authUser?.user?.id;
+    if (!ownerId && shop?.id) {
+      const { data: shopRole } = await supabase.from('user_roles').select('user_id').eq('shop_id', shop.id).eq('role', 'shop_owner').limit(1).maybeSingle();
+      ownerId = shopRole?.user_id;
       if (ownerId) await supabase.from('shops').update({ owner_id: ownerId }).eq('id', shopId);
     }
     if (ownerId) {
@@ -15,6 +15,7 @@ export async function createOrderNotifications(supabase, orderId, items, buyerNa
         title: 'New Order Received',
         message: `${buyerName || 'A buyer'} placed an order (ID: ${orderId.substring(0, 8)})`,
         order_id: orderId,
+        recipient_context: 'artisan',
       });
     }
   }

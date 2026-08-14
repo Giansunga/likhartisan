@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
+import { getChatMessagePreview } from '../../lib/chatMessages';
 import { formatTime } from '../../lib/utils';
 
 export interface BuyerShop {
@@ -139,7 +140,7 @@ export function BuyerConversationList({
                     <strong>{conversation.shop_name}</strong>
                     <time dateTime={conversation.last_message_at}>{formatTime(conversation.last_message_at)}</time>
                   </span>
-                  <span className="buyer-chat-conversation__preview">{conversation.last_message || 'Start a conversation'}</span>
+                  <span className="buyer-chat-conversation__preview">{getChatMessagePreview(conversation.last_message) || 'Start a conversation'}</span>
                 </span>
               </button>
               {conversation.buyer_unread > 0 ? (

@@ -103,6 +103,19 @@ describe('SellerMessages buyer identity', () => {
     expect(screen.queryByText('private-buyer@example.test')).not.toBeInTheDocument();
   });
 
+  it('shows readable structured-message previews instead of JSON code', async () => {
+    const structuredMessage = JSON.stringify({
+      type: 'product_inquiry',
+      message: 'Is the large vase available?',
+      productId: 'vase-1',
+    });
+    mocks.conversations = [conversation('Maria Santos', { last_message: structuredMessage })];
+    const { container } = renderMessages();
+
+    expect(await screen.findByText('Is the large vase available?')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('"type":"product_inquiry"');
+  });
+
   it('refreshes a renamed buyer through Broadcast and keeps the conversation open', async () => {
     mocks.conversations = [conversation('Maria Santos')];
     renderMessages();

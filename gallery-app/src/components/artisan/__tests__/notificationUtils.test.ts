@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArtisanNotification } from '../../../types/artisan';
 import { filterNotifications, groupNotifications, notificationCounts, relativeNotificationTime } from '../notificationUtils';
 
-const notification = (overrides: Partial<ArtisanNotification>): ArtisanNotification => ({ id: 'one', user_id: 'seller', type: 'system', read: false, created_at: '2026-08-10T08:00:00Z', ...overrides });
+const notification = (overrides: Partial<ArtisanNotification>): ArtisanNotification => ({ id: 'one', user_id: 'seller', type: 'system', title: 'Update', message: 'Details', recipient_context: 'artisan', read: false, created_at: '2026-08-10T08:00:00Z', ...overrides });
 const notifications = [
   notification({ id: 'order', order_id: 'order-1', type: 'shipped' }),
   notification({ id: 'message', type: 'message' }),

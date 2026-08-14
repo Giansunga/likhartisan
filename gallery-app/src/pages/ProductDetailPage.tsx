@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { addToCart } from '../data/store';
+import { addToCart, getCart, onCartUpdate } from '../data/store';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +9,7 @@ import type { Product, ProductVariation, ProductReview, CartItem } from '../type
 import type { ReactElement } from 'react';
 import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
 import RecommendationsSection from '../components/RecommendationsSection';
+import { animateProductToCart } from '../lib/cartAnimation';
 
 function renderStars(rating: number, size = 14): ReactElement[] {
   const stars: ReactElement[] = [];
@@ -58,6 +59,7 @@ export default function ProductDetailPage() {
   const [askSuccess, setAskSuccess] = useState(false);
   const [askMessage, setAskMessage] = useState('');
   const [askSending, setAskSending] = useState(false);
+  const [cartRevision, setCartRevision] = useState(0);
   const productRating = useMemo(() => {
     if (allReviews.length === 0) return { avg: 0, count: 0 };
     const total = allReviews.reduce((s, r) => s + r.rating, 0);
@@ -75,6 +77,22 @@ export default function ProductDetailPage() {
   }, []);
 
   const displayPrice = selectedVariation?.price ?? product?.price ?? 0;
+  const cartProductId = product?.id ?? '';
+  const cartVariationId = selectedVariation?.id ?? '';
+  const cartQuantity = useMemo(() => {
+    if (!cartProductId) return 0;
+    return getCart().find(item => (
+      item.productId === cartProductId && (item.variationId ?? '') === cartVariationId
+    ))?.qty ?? 0;
+  }, [cartProductId, cartRevision, cartVariationId]);
+
+  useEffect(() => onCartUpdate(() => setCartRevision(current => current + 1)), []);
+
+  useEffect(() => {
+    if (!product?.image) return;
+    const animationImage = new Image();
+    animationImage.src = product.image;
+  }, [product?.image]);
 
   async function handleAskSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -244,8 +262,11 @@ export default function ProductDetailPage() {
     );
   }
 
-  const handleAddToCart = async () => {
-    addToCart({
+  const availableStock = Math.max(0, Math.floor(Number(selectedVariation?.stock ?? product.stock) || 0));
+  const cartAtStockLimit = availableStock > 0 && cartQuantity >= availableStock;
+
+  const handleAddToCart = () => {
+    const result = addToCart({
       productId: product.id,
       productName: product.name,
       price: displayPrice,
@@ -255,7 +276,13 @@ export default function ProductDetailPage() {
       qty: 1,
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
-    });
+    }, availableStock);
+
+    if (result.addedQty === 0) {
+      toast.info(`Only ${availableStock} available. Your cart already contains the maximum quantity.`);
+      return;
+    }
+    animateProductToCart(product.image);
   };
 
   const handleBuy = async (e: React.FormEvent) => {
@@ -331,7 +358,7 @@ export default function ProductDetailPage() {
 
           <div className="product-viewer-layout">
             <div className="product-image-container">
-              <div className="product-viewer-img-frame">
+              <div className="product-viewer-img-frame" data-product-cart-source>
                 {product.model3d ? (
                   <div className="w-full h-full">
                     <Suspense fallback={
@@ -410,7 +437,7 @@ export default function ProductDetailPage() {
               </div>
 
               {(() => {
-                const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+                const stock = availableStock;
                 const isOutOfStock = stock === 0;
                 const isLowStock = stock > 0 && stock <= 3;
                 return (
@@ -432,14 +459,15 @@ export default function ProductDetailPage() {
               {!isMobile && (
                 <div className="product-viewer-actions">
                   {(() => {
-                    const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+                    const stock = availableStock;
                     const isOutOfStock = stock === 0;
                     const needsVariation = variations.length > 0 && !selectedVariation;
+                    const addDisabled = isOutOfStock || needsVariation || cartAtStockLimit;
                     return (
                       <>
                         <button className="btn-product-buy" onClick={handleBuy} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Buy Now</button>
                         <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
-                        <button className="btn-product-design" onClick={handleAddToCart} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Add to Cart</button>
+                        <button className="btn-product-design" onClick={handleAddToCart} disabled={addDisabled} style={{ opacity: addDisabled ? 0.5 : 1, cursor: addDisabled ? 'not-allowed' : 'pointer' }}>{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
                       </>
                     );
                   })()}
@@ -644,23 +672,24 @@ export default function ProductDetailPage() {
 
       {isMobile && (
         <div className="mobile-action-bar" style={{
-          position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom) + 58px)', left: 0, right: 0,
+          position: 'fixed', bottom: 'var(--mobile-nav-reserved-height)', left: 0, right: 0,
           background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
           display: 'flex', alignItems: 'center', gap: '10px', zIndex: 40,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
         }}>
           {(() => {
-            const stock = selectedVariation?.stock ?? product?.stock ?? 0;
+            const stock = availableStock;
             const isOutOfStock = stock === 0;
             const needsVariation = variations.length > 0 && !selectedVariation;
-            const disabled = isOutOfStock || needsVariation;
+            const buyDisabled = isOutOfStock || needsVariation;
+            const addDisabled = buyDisabled || cartAtStockLimit;
             return (
               <>
                 <button onClick={handleAskClick} className="btn-chat" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                 </button>
-                <button onClick={handleAddToCart} disabled={disabled} className="btn-cart" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Add to Cart</button>
-                <button onClick={handleBuy} disabled={disabled} className="btn-buy" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: disabled ? 0.5 : 1 }}>Buy Now</button>
+                <button onClick={handleAddToCart} disabled={addDisabled} className="btn-cart" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: addDisabled ? 0.5 : 1 }}>{cartAtStockLimit ? 'Stock Limit' : 'Add to Cart'}</button>
+                <button onClick={handleBuy} disabled={buyDisabled} className="btn-buy" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: buyDisabled ? 0.5 : 1 }}>Buy Now</button>
               </>
             );
           })()}

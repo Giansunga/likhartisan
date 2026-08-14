@@ -7,10 +7,14 @@ import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { consumeCartCheckoutAuthPending } from '../lib/cartCheckout';
+import NotificationDropdown from './notifications/NotificationDropdown';
+import { useNotifications } from '../hooks/useNotifications';
+import { notificationDestination, notificationViewAllDestination } from '../lib/notifications';
+import type { NotificationContext, NotificationRecord } from '../types/notifications';
 
 function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
   return (
-    <Link to="/cart" aria-label={`Shopping cart with ${count} ${count === 1 ? 'item' : 'items'}`} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+    <Link to="/cart" data-cart-animation-target aria-label={`Shopping cart with ${count} ${count === 1 ? 'item' : 'items'}`} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" aria-hidden="true">
         <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
@@ -37,7 +41,7 @@ export default function Navbar() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const notifPanelRef = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string; read: boolean; title?: string; message?: string; product_image?: string; isReal?: boolean; order_id?: string }[]>([]);
+  const notificationButtonRef = useRef<HTMLButtonElement>(null);
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
@@ -50,6 +54,8 @@ export default function Navbar() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { user } = useAuth();
   const loggedIn = !!user;
+  const notificationContext: NotificationContext = isArtisanDashboard ? 'artisan' : 'buyer';
+  const notificationData = useNotifications(user?.id, notificationContext, 10);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -69,42 +75,6 @@ export default function Navbar() {
     const unsubscribe = onCartUpdate(() => setCartCount(getCartCount()));
     return unsubscribe;
   }, []);
-
-  async function fetchBuyerNotifications() {
-    if (!user) { setNotifications([]); return; }
-    const { data } = await supabase
-      .from('notifications')
-      .select('id, type, title, message, product_image, created_at, read, order_id')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    if (data) {
-      setNotifications(data.map((n: any) => ({
-        id: n.id,
-        type: n.type || 'notification',
-        text: n.title ? `${n.title}: ${n.message || ''}` : n.message || 'New notification',
-        title: n.title || '',
-        message: n.message || '',
-        product_image: n.product_image || '',
-        time: n.created_at,
-        read: !!n.read,
-        order_id: n.order_id || '',
-        isReal: true,
-      })));
-    }
-  }
-
-  async function markNotificationRead(id: string) {
-    await supabase.from('notifications').update({ read: true }).eq('id', id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  }
-
-  async function markAllRead() {
-    const userId = user?.id;
-    if (!userId) return;
-    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }
 
   useEffect(() => {
     setUserEmail(user?.email ?? null);
@@ -142,10 +112,8 @@ export default function Navbar() {
         }
       });
       setShopImage('');
-      fetchBuyerNotifications();
     } else {
       setShopImage('');
-      setNotifications([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -176,83 +144,6 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!isArtisanDashboard || !userEmail || (!SHOP_EMAILS.includes(userEmail) && !hasShopRole)) return;
-
-    async function init() {
-      async function fetchNotifications() {
-        const userId = user?.id;
-        if (!userId) return;
-
-        // Persisted notifications from the notifications table
-        const { data: persisted } = await supabase
-          .from('notifications')
-          .select('id, type, title, message, product_image, created_at, read, order_id')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        const realNotifs = (persisted || []).map((n: any) => ({
-          id: n.id, type: n.type || 'notification', isReal: true,
-          text: n.title ? `${n.title}: ${n.message || ''}` : n.message || 'New notification',
-          title: n.title || '', message: n.message || '',
-          product_image: n.product_image || '',
-          time: n.created_at, read: !!n.read,
-          order_id: n.order_id || '',
-        }));
-
-        // Sort by time, cap at 10
-        realNotifs.sort((a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime());
-        setNotifications(realNotifs.slice(0, 10));
-      }
-
-      fetchNotifications();
-
-      const notifChannel = supabase
-        .channel(`notifications:artisan:${user?.id}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, fetchNotifications)
-        .subscribe();
-      const poll = setInterval(fetchNotifications, 30000);
-
-      cleanupFns.push(() => {
-        supabase.removeChannel(notifChannel);
-        clearInterval(poll);
-      });
-    }
-
-    const cleanupFns: (() => void)[] = [];
-    init();
-
-    return () => {
-      cleanupFns.forEach(fn => fn());
-    };
-  }, [isArtisanDashboard, userEmail, user?.id]);
-
-  useEffect(() => {
-    if (!loggedIn || isArtisanDashboard || !userEmail || SHOP_EMAILS.includes(userEmail) || hasShopRole) return;
-    const userId = user?.id;
-    if (!userId) return;
-
-    fetchBuyerNotifications();
-
-    // Realtime: refresh on any change to this buyer's notifications.
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => fetchBuyerNotifications())
-      .subscribe();
-
-    // Polling fallback in case realtime is unavailable.
-    const poll = setInterval(fetchBuyerNotifications, 30000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(poll);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedIn, isArtisanDashboard, userEmail, user?.id]);
-
   function handleAuthChange(email?: string) {
     const userEmailStr = email || userEmail || '';
     if (SHOP_EMAILS.includes(userEmailStr) || hasShopRole) {
@@ -277,105 +168,31 @@ export default function Navbar() {
     { to: '/shops', label: 'Shops' },
     { to: '/about', label: 'About' },
   ];
-  const unreadNotifications = notifications.filter(n => !n.read).length;
-
-  // Relative time ("2h ago") — matches the Dashboard notifications panel.
-  const timeAgo = (iso: string) => {
-    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (s < 60) return 'just now';
-    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-    const d = Math.floor(h / 24); if (d < 7) return `${d}d ago`;
-    return new Date(iso).toLocaleDateString();
+  const closeNotifications = (restoreFocus = false) => {
+    setShowNotifications(false);
+    if (restoreFocus) requestAnimationFrame(() => notificationButtonRef.current?.focus());
   };
 
-  // Per-type icon + accent color (mirrors DashboardPage typeConfig).
-  const notifTypeConfig: Record<string, { bg: string; color: string; icon: string }> = {
-    preparing: { bg: '#E3F2FD', color: '#1565C0', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-    shipped:   { bg: '#F3E5F5', color: '#6A1B9A', icon: 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z' },
-    delivered: { bg: '#E8F5E9', color: '#2E7D32', icon: 'M20 6L9 17l-5-5' },
-    completed: { bg: '#FFF3E0', color: '#C1570D', icon: 'M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3' },
-    cancelled: { bg: '#FFEBEE', color: '#D32F2F', icon: 'M18 6L6 18M6 6l12 12' },
-    payment:   { bg: '#FFF9C4', color: '#F57F17', icon: 'M1 4h22v16H1zM1 10h22' },
-    message:   { bg: '#F5F5F5', color: '#616161', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
+  const openNotification = (notification: NotificationRecord) => {
+    if (!notification.read) void notificationData.markRead(notification.id);
+    closeNotifications();
+    navigate(notificationDestination(notification));
   };
-  const defaultNotifType = { bg: 'rgba(193,87,13,0.12)', color: 'var(--accent-color)', icon: 'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0' };
 
   const notifDropdown = (
-    <div ref={notifPanelRef} style={isMobile
-      ? { position: 'fixed', top: 'calc(var(--nav-height) + 8px)', left: '12px', right: '12px', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', maxWidth: 'none', maxHeight: 'calc(100dvh - var(--nav-height) - 90px)', zIndex: 2000, overflow: 'hidden', display: 'flex', flexDirection: 'column' }
-      : { position: 'absolute', right: 0, top: 'calc(100% + 10px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', width: '360px', maxWidth: 'calc(100vw - 24px)', maxHeight: 'calc(100vh - 110px)', zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
-          Notifications{unreadNotifications > 0 && <span style={{ marginLeft: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#fff', background: '#E53935', borderRadius: '10px', padding: '1px 7px' }}>{unreadNotifications}</span>}
-        </span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {unreadNotifications > 0 && (
-            <button onClick={markAllRead} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Mark all read</button>
-          )}
-          <button onClick={() => { setShowNotifications(false); if (SHOP_EMAILS.includes(userEmail || '') || hasShopRole) navigate('/artisan-dashboard/notifications'); else navigate('/dashboard?tab=notifications'); }} style={{ border: 'none', background: 'none', color: 'var(--primary-color)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>View all</button>
-        </div>
-      </div>
-      <div style={{ maxHeight: isMobile ? 'none' : '360px', flex: isMobile ? 1 : undefined, minHeight: isMobile ? 0 : undefined, overflowY: 'auto', paddingBottom: '6px' }}>
-        {notifications.length === 0 ? (
-          <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-light)' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="1.8" style={{ width: '22px', height: '22px' }}>
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
-              </svg>
-            </div>
-            <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dark)', margin: 0 }}>You're all caught up</p>
-            <p style={{ fontSize: '0.78rem', margin: '4px 0 0' }}>No notifications yet</p>
-          </div>
-        ) : (
-          notifications.map(n => {
-            const href = n.order_id ? `/dashboard?tab=purchases&order=${n.order_id}` : null;
-            const tc = notifTypeConfig[n.type] || defaultNotifType;
-            return (
-              <button key={n.id} onClick={() => { 
-                if (n.isReal) { 
-                  markNotificationRead(n.id); 
-                  setShowNotifications(false); 
-                  if (n.order_id && (SHOP_EMAILS.includes(userEmail || '') || hasShopRole)) {
-                    navigate(`/artisan-dashboard/orders?orderId=${n.order_id}`);
-                  } else if (n.order_id) {
-                    navigate('/dashboard?tab=purchases');
-                    window.dispatchEvent(new CustomEvent('deep-link-order', { detail: { orderId: n.order_id } }));
-                  } else if (href) {
-                    navigate(href);
-                  } else {
-                    navigate('/dashboard?tab=notifications');
-                  }
-                } else { 
-                  setShowNotifications(false); 
-                  if (isArtisanDashboard) navigate('/artisan-dashboard'); 
-                } 
-              }}
-              style={{ width: '100%', padding: '12px 16px', border: 'none', borderBottom: '1px solid #F5F0EB', display: 'flex', gap: '12px', alignItems: 'flex-start', background: n.read ? 'transparent' : '#FDF8F4', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = n.read ? '#FAF7F4' : '#FBEFE6')}
-              onMouseLeave={e => (e.currentTarget.style.background = n.read ? 'transparent' : '#FDF8F4')}>
-              {n.product_image ? (
-                <img src={n.product_image} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0, border: '1px solid #E8E0D8' }} />
-              ) : (
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke={tc.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
-                    <path d={tc.icon} />
-                  </svg>
-                </div>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {n.title
-                  ? <><p style={{ fontSize: '0.85rem', fontWeight: n.read ? 500 : 700, color: 'var(--text-dark)', lineHeight: 1.35, margin: 0 }}>{n.title}</p>
-                      {n.message && <p style={{ fontSize: '0.78rem', color: 'var(--text-light)', lineHeight: 1.35, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</p>}</>
-                  : <p style={{ fontSize: '0.85rem', color: 'var(--text-dark)', lineHeight: 1.4, margin: 0 }}>{n.text}</p>}
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '4px', marginBottom: 0 }}>{timeAgo(n.time)}</p>
-              </div>
-              {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E53935', flexShrink: 0, marginTop: '6px' }} />}
-            </button>
-            );
-          })
-        )}
-      </div>
+    <div ref={notifPanelRef}>
+      <NotificationDropdown
+        context={notificationContext}
+        notifications={notificationData.notifications}
+        unreadCount={notificationData.unreadCount}
+        loading={notificationData.loading}
+        error={notificationData.error}
+        onClose={closeNotifications}
+        onRetry={() => void notificationData.reload()}
+        onMarkAllRead={() => void notificationData.markAllRead()}
+        onViewAll={() => { closeNotifications(); navigate(notificationViewAllDestination(notificationContext)); }}
+        onOpenNotification={openNotification}
+      />
     </div>
   );
 
@@ -395,13 +212,13 @@ export default function Navbar() {
           </Link>
           <div className="flex items-center gap-4">
             <div ref={notifDropdownRef} className="relative">
-              <button onClick={() => setShowNotifications(!showNotifications)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '6px', borderRadius: '6px', position: 'relative' }}>
+              <button ref={notificationButtonRef} onClick={() => setShowNotifications(current => !current)} aria-label="Notifications" aria-expanded={showNotifications} aria-controls="navbar-notification-panel" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '6px', borderRadius: '6px', position: 'relative' }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                {notifications.filter(n => !n.read).length > 0 && (
+                {notificationData.unreadCount > 0 && (
                   <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-                    {notifications.filter(n => !n.read).length}
+                    {notificationData.unreadCount > 99 ? '99+' : notificationData.unreadCount}
                   </span>
                 )}
               </button>
@@ -458,13 +275,13 @@ export default function Navbar() {
             {loggedIn ? (
               <>
                 <div ref={notifDropdownRef} className="relative">
-                  <button onClick={() => setShowNotifications(!showNotifications)} aria-label="Notifications" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                  <button ref={notificationButtonRef} onClick={() => setShowNotifications(current => !current)} aria-label="Notifications" aria-expanded={showNotifications} aria-controls="navbar-notification-panel" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                     </svg>
-                    {unreadNotifications > 0 && (
+                    {notificationData.unreadCount > 0 && (
                       <span className="absolute bg-accent text-white font-bold rounded-full flex items-center justify-center border-2 border-white" style={{ top: isMobile ? '0' : '2px', right: isMobile ? '0' : '2px', width: isMobile ? '16px' : '18px', height: isMobile ? '16px' : '18px', fontSize: isMobile ? '0.55rem' : '0.65rem' }}>
-                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                        {notificationData.unreadCount > 99 ? '99+' : notificationData.unreadCount}
                       </span>
                     )}
                   </button>

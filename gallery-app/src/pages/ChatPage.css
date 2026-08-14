@@ -434,7 +434,7 @@
 }
 
 @media (max-width: 768px) {
-  .buyer-chat-wrapper { height: calc(100dvh - var(--nav-height) - 64px - env(safe-area-inset-bottom)); }
+  .buyer-chat-wrapper { height: calc(100dvh - var(--nav-height) - var(--mobile-nav-reserved-height)); }
   .buyer-chat-layout { display: block; }
   .buyer-chat-sidebar-slot { width: 100%; height: 100%; border-right: 0; }
   .buyer-chat-sidebar-slot.is-hidden { display: none; }
@@ -455,7 +455,7 @@
   .buyer-chat-composer__hint { display: none; }
   .buyer-chat-attach,
   .buyer-chat-send { width: 40px; height: 40px; flex-basis: 40px; }
-  .buyer-shop-surface { inset: var(--nav-height) 0 calc(64px + env(safe-area-inset-bottom)); align-items: flex-end; }
+  .buyer-shop-surface { inset: var(--nav-height) 0 var(--mobile-nav-reserved-height); align-items: flex-end; }
   .buyer-shop-panel { width: 100%; height: auto; max-height: 80dvh; border: 0; border-radius: 20px 20px 0 0; box-shadow: 0 -16px 42px rgba(44, 27, 16, .18); animation-name: buyerChatSheet; }
   .buyer-shop-panel__handle { width: 42px; height: 4px; margin: 9px auto 0; border-radius: 4px; background: #d8cec5; }
   .buyer-shop-panel__topbar { padding-top: 10px; }

@@ -74,7 +74,6 @@ export default function LikhAIConversation({ compact = false, autoFocus = false 
       <div className="likhai-messages" aria-live="polite">
         {messages.length === 0 && (
           <div className="likhai-welcome">
-            <img src="/images/likhai-logo.png" alt="" />
             <h2>Welcome to LikhAI</h2>
             <p>Ask about verified orders, pottery, shops, payments, delivery, or the Freeform Designer—in English, Filipino, or Taglish.</p>
             <div className="likhai-quick-actions">

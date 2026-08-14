@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { mapSupabaseProduct, fmt } from '../lib/utils';
@@ -23,8 +23,6 @@ export default function RecommendationsSection({
 }: RecommendationsSectionProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     fetchRecommendations();
@@ -141,22 +139,11 @@ export default function RecommendationsSection({
     setLoading(false);
   }
 
-  function slide(dir: number) {
-    const el = trackRef.current;
-    if (!el) return;
-    const cardWidth = 280 + 30; // card width + gap
-    const visible = Math.floor(el.parentElement!.clientWidth / cardWidth);
-    const maxOffset = Math.max(0, (products.length - visible) * cardWidth);
-    let newOffset = offset - dir * visible * cardWidth;
-    newOffset = Math.max(-maxOffset, Math.min(0, newOffset));
-    setOffset(newOffset);
-  }
-
   if (loading || products.length === 0) return null;
 
   return (
     <section style={{ marginTop: '40px', paddingBottom: '48px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div style={{ marginBottom: '20px' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>
             {title}
@@ -165,52 +152,23 @@ export default function RecommendationsSection({
             <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', margin: '4px 0 0' }}>{subtitle}</p>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => slide(1)}
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid var(--bg-tertiary)',
-              background: 'var(--bg-primary)', color: 'var(--text-dark)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-color)'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-primary)'; e.currentTarget.style.color = 'var(--text-dark)'; e.currentTarget.style.borderColor = 'var(--bg-tertiary)'; }}
-          >
-            &lt;
-          </button>
-          <button
-            onClick={() => slide(-1)}
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%', border: '1.5px solid var(--bg-tertiary)',
-              background: 'var(--bg-primary)', color: 'var(--text-dark)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-color)'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'var(--accent-color)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-primary)'; e.currentTarget.style.color = 'var(--text-dark)'; e.currentTarget.style.borderColor = 'var(--bg-tertiary)'; }}
-          >
-            &gt;
-          </button>
-        </div>
       </div>
 
-      <div style={{ width: '100%', overflow: 'hidden', padding: '10px 0' }}>
+      <div
+        className="recommendations-scroll"
+        role="region"
+        aria-label={`${title} products`}
+        tabIndex={0}
+      >
         <div
-          ref={trackRef}
-          style={{
-            display: 'flex',
-            gap: '30px',
-            transition: 'transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)',
-            transform: `translateX(${offset}px)`,
-          }}
+          className="recommendations-scroll__track"
         >
           {products.map(p => (
             <Link
               key={p.id}
               to={`/product/${p.id}`}
-              className="product-card-item group"
-              style={{ minWidth: 280, width: 280, textDecoration: 'none', color: 'inherit' }}
+              className="product-card-item recommendations-scroll__card group"
+              style={{ textDecoration: 'none', color: 'inherit' }}
             >
               <div className="product-img-wrapper">
                 <img src={p.image} alt={p.name} />

@@ -21,6 +21,7 @@ import {
 } from './services/paymongoService.js';
 import { createOrderNotifications, decrementStockForItems } from './services/orderFulfillmentService.js';
 import { createCustomOrderCheckout } from './services/customOrderCheckoutService.js';
+import { resolveNotificationRecipient } from './services/notificationService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -641,18 +642,15 @@ app.post('/api/notifications', async (req, res) => {
     const authUserId = await verifyAuth(req, res);
     if (!authUserId) return;
 
-    const { user_id, type, title, message, order_id, product_image } = req.body;
+    const { type, title, message, product_image } = req.body;
     if (!type || !title || !message) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Allow cross-user inserts here because the authenticated caller is a seller
-    // creating a notification for the buyer from an order event.
-    // Authenticity is enforced by jwt-verified verifyAuth above.
-    const finalUserId = user_id || authUserId;
+    const target = await resolveNotificationRecipient(supabase, authUserId, req.body);
 
     const { data, error } = await supabase
       .from('notifications')
-      .insert({ user_id: finalUserId, type, title, message, order_id, product_image })
+      .insert({ ...target, type, title, message, product_image: product_image || '' })
       .select()
       .single();
     if (error) {
@@ -662,7 +660,7 @@ app.post('/api/notifications', async (req, res) => {
     res.json({ data });
   } catch (e) {
     console.error('Notification error:', e);
-    res.status(500).json({ error: 'Server error' });
+    res.status(e.status || 500).json({ error: e.status ? e.message : 'Server error' });
   }
 });
 

@@ -1,8 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { Home, Grid3X3, Store, Palette } from 'lucide-react';
+import { useVisualViewportBottomOffset } from '../hooks/useVisualViewportBottomOffset';
+
+const navItems = [
+  { name: 'Home', path: '/', icon: Home },
+  { name: 'Gallery', path: '/gallery', icon: Grid3X3 },
+  { name: 'Shops', path: '/shops', icon: Store },
+  { name: 'Design', path: '/freeform', icon: Palette },
+] as const;
 
 export default function BottomNav() {
   const location = useLocation();
+  useVisualViewportBottomOffset();
 
   if (location.pathname.startsWith('/artisan-dashboard')) {
     return null;
@@ -13,28 +23,23 @@ export default function BottomNav() {
     return location.pathname.startsWith(path);
   };
 
-  const navItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Gallery', path: '/gallery', icon: Grid3X3 },
-    { name: 'Shops', path: '/shops', icon: Store },
-    { name: 'Design', path: '/freeform', icon: Palette },
-  ];
-
-  return (
-    <nav className="bottom-nav">
+  return createPortal(
+    <nav className="bottom-nav" aria-label="Mobile navigation">
       {navItems.map((item) => {
-        const active = item.path ? isActive(item.path) : false;
+        const active = isActive(item.path);
         return (
           <Link
             key={item.name}
             to={item.path}
             className={`bottom-nav-item ${active ? 'bottom-nav-item--active' : ''}`}
+            aria-current={active ? 'page' : undefined}
           >
-            <item.icon size={22} strokeWidth={active ? 2.5 : 1.8} />
+            <item.icon strokeWidth={active ? 2.5 : 1.8} aria-hidden="true" />
             <span>{item.name}</span>
           </Link>
         );
       })}
-    </nav>
+    </nav>,
+    document.body,
   );
 }

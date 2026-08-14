@@ -10,7 +10,7 @@ import {
   savePendingPurchase,
   writeCartCheckoutDraft,
 } from '../cartCheckout';
-import { getCart, removeCartLines, setCart } from '../../data/store';
+import { addToCart, getCart, removeCartLines, setCart } from '../../data/store';
 
 const cart: CartItem[] = [
   { productId: 'p1', variationId: 'v1', productName: 'Vase', image: '', price: 100, qty: 1, shopId: 's1', shopName: 'Clay House' },
@@ -64,5 +64,24 @@ describe('cart checkout contract', () => {
     removeCartLines([getCartLineKey(cart[1])]);
 
     expect(getCart()).toEqual([cart[0], cart[2]]);
+  });
+
+  it('never adds more than the available stock for a cart line', () => {
+    const item = { ...cart[0], qty: 1 };
+
+    expect(addToCart(item, 2)).toMatchObject({ addedQty: 1, quantity: 1, maximum: 2 });
+    expect(addToCart(item, 2)).toMatchObject({ addedQty: 1, quantity: 2, maximum: 2 });
+    expect(addToCart(item, 2)).toMatchObject({ addedQty: 0, quantity: 2, maximum: 2 });
+    expect(getCart()).toEqual([{ ...item, qty: 2 }]);
+  });
+
+  it('keeps variation stock limits independent', () => {
+    const first = { ...cart[0], qty: 2 };
+    const second = { ...cart[1], qty: 2 };
+
+    addToCart(first, 1);
+    addToCart(second, 3);
+
+    expect(getCart()).toEqual([{ ...first, qty: 1 }, second]);
   });
 });

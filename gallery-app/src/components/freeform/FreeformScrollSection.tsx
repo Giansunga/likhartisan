@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, useScroll, useTransform, useMotionValueEvent, useSpring } from 'framer-motion';
+import { motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_ATTACHMENT_TRANSFORM, type AttachmentSelection } from './attachments';
 import type { DecorationParams } from './decor';
@@ -9,6 +9,34 @@ import type { KnownFinishId } from './materials';
 const FreeformViewer = lazy(() => import('./FreeformViewer'));
 
 const LANDING_HANDLE_HEIGHT = 0.485;
+const CAPTION_BREAKPOINTS = [0.2175, 0.4775, 0.6675, 0.8375] as const;
+
+function captionIndexForProgress(progress: number) {
+  const index = CAPTION_BREAKPOINTS.findIndex((breakpoint) => progress < breakpoint);
+  return index === -1 ? CAPTION_BREAKPOINTS.length : index;
+}
+
+function captionAnimation(index: number, activeIndex: number) {
+  const active = index === activeIndex;
+  return {
+    opacity: active ? 1 : 0,
+    y: active ? 0 : index < activeIndex ? -64 : 64,
+  };
+}
+
+function captionTransition(active: boolean) {
+  return {
+    opacity: {
+      duration: active ? 0.24 : 0.14,
+      delay: active ? 0.06 : 0,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
+    y: {
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
+  };
+}
 
 const FEATURED_ATTACHMENT: AttachmentSelection = {
   version: 4,
@@ -55,6 +83,7 @@ export default function FreeformScrollSection() {
   const freeformSectionRef = useRef<HTMLDivElement>(null);
   const [freeformVisible, setFreeformVisible] = useState(false);
   const [previewColor, setPreviewColor] = useState('#BE734F');
+  const [activeCaption, setActiveCaption] = useState(0);
 
   // Framer motion scroll setup
   const { scrollYProgress } = useScroll({ target: freeformSectionRef, offset: ['start start', 'end end'] });
@@ -164,6 +193,36 @@ export default function FreeformScrollSection() {
       });
   }, [freeformVisible, previewModel]);
 
+  useEffect(() => {
+    const section = freeformSectionRef.current;
+    if (!section) return;
+
+    let animationFrame = 0;
+    const updateCaption = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => {
+        const rect = section.getBoundingClientRect();
+        const scrollDistance = Math.max(1, rect.height - window.innerHeight);
+        const progress = Math.min(1, Math.max(0, -rect.top / scrollDistance));
+        const nextCaption = captionIndexForProgress(progress);
+        setActiveCaption((current) => current === nextCaption ? current : nextCaption);
+      });
+    };
+
+    updateCaption();
+    window.addEventListener('scroll', updateCaption, { passive: true });
+    window.addEventListener('resize', updateCaption);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateCaption);
+    resizeObserver?.observe(section);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('scroll', updateCaption);
+      window.removeEventListener('resize', updateCaption);
+      resizeObserver?.disconnect();
+    };
+  }, []);
+
   function goToFreeform() {
     navigate('/freeform', {
       state: {
@@ -177,41 +236,7 @@ export default function FreeformScrollSection() {
   }
 
   // Animation Transforms — tuned for smooth 60fps fades
-  // Softer spring for opacity (no overshoot, silky fade)
-  const opacitySpring = { stiffness: 60, damping: 28, restDelta: 0.005 };
-  // Slightly stiffer spring for position (responsive but no jitter)
-  const positionSpring = { stiffness: 70, damping: 26, restDelta: 0.5 };
-
-  const rawIntroOpacity = useTransform(scrollYProgress, [0, 0.08, 0.2, 0.28], [1, 1, 0.5, 0]);
-  const introOpacity = useSpring(rawIntroOpacity, opacitySpring);
-  
-  const rawIntroY = useTransform(scrollYProgress, [0, 0.1, 0.25], [0, 0, -40]);
-  const introY = useSpring(rawIntroY, positionSpring);
-  
-  const rawShapeOpacity = useTransform(scrollYProgress, [0.18, 0.28, 0.48, 0.58], [0, 1, 1, 0]);
-  const shapeOpacity = useSpring(rawShapeOpacity, opacitySpring);
-  
-  const rawShapeY = useTransform(scrollYProgress, [0.2, 0.3, 0.5, 0.6], [40, 0, 0, -40]);
-  const shapeY = useSpring(rawShapeY, positionSpring);
-  
-  const rawFinishOpacity = useTransform(scrollYProgress, [0.46, 0.56, 0.7, 0.78], [0, 1, 1, 0]);
-  const finishOpacity = useSpring(rawFinishOpacity, opacitySpring);
-  
-  const rawFinishY = useTransform(scrollYProgress, [0.48, 0.58, 0.72], [40, 0, -40]);
-  const finishY = useSpring(rawFinishY, positionSpring);
-
-  const rawDecorOpacity = useTransform(scrollYProgress, [0.68, 0.76, 0.82, 0.88], [0, 1, 1, 0]);
-  const decorOpacity = useSpring(rawDecorOpacity, opacitySpring);
-
-  const rawDecorY = useTransform(scrollYProgress, [0.7, 0.78, 0.88], [40, 0, -40]);
-  const decorY = useSpring(rawDecorY, positionSpring);
-
-  const rawAttachmentOpacity = useTransform(scrollYProgress, [0.82, 0.9, 1], [0, 1, 1]);
-  const attachmentOpacity = useSpring(rawAttachmentOpacity, opacitySpring);
-
-  const rawAttachmentY = useTransform(scrollYProgress, [0.84, 0.92, 1], [40, 0, 0]);
-  const attachmentY = useSpring(rawAttachmentY, positionSpring);
-
+  // The scroll hint still tracks continuous progress; captions use discrete handoffs above.
   const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.05, 0.9, 1], [1, 0, 0, 0]);
 
   return (
@@ -229,7 +254,11 @@ export default function FreeformScrollSection() {
             
             {/* Slide 1: Intro */}
             <motion.div 
-              style={{ opacity: introOpacity, y: introY, willChange: 'opacity, transform' }}
+              initial={false}
+              animate={captionAnimation(0, activeCaption)}
+              transition={captionTransition(activeCaption === 0)}
+              aria-hidden={activeCaption !== 0}
+              style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption freeform-landing-caption--intro freeform-landing-intro-slide absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
               <p className="freeform-landing-caption__kicker">Design Studio · Live 3D preview</p>
@@ -243,7 +272,11 @@ export default function FreeformScrollSection() {
 
             {/* Slide 2: Shape */}
             <motion.div 
-              style={{ opacity: shapeOpacity, y: shapeY, willChange: 'opacity, transform' }}
+              initial={false}
+              animate={captionAnimation(1, activeCaption)}
+              transition={captionTransition(activeCaption === 1)}
+              aria-hidden={activeCaption !== 1}
+              style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
               <p className="freeform-landing-caption__kicker">01 · Shape</p>
@@ -257,7 +290,11 @@ export default function FreeformScrollSection() {
 
             {/* Slide 3: Finish */}
             <motion.div 
-              style={{ opacity: finishOpacity, y: finishY, willChange: 'opacity, transform' }}
+              initial={false}
+              animate={captionAnimation(2, activeCaption)}
+              transition={captionTransition(activeCaption === 2)}
+              aria-hidden={activeCaption !== 2}
+              style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
               <p className="freeform-landing-caption__kicker">02 · Finish</p>
@@ -271,7 +308,11 @@ export default function FreeformScrollSection() {
 
             {/* Slide 4: Decor */}
             <motion.div
-              style={{ opacity: decorOpacity, y: decorY, willChange: 'opacity, transform' }}
+              initial={false}
+              animate={captionAnimation(3, activeCaption)}
+              transition={captionTransition(activeCaption === 3)}
+              aria-hidden={activeCaption !== 3}
+              style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
               <p className="freeform-landing-caption__kicker">03 · Decorate</p>
@@ -285,7 +326,11 @@ export default function FreeformScrollSection() {
 
             {/* Slide 5: 3D Attachments */}
             <motion.div
-              style={{ opacity: attachmentOpacity, y: attachmentY, willChange: 'opacity, transform' }}
+              initial={false}
+              animate={captionAnimation(4, activeCaption)}
+              transition={captionTransition(activeCaption === 4)}
+              aria-hidden={activeCaption !== 4}
+              style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
               <p className="freeform-landing-caption__kicker">04 · Details</p>
@@ -298,6 +343,7 @@ export default function FreeformScrollSection() {
               <div className="flex gap-4">
                 <button
                   onClick={goToFreeform}
+                  tabIndex={activeCaption === 4 ? undefined : -1}
                   className="flex items-center gap-2.5 text-white font-semibold text-[0.85rem] sm:text-[0.95rem] py-3 sm:py-3.5 px-6 sm:px-8 rounded-[10px] transition-all bg-[#A95A20] shadow-[0_4px_16px_rgba(169,90,32,0.35)] hover:bg-[#8F4818] hover:scale-105 cursor-pointer"
                 >
                   Open Design Studio

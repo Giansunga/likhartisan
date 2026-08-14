@@ -25,6 +25,7 @@ import {
   YAxis,
 } from 'recharts';
 import { exportToCsv, type CsvColumn } from '../../lib/csvExport';
+import { getChatMessagePreview } from '../../lib/chatMessages';
 import { supabase } from '../../lib/supabase';
 import type { ArtisanConversationSummary, ArtisanOrder } from '../../types/artisan';
 import { useArtisanPortal } from './artisanContextValue';
@@ -237,7 +238,7 @@ export default function SellerOverview() {
             })}</div> : <div className="seller-mini-empty seller-mini-empty--small"><Inbox /><p>No recent orders</p></div>}
           </SectionCard>
           <SectionCard title="Customer Messages" action={<Link to="messages">View all</Link>}>
-            {conversations.length ? <div className="seller-summary-list">{conversations.slice(0, 2).map(conversation => <Link to="messages" key={conversation.id}><span>{conversation.buyer_name || 'Customer'}</span><small>{conversation.last_message || 'New conversation'}</small></Link>)}</div> : <div className="seller-mini-empty seller-mini-empty--small"><MessageCircle /><p>No new messages</p></div>}
+          {conversations.length ? <div className="seller-summary-list">{conversations.slice(0, 2).map(conversation => <Link to="messages" key={conversation.id}><span>{conversation.buyer_name || 'Customer'}</span><small>{getChatMessagePreview(conversation.last_message) || 'New conversation'}</small></Link>)}</div> : <div className="seller-mini-empty seller-mini-empty--small"><MessageCircle /><p>No new messages</p></div>}
           </SectionCard>
         </div>
       </div>

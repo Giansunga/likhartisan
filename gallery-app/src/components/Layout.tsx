@@ -7,7 +7,7 @@ import BottomNav from './BottomNav';
 class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(err: any) { console.error('Page error:', err); }
+  componentDidCatch(err: unknown) { console.error('Page error:', err); }
   render() {
     if (this.state.hasError) {
       return (
@@ -70,7 +70,7 @@ export default function Layout() {
           Skip to content
         </a>
         <Navbar />
-        <main id="main-content" className={`${hideNavPadding ? '' : 'pt-16 md:pt-20'} layout-main${isChat ? ' layout-main--chat' : ''}`}>
+        <main id="main-content" className={`${hideNavPadding ? '' : 'layout-main--with-nav'} layout-main${isChat ? ' layout-main--chat' : ''}`}>
           <Outlet />
         </main>
         {!hideFooter && <Footer />}

@@ -1,17 +1,8 @@
 import { useMemo, type RefObject } from 'react';
+import { parseChatMessage } from '../../lib/chatMessages';
 import { fmt } from '../../lib/utils';
 import DesignMessageCard from './DesignMessageCard';
 import { BuyerShopAvatar, type BuyerMessage } from './BuyerChatUI';
-
-interface ProductInquiryPayload extends Record<string, unknown> {
-  type: 'product_inquiry';
-  message?: string;
-  productId?: string;
-  productImage?: string;
-  productName?: string;
-  productPrice?: number;
-  variantDimensions?: string;
-}
 
 interface MessageGroup {
   senderId: string;
@@ -25,30 +16,6 @@ interface BuyerMessageListProps {
   shopImage?: string;
   remoteTyping: boolean;
   endRef: RefObject<HTMLDivElement | null>;
-}
-
-function parseStructuredMessage(message: BuyerMessage): {
-  text: string;
-  designData: Record<string, unknown> | null;
-  productData: ProductInquiryPayload | null;
-} {
-  try {
-    const payload = JSON.parse(message.text) as Record<string, unknown>;
-    const type = payload.type;
-    if (type === 'design_submission' || type === 'design_request' || type === 'design_request_update' || payload.design) {
-      return { text: typeof payload.message === 'string' ? payload.message : '', designData: payload, productData: null };
-    }
-    if (type === 'product_inquiry') {
-      return {
-        text: typeof payload.message === 'string' ? payload.message : '',
-        designData: null,
-        productData: payload as ProductInquiryPayload,
-      };
-    }
-  } catch {
-    // Plain text messages are expected to fail JSON parsing.
-  }
-  return { text: message.text, designData: null, productData: null };
 }
 
 export default function BuyerMessageList({ messages, userId, shopName, shopImage, remoteTyping, endRef }: BuyerMessageListProps) {
@@ -70,7 +37,7 @@ export default function BuyerMessageList({ messages, userId, shopName, shopImage
         return (
           <div key={`${group.senderId}-${lastMessage.id}`} className={`msg-group msg-group--${direction}`}>
             {group.messages.map((message, index) => {
-              const { text, designData, productData } = parseStructuredMessage(message);
+              const { text, design: designData, product: productData } = parseChatMessage(message.text);
               const isLast = index === group.messages.length - 1;
               return (
                 <div key={message.id} className={`msg-row msg-row--${direction} msg-fade-in`}>

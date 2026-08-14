@@ -613,7 +613,7 @@
   }
 
   .account-savebar {
-    bottom: calc(env(safe-area-inset-bottom) + 70px);
+    bottom: calc(var(--mobile-nav-reserved-height) + 6px);
     align-items: stretch;
     flex-direction: column;
     padding: 12px;

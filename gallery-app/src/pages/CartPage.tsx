@@ -159,7 +159,8 @@ export default function CartPage() {
         const productMap = new Map(productRows.map(product => [product.id, product]));
         const variationMap = new Map(variationRows.map(variation => [variation.id, variation]));
         const nextCatalog: Record<string, CatalogLineState> = {};
-        let pricesChanged = false;
+        let cartChanged = false;
+        let quantityAdjusted = false;
 
         const revisedItems = items.map(item => {
           const product = productMap.get(item.productId);
@@ -167,6 +168,8 @@ export default function CartPage() {
           const stock = Number(item.variationId ? variation?.stock : product?.stock) || 0;
           const price = Number(variation?.price ?? product?.price ?? item.price);
           const priceChanged = Boolean(product) && price !== item.price;
+          const quantity = stock > 0 ? Math.min(item.qty, stock) : item.qty;
+          const quantityChanged = quantity !== item.qty;
           const available = Boolean(product)
             && product?.status === 'active'
             && (!item.variationId || Boolean(variation))
@@ -182,17 +185,19 @@ export default function CartPage() {
             height: variation?.height || product?.height || '',
           };
 
-          if (!priceChanged) return item;
-          pricesChanged = true;
-          return { ...item, price };
+          if (!priceChanged && !quantityChanged) return item;
+          cartChanged = true;
+          quantityAdjusted ||= quantityChanged;
+          return { ...item, price, qty: quantity };
         });
 
         setCatalog(nextCatalog);
         setShopAddresses(Object.fromEntries(shopRows.map(shop => [shop.id, shop.location || ''])));
         setValidationStatus('ready');
-        if (pricesChanged) {
+        if (cartChanged) {
           setCart(revisedItems);
           setItems(revisedItems);
+          if (quantityAdjusted) toast.info('Cart quantities were adjusted to match available stock.');
         }
       } catch {
         if (!cancelled) setValidationStatus('error');

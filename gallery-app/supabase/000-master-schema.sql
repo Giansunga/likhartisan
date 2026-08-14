@@ -186,13 +186,19 @@ CREATE TABLE IF NOT EXISTS notifications (
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  conversation_id UUID,
+  recipient_context TEXT NOT NULL DEFAULT 'buyer' CHECK (recipient_context IN ('buyer', 'artisan')),
   product_image TEXT DEFAULT '',
   read BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE notifications
+  ADD COLUMN IF NOT EXISTS recipient_context TEXT NOT NULL DEFAULT 'buyer';
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_context_created ON notifications(user_id, recipient_context, created_at DESC);
 
 -- ── 10. CONVERSATIONS ──────────────────────────────────────────────────────
 
@@ -213,6 +219,13 @@ CREATE TABLE IF NOT EXISTS conversations (
 
 CREATE INDEX IF NOT EXISTS idx_conversations_buyer_id ON conversations(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_shop_id ON conversations(shop_id);
+
+DO $$ BEGIN
+  ALTER TABLE notifications ADD COLUMN IF NOT EXISTS conversation_id UUID;
+  ALTER TABLE notifications ADD CONSTRAINT notifications_conversation_id_fkey
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ── 11. MESSAGES ───────────────────────────────────────────────────────────
 

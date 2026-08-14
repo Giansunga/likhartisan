@@ -13,12 +13,31 @@ function set<T>(key: string, val: T) {
 // ─── Cart ───
 export function getCart(): CartItem[] { return get<CartItem[]>('lk_cart', []); }
 export function setCart(items: CartItem[]) { set('lk_cart', items); emitCartUpdate(); }
-export function addToCart(item: CartItem) {
+export interface AddToCartResult {
+  addedQty: number;
+  quantity: number;
+  maximum: number | null;
+}
+
+export function addToCart(item: CartItem, maximumQuantity?: number): AddToCartResult {
   const cart = getCart();
   const existing = cart.find(i => i.productId === item.productId && i.variationId === item.variationId);
-  if (existing) existing.qty += item.qty;
-  else cart.push(item);
+  const requested = Math.max(0, Math.floor(Number(item.qty) || 0));
+  const maximum = Number.isFinite(maximumQuantity)
+    ? Math.max(0, Math.floor(maximumQuantity as number))
+    : Number.POSITIVE_INFINITY;
+  const current = existing ? Math.max(0, Math.floor(Number(existing.qty) || 0)) : 0;
+  const quantity = Math.min(current + requested, maximum);
+  const addedQty = Math.max(0, quantity - current);
+
+  if (addedQty === 0) {
+    return { addedQty, quantity: current, maximum: Number.isFinite(maximum) ? maximum : null };
+  }
+
+  if (existing) existing.qty = quantity;
+  else cart.push({ ...item, qty: quantity });
   setCart(cart);
+  return { addedQty, quantity, maximum: Number.isFinite(maximum) ? maximum : null };
 }
 export function removeFromCart(productId: string, variationId?: string) {
   if (variationId) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,8 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import AccountPanel from '../components/account/AccountPanel';
 import PurchasePanel from '../components/purchases/PurchasePanel';
 import type { PurchaseSummary } from '../types/purchases';
+import NotificationCenter from '../components/notifications/NotificationCenter';
+import { useNotifications } from '../hooks/useNotifications';
 
 interface OrderItem {
   productId: string;
@@ -70,7 +72,6 @@ export default function DashboardPage() {
     const tab = searchParams.get('tab');
     return tab === 'purchases' || tab === 'notifications' || tab === 'account' ? tab : 'account';
   });
-  const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [rateOrder, setRateOrder] = useState<DashboardOrder | null>(null);
   const [rateItemIndex, setRateItemIndex] = useState(0);
   const [rateForm, setRateForm] = useState({ rating: 0, body: '', showName: true, sellerService: 0 });
@@ -81,15 +82,13 @@ export default function DashboardPage() {
   const [rateSubmitted, setRateSubmitted] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [deleteReviewId, setDeleteReviewId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [userReviews, setUserReviews] = useState<Record<string, any>>({});
-  const [notifications, setNotifications] = useState<any[]>([]);
   const rateFileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const buyerNotifications = useNotifications(user?.id, 'buyer');
 
   useEffect(() => {
     loadUserReviews();
-    loadNotifications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -99,15 +98,6 @@ export default function DashboardPage() {
     else if (tab === 'notifications') setActivePanel('notifications');
     else if (tab === 'account') setActivePanel('account');
   }, [searchParams]);
-
-  useEffect(() => {
-    function handleDeepLink(event: Event) {
-      const { orderId } = (event as CustomEvent).detail;
-      if (orderId) setSearchParams({ tab: 'purchases', order: orderId });
-    }
-    window.addEventListener('deep-link-order', handleDeepLink);
-    return () => window.removeEventListener('deep-link-order', handleDeepLink);
-  }, [setSearchParams]);
 
   useEffect(() => {
     if (!searchParams.get('order')) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -127,50 +117,6 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.error('Load reviews error:', e);
-    }
-  }
-
-  async function loadNotifications() {
-    try {
-      if (!user) return;
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (data) setNotifications(data);
-    } catch (e) {
-      console.error('Load notifications error:', e);
-    } finally {
-      setLoadingNotifications(false);
-    }
-  }
-
-  async function markNotificationRead(id: string) {
-    try {
-      await supabase.from('notifications').update({ read: true }).eq('id', id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    } catch (e) {
-      console.error('Mark read error:', e);
-    }
-  }
-
-  async function markAllNotificationsRead() {
-    try {
-      if (!user) return;
-      await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (e) {
-      console.error('Mark all read error:', e);
-    }
-  }
-
-  async function deleteNotification(id: string) {
-    try {
-      await supabase.from('notifications').delete().eq('id', id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (e) {
-      console.error('Delete notification error:', e);
     }
   }
 
@@ -282,7 +228,7 @@ export default function DashboardPage() {
     setDeleteReviewId(null);
   }
 
-  const unreadNotificationCount = notifications.filter(n => !n.read).length;
+  const unreadNotificationCount = buyerNotifications.unreadCount;
   const accountSummaryName = String(user?.user_metadata?.name || 'Customer Name');
   const accountSummaryImage = String(user?.user_metadata?.avatar_url || '');
   const accountSummaryInitial = accountSummaryName.charAt(0).toUpperCase() || 'U';
@@ -356,124 +302,7 @@ export default function DashboardPage() {
             {activePanel === 'account' ? (
               <AccountPanel />
             ) : activePanel === 'notifications' ? (
-              <div className="dashboard-main" style={{ background: '#fff', borderRadius: 'var(--radius-md)', border: '1px solid #E8E0D8', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-                <div style={{ padding: '32px 28px', borderBottom: '1px solid #E8E0D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--primary-color)', marginBottom: '4px' }}>Notifications</h3>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-light)', fontFamily: 'var(--font-sans)' }}>
-                      {unreadNotificationCount > 0
-                        ? `You have ${unreadNotificationCount} unread notification${unreadNotificationCount > 1 ? 's' : ''}.`
-                        : "You're all caught up."}
-                    </p>
-                  </div>
-                  {unreadNotificationCount > 0 && (
-                    <button onClick={markAllNotificationsRead}
-                      style={{ padding: '8px 16px', border: '1.5px solid var(--primary-color)', borderRadius: '8px', background: 'transparent', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.82rem', fontFamily: 'var(--font-sans)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-color)'; e.currentTarget.style.color = '#fff'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--primary-color)'; }}>
-                      Mark All as Read
-                    </button>
-                  )}
-                </div>
-                <div style={{ padding: '0' }}>
-                  {loadingNotifications ? (
-                    /* Notification skeleton rows */
-                    [1, 2, 3, 4].map(i => (
-                      <div key={i} style={{ display: 'flex', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #F0EBE4' }}>
-                        <div className="shimmer-skeleton" style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }} />
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div className="shimmer-skeleton" style={{ height: '13px', width: '70%', borderRadius: '4px' }} />
-                          <div className="shimmer-skeleton" style={{ height: '11px', width: '40%', borderRadius: '4px' }} />
-                        </div>
-                      </div>
-                    ))
-                  ) : notifications.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-light)' }}>
-                      <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#FAF5EF', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: 40, height: 40, opacity: 0.5 }}>
-                          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                          <path d="M13.73 21a2 2 0 01-3.46 0" />
-                        </svg>
-                      </div>
-                      <h4 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: '#333', marginBottom: '8px' }}>No notifications yet</h4>
-                      <p style={{ fontSize: '0.88rem', color: '#888', fontFamily: 'var(--font-sans)', marginBottom: '20px', maxWidth: '360px', margin: '0 auto 20px', lineHeight: 1.5 }}>
-                        We'll notify you when there's an update on your orders, messages, or account.
-                      </p>
-                      <Link to="/gallery" style={{ display: 'inline-block', padding: '10px 28px', background: 'var(--accent-color)', color: '#fff', borderRadius: '8px', fontSize: '0.88rem', fontWeight: 600, fontFamily: 'var(--font-sans)', textDecoration: 'none', transition: 'opacity 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                        Continue Shopping
-                      </Link>
-                    </div>
-                  ) : (
-                    notifications.map(n => {
-                      const timeAgo = (() => {
-                        const diff = Date.now() - new Date(n.created_at).getTime();
-                        const mins = Math.floor(diff / 60000);
-                        if (mins < 1) return 'Just now';
-                        if (mins < 60) return `${mins}m ago`;
-                        const hrs = Math.floor(mins / 60);
-                        if (hrs < 24) return `${hrs}h ago`;
-                        const days = Math.floor(hrs / 24);
-                        return `${days}d ago`;
-                      })();
-                      const handleNotificationClick = () => {
-                        markNotificationRead(n.id);
-                        setActivePanel('purchases');
-                        if (n.order_id) {
-                          setSearchParams({ tab: 'purchases', order: n.order_id });
-                        } else {
-                          setSearchParams({ tab: 'purchases' });
-                        }
-                      };
-                      return (
-                        <div key={n.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`${n.title}. ${n.message}. ${timeAgo}`}
-                          onClick={handleNotificationClick}
-                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNotificationClick(); } }}
-                          style={{
-                            display: 'flex', gap: '14px', padding: '18px 28px',
-                            borderBottom: '1px solid #E8E0D8', cursor: 'pointer',
-                            background: n.read ? 'transparent' : 'rgba(253,211,133,0.08)',
-                            transition: 'all 0.2s ease', outline: 'none',
-                          }}
-                          onFocus={e => (e.currentTarget.style.boxShadow = 'inset 0 0 0 2px var(--accent-color)')}
-                          onBlur={e => (e.currentTarget.style.boxShadow = 'none')}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = n.read ? 'rgba(193,87,13,0.03)' : 'rgba(253,211,133,0.14)';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = n.read ? 'transparent' : 'rgba(253,211,133,0.08)';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}>
-                          {n.product_image && (
-                            <img src={n.product_image} alt="" style={{ width: '52px', height: '52px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: '1px solid #E8E0D8' }} />
-                          )}
-                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                              <span style={{ fontSize: '0.88rem', fontWeight: n.read ? 500 : 700, color: '#333', fontFamily: 'var(--font-sans)' }}>{n.title}</span>
-                              {!n.read && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#C1570D', flexShrink: 0 }} />}
-                            </div>
-                            <p style={{ fontSize: '0.82rem', color: '#888', fontFamily: 'var(--font-sans)', margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                            <span style={{ fontSize: '0.75rem', color: '#aaa', fontFamily: 'var(--font-sans)', marginTop: '4px' }}>{timeAgo}</span>
-                          </div>
-                          <button aria-label="Delete notification" onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(n.id); }}
-                            style={{ background: 'none', border: 'none', padding: '6px', cursor: 'pointer', color: '#aaa', alignSelf: 'center', opacity: 0.5, transition: 'opacity 0.15s', borderRadius: '4px' }}
-                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                            onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              <NotificationCenter context="buyer" data={buyerNotifications} />
             ) : (
               <PurchasePanel
                 reviewedProductIds={new Set(Object.keys(userReviews))}
@@ -641,25 +470,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Delete Notification Confirmation */}
-      {confirmDeleteId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }} onClick={() => setConfirmDeleteId(null)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '32px 36px', maxWidth: '440px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#333', marginBottom: '12px' }}>Delete Notification</h3>
-            <p style={{ fontSize: '0.92rem', color: '#666', lineHeight: 1.6, marginBottom: '24px' }}>Are you sure you want to delete this notification? This action cannot be undone.</p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button onClick={() => setConfirmDeleteId(null)}
-                style={{ padding: '10px 24px', border: '1.5px solid #ccc', borderRadius: '8px', background: '#fff', color: '#666', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
-                CANCEL
-              </button>
-              <button onClick={() => { deleteNotification(confirmDeleteId); setConfirmDeleteId(null); }}
-                style={{ padding: '10px 24px', border: 'none', borderRadius: '8px', background: '#D32F2F', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
-                DELETE
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

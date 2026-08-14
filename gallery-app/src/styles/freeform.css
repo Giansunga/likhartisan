@@ -15,6 +15,11 @@
   font-family: var(--font-sans);
 }
 
+body:has(.freeform-page) .likhai-launcher,
+body:has(.freeform-page) .likhai-dock {
+  display: none;
+}
+
 /* ── Stepper ──────────────────────────────────────────────────────────────── */
 
 .freeform-stepper {
@@ -508,7 +513,7 @@
 .freeform-summary-panel-inner {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -536,11 +541,30 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tertiary) transparent;
+}
+
+.freeform-summary-content::-webkit-scrollbar {
+  width: 5px;
+}
+
+.freeform-summary-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.freeform-summary-content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--bg-tertiary);
 }
 
 .freeform-summary-row {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--bg-tertiary);
@@ -570,6 +594,7 @@
 }
 
 .freeform-summary-row-info {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -587,7 +612,9 @@
 .freeform-summary-row-value {
   font-size: 0.81rem;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--text-dark);
+  overflow-wrap: anywhere;
 }
 
 .freeform-summary-row-price {
@@ -638,6 +665,46 @@
   font-size: .75rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+@media (min-width: 1101px) and (max-height: 800px) {
+  .freeform-summary-panel-inner {
+    padding: 16px;
+  }
+
+  .freeform-summary-header {
+    margin-bottom: 6px;
+    padding-bottom: 9px;
+  }
+
+  .freeform-summary-row {
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  .freeform-summary-row-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .freeform-summary-footer {
+    gap: 5px;
+    padding-top: 7px;
+  }
+
+  .freeform-summary-footer .freeform-summary-row {
+    padding: 6px 0;
+  }
+
+  .freeform-price-total {
+    font-size: 1.15rem;
+  }
+
+  .freeform-summary-send-btn {
+    min-height: 44px;
+    padding: 9px 12px;
+  }
 }
 
 .freeform-price-total {
@@ -1583,7 +1650,7 @@
     height: calc(100dvh - env(safe-area-inset-bottom, 0px));
     min-height: 0;
     overflow: hidden;
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--mobile-nav-reserved-height) + 12px);
   }
 
   .freeform-stepper {
@@ -1793,8 +1860,8 @@
   .freeform-summary-save { width: 100%; min-height: 48px; justify-content: center; }
   .freeform-bottom-note { display: none; }
 
-  body:has(.freeform-page) .likhai-dock-launcher,
-  body:has(.freeform-page) .likhai-dock-window {
+  body:has(.freeform-page) .likhai-launcher,
+  body:has(.freeform-page) .likhai-dock {
     display: none;
   }
 }
@@ -1804,7 +1871,7 @@
     display: block;
     height: auto;
     min-height: 100dvh;
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--mobile-nav-reserved-height) + 20px);
     overflow: visible;
   }
 
@@ -1945,9 +2012,9 @@
 
 @media (max-width: 768px) {
   .layout-main:has(.freeform-page) { padding-bottom: 0; }
-  .freeform-page { padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
-  .freeform-mobile-actions { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
-  .freeform-bottom-wrap { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .freeform-page { padding-bottom: calc(var(--mobile-nav-reserved-height) + 84px); }
+  .freeform-mobile-actions { bottom: var(--mobile-nav-reserved-height); }
+  .freeform-bottom-wrap { bottom: var(--mobile-nav-reserved-height); }
 }
 
 @media (min-width: 768px) and (max-width: 1100px) and (max-height: 500px) {

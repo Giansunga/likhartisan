@@ -398,12 +398,15 @@ CREATE POLICY "notifications_insert_own" ON public.notifications
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "notifications_update_own" ON public.notifications
-  FOR UPDATE USING (user_id = auth.uid());
+  FOR UPDATE
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 CREATE POLICY "notifications_delete_own" ON public.notifications
   FOR DELETE USING (user_id = auth.uid() OR public.is_admin());
 
 CREATE POLICY "notifications_insert_service" ON public.notifications
+  TO service_role
   FOR INSERT WITH CHECK (true);
 
 -- =============================================================================

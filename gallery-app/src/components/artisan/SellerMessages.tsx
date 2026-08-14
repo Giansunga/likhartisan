@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import DesignMessageCard from '../chat/DesignMessageCard';
+import { getChatMessagePreview } from '../../lib/chatMessages';
 import { FALLBACK_BUYER_NAME } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { fmt, formatTime } from '../../lib/utils';
@@ -22,6 +23,7 @@ import { SellerConfirmDialog } from './Overlay';
 import { useArtisanPortal } from './artisanContextValue';
 import { filterConversations, groupMessages, parseMessageContent, type ConversationFilter } from './messageUtils';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { API_BASE } from '../../lib/api';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -175,6 +177,16 @@ export default function SellerMessages() {
       const { error: conversationError } = await supabase.from('conversations').update({ last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread }).eq('id', selected.id).select('id').single();
       setMessages(current => current.some(message => message.id === data.id) ? current : [...current, data as ArtisanMessage]);
       setConversations(current => current.map(conversation => conversation.id === selected.id ? { ...conversation, last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread } : conversation));
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch(`${API_BASE}/api/notifications`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+          body: JSON.stringify({ type: 'message', title: 'New Message', message: `${shop.name}: ${preview.substring(0, 80)}`, conversation_id: selected.id }),
+        });
+      } catch (notificationError) {
+        console.error('Failed to create buyer message notification:', notificationError);
+      }
       setDraft('');
       clearAttachment();
       if (conversationError) setError('Your message was sent, but the inbox preview could not be refreshed.');
@@ -229,7 +241,7 @@ export default function SellerMessages() {
               return <div className={`seller-conversation ${active ? 'is-active' : ''} ${conversation.artisan_unread ? 'is-unread' : ''}`} key={conversation.id}>
                 <button type="button" className="seller-conversation__select" onClick={() => chooseConversation(conversation)} aria-pressed={active}>
                   <div className="seller-message-avatar-wrap"><BuyerAvatar conversation={conversation} /><i className={online ? 'is-online' : ''} aria-label={online ? 'Online' : 'Offline'} /></div>
-                  <div className="seller-conversation__copy"><div><strong>{conversation.buyer_name || FALLBACK_BUYER_NAME}</strong><time>{formatTime(conversation.last_message_at || '')}</time></div><p>{conversation.last_message || 'Start the conversation'}</p></div>
+                  <div className="seller-conversation__copy"><div><strong>{conversation.buyer_name || FALLBACK_BUYER_NAME}</strong><time>{formatTime(conversation.last_message_at || '')}</time></div><p>{getChatMessagePreview(conversation.last_message) || 'Start the conversation'}</p></div>
                   {conversation.artisan_unread ? <b className="seller-conversation__badge">{conversation.artisan_unread > 99 ? '99+' : conversation.artisan_unread}</b> : null}
                 </button>
                 <button type="button" className="seller-conversation__menu" onClick={() => setDeleteTarget(conversation)} aria-label={`Delete conversation with ${conversation.buyer_name || FALLBACK_BUYER_NAME}`}><Trash2 size={15} /></button>

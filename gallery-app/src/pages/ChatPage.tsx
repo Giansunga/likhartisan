@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
 import { FALLBACK_BUYER_NAME } from '../lib/constants';
+import { getChatMessagePreview } from '../lib/chatMessages';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import BuyerMessageList from '../components/chat/BuyerMessageList';
 import {
@@ -198,26 +199,23 @@ export default function ChatPage() {
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: text || '📷 Image', last_message_at: new Date().toISOString(), artisan_unread: (selectedConv.artisan_unread || 0) + 1 } : c));
         // Create real notification for shop owner via backend API to bypass RLS
         try {
-          const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
-          if (shop?.owner_id) {
-            const meta = user?.user_metadata || {};
-            const buyerName = meta.name || FALLBACK_BUYER_NAME;
-            const { data: { session } } = await supabase.auth.getSession();
-            await fetch(`${API_BASE}/api/notifications`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
-              },
-              body: JSON.stringify({
-                user_id: shop.owner_id,
-                type: 'message',
-                title: 'New Message',
-                message: `${buyerName}: ${(text || '📷 Image').substring(0, 80)}`,
-                product_image: '',
-              })
-            });
-          }
+          const meta = user?.user_metadata || {};
+          const buyerName = meta.name || FALLBACK_BUYER_NAME;
+          const { data: { session } } = await supabase.auth.getSession();
+          await fetch(`${API_BASE}/api/notifications`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(session ? { Authorization: `Bearer ${session.access_token}` } : {})
+            },
+            body: JSON.stringify({
+              type: 'message',
+              title: 'New Message',
+              message: `${buyerName}: ${(text || '📷 Image').substring(0, 80)}`,
+              conversation_id: selectedConv.id,
+              product_image: '',
+            })
+          });
         } catch (e) { console.error('Failed to create message notification:', e); }
       }
     } finally {
@@ -312,7 +310,11 @@ export default function ChatPage() {
         if (newMsg.sender_id !== userId) {
           await supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
         }
-        setConversations(prev => prev.map(c => c.id === selectedConv.id ? { ...c, last_message: newMsg.text, last_message_at: newMsg.created_at } : c));
+        setConversations(prev => prev.map(c => c.id === selectedConv.id ? {
+          ...c,
+          last_message: getChatMessagePreview(newMsg.text) || (newMsg.image_url ? 'Image attachment' : ''),
+          last_message_at: newMsg.created_at,
+        } : c));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };

@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { fmt, displayVariation } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
 import { API_BASE } from '../../lib/api';
+import { getChatMessagePreview, parseChatMessage } from '../../lib/chatMessages';
 import { FALLBACK_BUYER_NAME } from '../../lib/constants';
 import DesignMessageCard from '../../components/chat/DesignMessageCard';
 import { motion } from 'framer-motion';
@@ -2038,7 +2039,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                       <span style={{ fontSize: '0.75rem', color: '#A89688', flexShrink: 0, marginLeft: '8px' }}>{formatTime(conv.last_message_at)}</span>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#A89688', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '20px' }}>
-                      {conv.last_message || 'Start a conversation'}
+                      {getChatMessagePreview(conv.last_message) || 'Start a conversation'}
                     </div>
                   </div>
 
@@ -2136,19 +2137,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
 
                         {/* Bubbles */}
                         {group.msgs.map((msg: any, mi: number) => {
-                          let productData: any = null;
-                          let designData: any = null;
-                          let text = msg.text;
-                          try {
-                            const p = JSON.parse(msg.text);
-                            if (p.type === 'design_submission' || p.design) {
-                              designData = p;
-                              text = p.message;
-                            } else if (p.type === 'product_inquiry') {
-                              productData = p;
-                              text = p.message;
-                            }
-                          } catch {}
+                          const { text, product: productData, design: designData } = parseChatMessage(msg.text);
 
                           const isLast = mi === group.msgs.length - 1;
 
