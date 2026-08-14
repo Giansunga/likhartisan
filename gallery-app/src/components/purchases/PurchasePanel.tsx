@@ -120,7 +120,36 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
     setExpanded(id); update({ order: id });
   }
   async function mutate(order: PurchaseSummary, action: 'cancel' | 'receive') { setMutation(order.id); try { await purchaseApi(`/${order.id}/${action}`, { method: 'POST' }); toast.success(action === 'cancel' ? 'Order cancelled.' : 'Receipt confirmed.'); setConfirm(null); await reload(); } catch (e) { toast.error((e as Error).message); } finally { setMutation(null); } }
-  async function pay(order: PurchaseSummary) { if (!order.checkoutSessionId) return toast.error('No payment session found.'); try { const { data: { session: authSession } } = await supabase.auth.getSession(); if (!authSession) throw new Error('Sign-in required'); const response = await fetch(`${API_BASE}/api/session/${order.checkoutSessionId}`, { headers: { Authorization: `Bearer ${authSession.access_token}` } }); const session = await response.json(); if (response.ok && session.checkout_url) { localStorage.setItem('likhartisan_checkout_session_id', order.checkoutSessionId); window.location.assign(session.checkout_url); } else toast.info('This payment session has expired.'); } catch { toast.error('Payment is temporarily unavailable.'); } }
+  async function pay(order: PurchaseSummary) {
+    setMutation(order.id);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) throw new Error('Sign-in required');
+      if (order.checkoutSessionId) {
+        const response = await fetch(`${API_BASE}/api/session/${order.checkoutSessionId}`, { headers: { Authorization: `Bearer ${authSession.access_token}` } });
+        const paymentSession = await response.json();
+        if (response.ok && paymentSession.checkout_url) {
+          localStorage.setItem('likhartisan_checkout_session_id', order.checkoutSessionId);
+          localStorage.setItem('likhartisan_order_id', order.id);
+          window.location.assign(paymentSession.checkout_url);
+          return;
+        }
+      }
+      if (order.orderType !== 'customized') throw new Error('This payment session has expired.');
+      const response = await fetch(`${API_BASE}/api/orders/${order.id}/checkout`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      const result = await response.json() as { checkoutUrl?: string; checkoutSessionId?: string; error?: string };
+      if (!response.ok || !result.checkoutUrl || !result.checkoutSessionId) throw new Error(result.error || 'Payment is temporarily unavailable.');
+      localStorage.setItem('likhartisan_checkout_session_id', result.checkoutSessionId);
+      localStorage.setItem('likhartisan_order_id', order.id);
+      window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      toast.error((error as Error).message || 'Payment is temporarily unavailable.');
+    } finally {
+      setMutation(null);
+    }
+  }
   async function reorder(order: PurchaseSummary) { setMutation(order.id); try { const plan = await purchaseApi<ReorderPlan>(`/${order.id}/reorder-plan`, { method: 'POST' }); if (!plan.available.length) return toast.error('None of these items are currently available.'); const warning = plan.unavailable.length ? `\n\nUnavailable: ${plan.unavailable.map(item => item.productName).join(', ')}` : ''; if (!window.confirm(`Add ${plan.available.length} available item${plan.available.length === 1 ? '' : 's'} to your cart?${warning}`)) return; plan.available.forEach(addToCart); toast.success('Available items added to your cart.'); navigate('/cart'); } catch (e) { toast.error((e as Error).message); } finally { setMutation(null); } }
   const primary = (order: PurchaseSummary) => order.status === 'to-pay' ? <button className="purchase-btn primary" onClick={() => void pay(order)}>Pay now</button> : order.status === 'to-receive' ? <button className="purchase-btn primary" onClick={() => setConfirm({ order, action: 'receive' })}>Confirm received</button> : order.status === 'completed' ? <button className="purchase-btn primary" onClick={() => void reorder(order)}>Buy again</button> : <button className="purchase-btn primary" onClick={() => void toggle(order.id)}>View details</button>;
   const linkedOrderId = params.get('order');

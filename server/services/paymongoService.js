@@ -117,6 +117,25 @@ export async function retrieveCheckoutSession(sessionId, secretKey, fetchImpl = 
   return body.data;
 }
 
+export async function createCheckoutSession(attributes, secretKey, fetchImpl = fetch) {
+  const response = await fetchImpl('https://api.paymongo.com/v1/checkout_sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data: { attributes } }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.data?.id || !body?.data?.attributes?.checkout_url) {
+    const error = new Error('Unable to create checkout session with PayMongo');
+    error.status = response.status >= 500 ? 503 : 400;
+    error.providerErrors = body?.errors;
+    throw error;
+  }
+  return body.data;
+}
+
 export function parsePayMongoSignature(header) {
   if (typeof header !== 'string') return {};
   return Object.fromEntries(header.split(',').map(part => part.trim().split('=', 2)).filter(([key, value]) => key && value));

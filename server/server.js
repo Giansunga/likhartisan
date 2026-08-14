@@ -14,11 +14,13 @@ import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
 import { createPurchasesRouter } from './routes/purchases.js';
 import {
+  createCheckoutSession,
   retrieveCheckoutSession,
   verifyCheckoutSession,
   verifyPayMongoSignature as verifyPayMongoWebhookSignature,
 } from './services/paymongoService.js';
 import { createOrderNotifications, decrementStockForItems } from './services/orderFulfillmentService.js';
+import { createCustomOrderCheckout } from './services/customOrderCheckoutService.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -352,15 +354,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const orderId = crypto.randomUUID();
     const referenceNumber = `LA-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
-    const response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString('base64')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: {
-          attributes: {
+    const checkoutSession = await createCheckoutSession({
             line_items: lineItems,
             payment_method_types: ['gcash', 'paymaya', 'qrph', 'card'],
             success_url: `${FRONTEND_URL}/checkout/success?order_id=${encodeURIComponent(orderId)}&ref=${encodeURIComponent(referenceNumber)}`,
@@ -381,20 +375,10 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
               verifiedShippingFee: verifiedShippingFee.toString(),
               serverTotal: serverTotal.toString(),
             },
-          },
-        },
-      }),
-    });
+    }, PAYMONGO_SECRET_KEY);
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('PayMongo error:', data);
-      return res.status(response.status).json({ error: data.errors || 'Payment session creation failed' });
-    }
-
-    const checkoutUrl = data.data.attributes.checkout_url;
-    const sessionId = data.data.id;
+    const checkoutUrl = checkoutSession.attributes.checkout_url;
+    const sessionId = checkoutSession.id;
 
     const mappedItems = verifiedItems.map(item => ({
       product_id: item.productId,
@@ -457,7 +441,26 @@ app.get('/api/session/:sessionId', paymongoLimiter, async (req, res) => {
   }
 });
 
-const PAYMENT_ORDER_FIELDS = 'id, user_id, user_name, items, total, status, payment_status, payment_reference, checkout_session_id';
+// Create or resume checkout for an approved custom-design order.
+app.post('/api/orders/:orderId/checkout', paymongoLimiter, async (req, res) => {
+  try {
+    const authUserId = await verifyAuth(req, res);
+    if (!authUserId) return;
+    const result = await createCustomOrderCheckout({
+      supabase,
+      userId: authUserId,
+      orderId: req.params.orderId,
+      secretKey: PAYMONGO_SECRET_KEY,
+      frontendUrl: FRONTEND_URL,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('[custom-checkout] Error:', error.message);
+    return res.status(error.status || 500).json({ error: error.status && error.status < 500 ? error.message : 'Unable to start custom-order checkout' });
+  }
+});
+
+const PAYMENT_ORDER_FIELDS = 'id, user_id, user_name, items, total, status, payment_status, payment_reference, checkout_session_id, design_request_id, order_type';
 
 async function finalizeVerifiedOrder(order, verification, source) {
   if (order.payment_status === 'paid' && order.status === 'paid') return { transitioned: false, alreadyPaid: true };
@@ -480,6 +483,17 @@ async function finalizeVerifiedOrder(order, verification, source) {
   try {
     await decrementStockForItems(supabase, order.items || []);
     await createOrderNotifications(supabase, order.id, order.items || [], order.user_name || '');
+    if (order.design_request_id) {
+      const { data: request } = await supabase.from('design_requests')
+        .select('current_revision').eq('id', order.design_request_id).maybeSingle();
+      await supabase.from('design_request_events').insert({
+        request_id: order.design_request_id,
+        actor_role: 'system',
+        event_type: 'payment_verified',
+        revision_number: request?.current_revision || null,
+        payload: { order_id: order.id, payment_provider_id: verification.providerPaymentId, source },
+      });
+    }
   } catch (error) {
     console.error(`[payment] Fulfillment initialization failed for ${order.id}:`, error.message);
   }

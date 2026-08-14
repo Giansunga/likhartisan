@@ -1388,7 +1388,7 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
         const shopItems = items.filter((i: any) => i.shop_id === shopId || (!!shopName && i.shop_name === shopName));
         if (shopItems.length > 0) {
           for (const item of shopItems) {
-            const paymentStatus = order.status || 'pending';
+            const paymentStatus = order.payment_status || 'pending';
             shopOrders.push({
               id: order.id,
               item_name: item.product_name || '',
@@ -1398,6 +1398,9 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
               item_variation: item.variation || '',
               payment_status: paymentStatus === 'pending' ? 'Pending' : paymentStatus === 'paid' || paymentStatus === 'completed' ? 'Paid' : paymentStatus === 'refunded' ? 'Refunded' : 'Cancelled',
               delivery_status: order.delivery_status || 'pending',
+              status: order.status || 'pending',
+              order_type: order.order_type || 'product',
+              design_request_id: order.design_request_id || null,
               total: order.total,
               shipping_fee: order.shipping_fee || 0,
               subtotal: order.subtotal || 0,
@@ -1441,6 +1444,22 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
       console.error('Failed to create notification:', err);
       toast.error('Order updated but notification failed to send');
     });
+  }
+
+  async function advanceDeliveryStatus(order: { id: string; order_type?: string }, newStatus: string) {
+    if (order.order_type !== 'customized') return updateDeliveryStatus(order.id, newStatus);
+    setUpdateError('');
+    const { data, error } = await supabase.rpc('advance_custom_order', {
+      p_order_id: order.id,
+      p_next_status: newStatus,
+    });
+    if (error) { setUpdateError('Failed: ' + error.message); return; }
+    setOrders(prev => prev.map(item => item.id === order.id ? {
+      ...item,
+      delivery_status: data.delivery_status,
+      status: data.status,
+      payment_status: data.payment_status === 'paid' ? 'Paid' : item.payment_status,
+    } : item));
   }
 
   const deliveryBadge = (status: string) => {
@@ -1575,6 +1594,7 @@ return (
                     <img src={order.item_image} alt={order.item_name} style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0, background: 'var(--bg-secondary)' }} />
                     <div>
                       <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: '2px' }}>{order.item_name}</div>
+                      {order.order_type === 'customized' && <a href={`/artisan-dashboard/requests?requestId=${encodeURIComponent(order.design_request_id)}`} onClick={event => event.stopPropagation()} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#823E0B' }}>Custom design · View request</a>}
                       {order.item_variation && <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>{displayVariation(order.item_variation)}</div>}
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>Qty: {order.item_qty}</div>
                     </div>
@@ -1598,22 +1618,22 @@ return (
                                     {/* Active orders: show action buttons based on delivery status */}
                                     {order.delivery_status === 'pending' && order.payment_status !== 'Cancelled' && order.status !== 'cancelled' && (
                                       <>
-                                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'preparing'); }}
-                                          style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Confirm Order</button>
+                                        <button disabled={order.order_type === 'customized' && order.payment_status !== 'Paid'} onClick={(e) => { e.stopPropagation(); void advanceDeliveryStatus(order, 'preparing'); }}
+                                          style={{ padding: '5px 12px', border: '1.5px solid #1565C0', borderRadius: '6px', background: '#1565C0', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: order.order_type === 'customized' && order.payment_status !== 'Paid' ? 'not-allowed' : 'pointer', opacity: order.order_type === 'customized' && order.payment_status !== 'Paid' ? 0.55 : 1 }}>{order.order_type === 'customized' && order.payment_status !== 'Paid' ? 'Awaiting Payment' : order.order_type === 'customized' ? 'Start Production' : 'Confirm Order'}</button>
                                       </>
                                     )}
                     {order.delivery_status === 'preparing' && (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'shipped'); }}
+                        <button onClick={(e) => { e.stopPropagation(); void advanceDeliveryStatus(order, 'shipped'); }}
                           style={{ padding: '5px 12px', border: '1.5px solid #ED6C02', borderRadius: '6px', background: '#ED6C02', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Hand to Courier</button>
                       </>
                     )}
                     {order.delivery_status === 'shipped' && (
-                      <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'delivered'); }}
+                      <button onClick={(e) => { e.stopPropagation(); void advanceDeliveryStatus(order, 'delivered'); }}
                         style={{ padding: '5px 12px', border: '1.5px solid #2E7D32', borderRadius: '6px', background: '#2E7D32', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Mark Delivered</button>
                     )}
                     {order.delivery_status === 'delivered' && (
-                      <button onClick={(e) => { e.stopPropagation(); updateDeliveryStatus(order.id, 'completed'); }}
+                      <button onClick={(e) => { e.stopPropagation(); void advanceDeliveryStatus(order, 'completed'); }}
                         style={{ padding: '5px 12px', border: '1.5px solid #1B5E20', borderRadius: '6px', background: '#1B5E20', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Complete</button>
                     )}
                     {order.delivery_status === 'completed' && (
@@ -1675,6 +1695,7 @@ return (
                 </div>
                 <div style={{ fontWeight: 700, color: 'var(--accent-color)', fontSize: '1rem' }}>{'\u20B1'}{(selectedOrder.item_price * selectedOrder.item_qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
               </div>
+              {selectedOrder.order_type === 'customized' && <a href={`/artisan-dashboard/requests?requestId=${encodeURIComponent(selectedOrder.design_request_id)}`} style={{ display: 'inline-block', marginTop: '12px', color: '#823E0B', fontSize: '0.82rem', fontWeight: 700 }}>View custom design request</a>}
               {(selectedOrder.shipping_fee > 0 || selectedOrder.delivery_option === 'courier') && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #E8E0D8' }}>
                   <span style={{ fontSize: '0.82rem', color: '#8C7B6E' }}>Shipping Fee{selectedOrder.delivery_option === 'pickup' ? ' (Pickup)' : ''}</span>
@@ -1720,19 +1741,19 @@ return (
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#d32f2f', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel Order</button>
               )}
               {selectedOrder.delivery_status === 'pending' && selectedOrder.payment_status !== 'Cancelled' && selectedOrder.status !== 'cancelled' && (
-                <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'preparing'); setSelectedOrder(null); }}
-                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Confirm Order</button>
+                <button disabled={selectedOrder.order_type === 'customized' && selectedOrder.payment_status !== 'Paid'} onClick={() => { void advanceDeliveryStatus(selectedOrder, 'preparing'); setSelectedOrder(null); }}
+                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'var(--primary-color)', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: selectedOrder.order_type === 'customized' && selectedOrder.payment_status !== 'Paid' ? 'not-allowed' : 'pointer', opacity: selectedOrder.order_type === 'customized' && selectedOrder.payment_status !== 'Paid' ? 0.55 : 1 }}>{selectedOrder.order_type === 'customized' && selectedOrder.payment_status !== 'Paid' ? 'Awaiting Payment' : selectedOrder.order_type === 'customized' ? 'Start Production' : 'Confirm Order'}</button>
               )}
               {selectedOrder.delivery_status === 'preparing' && (
-                <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'shipped'); setSelectedOrder(null); }}
+                <button onClick={() => { void advanceDeliveryStatus(selectedOrder, 'shipped'); setSelectedOrder(null); }}
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#6A1B9A', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Hand to Courier</button>
               )}
               {selectedOrder.delivery_status === 'shipped' && (
-                <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'delivered'); setSelectedOrder(null); }}
+                <button onClick={() => { void advanceDeliveryStatus(selectedOrder, 'delivered'); setSelectedOrder(null); }}
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#2E7D32', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Mark Delivered</button>
               )}
               {selectedOrder.delivery_status === 'delivered' && (
-                <button onClick={() => { updateDeliveryStatus(selectedOrder.id, 'completed'); setSelectedOrder(null); }}
+                <button onClick={() => { void advanceDeliveryStatus(selectedOrder, 'completed'); setSelectedOrder(null); }}
                   style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#1565C0', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Complete</button>
               )}
             </div>
@@ -1829,19 +1850,8 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
               .from('conversations').select('*, buyer_id').eq('shop_id', shopId)
               .order('last_message_at', { ascending: false });
             if (data) {
-              // Enrich conversations with buyer names — try orders table for email fallback
-              const buyerIds = [...new Set(data.filter((c: any) => !c.buyer_name || c.buyer_name === FALLBACK_BUYER_NAME).map((c: any) => c.buyer_id).filter(Boolean))];
-              const emailMap: Record<string, string> = {};
-              if (buyerIds.length > 0) {
-                const { data: orderRows } = await supabase.from('orders').select('buyer_email, buyer_id').in('buyer_id', buyerIds).limit(1);
-                if (orderRows) {
-                  orderRows.forEach((o: any) => { if (o.buyer_email && o.buyer_id) emailMap[o.buyer_id] = o.buyer_email; });
-                }
-              }
               const enriched = data.map((c: any) => {
-                if (c.buyer_name && c.buyer_name !== FALLBACK_BUYER_NAME) return c;
-                const fallback = emailMap[c.buyer_id] || FALLBACK_BUYER_NAME;
-                return { ...c, buyer_name: fallback };
+                return { ...c, buyer_name: c.buyer_name?.trim() || FALLBACK_BUYER_NAME };
               });
               setConversations(enriched);
               setSelectedConv((current: any) => current ? enriched.find((conversation: any) => conversation.id === current.id) || null : null);

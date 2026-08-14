@@ -92,6 +92,8 @@ export function mapPurchase(order, activeReturn = null) {
     estimatedDelivery: order.estimated_delivery || '',
     deliveryNotes: order.delivery_notes || '',
     checkoutSessionId: order.checkout_session_id || '',
+    orderType: order.order_type || 'product',
+    designRequestId: order.design_request_id || '',
     createdAt: order.created_at,
     activeReturn,
   };

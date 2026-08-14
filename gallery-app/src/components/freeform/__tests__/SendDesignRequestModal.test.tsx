@@ -32,4 +32,18 @@ describe('SendDesignRequestModal', () => {
     expect(screen.getByRole('heading', { name: 'Design sent successfully' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send Request' })).not.toBeInTheDocument();
   });
+
+  it('hydrates revision fields and keeps the original shop locked', () => {
+    const submit = vi.fn();
+    const selectShop = vi.fn();
+    render(<SendDesignRequestModal open revisionMode initialQuantity={4} initialNote="Make the rim wider." shops={[{ id: 'shop-1', name: 'Regala Pottery' }, { id: 'shop-2', name: 'Other Shop' }]} selectedShopId="shop-1" snapshot={snapshot} submitting={false} successConversationId={null} onSelectShop={selectShop} onSubmit={submit} onClose={() => {}} onOpenMessages={() => {}} />);
+    expect(screen.getByRole('heading', { name: 'Send revised design' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Quantity')).toHaveValue(4);
+    expect(screen.getByLabelText(/Note/)).toHaveValue('Make the rim wider.');
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Other Shop')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Send Revision' }));
+    expect(submit).toHaveBeenCalledWith(4, 'Make the rim wider.');
+    expect(selectShop).not.toHaveBeenCalled();
+  });
 });

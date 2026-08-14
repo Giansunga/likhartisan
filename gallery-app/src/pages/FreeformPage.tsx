@@ -94,6 +94,8 @@ export default function FreeformPage() {
   const [submitting, setSubmitting] = useState(false);
   const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
   const [requestConversationId, setRequestConversationId] = useState<string | null>(null);
+  const [revisionQuantity, setRevisionQuantity] = useState(1);
+  const [revisionNote, setRevisionNote] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [designName, setDesignName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -114,6 +116,8 @@ export default function FreeformPage() {
   const cameraRef = useRef<THREE.Camera | null>(null);
   const shopModalShownRef = useRef(false);
   const { user } = useAuth();
+  const revisionRequestId = searchParams.get('requestId');
+  const revisionMode = searchParams.get('revise') === '1' && Boolean(revisionRequestId);
 
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
 
@@ -171,6 +175,10 @@ function applyDesign(design: {
   }
 
   async function handleLoadSavedDesign(design: SavedDesign) {
+    if (revisionMode && design.shop_id && design.shop_id !== selectedShopId) {
+      toast.error('A revision must stay with the shop that received the original request.');
+      return;
+    }
     if (selectedShopId && design.shop_id && design.shop_id !== selectedShopId) {
       const ok = confirm(`Switch Shop?\n\nThis design was created for ${design.shops?.name || 'another shop'}.\nLoading it will switch your current shop and replace the current design.`);
       if (!ok) return;
@@ -231,6 +239,39 @@ function applyDesign(design: {
     async function bootstrap() {
       const designId = searchParams.get('design');
 
+      if (revisionMode && revisionRequestId && user) {
+        const { data: request, error } = await supabase.from('design_requests')
+          .select('*, shops(name,image,location)')
+          .eq('id', revisionRequestId).eq('buyer_id', user.id).eq('status', 'changes_requested').maybeSingle();
+        if (error || !request) {
+          toast.error('This design request is not available for revision.');
+          return;
+        }
+        const snapshot = request.design_snapshot as DesignRequestSnapshotV1;
+        const requestShop = Array.isArray(request.shops) ? request.shops[0] : request.shops;
+        setSelectedModel(snapshot.model.file);
+        setSelectedModelId(snapshot.model.id);
+        setModelName(snapshot.model.name);
+        setModelCategory(snapshot.model.category || 'Vase');
+        setModelThumbnail(snapshot.model.thumbnail || '');
+        setShapeParams(snapshot.shape);
+        setMaterialParams(normalizeMaterialParams(snapshot.material));
+        setDecorationParams(snapshot.decoration);
+        setAttachmentParams(normalizeAttachmentSelections(snapshot.attachments));
+        setSelectedShopId(request.shop_id);
+        setSelectedShop(request.shop_id);
+        setSelectedShopName(requestShop?.name || 'Selected shop');
+        setShops([{ id: request.shop_id, name: requestShop?.name || 'Selected shop', image: requestShop?.image || '', location: requestShop?.location || '' }]);
+        setRevisionQuantity(request.quantity);
+        setRevisionNote(request.buyer_note || '');
+        setRequestConversationId(null);
+        setRequestToken(crypto.randomUUID());
+        setActiveStep('review');
+        setHasUnsavedChanges(false);
+        toast.info('Update the design, then send the revision back to the shop.');
+        return;
+      }
+
       // Load from saved design URL — forces shop context
       if (designId) {
         if (user) {
@@ -289,7 +330,7 @@ function applyDesign(design: {
 
     bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, revisionMode, revisionRequestId]);
 
   useEffect(() => {
     // Design updates originate in several child editors, so dirty-state tracking is centralized here.
@@ -429,7 +470,9 @@ function applyDesign(design: {
       return;
     }
 
-    const { data } = await supabase.from('shops').select('*').order('created_at', { ascending: false });
+    const { data } = revisionMode
+      ? await supabase.from('shops').select('*').eq('id', selectedShopId).limit(1)
+      : await supabase.from('shops').select('*').order('created_at', { ascending: false });
     if (data && data.length > 0) {
       setShops(data);
       setSelectedShop(data.some(shop => shop.id === selectedShopId) ? selectedShopId : null);
@@ -446,16 +489,24 @@ function applyDesign(design: {
     setSubmitting(true);
     if (!user || quantity < 1 || quantity > 100) { setSubmitting(false); return; }
     try {
-      const { data, error } = await supabase.rpc('submit_design_request', {
-        p_shop_id: selectedShop,
-        p_client_token: requestToken,
-        p_design_snapshot: requestSnapshot,
-        p_quantity: quantity,
-        p_buyer_note: buyerNote.trim(),
-      });
+      const { data, error } = revisionMode && revisionRequestId
+        ? await supabase.rpc('revise_design_request', {
+          p_request_id: revisionRequestId,
+          p_client_token: requestToken,
+          p_design_snapshot: requestSnapshot,
+          p_quantity: quantity,
+          p_buyer_note: buyerNote.trim(),
+        })
+        : await supabase.rpc('submit_design_request', {
+          p_shop_id: selectedShop,
+          p_client_token: requestToken,
+          p_design_snapshot: requestSnapshot,
+          p_quantity: quantity,
+          p_buyer_note: buyerNote.trim(),
+        });
       if (error) throw error;
       setRequestConversationId(data?.conversation_id || null);
-      toast.success('Your design request was sent.');
+      toast.success(revisionMode ? 'Your revised design was sent.' : 'Your design request was sent.');
     } catch (error) {
       console.error('Design request submission failed:', error);
       toast.error(error instanceof Error ? error.message : 'Could not send the design request. Please try again.');
@@ -561,12 +612,12 @@ function applyDesign(design: {
                 <h2 className="freeform-sidebar-title">Customization</h2>
               </div>
               <div className="freeform-sidebar-action-row compact">
-                <button
+                {!revisionMode && <button
                   onClick={() => { shopModalShownRef.current = true; setShopSelectOpen(true); }}
                   className="freeform-load-saved-btn"
                 >
                   {selectedShopId ? 'Switch Shop' : 'Select Shop'}
-                </button>
+                </button>}
                 <button onClick={() => setSavedDesignsOpen(true)} className="freeform-load-saved-btn">
                   Load Saved Design
                 </button>
@@ -1032,6 +1083,9 @@ function applyDesign(design: {
         snapshot={selectedModel ? requestSnapshot : null}
         submitting={submitting}
         successConversationId={requestConversationId}
+        revisionMode={revisionMode}
+        initialQuantity={revisionQuantity}
+        initialNote={revisionNote}
         onSelectShop={(shop) => { setSelectedShop(shop.id); setSelectedShopId(shop.id); setSelectedShopName(shop.name); }}
         onSubmit={(quantity, note) => void handleSubmitToShop(quantity, note)}
         onClose={() => { if (!submitting) setShowShopModal(false); }}
@@ -1039,7 +1093,7 @@ function applyDesign(design: {
       />
 
       {/* ── SHOP SELECT MODAL (freeform entry) ── */}
-      <ShopSelectModal
+      {!revisionMode && <ShopSelectModal
         open={shopSelectOpen}
         onSelect={(id, name) => {
           if (selectedShopId !== id && attachmentParams.length) {
@@ -1055,7 +1109,7 @@ function applyDesign(design: {
           setSelectedShopName(name);
           setShopSelectOpen(false);
         }}
-      />
+      />}
       <SavedDesignsModal
         open={savedDesignsOpen}
         currentShopId={selectedShopId}

@@ -24,6 +24,7 @@ OPTIONAL / INCREMENTAL FILES (for existing databases, column additions):
   add-payment-status-column.sql    Payment status column (in master)
   add-lalamove-quote-id.sql        Lalamove quote ID column (in master)
   add-buyer-profile-to-conversations.sql  Buyer name/avatar (in master)
+  sync-buyer-identity-to-conversations.sql  Sync canonical Auth name/avatar into conversations
   add-location-column.sql          Shop location column (in master)
   add-review-seller-ratings.sql    Seller/delivery ratings (in master)
   add-review-images.sql            Review images array (in master)

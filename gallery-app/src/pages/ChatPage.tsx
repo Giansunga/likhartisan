@@ -129,10 +129,6 @@ export default function ChatPage() {
     const uid = user?.id;
     if (!uid) { toast.error('Please sign in to start a conversation.'); return; }
 
-    const meta = user?.user_metadata || {};
-    const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
-    const buyerAvatar = meta.avatar_url || '';
-
     const existing = conversations.find(c => c.shop_id === shop.id);
     if (existing) {
       setSelectedConv(existing);
@@ -143,7 +139,7 @@ export default function ChatPage() {
 
     const { data, error } = await supabase
       .from('conversations')
-      .insert({ buyer_id: uid, shop_id: shop.id, shop_name: shop.name, buyer_name: buyerName, buyer_avatar: buyerAvatar, last_message: '', last_message_at: new Date().toISOString() })
+      .insert({ buyer_id: uid, shop_id: shop.id, shop_name: shop.name, last_message: '', last_message_at: new Date().toISOString() })
       .select().single();
 
     if (error) { toast.error('Failed: ' + error.message); return; }
@@ -205,7 +201,7 @@ export default function ChatPage() {
           const { data: shop } = await supabase.from('shops').select('owner_id').eq('id', selectedConv.shop_id).single();
           if (shop?.owner_id) {
             const meta = user?.user_metadata || {};
-            const buyerName = meta.name || user?.email || FALLBACK_BUYER_NAME;
+            const buyerName = meta.name || FALLBACK_BUYER_NAME;
             const { data: { session } } = await supabase.auth.getSession();
             await fetch(`${API_BASE}/api/notifications`, {
               method: 'POST',

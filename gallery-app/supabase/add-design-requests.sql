@@ -74,7 +74,7 @@ begin
   if found then return v_request; end if;
   select * into v_shop from public.shops where id = p_shop_id;
   if not found then raise exception 'Shop not found'; end if;
-  v_buyer_name := coalesce(auth.jwt()#>>'{user_metadata,name}', auth.jwt()->>'email', 'Customer');
+  v_buyer_name := coalesce(nullif(btrim(auth.jwt()#>>'{user_metadata,name}'), ''), 'Customer');
   select * into v_conversation from public.conversations
     where buyer_id = v_user_id and shop_id = p_shop_id order by last_message_at desc nulls last limit 1;
   if not found then
@@ -169,7 +169,7 @@ begin
   if v_request.status = 'approved' and v_request.order_id is not null then return v_request; end if;
   if v_request.status <> 'quoted' or v_request.quoted_price is null then raise exception 'Only a current quote can be approved'; end if;
   select * into v_shop from public.shops where id=v_request.shop_id;
-  v_buyer_name := coalesce(auth.jwt()#>>'{user_metadata,name}', auth.jwt()->>'email', 'Customer');
+  v_buyer_name := coalesce(nullif(btrim(auth.jwt()#>>'{user_metadata,name}'), ''), 'Customer');
   insert into public.orders(user_id,user_name,buyer_email,items,subtotal,shipping_fee,total,delivery_option,delivery_status,status,payment_status,order_type,customer_notes,design_request_id)
   values(v_user_id,v_buyer_name,coalesce(auth.jwt()->>'email',''),jsonb_build_array(jsonb_build_object(
     'product_id',null,'product_name',coalesce(v_request.design_snapshot#>>'{model,name}','Custom pottery design'),

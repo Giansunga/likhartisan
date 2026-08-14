@@ -80,13 +80,10 @@ export default function SellerMessages() {
         .order('last_message_at', { ascending: false });
       if (conversationError) throw conversationError;
       const rows = (data || []) as ArtisanConversationSummary[];
-      const buyerIds = [...new Set(rows.filter(row => !row.buyer_name || row.buyer_name === FALLBACK_BUYER_NAME).map(row => row.buyer_id).filter((id): id is string => Boolean(id)))];
-      const emailMap: Record<string, string> = {};
-      if (buyerIds.length) {
-        const { data: orders } = await supabase.from('orders').select('buyer_email, buyer_id').in('buyer_id', buyerIds);
-        for (const order of orders || []) if (order.buyer_id && order.buyer_email && !emailMap[order.buyer_id]) emailMap[order.buyer_id] = order.buyer_email;
-      }
-      setConversations(rows.map(row => row.buyer_name && row.buyer_name !== FALLBACK_BUYER_NAME ? row : { ...row, buyer_name: (row.buyer_id && emailMap[row.buyer_id]) || FALLBACK_BUYER_NAME }));
+      setConversations(rows.map(row => ({
+        ...row,
+        buyer_name: row.buyer_name?.trim() || FALLBACK_BUYER_NAME,
+      })));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Conversations could not be loaded.');
     } finally {
@@ -109,7 +106,7 @@ export default function SellerMessages() {
   }, [selectedId]);
 
   useEffect(() => { queueMicrotask(() => { void loadMessages(); }); }, [loadMessages]);
-  usePortalRealtimeRefresh(['conversations', 'orders'], () => loadConversations(true));
+  usePortalRealtimeRefresh(['conversations'], () => loadConversations(true));
   usePortalRealtimeRefresh(['messages'], loadMessages);
 
   useEffect(() => {

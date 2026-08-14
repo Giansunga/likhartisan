@@ -43,6 +43,8 @@ export interface PurchaseSummary {
   trackingNumber: string;
   estimatedDelivery: string;
   checkoutSessionId: string;
+  orderType?: string;
+  designRequestId?: string;
   createdAt: string;
   activeReturn: ReturnRequest | null;
 }
