@@ -1,0 +1,7 @@
+- generic [ref=e2]:
+  - button "Open LikhAI customer support" [ref=e3] [cursor=pointer]:
+    - generic [ref=e4]:
+      - strong [ref=e5]: LikhAI
+      - generic [ref=e6]: Customer Support
+  - generic [ref=e7]: Loading...
+  - region "Notifications alt+T"

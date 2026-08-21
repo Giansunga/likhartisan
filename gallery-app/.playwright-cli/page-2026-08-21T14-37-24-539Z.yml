@@ -1,0 +1,201 @@
+- generic [active] [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - button "Open LikhAI customer support" [ref=f7e3] [cursor=pointer]:
+      - generic [ref=f7e4]:
+        - strong [ref=f7e5]: LikhAI
+        - generic [ref=f7e6]: Customer Support
+    - generic [ref=f7e7]:
+      - link "Skip to content" [ref=f7e8] [cursor=pointer]:
+        - /url: "#main-content"
+      - navigation "Main navigation" [ref=f7e9]:
+        - generic [ref=f7e10]:
+          - link [ref=f7e11] [cursor=pointer]:
+            - /url: /
+            - img "LikhArtisan" [ref=f7e12]
+          - generic [ref=f7e13]:
+            - link "Shopping cart with 0 items" [ref=f7e14] [cursor=pointer]:
+              - /url: /cart
+            - button "SIGN IN" [ref=f7e19]
+      - main [ref=f7e20]:
+        - generic [ref=f7e21]:
+          - generic [ref=f7e25]:
+            - heading "Explore the Local Pottery Industry in Santo Tomas" [level=1] [ref=f7e26]: Explore the Local PotteryIndustry in Santo Tomas
+            - link "Explore" [ref=f7e27] [cursor=pointer]:
+              - /url: /gallery
+          - region [ref=f7e28]:
+            - generic [ref=f7e29]:
+              - generic [ref=f7e30]:
+                - generic [ref=f7e31]: Field Notes · Issue 01
+                - generic [ref=f7e32]: Santo Tomas, Pampanga
+              - generic [ref=f7e33]:
+                - generic [ref=f7e34]:
+                  - generic [ref=f7e35]: The pottery capital of the Philippines
+                  - heading [level=2] [ref=f7e36]:
+                    - text: Where earth becomes
+                    - emphasis [ref=f7e37]: inheritance.
+                  - paragraph [ref=f7e38]: In Santo Tomas, pottery is not simply an object. It is a working tradition—formed through repetition, patience, and knowledge passed from one pair of hands to another.
+                  - blockquote [ref=f7e39]: “Technology is the bridge—not the author of the craft.”
+                  - link "Read the full story" [ref=f7e40] [cursor=pointer]:
+                    - /url: /about#origin
+                - generic [ref=f7e43]:
+                  - figure "Finished and drying forms gathered inside a local pottery workshop." [ref=f7e44]:
+                    - img "Rows of finished clay pots in a Santo Tomas workshop" [ref=f7e45]
+                  - figure "Every surface begins with practiced hands." [ref=f7e47]:
+                    - img "A potter shaping a large clay vessel" [ref=f7e48]
+              - generic [ref=f7e50]:
+                - generic [ref=f7e51]:
+                  - term [ref=f7e52]: Place
+                  - definition [ref=f7e53]:
+                    - strong [ref=f7e54]: Rooted in Santo Tomas
+                    - generic [ref=f7e55]: Pampanga, Philippines
+                - generic [ref=f7e56]:
+                  - term [ref=f7e57]: Practice
+                  - definition [ref=f7e58]:
+                    - strong [ref=f7e59]: Formed through skilled hands
+                    - generic [ref=f7e60]: Shaped, finished, and shared locally
+                - generic [ref=f7e61]:
+                  - term [ref=f7e62]: Purpose
+                  - definition [ref=f7e63]:
+                    - strong [ref=f7e64]: Made easier to discover
+                    - generic [ref=f7e65]: Stories, shops, objects, and custom ideas
+          - region [ref=f7e66]:
+            - generic [ref=f7e67]:
+              - generic [ref=f7e68]:
+                - generic [ref=f7e69]:
+                  - generic [ref=f7e70]: Inside the story
+                  - heading [level=2] [ref=f7e71]:
+                    - text: Continue reading in
+                    - emphasis [ref=f7e72]: About
+                - paragraph [ref=f7e73]: Three short chapters connect the place, its practice, and the digital tools built around it.
+              - list [ref=f7e74]:
+                - listitem [ref=f7e75]:
+                  - link "01 Origins Why LikhArtisan exists A local craft deserves a clearer, more useful path online. Read chapter" [ref=f7e76] [cursor=pointer]:
+                    - /url: /about#origin
+                    - generic [ref=f7e77]: "01"
+                    - generic [ref=f7e78]: Origins
+                    - heading "Why LikhArtisan exists" [level=3] [ref=f7e79]
+                    - paragraph [ref=f7e80]: A local craft deserves a clearer, more useful path online.
+                    - generic [ref=f7e81]: Read chapter
+                - listitem [ref=f7e84]:
+                  - link "02 Heritage A working local tradition Meet the practice and place behind Santo Tomas pottery. Read chapter" [ref=f7e85] [cursor=pointer]:
+                    - /url: /about#heritage
+                    - generic [ref=f7e86]: "02"
+                    - generic [ref=f7e87]: Heritage
+                    - heading "A working local tradition" [level=3] [ref=f7e88]
+                    - paragraph [ref=f7e89]: Meet the practice and place behind Santo Tomas pottery.
+                    - generic [ref=f7e90]: Read chapter
+                - listitem [ref=f7e93]:
+                  - link "03 The digital bridge From discovery to a maker See how the gallery, 3D tools, and shops connect. Read chapter" [ref=f7e94] [cursor=pointer]:
+                    - /url: /about#platform
+                    - generic [ref=f7e95]: "03"
+                    - generic [ref=f7e96]: The digital bridge
+                    - heading "From discovery to a maker" [level=3] [ref=f7e97]
+                    - paragraph [ref=f7e98]: See how the gallery, 3D tools, and shops connect.
+                    - generic [ref=f7e99]: Read chapter
+          - region [ref=f7e102]:
+            - generic [ref=f7e103]:
+              - generic [ref=f7e104]:
+                - generic [ref=f7e105]:
+                  - generic [ref=f7e106]: Objects · Volume 01
+                  - heading [level=2] [ref=f7e107]:
+                    - text: Pottery for
+                    - emphasis [ref=f7e108]: everyday rituals
+                - paragraph [ref=f7e109]: From sculptural vessels to small moments of light, find a piece that feels at home with you.
+              - generic [ref=f7e110]:
+                - link "01 Vases Sculptural forms for everyday spaces. View collection" [ref=f7e111] [cursor=pointer]:
+                  - /url: /gallery?category=Vases
+                  - generic [ref=f7e112]: "01"
+                  - generic [ref=f7e113]: Vases
+                  - generic [ref=f7e114]: Sculptural forms for everyday spaces.
+                  - generic [ref=f7e115]: View collection
+                - link "02 Planters Made to let growing things thrive. View collection" [ref=f7e118] [cursor=pointer]:
+                  - /url: /gallery?category=Planters
+                  - generic [ref=f7e119]: "02"
+                  - generic [ref=f7e120]: Planters
+                  - generic [ref=f7e121]: Made to let growing things thrive.
+                  - generic [ref=f7e122]: View collection
+                - link "03 Jars Useful vessels with a handmade soul. View collection" [ref=f7e125] [cursor=pointer]:
+                  - /url: /gallery?category=Jars
+                  - generic [ref=f7e126]: "03"
+                  - generic [ref=f7e127]: Jars
+                  - generic [ref=f7e128]: Useful vessels with a handmade soul.
+                  - generic [ref=f7e129]: View collection
+                - link "04 Amphoras Classic silhouettes shaped by tradition. View collection" [ref=f7e132] [cursor=pointer]:
+                  - /url: /gallery?category=Amphoras
+                  - generic [ref=f7e133]: "04"
+                  - generic [ref=f7e134]: Amphoras
+                  - generic [ref=f7e135]: Classic silhouettes shaped by tradition.
+                  - generic [ref=f7e136]: View collection
+                - link "05 Tea Light Vases Small pieces that hold a warm glow. View collection" [ref=f7e139] [cursor=pointer]:
+                  - /url: /gallery?category=Tea%20Light%20Vases
+                  - generic [ref=f7e140]: "05"
+                  - generic [ref=f7e141]: Tea Light Vases
+                  - generic [ref=f7e142]: Small pieces that hold a warm glow.
+                  - generic [ref=f7e143]: View collection
+              - link "Browse the full gallery" [ref=f7e146] [cursor=pointer]:
+                - /url: /gallery
+          - region [ref=f7e149]:
+            - generic [ref=f7e150]:
+              - generic [ref=f7e151]:
+                - generic [ref=f7e152]:
+                  - generic [ref=f7e153]: Makers directory · Volume 01
+                  - heading [level=2] [ref=f7e154]:
+                    - text: Shops keeping the
+                    - emphasis [ref=f7e155]: craft in motion
+                - generic "Shop carousel controls" [ref=f7e157]:
+                  - button "Show previous shops" [disabled] [ref=f7e158]
+                  - button "Show next shops" [disabled] [ref=f7e161]
+              - status "Loading shops" [ref=f7e164]
+          - generic [ref=f7e170]:
+            - generic [ref=f7e171]:
+              - generic [ref=f7e172]:
+                - paragraph [ref=f7e173]: Design Studio · Live 3D preview
+                - heading "Start with a form. Make it yours." [level=2] [ref=f7e174]
+                - paragraph [ref=f7e175]: Shape a pottery concept in real time, then refine its finish, pattern, and sculpted details before sharing it with a participating shop.
+              - generic:
+                - paragraph: 01 · Shape
+                - heading [level=2]: Shape the silhouette.
+                - paragraph: Adjust the height, body width, neck, rim, and curvature. Every change appears instantly on the 3D piece.
+              - generic:
+                - paragraph: 02 · Finish
+                - heading [level=2]: Choose the surface.
+                - paragraph: Compare raw clay, ceramic, and glazed finishes to find the tone and texture that suit your piece.
+              - generic:
+                - paragraph: 03 · Decorate
+                - heading [level=2]: Give it a signature.
+                - paragraph: Place a pattern, tune its scale and color, then choose a painted or engraved treatment.
+              - generic [ref=f7e176]:
+                - paragraph [ref=f7e177]: 04 · Details
+                - heading [level=2] [ref=f7e178]: Complete the form.
+                - paragraph [ref=f7e179]: Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.
+                - button [ref=f7e181] [cursor=pointer]: Open Design Studio
+            - generic [ref=f7e182]:
+              - generic [ref=f7e183]: Loading 3D preview...
+              - generic: Scroll to explore
+          - region [ref=f7e188]:
+            - generic [ref=f7e190]:
+              - generic [ref=f7e191]:
+                - img "Handmade pottery displayed in Santo Tomas" [ref=f7e192]
+                - generic [ref=f7e193]: Back cover · Santo Tomas
+              - generic [ref=f7e194]:
+                - generic [ref=f7e195]: Keep local craft in motion
+                - heading [level=2] [ref=f7e196]:
+                  - text: Bring home a pieceof
+                  - emphasis [ref=f7e197]: Santo Tomas.
+                - paragraph [ref=f7e198]: Every piece connects you to a living craft tradition and the people continuing it with care.
+                - generic [ref=f7e199]:
+                  - link "Shop handcrafted pottery" [ref=f7e200] [cursor=pointer]:
+                    - /url: /gallery
+                  - link "Read the full story" [ref=f7e204] [cursor=pointer]:
+                    - /url: /about
+                - button "Create a free account" [ref=f7e207] [cursor=pointer]
+    - region "Notifications alt+T"
+  - navigation "Mobile navigation" [ref=f7e210]:
+    - link "Home" [ref=f7e211] [cursor=pointer]:
+      - /url: /
+    - link "Gallery" [ref=f7e216] [cursor=pointer]:
+      - /url: /gallery
+    - link "Shops" [ref=f7e220] [cursor=pointer]:
+      - /url: /shops
+    - link "Design" [ref=f7e226] [cursor=pointer]:
+      - /url: /freeform

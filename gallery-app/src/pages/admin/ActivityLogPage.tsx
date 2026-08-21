@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ChevronRight, Clock3, Download, FileClock, RefreshCw,
-  Search, ShieldAlert, X,
+  Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
@@ -152,12 +152,7 @@ export default function ActivityLogPage() {
 
   return (
     <div className="activity-page">
-      <header className="activity-page__header">
-        <div>
-          <p className="activity-page__eyebrow"><ShieldAlert size={15} aria-hidden="true" /> System audit</p>
-          <h1>Activity Logs</h1>
-          <p>Trace business and security changes across the marketplace. Records are retained for 90 days.</p>
-        </div>
+      <header className="activity-page__header" style={{ justifyContent: 'flex-end' }}>
         <button className="activity-button activity-button--primary" type="button" disabled={exporting} onClick={() => void handleExport()}>
           {exporting ? <RefreshCw className="activity-spin" size={17} aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}
           {exporting ? 'Preparing…' : 'Export CSV'}

@@ -1,61 +1,30 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import ProductTable from '../ProductTable';
 import type { Product } from '../../../types';
 
-const products: Product[] = Array.from({ length: 13 }, (_, index) => ({
-  id: `product-${index + 1}`,
-  name: `Product ${index + 1}`,
-  description: '',
-  category: 'Vases',
-  price: index + 1,
-  stock: 10,
-  inStock: true,
-  image: '/product.png',
-  materials: 'Clay',
-  dimensions: '10 x 10 cm',
-  height: '10 cm',
-  openingDiameter: '5 cm',
-  technique: 'Handmade',
-  shopId: 'shop-1',
-  shopName: 'Test Shop',
-  status: 'active',
-  views: 0,
-  ratingAvg: 0,
-  ratingCount: 0,
-  createdAt: new Date(2026, 0, index + 1).toISOString(),
-  updatedAt: new Date(2026, 0, index + 1).toISOString(),
-}));
-
-const handlers = {
-  onDelete: vi.fn(),
-  onArchive: vi.fn(),
-  onEdit: vi.fn(),
+const product: Product = {
+  id: 'product-1', name: 'Sample Vase', description: '', category: 'Vases', price: 450, stock: 2, inStock: true,
+  image: '/product.png', materials: 'Clay', dimensions: '', height: '', openingDiameter: '', technique: 'Handmade',
+  shopId: 'shop-1', shopName: 'Test Shop', status: 'active', views: 8, ratingAvg: 0, ratingCount: 0,
+  createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z',
 };
 
-afterEach(() => {
-  window.sessionStorage.clear();
-});
+describe('ProductTable', () => {
+  it('renders inventory and exposes edit plus menu actions', () => {
+    const handlers = { onEdit: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn() };
+    render(<ProductTable products={[product]} {...handlers} />);
 
-describe('ProductTable pagination', () => {
-  it('restores the selected page after switching away and returning', () => {
-    const firstRender = render(<ProductTable products={products} {...handlers} />);
-
-    fireEvent.click(screen.getByRole('button', { name: '2' }));
-    expect(window.sessionStorage.getItem('admin-products-page')).toBe('2');
-    firstRender.unmount();
-
-    render(<ProductTable products={products} {...handlers} />);
-
-    expect(screen.getByRole('button', { name: '2' }).className).toContain('bg-primary');
+    expect(screen.getAllByText('Low stock').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    expect(handlers.onEdit).toHaveBeenCalledWith(product);
+    fireEvent.click(screen.getAllByRole('button', { name: /More actions/ })[0]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive product' }));
+    expect(handlers.onArchive).toHaveBeenCalledWith(product);
   });
 
-  it('clamps a restored page when fewer product pages are available', () => {
-    window.sessionStorage.setItem('admin-products-page', '3');
-
-    render(<ProductTable products={products.slice(0, 7)} {...handlers} />);
-
-    expect(screen.getByRole('button', { name: '2' }).className).toContain('bg-primary');
-    expect(window.sessionStorage.getItem('admin-products-page')).toBe('2');
+  it('disables duplicate actions for the busy product', () => {
+    render(<ProductTable products={[product]} busyProductId="product-1" onEdit={vi.fn()} onArchive={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getAllByRole('button', { name: 'Working…' })[0]).toBeDisabled();
   });
 });

@@ -1,0 +1,229 @@
+- generic [ref=f2e2]:
+  - button "Open LikhAI customer support" [ref=f2e3] [cursor=pointer]:
+    - generic [ref=f2e4]:
+      - strong [ref=f2e5]: LikhAI
+      - generic [ref=f2e6]: Customer Support
+  - generic [ref=f2e7]:
+    - link "Skip to content" [ref=f2e8] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=f2e9]:
+      - generic [ref=f2e10]:
+        - link [ref=f2e11] [cursor=pointer]:
+          - /url: /
+          - img "LikhArtisan" [ref=f2e12]
+        - list [ref=f2e13]:
+          - listitem [ref=f2e14]:
+            - link "Home" [ref=f2e15] [cursor=pointer]:
+              - /url: /
+          - listitem [ref=f2e16]:
+            - link "Gallery" [ref=f2e17] [cursor=pointer]:
+              - /url: /gallery
+          - listitem [ref=f2e18]:
+            - link "Design" [ref=f2e19] [cursor=pointer]:
+              - /url: /freeform
+          - listitem [ref=f2e20]:
+            - link "Artisans" [ref=f2e21] [cursor=pointer]:
+              - /url: /artisans
+          - listitem [ref=f2e22]:
+            - link "Shops" [ref=f2e23] [cursor=pointer]:
+              - /url: /shops
+          - listitem [ref=f2e24]:
+            - link "About" [ref=f2e25] [cursor=pointer]:
+              - /url: /about
+        - generic [ref=f2e26]:
+          - link "Shopping cart with 0 items" [ref=f2e27] [cursor=pointer]:
+            - /url: /cart
+          - button "SIGN IN" [ref=f2e32]
+    - main [ref=f2e33]:
+      - generic [ref=f2e34]:
+        - generic [ref=f2e38]:
+          - heading "Explore the Local Pottery Industry in Santo Tomas" [level=1] [ref=f2e39]: Explore the Local PotteryIndustry in Santo Tomas
+          - link "Explore" [ref=f2e40] [cursor=pointer]:
+            - /url: /gallery
+        - region [ref=f2e41]:
+          - generic [ref=f2e42]:
+            - img "Rows of handmade pottery in a Santo Tomas workshop" [ref=f2e44]
+            - generic [ref=f2e45]:
+              - generic [ref=f2e46]: Santo Tomas, Pampanga
+              - generic [ref=f2e50]: The pottery capital of the Philippines
+              - heading [level=2] [ref=f2e51]:
+                - text: A living tradition,
+                - emphasis [ref=f2e52]: shaped by hand.
+              - paragraph [ref=f2e53]: Santo Tomas pottery carries generations of patience, skill, and imagination. LikhArtisan makes it easier to discover the people, shops, and pieces keeping that practice alive today.
+              - generic [ref=f2e54]:
+                - link "Our story" [ref=f2e55] [cursor=pointer]:
+                  - /url: /about
+                - link "Meet artisans" [ref=f2e58] [cursor=pointer]:
+                  - /url: /artisans
+          - list [ref=f2e60]:
+            - listitem [ref=f2e61]:
+              - generic [ref=f2e67]:
+                - strong [ref=f2e68]: Rooted in Santo Tomas
+                - generic [ref=f2e69]: Discover the pottery community of Pampanga.
+            - listitem [ref=f2e70]:
+              - link "Explore pottery shops in Santo Tomas" [ref=f2e71] [cursor=pointer]:
+                - /url: /shops
+                - generic [ref=f2e77]:
+                  - strong [ref=f2e78]: Shop local makers
+                  - generic [ref=f2e79]: Browse participating pottery shops in one place.
+            - listitem [ref=f2e82]:
+              - link "Open the 3D pottery Design Studio" [ref=f2e83] [cursor=pointer]:
+                - /url: /freeform
+                - generic [ref=f2e88]:
+                  - strong [ref=f2e89]: Design in 3D
+                  - generic [ref=f2e90]: Personalize a piece before it is made.
+        - region [ref=f2e93]:
+          - generic [ref=f2e94]:
+            - generic [ref=f2e95]:
+              - generic [ref=f2e96]: Find your form
+              - heading [level=2] [ref=f2e97]:
+                - text: Pottery for
+                - emphasis [ref=f2e98]: everyday rituals
+              - paragraph [ref=f2e99]: From sculptural vessels to small moments of light, find a piece that feels at home with you.
+            - generic [ref=f2e100]:
+              - link "Vases Sculptural forms for everyday spaces. Explore" [ref=f2e101] [cursor=pointer]:
+                - /url: /gallery?category=Vases
+                - generic [ref=f2e102]: Vases
+                - generic [ref=f2e103]: Sculptural forms for everyday spaces.
+                - generic [ref=f2e104]: Explore
+              - link "Planters Made to let growing things thrive. Explore" [ref=f2e107] [cursor=pointer]:
+                - /url: /gallery?category=Planters
+                - generic [ref=f2e108]: Planters
+                - generic [ref=f2e109]: Made to let growing things thrive.
+                - generic [ref=f2e110]: Explore
+              - link "Jars Useful vessels with a handmade soul. Explore" [ref=f2e113] [cursor=pointer]:
+                - /url: /gallery?category=Jars
+                - generic [ref=f2e114]: Jars
+                - generic [ref=f2e115]: Useful vessels with a handmade soul.
+                - generic [ref=f2e116]: Explore
+              - link "Amphoras Classic silhouettes shaped by tradition. Explore" [ref=f2e119] [cursor=pointer]:
+                - /url: /gallery?category=Amphoras
+                - generic [ref=f2e120]: Amphoras
+                - generic [ref=f2e121]: Classic silhouettes shaped by tradition.
+                - generic [ref=f2e122]: Explore
+              - link "Tea Light Vases Small pieces that hold a warm glow. Explore" [ref=f2e125] [cursor=pointer]:
+                - /url: /gallery?category=Tea%20Light%20Vases
+                - generic [ref=f2e126]: Tea Light Vases
+                - generic [ref=f2e127]: Small pieces that hold a warm glow.
+                - generic [ref=f2e128]: Explore
+            - link "Explore all pottery" [ref=f2e131] [cursor=pointer]:
+              - /url: /gallery
+        - generic [ref=f2e136]:
+          - generic [ref=f2e137]:
+            - generic [ref=f2e138]:
+              - paragraph [ref=f2e139]: Design Studio · Live 3D preview
+              - heading "Start with a form. Make it yours." [level=2] [ref=f2e140]
+              - paragraph [ref=f2e141]: Shape a pottery concept in real time, then refine its finish, pattern, and sculpted details before sharing it with a participating shop.
+            - generic:
+              - paragraph: 01 · Shape
+              - heading [level=2]: Shape the silhouette.
+              - paragraph: Adjust the height, body width, neck, rim, and curvature. Every change appears instantly on the 3D piece.
+            - generic:
+              - paragraph: 02 · Finish
+              - heading [level=2]: Choose the surface.
+              - paragraph: Compare raw clay, ceramic, and glazed finishes to find the tone and texture that suit your piece.
+            - generic:
+              - paragraph: 03 · Decorate
+              - heading [level=2]: Give it a signature.
+              - paragraph: Place a pattern, tune its scale and color, then choose a painted or engraved treatment.
+            - generic [ref=f2e142]:
+              - paragraph [ref=f2e143]: 04 · Details
+              - heading [level=2] [ref=f2e144]: Complete the form.
+              - paragraph [ref=f2e145]: Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.
+              - button [ref=f2e147] [cursor=pointer]: Open Design Studio
+          - generic [ref=f2e148]:
+            - generic [ref=f2e149]: Loading 3D preview...
+            - generic: Scroll to explore
+        - region [ref=f2e154]:
+          - generic [ref=f2e155]:
+            - generic [ref=f2e156]:
+              - generic [ref=f2e157]:
+                - text: Meet the makers
+                - heading [level=2] [ref=f2e158]:
+                  - text: Santo Tomas
+                  - emphasis [ref=f2e159]: shops
+              - generic [ref=f2e160]:
+                - generic "Shop carousel controls" [ref=f2e161]:
+                  - button "Show previous shops" [disabled] [ref=f2e162]
+                  - button "Show next shops" [disabled] [ref=f2e165]
+                - link "All shops" [ref=f2e168] [cursor=pointer]:
+                  - /url: /shops
+            - status "Loading shops" [ref=f2e171]
+        - region [ref=f2e175]:
+          - generic [ref=f2e177]:
+            - img "Handmade pottery displayed in Santo Tomas" [ref=f2e179]
+            - generic [ref=f2e180]:
+              - generic [ref=f2e181]: Keep local craft in motion
+              - heading [level=2] [ref=f2e182]:
+                - text: Bring home a pieceof
+                - emphasis [ref=f2e183]: Santo Tomas.
+              - paragraph [ref=f2e184]: Every piece connects you to a living craft tradition and the people continuing it with care.
+              - generic [ref=f2e185]:
+                - link "Shop handcrafted pottery" [ref=f2e186] [cursor=pointer]:
+                  - /url: /gallery
+                - link "Learn the story" [ref=f2e190] [cursor=pointer]:
+                  - /url: /about
+              - button "Create a free account" [ref=f2e193] [cursor=pointer]
+    - contentinfo [ref=f2e196]:
+      - generic [ref=f2e197]:
+        - generic [ref=f2e198]:
+          - generic [ref=f2e199]:
+            - link "LikhArtisan home" [ref=f2e200] [cursor=pointer]:
+              - /url: /
+              - img "LikhArtisan" [ref=f2e201]
+            - link "Contact us +63 967 671 1111" [ref=f2e202] [cursor=pointer]:
+              - /url: tel:+639676711111
+              - generic [ref=f2e205]:
+                - generic [ref=f2e206]: Contact us
+                - text: +63 967 671 1111
+          - navigation [ref=f2e207]:
+            - heading "Explore" [level=2] [ref=f2e208]
+            - list [ref=f2e209]:
+              - listitem [ref=f2e210]:
+                - link "Gallery" [ref=f2e211] [cursor=pointer]:
+                  - /url: /gallery
+              - listitem [ref=f2e212]:
+                - link "Shops" [ref=f2e213] [cursor=pointer]:
+                  - /url: /shops
+              - listitem [ref=f2e214]:
+                - link "Artisans" [ref=f2e215] [cursor=pointer]:
+                  - /url: /artisans
+              - listitem [ref=f2e216]:
+                - link "About" [ref=f2e217] [cursor=pointer]:
+                  - /url: /about
+          - navigation [ref=f2e218]:
+            - heading "Shop" [level=2] [ref=f2e219]
+            - list [ref=f2e220]:
+              - listitem [ref=f2e221]:
+                - link "Vases" [ref=f2e222] [cursor=pointer]:
+                  - /url: /gallery?category=Vases
+              - listitem [ref=f2e223]:
+                - link "Planters" [ref=f2e224] [cursor=pointer]:
+                  - /url: /gallery?category=Planters
+              - listitem [ref=f2e225]:
+                - link "Jars" [ref=f2e226] [cursor=pointer]:
+                  - /url: /gallery?category=Jars
+              - listitem [ref=f2e227]:
+                - link "Amphoras" [ref=f2e228] [cursor=pointer]:
+                  - /url: /gallery?category=Amphoras
+              - listitem [ref=f2e229]:
+                - link "Tea Light Vases" [ref=f2e230] [cursor=pointer]:
+                  - /url: /gallery?category=Tea%20Light%20Vases
+          - navigation [ref=f2e231]:
+            - heading "Create & Account" [level=2] [ref=f2e232]
+            - list [ref=f2e233]:
+              - listitem [ref=f2e234]:
+                - link "Design Studio" [ref=f2e235] [cursor=pointer]:
+                  - /url: /freeform
+              - listitem [ref=f2e236]:
+                - button "Sign in" [ref=f2e237] [cursor=pointer]
+              - listitem [ref=f2e238]:
+                - button "Create account" [ref=f2e239] [cursor=pointer]
+        - generic [ref=f2e240]:
+          - paragraph [ref=f2e241]: © 2026 LikhArtisan
+          - navigation "Legal information" [ref=f2e242]:
+            - link "Privacy Policy" [ref=f2e243] [cursor=pointer]:
+              - /url: /privacy
+            - link "Terms and Conditions" [ref=f2e244] [cursor=pointer]:
+              - /url: /terms
+  - region "Notifications alt+T"

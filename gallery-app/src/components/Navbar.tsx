@@ -46,17 +46,14 @@ export default function Navbar() {
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
-  const [shopDisplayName, setShopDisplayName] = useState('Shop');
-  const [shopInitials, setShopInitials] = useState('SN');
-  const [shopImage, setShopImage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [cartCount, setCartCount] = useState(getCartCount);
   const [hasShopRole, setHasShopRole] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { user } = useAuth();
   const loggedIn = !!user;
-  const notificationContext: NotificationContext = isArtisanDashboard ? 'artisan' : 'buyer';
-  const notificationData = useNotifications(user?.id, notificationContext, 10);
+  const notificationContext: NotificationContext = 'buyer';
+  const notificationData = useNotifications(isArtisanDashboard ? undefined : user?.id, notificationContext, 10);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -95,26 +92,14 @@ export default function Navbar() {
       }
     }
     if (user?.email && SHOP_EMAILS.includes(user.email)) {
-      const name = user.user_metadata?.name || user.email;
-      setShopDisplayName(name);
-      setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
       setHasShopRole(true);
-      supabase.from('shops').select('image').eq('email', user.email).single().then(({ data: shopData }) => {
-        if (shopData?.image) setShopImage(shopData.image);
-      });
     } else if (user) {
       // Check user_roles for shop_owner role (user may have multiple rows, so don't use .single())
       supabase.from('user_roles').select('role').eq('user_id', user.id).then(({ data }) => {
         if (data && data.some(r => r.role === 'shop_owner')) {
           setHasShopRole(true);
-          const name = user.user_metadata?.name || user.email || 'Shop';
-          setShopDisplayName(name);
-          setShopInitials(name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2));
         }
       });
-      setShopImage('');
-    } else {
-      setShopImage('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -211,38 +196,6 @@ export default function Navbar() {
             <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
             <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
-          <div className="flex items-center gap-4">
-            <div ref={notifDropdownRef} className="relative">
-              <button ref={notificationButtonRef} onClick={() => setShowNotifications(current => !current)} aria-label="Notifications" aria-expanded={showNotifications} aria-controls="navbar-notification-panel" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '6px', borderRadius: '6px', position: 'relative' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {notificationData.unreadCount > 0 && (
-                  <span style={{ position: 'absolute', top: '0', right: '0', width: '18px', height: '18px', background: '#E53935', color: '#fff', fontSize: '0.75rem', fontWeight: 700, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
-                    {notificationData.unreadCount > 99 ? '99+' : notificationData.unreadCount}
-                  </span>
-                )}
-              </button>
-              {showNotifications && (isMobile ? createPortal(notifDropdown, document.body) : notifDropdown)}
-            </div>
-            <div ref={profileDropdownRef} className="relative">
-              <button onClick={() => setShowProfileDropdown(!showProfileDropdown)} className="flex items-center gap-2 cursor-pointer" style={{ background: 'none', border: 'none' }}>
-                <div className="rounded-full overflow-hidden flex items-center justify-center border-2 border-cream-tertiary" style={{ width: isMobile ? '34px' : '38px', height: isMobile ? '34px' : '38px' }}>
-                  {shopImage ? (
-                    <img src={shopImage} alt={shopDisplayName} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-accent font-semibold" style={{ fontSize: isMobile ? '0.75rem' : '0.85rem' }}>{shopInitials}</span>
-                  )}
-                </div>
-                {!isMobile && <span className="font-semibold text-[0.95rem] text-brown-dark">{shopDisplayName}</span>}
-              </button>
-              {showProfileDropdown && (
-                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 100, padding: '6px 0' }}>
-                  <button onClick={handleLogout} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-dark)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>Sign Out</button>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       ) : (
         <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} h-full flex items-center justify-between relative`} style={{ padding: isMobile ? '0 16px' : '0 32px' }}>

@@ -1,598 +1,164 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertCircle, Box, CheckCircle2, CircleAlert, LoaderCircle, PackagePlus, RefreshCw, Search, ShoppingBag, Warehouse, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
-import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
-import ProductTable from '../../components/admin/ProductTable';
-import type { Product } from '../../types';
-import { mapSupabaseProduct } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
+import { mapSupabaseProduct } from '../../lib/utils';
+import { DEFAULT_PRODUCT_FILTERS, filterAndSortProducts, getProductInventoryCounts, mergeProductFilters, paginateProducts, productFiltersFromSearch } from '../../lib/adminProducts';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import ProductTable from '../../components/admin/ProductTable';
+import ProductEditorDialog, { type ProductEditorSave } from '../../components/admin/ProductEditorDialog';
+import type { Product } from '../../types';
+import type { ProductAdminFilters, ProductSort } from '../../types/adminProducts';
+import './products-admin.css';
 
-const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
+const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
+  { value: 'newest', label: 'Newest added' }, { value: 'oldest', label: 'Oldest added' }, { value: 'name', label: 'Name A–Z' }, { value: 'price_low', label: 'Price: low to high' }, { value: 'price_high', label: 'Price: high to low' }, { value: 'stock_low', label: 'Stock: low to high' }, { value: 'stock_high', label: 'Stock: high to low' }, { value: 'views', label: 'Most viewed' },
+];
+
+function SummaryCard({ label, value, note, active, onClick, icon }: { label: string; value: number; note: string; active: boolean; onClick: () => void; icon: ReactNode }) {
+  return <button className="products-summary-card" type="button" aria-pressed={active} onClick={onClick}><span>{icon}{label}</span><strong>{value.toLocaleString()}</strong><small>{note}</small></button>;
+}
+
+function trapDialog(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
+  if (event.key === 'Escape') { event.preventDefault(); onDismiss(); return; }
+  if (event.key !== 'Tab') return;
+  const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+  if (!focusable.length) return;
+  const first = focusable[0]; const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+
+function ProductConfirm({ product, action, busy, onCancel, onConfirm }: { product: Product; action: 'archive' | 'delete'; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const deleting = action === 'delete';
+  return <div className="products-confirm-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section className="products-confirm" role="dialog" aria-modal="true" aria-labelledby="products-confirm-title" tabIndex={-1} onKeyDown={(event) => trapDialog(event, () => { if (!busy) onCancel(); })}><h2 id="products-confirm-title">{deleting ? 'Delete product?' : product.status === 'archived' ? 'Activate product?' : 'Archive product?'}</h2><p>{product.name}</p><small>{deleting ? 'This permanently removes the product. This action cannot be undone.' : product.status === 'archived' ? 'This will make the product active in the catalog again.' : 'Archived products remain in the admin catalog but are removed from the active listing.'}</small><footer><button type="button" autoFocus onClick={onCancel} disabled={busy}>Cancel</button><button className={deleting ? 'is-danger' : ''} type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Working…' : deleting ? 'Delete product' : product.status === 'archived' ? 'Activate product' : 'Archive product'}</button></footer></section></div>;
+}
 
 export default function ProductListPage() {
-  const [productsList, setProductsList] = useState<Product[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchKey = searchParams.toString();
+  const filters = useMemo(() => productFiltersFromSearch(searchParams), [searchKey]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState({
-    name: '', category: '',
-    materials: '', technique: '',
-  });
-  const [variations, setVariations] = useState<{ id?: string; dimensions: string; height: string; openingDiameter: string; price: string; stock: string }[]>([]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [glbFile, setGlbFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [confirmation, setConfirmation] = useState<{ product: Product; action: 'archive' | 'delete' } | null>(null);
+  const [busyProductId, setBusyProductId] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  const requestRef = useRef(0);
 
-  useEffect(() => {
-    fetchProducts();
+  const load = useCallback(async () => {
+    const request = ++requestRef.current;
+    if (hasLoadedRef.current) setRefreshing(true); else setLoading(true);
+    setError('');
+    const { data, error: productsError } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (request !== requestRef.current) return;
+    if (productsError) { setError(productsError.message || 'Could not load products.'); setLoading(false); setRefreshing(false); return; }
+    const mapped = ((data ?? []) as any[]).map(mapSupabaseProduct) as Product[];
+    if (mapped.length) {
+      const { data: variations, error: variationsError } = await supabase.from('product_variations').select('product_id, price').in('product_id', mapped.map((product) => product.id));
+      if (request !== requestRef.current) return;
+      if (variationsError) { setError(variationsError.message || 'Could not load product prices.'); setLoading(false); setRefreshing(false); return; }
+      const lowest: Record<string, number> = {};
+      for (const variation of variations ?? []) {
+        if (variation.price != null && (lowest[variation.product_id] == null || variation.price < lowest[variation.product_id])) lowest[variation.product_id] = variation.price;
+      }
+      mapped.forEach((product) => { if (lowest[product.id] != null) product.price = lowest[product.id]; });
+    }
+    setProducts(mapped); hasLoadedRef.current = true; setUpdatedAt(new Date()); setLoading(false); setRefreshing(false);
   }, []);
 
-  useEffect(() => {
-    if (!editing) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+  useEffect(() => { void load(); }, [load]);
+  usePortalRealtimeRefresh(['products', 'product_variations'], load);
 
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) setEditing(null);
-    };
-    document.addEventListener('keydown', closeOnEscape);
+  const updateFilters = useCallback((next: ProductAdminFilters, replace = false) => {
+    setSearchParams(mergeProductFilters(new URLSearchParams(searchKey), next), { replace });
+  }, [searchKey, setSearchParams]);
+  const changeFilters = (patch: Partial<ProductAdminFilters>) => updateFilters({ ...filters, ...patch, page: patch.page ?? 1 });
+  const filtered = useMemo(() => filterAndSortProducts(products, filters), [filters, products]);
+  const pagination = useMemo(() => paginateProducts(filtered, filters.page), [filtered, filters.page]);
+  const counts = useMemo(() => getProductInventoryCounts(products), [products]);
+  const shops = useMemo(() => [...new Map(products.filter((product) => product.shopId).map((product) => [product.shopId, product.shopName])).entries()].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name)), [products]);
+  const categories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products]);
+  const hasFilters = Boolean(filters.q || filters.shop || filters.category || filters.status !== 'all' || filters.inventory !== 'all' || filters.sort !== 'newest' || filters.page !== 1);
 
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [editing, saving]);
+  useEffect(() => { if (filters.page !== pagination.page) updateFilters({ ...filters, page: pagination.page }, true); }, [filters, pagination.page, updateFilters]);
 
-  async function fetchProducts() {
-    setLoading(true);
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      const mapped = data.map((p: any) => mapSupabaseProduct(p));
-
-      const ids = mapped.map(p => p.id);
-      if (ids.length > 0) {
-        const { data: varRows } = await supabase
-          .from('product_variations')
-          .select('product_id, price')
-          .in('product_id', ids);
-
-        if (varRows && varRows.length > 0) {
-          const lowest: Record<string, number> = {};
-          for (const v of varRows) {
-            if (v.price && (!lowest[v.product_id] || v.price < lowest[v.product_id])) {
-              lowest[v.product_id] = v.price;
-            }
-          }
-          mapped.forEach(p => {
-            if (lowest[p.id]) p.price = lowest[p.id];
-          });
-        }
-      }
-
-      setProductsList(mapped);
-    }
-    setLoading(false);
-  }
-
-  usePortalRealtimeRefresh(['products', 'product_variations'], fetchProducts);
-
-  const handleDelete = async (id: string) => {
-    if (confirm('Delete this product?')) {
-      await supabase.from('products').delete().eq('id', id);
-      fetchProducts();
-    }
-  };
-
-  const handleArchive = async (id: string) => {
-    const product = productsList.find(p => p.id === id);
-    if (!product) return;
-    const newStatus = product.status === 'archived' ? 'active' : 'archived';
-    await supabase.from('products').update({ status: newStatus }).eq('id', id);
-    fetchProducts();
-  };
-
-  async function openEdit(p: Product) {
-    setEditing(p);
-    setForm({
-      name: p.name || '',
-      category: p.category || '',
-      materials: p.materials || '',
-      technique: p.technique || '',
-    });
-    setImageFile(null);
-    setImagePreview(p.image || '');
-    setGlbFile(null);
-    const { data } = await supabase
-      .from('product_variations')
-      .select('*')
-      .eq('product_id', p.id)
-      .order('sort_order');
-    if (data) {
-      setVariations(data.map((v: any) => ({
-        id: v.id, dimensions: v.dimensions, height: v.height, openingDiameter: v.opening_diameter,
-        price: v.price != null ? String(v.price) : '', stock: String(v.stock),
-      })));
-    } else {
-      setVariations([]);
-    }
-  }
-
-  async function saveEdit() {
-    if (!editing) return;
-    setSaving(true);
-
-    const updateData: Record<string, any> = {
-      name: form.name,
-      category: form.category,
-      materials: form.materials,
-      technique: form.technique,
-    };
-
-    if (imageFile) {
-      const uploadedUrl = await uploadFile(imageFile);
-      if (uploadedUrl) updateData.image = uploadedUrl;
-    }
-
-    if (glbFile) {
-      const uploadedUrl = await uploadFile(glbFile);
-      if (uploadedUrl) updateData.model3d = uploadedUrl;
-    }
-
-    const { error } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id', editing.id);
-    setSaving(false);
-    if (error) { toast.error('Failed to save: ' + error.message); return; }
-
-    const keptIds: string[] = [];
-    for (const v of variations) {
-      if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) continue;
-      if (v.id) {
-        await supabase.from('product_variations').update({
-          dimensions: v.dimensions.trim() || 'N/A',
-          height: v.height.trim() || 'N/A',
-          opening_diameter: v.openingDiameter.trim() || 'N/A',
-          price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
-        }).eq('id', v.id);
-        keptIds.push(v.id);
+  const performConfirmation = async () => {
+    if (!confirmation) return;
+    const { product, action } = confirmation;
+    setBusyProductId(product.id);
+    try {
+      if (action === 'delete') {
+        const { error: deleteError } = await supabase.from('products').delete().eq('id', product.id);
+        if (deleteError) throw deleteError;
+        setProducts((current) => current.filter((item) => item.id !== product.id));
+        toast.success('Product deleted.');
       } else {
-        const { data: inserted } = await supabase.from('product_variations').insert({
-          product_id: editing.id,
-          dimensions: v.dimensions.trim() || 'N/A',
-          height: v.height.trim() || 'N/A',
-          opening_diameter: v.openingDiameter.trim() || 'N/A',
-          price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
-          sort_order: variations.indexOf(v),
-        }).select('id').single();
+        const status = product.status === 'archived' ? 'active' : 'archived';
+        const { error: archiveError } = await supabase.from('products').update({ status }).eq('id', product.id);
+        if (archiveError) throw archiveError;
+        setProducts((current) => current.map((item) => item.id === product.id ? { ...item, status } : item));
+        toast.success(status === 'active' ? 'Product activated.' : 'Product archived.');
+      }
+      setConfirmation(null);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Product action failed.');
+    } finally { setBusyProductId(null); }
+  };
+
+  const saveProduct = async (product: Product, data: ProductEditorSave) => {
+    const updateData: Record<string, unknown> = { name: data.name, category: data.category, materials: data.materials, technique: data.technique };
+    if (data.imageFile) {
+      const url = await uploadToR2(data.imageFile, 'products');
+      if (!url) throw new Error('Product image upload failed.');
+      updateData.image = url;
+    }
+    if (data.modelFile) {
+      const url = await uploadToR2(data.modelFile, 'models');
+      if (!url) throw new Error('3D model upload failed.');
+      updateData.model3d = url;
+    }
+    const { error: productError } = await supabase.from('products').update(updateData).eq('id', product.id);
+    if (productError) throw new Error(productError.message || 'Could not save product details.');
+    const keptIds: string[] = [];
+    for (const [index, variation] of data.variations.entries()) {
+      const variationData = { dimensions: variation.dimensions.trim() || 'N/A', height: variation.height.trim() || 'N/A', opening_diameter: variation.openingDiameter.trim() || 'N/A', price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0 };
+      if (variation.id) {
+        const { error: variationError } = await supabase.from('product_variations').update(variationData).eq('id', variation.id);
+        if (variationError) throw new Error(variationError.message || 'Could not save a product variation.');
+        keptIds.push(variation.id);
+      } else {
+        const { data: inserted, error: variationError } = await supabase.from('product_variations').insert({ product_id: product.id, ...variationData, sort_order: index }).select('id').single();
+        if (variationError) throw new Error(variationError.message || 'Could not add a product variation.');
         if (inserted?.id) keptIds.push(inserted.id);
       }
     }
-
-    if (keptIds.length > 0) {
-      await supabase.from('product_variations').delete()
-        .eq('product_id', editing.id)
-        .not('id', 'in', `(${keptIds.join(',')})`);
-    } else {
-      await supabase.from('product_variations').delete().eq('product_id', editing.id);
-    }
-
-    // Recompute product-level stock from variations
-    const newTotalStock = await recomputeProductStock(editing.id);
-
-    setProductsList(prev => prev.map(p => p.id === editing.id ? {
-      ...p,
-      name: form.name,
-      category: form.category,
-      materials: form.materials,
-      technique: form.technique,
-      stock: newTotalStock,
-      inStock: newTotalStock > 0,
-      ...(imageFile && updateData.image ? { image: updateData.image } : {}),
-      ...(glbFile && updateData.model3d ? { model3d: updateData.model3d } : {}),
-    } : p));
-    setEditing(null);
-  }
-
-  function addVariation() {
-    setVariations(prev => [...prev, { dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]);
-  }
-
-  function updateVariation(index: number, field: string, value: string) {
-    setVariations(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
-  }
-
-  function removeVariation(index: number) {
-    setVariations(prev => prev.filter((_, i) => i !== index));
-  }
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
-    }
+    const removal = keptIds.length ? supabase.from('product_variations').delete().eq('product_id', product.id).not('id', 'in', `(${keptIds.join(',')})`) : supabase.from('product_variations').delete().eq('product_id', product.id);
+    const { error: removalError } = await removal;
+    if (removalError) throw new Error(removalError.message || 'Could not remove deleted variations.');
+    const stock = await recomputeProductStock(product.id);
+    setProducts((current) => current.map((item) => item.id === product.id ? { ...item, name: data.name, category: data.category, materials: data.materials, technique: data.technique, stock, inStock: stock > 0, ...(typeof updateData.image === 'string' ? { image: updateData.image } : {}), ...(typeof updateData.model3d === 'string' ? { model3d: updateData.model3d } : {}) } : item));
+    toast.success('Product changes saved.');
+    void load();
   };
 
-  const handleGlbChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setGlbFile(file);
-    }
-  };
+  if (loading && !hasLoadedRef.current) return <main className="products-page" aria-busy="true"><h1 className="sr-only">Products</h1><div className="products-summary-grid">{[0, 1, 2, 3].map((item) => <div className="products-summary-card products-skeleton" key={item}><span /></div>)}</div><div className="products-panel products-skeleton">{[0, 1, 2, 3, 4].map((item) => <span key={item} />)}</div></main>;
+  if (error && !hasLoadedRef.current) return <main className="products-page"><h1 className="sr-only">Products</h1><section className="products-panel products-state"><CircleAlert aria-hidden="true" /><h2>Products could not be loaded</h2><p>{error}</p><button type="button" onClick={() => void load()}>Try again</button></section></main>;
 
-  async function uploadFile(file: File): Promise<string | null> {
-    try {
-      const folder = file.name.endsWith('.glb') || file.name.endsWith('.gltf') ? 'models' : 'products';
-      return await uploadToR2(file, folder);
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
-  }
-
-  return (
-    <div>
-      <div className="portal-action-bar">
-        <Link
-          to="/admin/products/create"
-          className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors flex items-center gap-2"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Upload 3D Product
-        </Link>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-12 text-brown-medium">Loading products...</div>
-      ) : (
-        <ProductTable
-          products={productsList}
-          onDelete={handleDelete}
-          onArchive={handleArchive}
-          onEdit={openEdit}
-        />
-      )}
-
-      {/* Edit Modal */}
-      {editing && (
-        <div className="product-edit-backdrop" style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-        }} onClick={() => { if (!saving) setEditing(null); }}>
-          <div className="product-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="product-edit-title" aria-describedby="product-edit-description" style={{
-            background: '#fff', borderRadius: '16px', width: '900px', maxWidth: '100%',
-            maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
-          }} onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div className="product-edit-header" style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '24px 32px', borderBottom: '1px solid #E8E0D8', flexShrink: 0,
-            }}>
-              <div>
-                <h2 id="product-edit-title" style={{ fontSize: '1.2rem', fontWeight: 700, color: '#2C1810', margin: 0 }}>Edit Product</h2>
-                <p id="product-edit-description" style={{ fontSize: '0.82rem', color: '#8C7B6E', margin: '4px 0 0' }}>Update {editing.name}'s catalog details, media, pricing, and stock.</p>
-              </div>
-              <button type="button" aria-label="Close edit product dialog" disabled={saving} onClick={() => setEditing(null)} style={{
-                width: '36px', height: '36px', borderRadius: '10px', border: '1.5px solid #E8E0D8',
-                background: '#fff', fontSize: '1.2rem', cursor: 'pointer', color: '#8C7B6E',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#d32f2f'; e.currentTarget.style.color = '#d32f2f'; e.currentTarget.style.background = '#fdecea'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E0D8'; e.currentTarget.style.color = '#8C7B6E'; e.currentTarget.style.background = '#fff'; }}
-              >&#x2715;</button>
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="product-edit-body" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
-
-              {/* Section: Product Specifications */}
-              <section className="product-edit-section product-edit-specifications" style={{ marginBottom: '28px' }}>
-                <h3 style={{
-                  fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
-                  letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
-                  borderBottom: '1px solid #F0EBE5',
-                }}>Product Specifications</h3>
-                <div className="product-edit-specification-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label htmlFor="edit-product-name" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Name</label>
-                    <input id="edit-product-name" autoFocus type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                      style={{
-                        width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                        fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
-                        outline: 'none', transition: 'border-color 0.15s',
-                      }}
-                      onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                      onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-product-category" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Category</label>
-                    <select id="edit-product-category" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                      style={{
-                        width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                        fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
-                        outline: 'none', cursor: 'pointer',
-                      }}>
-                      <option value="">Select category</option>
-                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="edit-product-material" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Material</label>
-                    <input id="edit-product-material" type="text" value={form.materials} onChange={e => setForm({ ...form, materials: e.target.value })} placeholder="e.g. Terracotta Clay"
-                      style={{
-                        width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                        fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
-                        outline: 'none', transition: 'border-color 0.15s',
-                      }}
-                      onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                      onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-product-technique" style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Technique</label>
-                    <input id="edit-product-technique" type="text" value={form.technique} onChange={e => setForm({ ...form, technique: e.target.value })} placeholder="e.g. Handcrafted &amp; Kiln-Fired"
-                      style={{
-                        width: '100%', padding: '11px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                        fontSize: '0.88rem', boxSizing: 'border-box', color: '#2C1810', background: '#FAF8F5',
-                        outline: 'none', transition: 'border-color 0.15s',
-                      }}
-                      onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                      onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* Section: Media Upload */}
-              <section className="product-edit-section product-edit-media" style={{ marginBottom: '28px' }}>
-                <h3 style={{
-                  fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
-                  letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
-                  borderBottom: '1px solid #F0EBE5',
-                }}>Media Upload</h3>
-                <div className="product-edit-media-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>Product Image</label>
-                    <label style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      padding: '24px', border: '2px dashed #D4C8BB', borderRadius: '12px', cursor: 'pointer',
-                      background: '#FAF8F5', transition: 'all 0.15s',
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.background = 'rgba(130,62,11,0.03)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.background = '#FAF8F5'; }}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" strokeWidth="1.5" style={{ width: '32px', height: '32px', marginBottom: '8px' }}>
-                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-                      </svg>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
-                        {imageFile ? imageFile.name : 'Change Image'}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
-                      <input type="file" accept="image/*" onChange={handleImageChange} style={{ display: 'none' }} />
-                    </label>
-                    {imagePreview && <img src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E', marginBottom: '6px' }}>3D Model (.glb)</label>
-                    <label style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      padding: '24px', border: '2px dashed #D4C8BB', borderRadius: '12px', cursor: 'pointer',
-                      background: '#FAF8F5', transition: 'all 0.15s',
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.background = 'rgba(130,62,11,0.03)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.background = '#FAF8F5'; }}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#8C7B6E" strokeWidth="1.5" style={{ width: '32px', height: '32px', marginBottom: '8px' }}>
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                      </svg>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#823E0B' }}>
-                        {glbFile ? glbFile.name : (editing.model3d ? 'Replace 3D Model' : 'Choose 3D Model')}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>GLB format only</span>
-                      <input type="file" accept=".glb" onChange={handleGlbChange} style={{ display: 'none' }} />
-                    </label>
-                    {glbFile ? (
-                      <div style={{
-                        marginTop: '12px', padding: '10px 14px', background: 'rgba(130,62,11,0.06)',
-                        borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
-                      }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#823E0B" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                        </svg>
-                        <span style={{ fontSize: '0.78rem', color: '#823E0B', fontWeight: 500 }}>{glbFile.name}</span>
-                      </div>
-                    ) : editing.model3d ? (
-                      <div style={{
-                        marginTop: '12px', padding: '10px 14px', background: 'rgba(130,62,11,0.06)',
-                        borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px',
-                      }}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#823E0B" strokeWidth="2" style={{ width: '16px', height: '16px', flexShrink: 0 }}>
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                        </svg>
-                        <span style={{ fontSize: '0.78rem', color: '#823E0B', fontWeight: 500 }}>Current model attached</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
-
-              {/* Section: Variations */}
-              <section className="product-edit-section product-edit-variations">
-                <h3 style={{
-                  fontSize: '0.78rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase',
-                  letterSpacing: '0.08em', marginBottom: '16px', paddingBottom: '10px',
-                  borderBottom: '1px solid #F0EBE5',
-                }}>Variations                </h3>
-
-                {/* Total Stock Summary */}
-                {variations.length > 0 && (
-                  <div className="product-edit-stock-summary" style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
-                    padding: '10px 14px', borderRadius: '10px', background: '#F0EBE4',
-                  }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#5A4A3E' }}>Total Stock:</span>
-                    <span style={{
-                      fontSize: '0.95rem', fontWeight: 700,
-                      color: variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) === 0 ? '#d32f2f' :
-                             variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) <= 3 ? '#E67E22' : '#823E0B',
-                    }}>
-                      {variations.reduce((s, v) => s + (Number(v.stock) || 0), 0)}
-                    </span>
-                    {variations.reduce((s, v) => s + (Number(v.stock) || 0), 0) === 0 && (
-                      <span style={{ fontSize: '0.75rem', color: '#d32f2f', fontWeight: 600 }}>(Out of Stock)</span>
-                    )}
-                  </div>
-                )}
-
-                {variations.length > 0 ? (
-                  <div className="product-edit-variation-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                    {variations.map((v, i) => (
-                      <div key={v.id ?? i} className="product-edit-variation-card" style={{
-                        border: '1.5px solid #E8E0D8', borderRadius: '12px', padding: '16px',
-                        background: '#FAF8F5', position: 'relative',
-                      }}>
-                        <div className="product-edit-variation-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                          <span style={{
-                            fontSize: '0.75rem', fontWeight: 700, color: '#823E0B', textTransform: 'uppercase',
-                            letterSpacing: '0.06em', background: 'rgba(130,62,11,0.08)', padding: '3px 10px',
-                            borderRadius: '6px',
-                          }}>Variation {i + 1}</span>
-                          <button type="button" onClick={() => removeVariation(i)} style={{
-                            background: 'none', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                            color: '#d32f2f', cursor: 'pointer', padding: '5px 12px', fontSize: '0.78rem',
-                            fontWeight: 600, transition: 'all 0.15s',
-                          }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#d32f2f'; e.currentTarget.style.background = '#fdecea'; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E0D8'; e.currentTarget.style.background = 'none'; }}
-                          >Remove</button>
-                        </div>
-                        <div className="product-edit-dimension-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                          <div>
-                            <label htmlFor={`edit-variation-${i}-dimensions`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Dimensions</label>
-                            <input id={`edit-variation-${i}-dimensions`} value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 15cm x 10cm"
-                              style={{
-                                width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                                fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
-                                outline: 'none', transition: 'border-color 0.15s',
-                              }}
-                              onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                              onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor={`edit-variation-${i}-height`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Height</label>
-                            <input id={`edit-variation-${i}-height`} value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 20cm"
-                              style={{
-                                width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                                fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
-                                outline: 'none', transition: 'border-color 0.15s',
-                              }}
-                              onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                              onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor={`edit-variation-${i}-opening`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Opening Diameter</label>
-                            <input id={`edit-variation-${i}-opening`} value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 8cm"
-                              style={{
-                                width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                                fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
-                                outline: 'none', transition: 'border-color 0.15s',
-                              }}
-                              onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                              onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                            />
-                          </div>
-                        </div>
-                        <div className="product-edit-inventory-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-                          <div>
-                            <label htmlFor={`edit-variation-${i}-price`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Price</label>
-                            <input id={`edit-variation-${i}-price`} type="number" min="0" step="0.01" value={v.price} onChange={e => updateVariation(i, 'price', e.target.value)} placeholder="0.00"
-                              style={{
-                                width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                                fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
-                                outline: 'none', transition: 'border-color 0.15s',
-                              }}
-                              onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                              onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor={`edit-variation-${i}-stock`} style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Stock</label>
-                            <input id={`edit-variation-${i}-stock`} type="number" min="0" step="1" value={v.stock} onChange={e => updateVariation(i, 'stock', e.target.value)} placeholder="0"
-                              style={{
-                                width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
-                                fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
-                                outline: 'none', transition: 'border-color 0.15s',
-                              }}
-                              onFocus={e => e.currentTarget.style.borderColor = '#823E0B'}
-                              onBlur={e => e.currentTarget.style.borderColor = '#E8E0D8'}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="product-edit-empty" style={{ fontSize: '0.85rem', color: '#B8A89A', marginBottom: '16px' }}>No variations added yet. Add a variation below.</p>
-                )}
-
-                <button className="product-edit-add" type="button" onClick={addVariation} style={{
-                  width: '100%', padding: '12px', border: '2px dashed #D4C8BB', borderRadius: '10px',
-                  background: 'transparent', color: '#823E0B', fontWeight: 600, fontSize: '0.88rem',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  transition: 'all 0.15s',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.background = 'rgba(130,62,11,0.04)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Add New Variation
-                </button>
-              </section>
-            </div>
-
-            {/* Sticky Footer */}
-            <div className="product-edit-footer" style={{
-              display: 'flex', gap: '12px', justifyContent: 'flex-end', padding: '16px 32px',
-              borderTop: '1px solid #E8E0D8', background: '#fff', flexShrink: 0,
-              borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px',
-            }}>
-              <button type="button" className="product-edit-cancel" onClick={() => setEditing(null)} disabled={saving} style={{
-                padding: '11px 24px', border: '1.5px solid #D4C8BB', borderRadius: '10px',
-                background: '#fff', color: '#5A4A3E', fontSize: '0.88rem', fontWeight: 600,
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#823E0B'; e.currentTarget.style.color = '#823E0B'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#D4C8BB'; e.currentTarget.style.color = '#5A4A3E'; }}
-              >Cancel</button>
-              <button type="button" className="product-edit-save" onClick={saveEdit} disabled={saving} style={{
-                padding: '11px 28px', border: 'none', borderRadius: '10px',
-                background: saving ? '#B8A89A' : '#823E0B', color: '#fff', fontSize: '0.88rem', fontWeight: 600,
-                cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
-                boxShadow: saving ? 'none' : '0 2px 8px rgba(130,62,11,0.25)',
-              }}
-                onMouseEnter={e => { if (!saving) e.currentTarget.style.background = '#6B3209'; }}
-                onMouseLeave={e => { if (!saving) e.currentTarget.style.background = '#823E0B'; }}
-              >{saving ? 'Saving...' : 'Save Changes'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <main className="products-page">
+    <h1 className="sr-only">Products</h1>
+    <div className="products-page__topbar" aria-live="polite"><span className={refreshing ? 'is-refreshing' : ''}>{refreshing ? <LoaderCircle aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{refreshing ? 'Refreshing' : 'Live data'}</span>{updatedAt && <small>Updated {updatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</small>}<button type="button" onClick={() => void load()} disabled={refreshing}><RefreshCw aria-hidden="true" />Refresh</button><Link to="/admin/products/create"><PackagePlus aria-hidden="true" />Upload 3D Product</Link></div>
+    <section className="products-summary-grid" aria-label="Product inventory summary"><SummaryCard label="Total products" value={counts.total} note="All catalog items" active={filters.status === 'all' && filters.inventory === 'all'} onClick={() => changeFilters({ status: 'all', inventory: 'all' })} icon={<Box aria-hidden="true" />} /><SummaryCard label="Active" value={counts.active} note="Visible catalog items" active={filters.status === 'active'} onClick={() => changeFilters({ status: 'active', inventory: 'all' })} icon={<ShoppingBag aria-hidden="true" />} /><SummaryCard label="Low stock" value={counts.low} note="1–3 units remaining" active={filters.inventory === 'low'} onClick={() => changeFilters({ inventory: 'low' })} icon={<Warehouse aria-hidden="true" />} /><SummaryCard label="Out of stock" value={counts.out} note="Needs replenishment" active={filters.inventory === 'out'} onClick={() => changeFilters({ inventory: 'out' })} icon={<AlertCircle aria-hidden="true" />} /></section>
+    <section className="products-toolbar" aria-label="Product filters"><div className="products-toolbar__main"><label className="products-search"><Search aria-hidden="true" /><span className="sr-only">Search products and shops</span><input type="search" value={filters.q} placeholder="Search products or shops" onChange={(event) => changeFilters({ q: event.target.value })} />{filters.q && <button type="button" aria-label="Clear product search" onClick={() => changeFilters({ q: '' })}><X aria-hidden="true" /></button>}</label><label className="products-sort"><span className="sr-only">Sort products</span><select value={filters.sort} onChange={(event) => changeFilters({ sort: event.target.value as ProductSort })}>{SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div><div className="products-toolbar__filters"><select aria-label="Shop" value={filters.shop} onChange={(event) => changeFilters({ shop: event.target.value })}><option value="">All shops</option>{shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}</select><select aria-label="Category" value={filters.category} onChange={(event) => changeFilters({ category: event.target.value })}><option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</select><select aria-label="Status" value={filters.status} onChange={(event) => changeFilters({ status: event.target.value as ProductAdminFilters['status'] })}><option value="all">All status</option><option value="active">Active</option><option value="archived">Archived</option><option value="draft">Draft</option></select><select aria-label="Inventory" value={filters.inventory} onChange={(event) => changeFilters({ inventory: event.target.value as ProductAdminFilters['inventory'] })}><option value="all">All inventory</option><option value="low">Low stock</option><option value="out">Out of stock</option></select></div><footer><span>{filtered.length.toLocaleString()} of {products.length.toLocaleString()} products</span>{hasFilters && <button type="button" onClick={() => updateFilters(DEFAULT_PRODUCT_FILTERS)}>Clear filters</button>}</footer></section>
+    {error && <div className="products-notice" role="status"><AlertCircle aria-hidden="true" />{error}<button type="button" onClick={() => void load()}>Retry</button></div>}
+    <section className="products-panel" aria-label="Product catalog">{products.length === 0 ? <div className="products-state"><Box aria-hidden="true" /><h2>No products yet</h2><p>Upload the first 3D product to start the catalog.</p><Link to="/admin/products/create">Upload 3D Product</Link></div> : filtered.length === 0 ? <div className="products-state"><Search aria-hidden="true" /><h2>No products match these filters</h2><p>Try another search or clear the active filters.</p><button type="button" onClick={() => updateFilters(DEFAULT_PRODUCT_FILTERS)}>Clear filters</button></div> : <><ProductTable products={pagination.items} busyProductId={busyProductId} onEdit={setEditing} onArchive={(product) => setConfirmation({ product, action: 'archive' })} onDelete={(product) => setConfirmation({ product, action: 'delete' })} />{pagination.totalPages > 1 && <footer className="products-pagination"><span>Page {pagination.page} of {pagination.totalPages}</span><div><button type="button" disabled={pagination.page === 1} onClick={() => updateFilters({ ...filters, page: pagination.page - 1 })}>Previous</button><button type="button" disabled={pagination.page === pagination.totalPages} onClick={() => updateFilters({ ...filters, page: pagination.page + 1 })}>Next</button></div></footer>}</>}</section>
+    <ProductEditorDialog product={editing} onClose={() => setEditing(null)} onSave={saveProduct} />
+    {confirmation && <ProductConfirm product={confirmation.product} action={confirmation.action} busy={busyProductId === confirmation.product.id} onCancel={() => setConfirmation(null)} onConfirm={() => void performConfirmation()} />}
+  </main>;
 }

@@ -700,6 +700,7 @@
   color: var(--primary-color);
   font-size: clamp(2rem, 5vw, 3.25rem);
   line-height: 1.04;
+  text-align: center;
 }
 
 .cart-empty p {

@@ -50,6 +50,7 @@ const ThemeCustomizer = lazy(() => import('./pages/admin/ThemeCustomizer'));
 const ArtisanManagePage = lazy(() => import('./pages/admin/ArtisanManagePage'));
 const ModelManagePage = lazy(() => import('./pages/admin/ModelManagePage'));
 const ActivityLogPage = lazy(() => import('./pages/admin/ActivityLogPage'));
+const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
 
 // Synchronous check BEFORE React mounts — prevents homepage flash
 const hash = window.location.hash;
@@ -149,6 +150,7 @@ function AppShell() {
             <Route path="artisans" element={<ArtisanManagePage />} />
             <Route path="models" element={<ModelManagePage />} />
             <Route path="activity" element={<ActivityLogPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
           </Route>
           <Route path="*" element={<Layout />}>
             <Route path="*" element={<NotFoundPage />} />

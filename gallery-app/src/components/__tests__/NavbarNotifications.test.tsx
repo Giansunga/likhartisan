@@ -58,12 +58,10 @@ describe('Navbar notification routing', () => {
     expect(requestedContext).toBe('buyer');
   });
 
-  it('opens the exact artisan conversation inside the artisan surface', async () => {
+  it('hides notification controls in the artisan surface top bar', () => {
     renderNavbar('/artisan-dashboard');
-    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
-    fireEvent.click(screen.getByRole('button', { name: /New message/ }));
-    await waitFor(() => expect(screen.getByLabelText('current location')).toHaveTextContent('/artisan-dashboard/messages?conversation=conversation%20%2F%201'));
-    expect(requestedContext).toBe('artisan');
+    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'User menu' })).not.toBeInTheDocument();
   });
 
   it('routes View all according to the current surface', async () => {

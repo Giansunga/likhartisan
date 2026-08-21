@@ -48,6 +48,7 @@ describe('AdminLayout access control', () => {
 
     expect(await screen.findByText('Admin dashboard content')).toBeDefined();
     expect(screen.getByText('Activity Logs').closest('a')?.getAttribute('href')).toBe('/admin/activity');
+    expect(screen.getByText('Analytics').closest('a')?.getAttribute('href')).toBe('/admin/analytics');
     expect(mocks.from).not.toHaveBeenCalled();
   });
 

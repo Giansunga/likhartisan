@@ -161,7 +161,7 @@ export default function AboutPage() {
       </header>
 
       <main>
-        <section className="about-section about-origin" aria-labelledby="about-origin-title">
+        <section id="origin" className="about-section about-origin" aria-labelledby="about-origin-title">
           <div className="about-container about-origin__grid">
             <motion.figure {...reveal} className="about-photo about-origin__photo">
               <img
@@ -188,7 +188,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-section about-heritage" aria-labelledby="about-heritage-title">
+        <section id="heritage" className="about-section about-heritage" aria-labelledby="about-heritage-title">
           <div className="about-container about-heritage__grid">
             <motion.div {...reveal} className="about-heritage__copy">
               <p className="about-eyebrow about-eyebrow--clay">A working local tradition</p>
@@ -222,7 +222,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-section about-platform" aria-labelledby="about-platform-title">
+        <section id="platform" className="about-section about-platform" aria-labelledby="about-platform-title">
           <div className="about-container">
             <motion.div {...reveal} className="about-section-heading">
               <p className="about-eyebrow">The digital bridge</p>
@@ -258,7 +258,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-section about-makers" aria-labelledby="about-makers-title">
+        <section id="makers" className="about-section about-makers" aria-labelledby="about-makers-title">
           <div className="about-container">
             <motion.div {...reveal} className="about-makers__heading">
               <div>
@@ -324,7 +324,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="about-section about-commitments" aria-labelledby="about-commitments-title">
+        <section id="commitments" className="about-section about-commitments" aria-labelledby="about-commitments-title">
           <div className="about-container">
             <motion.div {...reveal} className="about-section-heading about-section-heading--left">
               <p className="about-eyebrow">Our commitments</p>

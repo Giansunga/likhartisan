@@ -1,0 +1,155 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - button "Open LikhAI customer support" [ref=f4e3] [cursor=pointer]:
+      - generic [ref=f4e4]:
+        - strong [ref=f4e5]: LikhAI
+        - generic [ref=f4e6]: Customer Support
+    - generic [ref=f4e7]:
+      - link "Skip to content" [ref=f4e8] [cursor=pointer]:
+        - /url: "#main-content"
+      - navigation "Main navigation" [ref=f4e9]:
+        - generic [ref=f4e10]:
+          - link [ref=f4e11] [cursor=pointer]:
+            - /url: /
+            - img "LikhArtisan" [ref=f4e12]
+          - generic [ref=f4e13]:
+            - link "Shopping cart with 0 items" [ref=f4e14] [cursor=pointer]:
+              - /url: /cart
+            - button "SIGN IN" [ref=f4e19]
+      - main [ref=f4e20]:
+        - generic [ref=f4e21]:
+          - generic [ref=f4e25]:
+            - heading "Explore the Local Pottery Industry in Santo Tomas" [level=1] [ref=f4e26]: Explore the Local PotteryIndustry in Santo Tomas
+            - link "Explore" [ref=f4e27] [cursor=pointer]:
+              - /url: /gallery
+          - region [ref=f4e28]:
+            - generic [ref=f4e29]:
+              - img "Rows of handmade pottery in a Santo Tomas workshop" [ref=f4e31]
+              - generic [ref=f4e32]:
+                - generic [ref=f4e33]: Santo Tomas, Pampanga
+                - generic [ref=f4e37]: The pottery capital of the Philippines
+                - heading [level=2] [ref=f4e38]:
+                  - text: A living tradition,
+                  - emphasis [ref=f4e39]: shaped by hand.
+                - paragraph [ref=f4e40]: Santo Tomas pottery carries generations of patience, skill, and imagination. LikhArtisan makes it easier to discover the people, shops, and pieces keeping that practice alive today.
+                - generic [ref=f4e41]:
+                  - link "Our story" [ref=f4e42] [cursor=pointer]:
+                    - /url: /about
+                  - link "Meet artisans" [ref=f4e45] [cursor=pointer]:
+                    - /url: /artisans
+            - list [ref=f4e47]:
+              - listitem [ref=f4e48]:
+                - generic [ref=f4e54]:
+                  - strong [ref=f4e55]: Rooted in Santo Tomas
+                  - generic [ref=f4e56]: Discover the pottery community of Pampanga.
+              - listitem [ref=f4e57]:
+                - link "Explore pottery shops in Santo Tomas" [ref=f4e58] [cursor=pointer]:
+                  - /url: /shops
+                  - generic [ref=f4e64]:
+                    - strong [ref=f4e65]: Shop local makers
+                    - generic [ref=f4e66]: Browse participating pottery shops in one place.
+              - listitem [ref=f4e69]:
+                - link "Open the 3D pottery Design Studio" [ref=f4e70] [cursor=pointer]:
+                  - /url: /freeform
+                  - generic [ref=f4e75]:
+                    - strong [ref=f4e76]: Design in 3D
+                    - generic [ref=f4e77]: Personalize a piece before it is made.
+          - region [ref=f4e80]:
+            - generic [ref=f4e81]:
+              - generic [ref=f4e82]:
+                - generic [ref=f4e83]: Find your form
+                - heading [level=2] [ref=f4e84]:
+                  - text: Pottery for
+                  - emphasis [ref=f4e85]: everyday rituals
+                - paragraph [ref=f4e86]: From sculptural vessels to small moments of light, find a piece that feels at home with you.
+              - generic [ref=f4e87]:
+                - link "Vases Sculptural forms for everyday spaces. Explore" [ref=f4e88] [cursor=pointer]:
+                  - /url: /gallery?category=Vases
+                  - generic [ref=f4e89]: Vases
+                  - generic [ref=f4e90]: Sculptural forms for everyday spaces.
+                  - generic [ref=f4e91]: Explore
+                - link "Planters Made to let growing things thrive. Explore" [ref=f4e94] [cursor=pointer]:
+                  - /url: /gallery?category=Planters
+                  - generic [ref=f4e95]: Planters
+                  - generic [ref=f4e96]: Made to let growing things thrive.
+                  - generic [ref=f4e97]: Explore
+                - link "Jars Useful vessels with a handmade soul. Explore" [ref=f4e100] [cursor=pointer]:
+                  - /url: /gallery?category=Jars
+                  - generic [ref=f4e101]: Jars
+                  - generic [ref=f4e102]: Useful vessels with a handmade soul.
+                  - generic [ref=f4e103]: Explore
+                - link "Amphoras Classic silhouettes shaped by tradition. Explore" [ref=f4e106] [cursor=pointer]:
+                  - /url: /gallery?category=Amphoras
+                  - generic [ref=f4e107]: Amphoras
+                  - generic [ref=f4e108]: Classic silhouettes shaped by tradition.
+                  - generic [ref=f4e109]: Explore
+                - link "Tea Light Vases Small pieces that hold a warm glow. Explore" [ref=f4e112] [cursor=pointer]:
+                  - /url: /gallery?category=Tea%20Light%20Vases
+                  - generic [ref=f4e113]: Tea Light Vases
+                  - generic [ref=f4e114]: Small pieces that hold a warm glow.
+                  - generic [ref=f4e115]: Explore
+              - link "Explore all pottery" [ref=f4e118] [cursor=pointer]:
+                - /url: /gallery
+          - generic [ref=f4e123]:
+            - generic [ref=f4e124]:
+              - generic [ref=f4e125]:
+                - paragraph [ref=f4e126]: Design Studio · Live 3D preview
+                - heading "Start with a form. Make it yours." [level=2] [ref=f4e127]
+                - paragraph [ref=f4e128]: Shape a pottery concept in real time, then refine its finish, pattern, and sculpted details before sharing it with a participating shop.
+              - generic:
+                - paragraph: 01 · Shape
+                - heading [level=2]: Shape the silhouette.
+                - paragraph: Adjust the height, body width, neck, rim, and curvature. Every change appears instantly on the 3D piece.
+              - generic:
+                - paragraph: 02 · Finish
+                - heading [level=2]: Choose the surface.
+                - paragraph: Compare raw clay, ceramic, and glazed finishes to find the tone and texture that suit your piece.
+              - generic:
+                - paragraph: 03 · Decorate
+                - heading [level=2]: Give it a signature.
+                - paragraph: Place a pattern, tune its scale and color, then choose a painted or engraved treatment.
+              - generic [ref=f4e129]:
+                - paragraph [ref=f4e130]: 04 · Details
+                - heading [level=2] [ref=f4e131]: Complete the form.
+                - paragraph [ref=f4e132]: Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.
+                - button [ref=f4e134] [cursor=pointer]: Open Design Studio
+            - generic [ref=f4e135]:
+              - generic [ref=f4e136]: Loading 3D preview...
+              - generic: Scroll to explore
+          - region [ref=f4e141]:
+            - generic [ref=f4e142]:
+              - generic [ref=f4e143]:
+                - generic [ref=f4e144]:
+                  - text: Meet the makers
+                  - heading [level=2] [ref=f4e145]:
+                    - text: Santo Tomas
+                    - emphasis [ref=f4e146]: shops
+                - generic "Shop carousel controls" [ref=f4e148]:
+                  - button "Show previous shops" [disabled] [ref=f4e149]
+                  - button "Show next shops" [disabled] [ref=f4e152]
+              - status "Loading shops" [ref=f4e155]
+          - region [ref=f4e159]:
+            - generic [ref=f4e161]:
+              - img "Handmade pottery displayed in Santo Tomas" [ref=f4e163]
+              - generic [ref=f4e164]:
+                - generic [ref=f4e165]: Keep local craft in motion
+                - heading [level=2] [ref=f4e166]:
+                  - text: Bring home a pieceof
+                  - emphasis [ref=f4e167]: Santo Tomas.
+                - paragraph [ref=f4e168]: Every piece connects you to a living craft tradition and the people continuing it with care.
+                - generic [ref=f4e169]:
+                  - link "Shop handcrafted pottery" [ref=f4e170] [cursor=pointer]:
+                    - /url: /gallery
+                  - link "Learn the story" [ref=f4e174] [cursor=pointer]:
+                    - /url: /about
+                - button "Create a free account" [ref=f4e177] [cursor=pointer]
+    - region "Notifications alt+T"
+  - navigation "Mobile navigation" [ref=f4e180]:
+    - link "Home" [ref=f4e181] [cursor=pointer]:
+      - /url: /
+    - link "Gallery" [ref=f4e186] [cursor=pointer]:
+      - /url: /gallery
+    - link "Shops" [ref=f4e190] [cursor=pointer]:
+      - /url: /shops
+    - link "Design" [ref=f4e196] [cursor=pointer]:
+      - /url: /freeform

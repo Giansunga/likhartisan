@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
-import { exportToCsv } from '../../lib/csvExport';
-import type { CsvColumn } from '../../lib/csvExport';
 import StatCard from '../../components/admin/dashboard/StatCard';
 import RevenueChart from '../../components/admin/dashboard/RevenueChart';
 import OrderStatusChart from '../../components/admin/dashboard/OrderStatusChart';
@@ -283,45 +281,6 @@ export default function DashboardPage() {
     setPrevPeriodLabel(`${MONTH_SHORT[prevStart.getMonth()]} ${prevStart.getFullYear()}`);
   }
 
-  const handleExportReport = useCallback(() => {
-    const ts = new Date().toISOString().slice(0, 10);
-    const summaryCols: CsvColumn[] = [
-      { key: 'metric', label: 'Metric' },
-      { key: 'value', label: 'Value' },
-    ];
-    const summaryRows = [
-      { metric: 'Total Revenue', value: fmt(revenue) },
-      { metric: 'Total Orders', value: String(totalOrders) },
-      { metric: 'Active Products', value: String(activeProducts) },
-      { metric: 'Active Shops', value: String(activeShops) },
-      { metric: 'Active Users', value: String(activeUsers) },
-    ];
-    exportToCsv(summaryRows, summaryCols, `dashboard-summary-${ts}`);
-
-    setTimeout(() => {
-      const revenueCols: CsvColumn[] = [
-        { key: 'period', label: 'Period' },
-        { key: 'revenue', label: 'Revenue' },
-      ];
-      const revenueRows = revenueChartData.map(d => ({ period: d.fullLabel, revenue: fmt(d.value) }));
-      exportToCsv(revenueRows, revenueCols, `dashboard-revenue-${ts}`);
-    }, 200);
-
-    setTimeout(() => {
-      const statusCols: CsvColumn[] = [
-        { key: 'status', label: 'Status' },
-        { key: 'count', label: 'Count' },
-        { key: 'percentage', label: 'Percentage' },
-      ];
-      const statusRows = orderStatus.map(s => ({
-        status: s.name,
-        count: String(s.value),
-        percentage: totalOrders > 0 ? ((s.value / totalOrders) * 100).toFixed(1) + '%' : '0.0%',
-      }));
-      exportToCsv(statusRows, statusCols, `dashboard-order-status-${ts}`);
-    }, 400);
-  }, [revenue, totalOrders, activeProducts, activeShops, activeUsers, revenueChartData, orderStatus]);
-
   if (loading) {
     return (
       <div style={{ padding: '48px', textAlign: 'center', color: '#77716B', fontSize: '0.95rem' }}>
@@ -354,19 +313,6 @@ export default function DashboardPage() {
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </div>
-          <button
-            onClick={handleExportReport}
-            style={{
-              padding: '9px 16px', borderRadius: '10px', border: '1.5px solid #934308',
-              background: '#fff', color: '#934308', fontWeight: 600, fontSize: '0.82rem',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-            }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-            </svg>
-            Export Report
-          </button>
         </div>
       </motion.div>
 

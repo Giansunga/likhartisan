@@ -38,8 +38,20 @@ export default function Layout() {
   const hideBottomNav = isArtisan;
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
+    const hash = decodeURIComponent(location.hash.replace(/^#/, ''));
+    const frame = window.requestAnimationFrame(() => {
+      if (hash) {
+        const target = document.getElementById(hash);
+        if (target) {
+          target.scrollIntoView({ block: 'start' });
+          return;
+        }
+      }
+      window.scrollTo(0, 0);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash, location.pathname]);
 
   return (
     <LayoutErrorBoundary>
