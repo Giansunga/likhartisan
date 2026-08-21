@@ -20,6 +20,8 @@ envVars:
     sync: false
   - key: GROQ_API_KEY
     sync: false
+  - key: GROQ_MODEL
+    value: openai/gpt-oss-20b
   - key: LALAMOVE_API_KEY
     sync: false
   - key: LALAMOVE_API_SECRET

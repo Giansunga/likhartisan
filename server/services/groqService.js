@@ -1,6 +1,6 @@
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-export const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+export const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 const REQUEST_TIMEOUT_MS = 12_000;
 
 const SYSTEM_PROMPT = `You are LikhAI, the official customer support assistant of LikhArtisan, an online marketplace for handcrafted Filipino pottery.
