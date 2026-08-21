@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.GROQ_API_KEY = 'test-key';
+process.env.GROQ_MODEL = 'primary-test-model';
+process.env.GROQ_FALLBACK_MODEL = 'fallback-test-model';
 const { chatWithGroq, GroqServiceError } = await import(`./groqService.js?test=${Date.now()}`);
 
 function jsonResponse(body, status = 200, headers = {}) {
@@ -67,6 +69,21 @@ test('classifies blocked model access without exposing provider details', async 
   );
 });
 
+test('uses the configured fallback model when the primary model is unavailable to the project', async () => {
+  const models = [];
+  const result = await chatWithGroq([{ role: 'user', content: 'Track my order' }], '', {
+    fetchImpl: async (_url, init) => {
+      models.push(JSON.parse(init.body).model);
+      return models.length === 1
+        ? jsonResponse({ error: { code: 'model_permission_blocked_project' } }, 403)
+        : jsonResponse({ model: 'fallback-test-model', choices: [{ message: { content: 'Your order is to ship.' } }] });
+    },
+  });
+  assert.deepEqual(models, ['primary-test-model', 'fallback-test-model']);
+  assert.equal(result.reply, 'Your order is to ship.');
+  assert.equal(result.model, 'fallback-test-model');
+});
+
 test('rejects malformed provider responses', async () => {
   await assert.rejects(
     chatWithGroq([{ role: 'user', content: 'Hello' }], '', { fetchImpl: async () => jsonResponse({ choices: [] }) }),
@@ -74,7 +91,7 @@ test('rejects malformed provider responses', async () => {
   );
 });
 
-test('aborts timed out requests and retries only once', async () => {
+test('aborts timed out requests, retries once per model, then reports the timeout', async () => {
   let calls = 0;
   const hangingFetch = (_url, init) => {
     calls += 1;
@@ -86,5 +103,5 @@ test('aborts timed out requests and retries only once', async () => {
     chatWithGroq([{ role: 'user', content: 'Hello' }], '', { fetchImpl: hangingFetch, timeoutMs: 5 }),
     error => error instanceof GroqServiceError && error.code === 'provider_timeout',
   );
-  assert.equal(calls, 2);
+  assert.equal(calls, 4);
 });

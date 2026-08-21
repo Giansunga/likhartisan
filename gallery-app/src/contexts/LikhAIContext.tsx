@@ -52,6 +52,7 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
       const assistantMessage: LikhAIMessage = {
         id: makeId(), role: 'assistant', content: result.reply, timestamp: new Date().toISOString(),
         responseId: result.responseId, groundingStatus: result.groundingStatus, cards: result.cards,
+        generationStatus: result.generationStatus,
         actions: result.actions, suggestions: result.suggestions,
       };
       setMessages(current => [...current, assistantMessage].slice(-MAX_MESSAGES));

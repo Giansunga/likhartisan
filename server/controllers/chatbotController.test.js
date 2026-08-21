@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buyerOrderStatus,
   detectIntent,
+  fallbackReply,
   handleChat,
   initChatbotController,
   normalizeHistory,
@@ -74,6 +75,24 @@ test('matches the buyer-facing paid order status rules', () => {
   assert.equal(buyerOrderStatus('processing', 'paid', 'delivered'), 'to-receive');
 });
 
+test('uses verified order data in the provider fallback reply', () => {
+  const reply = fallbackReply('order', false, 'Track my order', [{
+    type: 'order', shortId: 'abcd1234', status: 'to-ship',
+  }]);
+  assert.equal(reply, 'I found 1 verified order. Your newest order, #abcd1234, is To Ship. Open the order card for the full details.');
+  assert.doesNotMatch(reply, /could not generate/i);
+});
+
+test('does not refer to a missing order card in the provider fallback reply', () => {
+  const reply = fallbackReply('order', false, 'Track my order', []);
+  assert.equal(reply, 'I could not find a verified order for this account. Check My Purchases for the latest details.');
+  assert.doesNotMatch(reply, /card below/i);
+});
+
+test('does not refer to unavailable verified options for a general fallback reply', () => {
+  assert.doesNotMatch(fallbackReply('general', false, 'Hello', []), /below/i);
+});
+
 test('requires sign-in for order lookup without querying customer orders', async () => {
   const database = fakeSupabase();
   initChatbotController(database);
@@ -93,6 +112,7 @@ test('derives order ownership from the verified bearer token and ignores body us
   assert.equal(response.statusCode, 200);
   assert.equal(database.state.orderOwner, 'verified-owner');
   assert.equal(response.body.cards[0].status, 'to-ship');
+  assert.equal(response.body.generationStatus, 'fallback');
   assert.equal(database.state.metric.authenticated, true);
   assert.equal('user_id' in database.state.metric, false);
 });

@@ -1,5 +1,6 @@
 export type LikhAIIntent = 'order' | 'product' | 'shop' | 'freeform' | 'checkout' | 'shipping' | 'returns' | 'account' | 'general';
 export type LikhAIGroundingStatus = 'grounded' | 'partial' | 'unavailable';
+export type LikhAIGenerationStatus = 'generated' | 'fallback';
 
 export type LikhAIOrderCard = {
   type: 'order'; id: string; shortId: string; status: string; deliveryStatus: string;
@@ -21,12 +22,14 @@ export type LikhAIAction = { id: string; label: string; href: string };
 
 export type LikhAIResponse = {
   responseId: string; reply: string; intent: LikhAIIntent; groundingStatus: LikhAIGroundingStatus;
+  generationStatus: LikhAIGenerationStatus;
   cards: LikhAICard[]; actions: LikhAIAction[]; suggestions: string[]; requiresAuth: boolean;
 };
 
 export type LikhAIMessage = {
   id: string; role: 'user' | 'assistant'; content: string; timestamp: string;
   responseId?: string; groundingStatus?: LikhAIGroundingStatus; cards?: LikhAICard[];
+  generationStatus?: LikhAIGenerationStatus;
   actions?: LikhAIAction[]; suggestions?: string[]; rating?: 'positive' | 'negative';
   errorKind?: 'auth' | 'rate-limit' | 'provider' | 'connection';
 };

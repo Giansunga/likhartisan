@@ -154,6 +154,12 @@ function orderCard(order) {
   };
 }
 
+const ORDER_STATUS_LABELS = Object.freeze({
+  'to-pay': 'To Pay', 'to-ship': 'To Ship', preparing: 'Preparing',
+  'to-receive': 'To Receive', shipped: 'Shipped', delivered: 'Delivered',
+  completed: 'Completed', 'return-refund': 'Return / Refund', cancelled: 'Cancelled', pending: 'Pending',
+});
+
 function productCard(product) {
   return {
     type: 'product', id: product.id, name: product.name, category: product.category || '',
@@ -193,6 +199,7 @@ async function buildContext(intents, message, user) {
       context.push('The customer is not authenticated. Do not provide order information; ask them to sign in.');
       actions.unshift(SIGN_IN_ACTION);
     } else {
+      actions.push({ id: 'view-purchases', label: 'View my purchases', href: '/dashboard?tab=purchases' });
       jobs.push((async () => {
         const { data, error } = await supabase.from('orders')
           .select('id,status,payment_status,delivery_status,total,created_at,items')
@@ -255,17 +262,35 @@ async function buildContext(intents, message, user) {
   };
 }
 
-function fallbackReply(primary, requiresAuth, message) {
+export function fallbackReply(primary, requiresAuth, message, cards = []) {
   const filipino = /\b(ako|aking|ko|po|ba|paano|nasaan|magkano|gusto|hanap|bayad|order ko)\b/i.test(message);
   if (requiresAuth) return filipino
     ? 'Mag-sign in muna para ligtas kong makita ang iyong order details. Hindi ako gumagamit ng ID na ipinapadala lang ng browser.'
     : 'Please sign in so I can securely look up your order details.';
+
+  const matchingCards = cards.filter(card => card.type === primary);
+  if (primary === 'order') {
+    const latest = matchingCards[0];
+    if (latest) {
+      const status = ORDER_STATUS_LABELS[latest.status] || ORDER_STATUS_LABELS.pending;
+      return filipino
+        ? `May nahanap akong ${matchingCards.length} verified order${matchingCards.length === 1 ? '' : 's'}. Ang pinakabago, order #${latest.shortId}, ay ${status}. Buksan ang order card para sa buong detalye.`
+        : `I found ${matchingCards.length} verified order${matchingCards.length === 1 ? '' : 's'}. Your newest order, #${latest.shortId}, is ${status}. Open the order card for the full details.`;
+    }
+    return filipino
+      ? 'Wala akong nakitang verified order sa account na ito. Maaari mong tingnan ang My Purchases para sa pinakabagong detalye.'
+      : 'I could not find a verified order for this account. Check My Purchases for the latest details.';
+  }
+
   const replies = {
-    product: 'I could not generate a detailed recommendation right now, but the verified matching products are shown below.',
-    shop: 'I could not generate a detailed answer right now, but you can review the verified artisan shops below.',
-    order: 'I could not generate a detailed summary right now. Please use the verified order card below to review the latest status.',
+    product: matchingCards.length
+      ? `I found ${matchingCards.length} verified matching product${matchingCards.length === 1 ? '' : 's'}. Review the product cards for the latest details.`
+      : 'I could not find a verified matching product. Try broadening your search or browse all pottery.',
+    shop: matchingCards.length
+      ? `I found ${matchingCards.length} verified artisan shop${matchingCards.length === 1 ? '' : 's'}. Review the shop cards for the latest details.`
+      : 'I could not find a verified artisan shop for that request. Browse all shops to explore more makers.',
   };
-  return replies[primary] || 'LikhAI is temporarily unable to write a full reply. Please use one of the verified options below or try again shortly.';
+  return replies[primary] || 'LikhAI is temporarily unable to write a full reply. Please try again shortly.';
 }
 
 async function recordMetric(metric) {
@@ -288,12 +313,14 @@ export async function handleChat(req, res) {
     const grounded = await buildContext(all, sanitized, user);
     const messages = normalizeHistory(history, sanitized);
     let generated;
+    let generationStatus = 'generated';
     let errorCode = grounded.errors[0] || null;
     try {
       generated = await chatWithGroq(messages, grounded.context);
     } catch (error) {
       errorCode = error.code || 'provider_error';
-      generated = { reply: fallbackReply(primary, grounded.requiresAuth, sanitized), model: GROQ_MODEL, latencyMs: Date.now() - startedAt, usage: { inputTokens: 0, outputTokens: 0 } };
+      generationStatus = 'fallback';
+      generated = { reply: fallbackReply(primary, grounded.requiresAuth, sanitized, grounded.cards), model: GROQ_MODEL, latencyMs: Date.now() - startedAt, usage: { inputTokens: 0, outputTokens: 0 } };
     }
 
     metric = {
@@ -307,6 +334,7 @@ export async function handleChat(req, res) {
 
     const payload = {
       responseId, reply: generated.reply, intent: primary, groundingStatus: grounded.groundingStatus,
+      generationStatus,
       cards: grounded.cards, actions: grounded.actions, suggestions: grounded.suggestions,
       requiresAuth: grounded.requiresAuth,
     };

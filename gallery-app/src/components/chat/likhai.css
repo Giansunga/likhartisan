@@ -20,6 +20,7 @@
 .likhai-bubble { padding: 11px 14px; border-radius: 16px 16px 16px 4px; border: 1px solid #e8e0d8; background: #fff; color: var(--text-dark); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; font-size: .86rem; }
 .likhai-message--user .likhai-bubble { background: #823e0b; border-color: #823e0b; color: #fff; border-radius: 16px 16px 4px 16px; }
 .likhai-bubble--error { border-color: #e2b8a9; background: #fff7f3; }
+.likhai-generation-note { color: #5f4a32; font-size: .72rem; margin: 5px 4px; }
 .likhai-grounding-note { color: #8a5a22; font-size: .72rem; margin: 5px 4px; }
 .likhai-results { margin-top: 8px; }
 .likhai-card { box-sizing: border-box; border: 1px solid #e8e0d8; border-radius: 12px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.05); margin-bottom: 8px; color: var(--text-dark); text-decoration: none; overflow: hidden; }
