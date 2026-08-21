@@ -49,6 +49,24 @@ test('reports rate limiting after the bounded retry', async () => {
   );
 });
 
+test('classifies an invalid API key without exposing provider details', async () => {
+  await assert.rejects(
+    chatWithGroq([{ role: 'user', content: 'Hello' }], '', {
+      fetchImpl: async () => jsonResponse({ error: { code: 'invalid_api_key' } }, 401),
+    }),
+    error => error instanceof GroqServiceError && error.code === 'provider_invalid_api_key' && error.status === 502,
+  );
+});
+
+test('classifies blocked model access without exposing provider details', async () => {
+  await assert.rejects(
+    chatWithGroq([{ role: 'user', content: 'Hello' }], '', {
+      fetchImpl: async () => jsonResponse({ error: { code: 'model_permission_blocked_project' } }, 403),
+    }),
+    error => error instanceof GroqServiceError && error.code === 'provider_model_permission' && error.status === 502,
+  );
+});
+
 test('rejects malformed provider responses', async () => {
   await assert.rejects(
     chatWithGroq([{ role: 'user', content: 'Hello' }], '', { fetchImpl: async () => jsonResponse({ choices: [] }) }),

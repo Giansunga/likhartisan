@@ -27,6 +27,14 @@ function retryableStatus(status) {
   return status === 429 || [502, 503, 504].includes(status);
 }
 
+function providerFailureCode(status, body) {
+  if (status === 401) return 'provider_invalid_api_key';
+  if (body?.error?.code === 'model_permission_blocked_project' || body?.error?.code === 'model_permission_blocked_org') {
+    return 'provider_model_permission';
+  }
+  return status === 429 ? 'provider_rate_limited' : 'provider_error';
+}
+
 function retryDelay(response) {
   const seconds = Number(response.headers.get('retry-after'));
   return Number.isFinite(seconds) ? Math.min(seconds * 1000, 2000) : 250;
@@ -79,8 +87,10 @@ export async function chatWithGroq(messages, context = '', {
           await waitImpl(retryDelay(response));
           continue;
         }
+        let body = null;
+        try { body = await response.json(); } catch { /* The HTTP status is sufficient for safe classification. */ }
         throw new GroqServiceError(`Groq request failed with status ${response.status}`, {
-          code: response.status === 429 ? 'provider_rate_limited' : 'provider_error',
+          code: providerFailureCode(response.status, body),
           status: response.status === 429 ? 429 : 502,
         });
       }
