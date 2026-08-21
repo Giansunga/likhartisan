@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
@@ -97,12 +97,14 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
   const restored = parsePurchaseFilters(params);
   const { status, page, query: submittedQ } = restored;
   const [draftQ, setDraftQ] = useState(submittedQ);
-  const [expanded, setExpanded] = useState<string | null>(params.get('order'));
+  const linkedOrderId = params.get('order');
   const [details, setDetails] = useState<Record<string, PurchaseDetail>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
   const [mutation, setMutation] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ order: PurchaseSummary; action: 'cancel' | 'receive' } | null>(null);
   const [returnOrder, setReturnOrder] = useState<PurchaseSummary | null>(null);
+  const orderRefs = useRef<Record<string, HTMLElement | null>>({});
+  const lastScrolledOrderRef = useRef<string | null>(null);
   const query = useMemo(() => { const next = new URLSearchParams(); next.set('status', status); next.set('sort', 'newest'); next.set('page', String(page)); if (submittedQ) next.set('q', submittedQ); return next.toString(); }, [page, status, submittedQ]);
   const { data, loading, refreshing, error, reload } = usePurchases(user?.id, query, authLoading);
   function update(values: Record<string, string | null>) { const next = new URLSearchParams(params); next.set('tab', 'purchases'); Object.entries(values).forEach(([key, value]) => value ? next.set(key, value) : next.delete(key)); setParams(next); }
@@ -112,12 +114,21 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
     catch (error) { toast.error((error as Error).message); }
     finally { setDetailLoading(null); }
   }, []);
-  // Detail data is intentionally lazy and only synchronized after expansion.
+  // The URL is the single source of truth for an open purchase so LIKHAI links,
+  // browser navigation, and manually opening a card always stay synchronized.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (expanded && !details[expanded]) void loadDetail(expanded); }, [details, expanded, loadDetail]);
+  useEffect(() => { if (linkedOrderId && !details[linkedOrderId]) void loadDetail(linkedOrderId); }, [details, linkedOrderId, loadDetail]);
+  useEffect(() => { lastScrolledOrderRef.current = null; }, [linkedOrderId]);
+  useEffect(() => {
+    if (!linkedOrderId || !details[linkedOrderId] || lastScrolledOrderRef.current === linkedOrderId) return;
+    const frame = window.requestAnimationFrame(() => {
+      orderRefs.current[linkedOrderId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      lastScrolledOrderRef.current = linkedOrderId;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [details, linkedOrderId]);
   function toggle(id: string) {
-    if (expanded === id) { setExpanded(null); update({ order: null }); return; }
-    setExpanded(id); update({ order: id });
+    update({ order: linkedOrderId === id ? null : id });
   }
   async function mutate(order: PurchaseSummary, action: 'cancel' | 'receive') { setMutation(order.id); try { await purchaseApi(`/${order.id}/${action}`, { method: 'POST' }); toast.success(action === 'cancel' ? 'Order cancelled.' : 'Receipt confirmed.'); setConfirm(null); await reload(); } catch (e) { toast.error((e as Error).message); } finally { setMutation(null); } }
   async function pay(order: PurchaseSummary) {
@@ -152,7 +163,6 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
   }
   async function reorder(order: PurchaseSummary) { setMutation(order.id); try { const plan = await purchaseApi<ReorderPlan>(`/${order.id}/reorder-plan`, { method: 'POST' }); if (!plan.available.length) return toast.error('None of these items are currently available.'); const warning = plan.unavailable.length ? `\n\nUnavailable: ${plan.unavailable.map(item => item.productName).join(', ')}` : ''; if (!window.confirm(`Add ${plan.available.length} available item${plan.available.length === 1 ? '' : 's'} to your cart?${warning}`)) return; plan.available.forEach(addToCart); toast.success('Available items added to your cart.'); navigate('/cart'); } catch (e) { toast.error((e as Error).message); } finally { setMutation(null); } }
   const primary = (order: PurchaseSummary) => order.status === 'to-pay' ? <button className="purchase-btn primary" onClick={() => void pay(order)}>Pay now</button> : order.status === 'to-receive' ? <button className="purchase-btn primary" onClick={() => setConfirm({ order, action: 'receive' })}>Confirm received</button> : order.status === 'completed' ? <button className="purchase-btn primary" onClick={() => void reorder(order)}>Buy again</button> : <button className="purchase-btn primary" onClick={() => void toggle(order.id)}>View details</button>;
-  const linkedOrderId = params.get('order');
   const visibleOrders = linkedOrderId && details[linkedOrderId] && !data.orders.some(order => order.id === linkedOrderId)
     ? [details[linkedOrderId], ...data.orders]
     : data.orders;
@@ -163,8 +173,8 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
     </form>
     <nav className="purchase-tabs" aria-label="Purchase status">{TABS.map(tab => <button key={tab.key} aria-pressed={status === tab.key} onClick={() => update({ status: tab.key === 'all' ? null : tab.key, page: null, order: null })}>{tab.label}<span>{data.statusCounts[tab.key] || 0}</span></button>)}</nav>
     {loading ? <div className="purchase-list" aria-label="Loading purchases">{[1, 2, 3].map(value => <div className="purchase-card skeleton" key={value}><i /><div><i /><i /></div></div>)}</div> : error ? <div className="purchase-state"><h2>We couldn’t load your purchases</h2><p>{error}</p><button className="purchase-btn primary" onClick={() => void reload()}>Try again</button></div> : !visibleOrders.length ? <div className="purchase-state"><h2>{data.statusCounts.all ? 'No orders match these filters' : 'Your first handmade find is waiting'}</h2><p>{data.statusCounts.all ? 'Try another search or status.' : 'Orders you place will appear here.'}</p>{data.statusCounts.all ? <button className="purchase-btn secondary" onClick={() => { setDraftQ(''); update({ q: null, status: null, dateFrom: null, dateTo: null, sort: null, page: null }); }}>Clear filters</button> : <Link className="purchase-btn primary" to="/gallery">Explore the gallery</Link>}</div> : <div className="purchase-list">{visibleOrders.map(order => {
-      const detail = details[order.id]; const isOpen = expanded === order.id; const shops = order.shops.length > 1 ? 'Multiple shops' : order.shops[0]?.name || 'LikhArtisan Shop';
-      return <article className="purchase-card" key={order.id} id={`order-${order.id}`}><div className="purchase-card__top"><div><strong>{shops}</strong><span>Order #{order.shortId} · {new Date(order.createdAt).toLocaleDateString()}</span></div><div className={`purchase-status status-${order.status}`}><strong>{TABS.find(tab => tab.key === order.status)?.label}</strong><span>{STATUS_MESSAGE[order.status]}</span></div></div>
+      const detail = details[order.id]; const isOpen = linkedOrderId === order.id; const shops = order.shops.length > 1 ? 'Multiple shops' : order.shops[0]?.name || 'LikhArtisan Shop';
+      return <article className="purchase-card" key={order.id} id={`order-${order.id}`} ref={node => { orderRefs.current[order.id] = node; }}><div className="purchase-card__top"><div><strong>{shops}</strong><span>Order #{order.shortId} · {new Date(order.createdAt).toLocaleDateString()}</span></div><div className={`purchase-status status-${order.status}`}><strong>{TABS.find(tab => tab.key === order.status)?.label}</strong><span>{STATUS_MESSAGE[order.status]}</span></div></div>
         <div className="purchase-card__items">{order.items.slice(0, 2).map(item => <div className="purchase-item" key={item.index}><img src={item.image} alt="" /><div><strong>{item.productName}</strong><span>{displayVariation(item.dimensions || item.variation || '') || `Quantity: ${item.quantity}`}</span></div><b>{money(item.price * item.quantity)}</b></div>)}{order.items.length > 2 && <p>+{order.items.length - 2} more item{order.items.length > 3 ? 's' : ''}</p>}</div>
         <div className="purchase-card__footer"><div>Order total <strong>{money(order.total)}</strong></div><div>{primary(order)}<button className="purchase-btn secondary" aria-expanded={isOpen} aria-controls={`detail-${order.id}`} onClick={() => void toggle(order.id)}>{isOpen ? 'Hide details' : 'Details'}</button></div></div>
         {isOpen && <div className="purchase-detail" id={`detail-${order.id}`}>{detailLoading === order.id ? <div className="purchase-detail__loading" role="status">Loading authentic tracking history…</div> : detail ? <>

@@ -29,11 +29,17 @@ export default function ChatOrderCard({ order }: { order: LikhAIOrderCard }) {
           <strong>{order.productName || 'Order items'}</strong>
           <span>{order.itemCount} item{order.itemCount === 1 ? '' : 's'} · {date}</span>
           <strong>₱{Number(order.total || 0).toLocaleString()}</strong>
+          {order.paymentStatus && <span>Payment: {order.paymentStatus}</span>}
+          {order.deliveryProvider && <span>Courier: {order.deliveryProvider}</span>}
+          {order.trackingNumber && <span>Tracking: {order.trackingNumber}</span>}
+          {order.estimatedDelivery && <span>Estimated delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}</span>}
+          {order.returnStatus && <span>Return status: {order.returnStatus.replace(/_/g, ' ')}</span>}
+          {order.deliveryNotes && <span>Delivery note: {order.deliveryNotes}</span>}
         </div>
       </div>
       <div className="likhai-card__actions">
         <Link to={order.href}>View order</Link>
-        <Link to="/chat" className="likhai-card__secondary">Contact seller</Link>
+        <Link to={`/chat?order=${encodeURIComponent(order.id)}`} className="likhai-card__secondary">Contact seller</Link>
       </div>
     </article>
   );

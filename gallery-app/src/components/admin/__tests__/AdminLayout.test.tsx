@@ -47,6 +47,7 @@ describe('AdminLayout access control', () => {
     renderAdminRoute();
 
     expect(await screen.findByText('Admin dashboard content')).toBeDefined();
+    expect(screen.getByText('Activity Logs').closest('a')?.getAttribute('href')).toBe('/admin/activity');
     expect(mocks.from).not.toHaveBeenCalled();
   });
 

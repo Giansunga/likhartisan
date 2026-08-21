@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, KeyRound, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
+import { recordSecurityActivity } from '../../lib/activityApi';
 
 interface PasswordDialogProps {
   email: string;
@@ -92,6 +93,7 @@ export default function PasswordDialog({ email, onClose }: PasswordDialogProps) 
       if (signInError) throw new Error('Your current password is incorrect.');
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
+      await recordSecurityActivity('auth.password_changed');
       toast.success('Password updated successfully.');
       onClose();
     } catch (caught) {

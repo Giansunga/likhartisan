@@ -13,7 +13,7 @@ import {
   Store,
   X,
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { signOutWithActivity } from '../../lib/activityApi';
 import ArtisanProvider from './ArtisanContext';
 import { useArtisanPortal } from './artisanContextValue';
 import '../portal.css';
@@ -36,7 +36,7 @@ function ArtisanShell() {
   const navigate = useNavigate();
 
   async function logout() {
-    await supabase.auth.signOut();
+    await signOutWithActivity();
     navigate('/', { replace: true });
   }
 

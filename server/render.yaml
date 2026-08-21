@@ -12,6 +12,8 @@ envVars:
     sync: false
   - key: SUPABASE_SERVICE_KEY
     sync: false
+  - key: LIKHAI_FRONTEND_SUPABASE_URL
+    sync: false
   - key: PAYMONGO_SECRET_KEY
     sync: false
   - key: PAYMONGO_PUBLIC_KEY

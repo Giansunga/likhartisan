@@ -41,8 +41,13 @@ server/.env
 
 # Config (contains secrets)
 opencode.jsonc
+opencode.json
 
 .vercel
+
+# Codex/local verification artifacts
+.codex-likhai-deploy/
+gallery-app/*-check.png
 
 # Hermes agent temp files
 server/.hermes-tmp.*

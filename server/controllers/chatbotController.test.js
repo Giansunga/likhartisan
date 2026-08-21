@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buyerOrderStatus,
+  buildSupportExperience,
+  classifyAuthVerificationError,
   detectIntent,
+  detectSupportGoal,
   fallbackReply,
   handleChat,
   initChatbotController,
@@ -18,13 +21,25 @@ function responseRecorder() {
   };
 }
 
-function fakeSupabase({ tokenUser = null } = {}) {
+function fakeSupabase({ tokenUser = null, authError = { status: 401, code: 'bad_jwt' }, authThrow = null, returnRows = [], activityRows = [] } = {}) {
   const state = { orderOwner: null, metric: null };
   return {
     state,
-    auth: { getUser: async token => token === 'valid-token' && tokenUser ? { data: { user: tokenUser }, error: null } : { data: { user: null }, error: new Error('invalid') } },
+    auth: { getUser: async token => {
+      if (authThrow) throw authThrow;
+      return token === 'valid-token' && tokenUser
+        ? { data: { user: tokenUser }, error: null }
+        : { data: { user: null }, error: authError };
+    } },
     from(table) {
       if (table === 'likhai_response_metrics') return { insert: async metric => { state.metric = metric; return { error: null }; } };
+      if (table === 'order_return_requests' || table === 'order_activity_log') {
+        const rows = table === 'order_return_requests' ? returnRows : activityRows;
+        return {
+          select() { return this; }, in() { return this; }, neq() { return this; },
+          order() { return Promise.resolve({ data: rows, error: null }); },
+        };
+      }
       const query = {
         select() { return this; },
         eq(column, value) { if (table === 'orders' && column === 'user_id') state.orderOwner = value; return this; },
@@ -46,6 +61,36 @@ test('detects English, Filipino, and Taglish support intents', () => {
   assert.equal(detectIntent('Magkano ang terracotta na paso?').primary, 'product');
   assert.equal(detectIntent('Paano magbayad using GCash?').primary, 'checkout');
   assert.equal(detectIntent('Gusto ko i-customize ang kulay sa Freeform').primary, 'freeform');
+});
+
+test('adds only owned delivery and active-return details to an authenticated order card', async () => {
+  const database = fakeSupabase({
+    tokenUser: { id: 'verified-owner' },
+    returnRows: [{ order_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: 'under_review' }],
+  });
+  initChatbotController(database);
+  const response = responseRecorder();
+  await handleChat({ headers: { authorization: 'Bearer valid-token' }, body: { message: 'What is the status of my refund?' } }, response);
+  assert.equal(response.statusCode, 200);
+  assert.equal(database.state.orderOwner, 'verified-owner');
+  assert.equal(response.body.cards[0].paymentStatus, 'paid');
+  assert.equal(response.body.cards[0].returnStatus, 'under_review');
+  assert.ok(response.body.actions.some(action => action.id === 'view-return'));
+  assert.match(response.body.reply, /under review/i);
+});
+
+test('detects practical support goals and asks one clarifying question for vague help', () => {
+  const cases = [
+    ['Track my package', 'delivery_details'],
+    ['Paano ang payment ng order ko?', 'payment_status'],
+    ['Can I cancel my order?', 'cancel_order'],
+    ['Nasaan ang refund ko?', 'return_status'],
+    ['I forgot my password', 'account_recovery'],
+    ['I-message ang seller', 'contact_seller'],
+    ['help', 'clarify'],
+  ];
+  for (const [message, expected] of cases) assert.equal(detectSupportGoal(message), expected);
+  assert.match(fallbackReply('general', false, 'help'), /What would you like to sort out\?/);
 });
 
 test('normalizes history without duplicating the current user message', () => {
@@ -105,6 +150,23 @@ test('has deterministic bilingual fallbacks for support topics beyond records', 
   assert.match(fallbackReply('freeform', false, 'What can I customize?', []), /3D pottery design/i);
 });
 
+test('uses verified support playbooks and next actions without claiming it performed a write', () => {
+  const grounded = {
+    requiresAuth: false,
+    groundingStatus: 'grounded',
+    cards: [{
+      type: 'order', id: 'order-1', shortId: 'order-1', status: 'to-pay', href: '/dashboard?tab=purchases&order=order-1',
+      trackingNumber: 'TRACK-123', cancellationEligible: true, returnEligibility: 'eligible', returnStatus: null,
+    }],
+  };
+  const payment = buildSupportExperience('checkout', 'payment_status', 'What is my payment status?', grounded);
+  assert.equal(payment.actions[0].id, 'resume-payment');
+  assert.match(payment.resolution.label, /waiting for payment/i);
+  const delivery = fallbackReply('shipping', false, 'Track my order', grounded.cards, {}, 'delivery_details');
+  assert.match(delivery, /TRACK-123/);
+  assert.doesNotMatch(delivery, /submitted|cancelled your|refunded your|sent .*seller/i);
+});
+
 test('requires sign-in for order lookup without querying customer orders', async () => {
   const database = fakeSupabase();
   initChatbotController(database);
@@ -125,6 +187,8 @@ test('derives order ownership from the verified bearer token and ignores body us
   assert.equal(database.state.orderOwner, 'verified-owner');
   assert.equal(response.body.cards[0].status, 'to-ship');
   assert.equal(response.body.generationStatus, 'fallback');
+  assert.equal(response.body.resolution.state, 'resolved');
+  assert.ok(response.body.actions.some(action => action.id === 'open-order'));
   assert.equal(database.state.metric.authenticated, true);
   assert.equal('user_id' in database.state.metric, false);
 });
@@ -135,4 +199,45 @@ test('rejects an invalid optional bearer token', async () => {
   const response = responseRecorder();
   await handleChat({ headers: { authorization: 'Bearer invalid' }, body: { message: 'Shipping info' } }, response);
   assert.equal(response.statusCode, 401);
+  assert.equal(response.body.code, 'AUTH_SESSION_INVALID');
+  assert.ok(response.body.responseId);
+});
+
+test('treats a token from another Supabase project as an invalid session', async () => {
+  const database = fakeSupabase({ authError: { status: 401, code: 'bad_jwt' } });
+  initChatbotController(database);
+  const response = responseRecorder();
+  await handleChat({ headers: { authorization: 'Bearer other-project-token' }, body: { message: 'Track my order' } }, response);
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.body.code, 'AUTH_SESSION_INVALID');
+});
+
+test('reports a rejected backend credential as a retryable configuration failure', async () => {
+  const database = fakeSupabase({ authError: { status: 401, code: 'invalid_api_key', message: 'Invalid API key' } });
+  initChatbotController(database);
+  const response = responseRecorder();
+  await handleChat({ headers: { authorization: 'Bearer valid-looking-token' }, body: { message: 'Track my order' } }, response);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'AUTH_CONFIGURATION_INVALID');
+  assert.doesNotMatch(response.body.error, /sign in again/i);
+});
+
+test('reports temporary Supabase authentication failures without claiming the session expired', async () => {
+  const database = fakeSupabase({ authError: { status: 503, code: 'service_unavailable' } });
+  initChatbotController(database);
+  const response = responseRecorder();
+  await handleChat({
+    headers: { authorization: 'Bearer valid-looking-token', 'x-likhai-auth-retry': '1' },
+    body: { message: 'Track my order' },
+  }, response);
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.code, 'AUTH_VERIFICATION_UNAVAILABLE');
+  assert.doesNotMatch(response.body.error, /sign in again/i);
+});
+
+test('classifies rate limits, server errors, and network failures as verification outages', () => {
+  assert.equal(classifyAuthVerificationError({ status: 429 }), 'unavailable');
+  assert.equal(classifyAuthVerificationError({ status: 500 }), 'unavailable');
+  assert.equal(classifyAuthVerificationError(new Error('network failed')), 'unavailable');
+  assert.equal(classifyAuthVerificationError({ status: 401, code: 'bad_jwt' }), 'invalid');
 });

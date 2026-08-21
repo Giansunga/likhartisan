@@ -22,6 +22,11 @@
 .likhai-bubble--error { border-color: #e2b8a9; background: #fff7f3; }
 .likhai-generation-note { color: #5f4a32; font-size: .72rem; margin: 5px 4px; }
 .likhai-grounding-note { color: #8a5a22; font-size: .72rem; margin: 5px 4px; }
+.likhai-resolution { margin-top: 7px; padding: 8px 10px; border: 1px solid #e5d7c7; border-left: 3px solid #823e0b; border-radius: 8px; background: #fffaf5; color: var(--text-dark); font-size: .78rem; }
+.likhai-resolution span { color: #823e0b; font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.likhai-resolution p { margin: 2px 0 0; line-height: 1.35; }
+.likhai-resolution--clarify { border-left-color: #8a5a22; }
+.likhai-resolution--sign_in { border-left-color: #a33a20; }
 .likhai-results { margin-top: 8px; }
 .likhai-card { box-sizing: border-box; border: 1px solid #e8e0d8; border-radius: 12px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.05); margin-bottom: 8px; color: var(--text-dark); text-decoration: none; overflow: hidden; }
 .likhai-card__header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #eee5dc; font-size: .8rem; }

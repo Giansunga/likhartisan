@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { getCartCount, onCartUpdate } from '../data/store';
 import { supabase } from '../lib/supabase';
+import { signOutWithActivity } from '../lib/activityApi';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -154,7 +155,7 @@ export default function Navbar() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await signOutWithActivity();
     window.location.reload();
   }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { recordSecurityActivity, signOutWithActivity } from '../lib/activityApi';
 
 export default function UpdatePasswordPage() {
   const navigate = useNavigate();
@@ -73,8 +74,9 @@ export default function UpdatePasswordPage() {
       return;
     }
 
+    await recordSecurityActivity('auth.password_reset');
     // Sign out after password update so user isn't left logged in
-    await supabase.auth.signOut();
+    await signOutWithActivity();
 
     setSuccess(true);
     setTimeout(() => {

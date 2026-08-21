@@ -19,6 +19,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { SellerConfirmDialog } from '../../components/artisan/Overlay';
 import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { signOutWithActivity } from '../../lib/activityApi';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -329,9 +330,9 @@ export default function ArtisanDashboardPage() {
             ].map(({ label, icon, danger }) => (
               <button
                 key={label}
-                onClick={() => {
+                onClick={async () => {
                   if (label === 'Logout') {
-                    supabase.auth.signOut();
+                    await signOutWithActivity();
                     window.location.href = '/';
                   } else if (label === 'Back to Store') {
                     window.location.href = '/';

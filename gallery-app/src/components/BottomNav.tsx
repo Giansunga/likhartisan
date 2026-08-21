@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Home, Grid3X3, Store, Palette } from 'lucide-react';
-import { useVisualViewportBottomOffset } from '../hooks/useVisualViewportBottomOffset';
 
 const navItems = [
   { name: 'Home', path: '/', icon: Home },
@@ -12,7 +11,6 @@ const navItems = [
 
 export default function BottomNav() {
   const location = useLocation();
-  useVisualViewportBottomOffset();
 
   if (location.pathname.startsWith('/artisan-dashboard')) {
     return null;

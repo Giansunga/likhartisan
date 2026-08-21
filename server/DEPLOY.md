@@ -15,7 +15,8 @@
 5. Add Environment Variables:
    ```
    SUPABASE_URL=your_supabase_url
-   SUPABASE_SERVICE_KEY=your_service_key
+   SUPABASE_SERVICE_KEY=your_current_server_secret_key
+   LIKHAI_FRONTEND_SUPABASE_URL=the_same_url_used_by_VITE_SUPABASE_URL
    PAYMONGO_SECRET_KEY=your_paymongo_key
    LALAMOVE_API_KEY=your_lalamove_key
    LALAMOVE_API_SECRET=your_lalamove_secret
@@ -27,7 +28,9 @@
    PORT=3001
    ```
 
-LikhAI keeps serving verified fallback replies if Groq is unconfigured or unavailable. Use `/health/likhai` after backend deploy to confirm the configured model IDs and recent provider state. This endpoint only returns readiness fields; it does not expose keys, prompts, customer text, or order data.
+LikhAI keeps serving verified fallback replies if Groq is unconfigured or unavailable. Use `/health/likhai` after backend deploy to confirm the configured model IDs, Supabase authentication configuration state, and recent provider state. This endpoint only returns readiness fields; it does not expose keys, project URLs, prompts, customer text, or order data.
+
+For localhost, run `npm run check:auth-config` from the `server` directory after editing either `.env` file. The check confirms that both sides use the same Supabase project and that both configured keys are accepted; it never prints URLs or keys. If it reports `service_key_rejected`, create or copy a current server-side secret key from the same Supabase project and update only `SUPABASE_SERVICE_KEY`. Restart both development servers after changing Vite environment values.
 
 ## 2. Set Up Auto-Ping
 After deployment, Render gives you a URL like:

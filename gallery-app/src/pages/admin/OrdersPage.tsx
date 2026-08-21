@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
@@ -17,7 +18,9 @@ import {
 import { formatCurrency, matchesQueue } from '../../components/admin/orders/orderManagementUtils';
 import { exportToCsv } from '../../lib/csvExport';
 import { purchaseApi } from '../../lib/purchaseApi';
-import type { Order, OrderActivityLog } from '../../types';
+import type { Order } from '../../types';
+import type { ActivityLogRecord } from '../../types/activity';
+import { formatActivityLabel } from '../../lib/activityLog';
 import type { ReturnRequest } from '../../types/purchases';
 import '../../components/admin/orders/orders.css';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
@@ -58,6 +61,8 @@ function displayVariation(v?: string) {
 
 export default function OrdersPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const deepLinkOrderId = searchParams.get('orderId');
 
   /* ── state ── */
   const [orders, setOrders] = useState<Order[]>([]);
@@ -78,7 +83,7 @@ export default function OrdersPage() {
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
-  const [activityLogs, setActivityLogs] = useState<OrderActivityLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogRecord[]>([]);
   const [returnRequest, setReturnRequest] = useState<ReturnRequest | null>(null);
   const [sellerNotes, setSellerNotes] = useState('');
   const [buyerNotes, setBuyerNotes] = useState('');
@@ -116,7 +121,10 @@ export default function OrdersPage() {
       if (error) throw error;
       const nextOrders = (data || []) as Order[];
       setOrders(nextOrders);
-      setSelectedOrder(current => current ? nextOrders.find(order => order.id === current.id) || null : null);
+      setSelectedOrder(current => {
+        const requestedId = deepLinkOrderId || current?.id;
+        return requestedId ? nextOrders.find(order => order.id === requestedId) || null : null;
+      });
     } catch (e: any) {
       console.error('Failed to fetch orders:', e);
       setLoadError(e?.message || 'Check your connection and try again.');
@@ -124,7 +132,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deepLinkOrderId]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -139,15 +147,10 @@ export default function OrdersPage() {
   }
 
   /* ── helper: get user display name ── */
-  function getActorName(): string {
-    return user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Admin';
-  }
-
   /* ── update order status ── */
   async function updateOrderStatus(orderId: string, newStatus: string, reason?: string) {
     setStatusUpdating(true);
     try {
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
       const updates: Record<string, any> = {};
       if (newStatus === 'cancelled') {
         updates.status = 'cancelled';
@@ -159,22 +162,6 @@ export default function OrdersPage() {
       }
       const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
       if (error) throw error;
-
-      // log
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId,
-        p_previous_status: current?.status,
-        p_new_status: updates.status || current?.status,
-        p_previous_payment_status: current?.payment_status,
-        p_new_payment_status: updates.payment_status || current?.payment_status,
-        p_previous_delivery_status: current?.delivery_status,
-        p_new_delivery_status: updates.delivery_status || current?.delivery_status,
-        p_action_type: 'status_update',
-        p_actor_id: user?.id,
-        p_actor_name: getActorName(),
-        p_actor_role: 'admin',
-        p_reason: reason || null,
-      });
 
       showToast(`Order status updated to ${updates.status || newStatus}`, 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
@@ -188,10 +175,9 @@ export default function OrdersPage() {
   }
 
   /* ── update delivery status ── */
-  async function updateDeliveryStatus(orderId: string, newDelivery: string, reason?: string) {
+  async function updateDeliveryStatus(orderId: string, newDelivery: string, _reason?: string) {
     setStatusUpdating(true);
     try {
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
       const updates: Record<string, any> = { delivery_status: newDelivery };
       if (newDelivery === 'completed') updates.status = 'completed';
       if (newDelivery === 'cancelled') {
@@ -200,21 +186,6 @@ export default function OrdersPage() {
       }
       const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
       if (error) throw error;
-
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId,
-        p_previous_status: current?.status,
-        p_new_status: updates.status || current?.status,
-        p_previous_payment_status: current?.payment_status,
-        p_new_payment_status: current?.payment_status,
-        p_previous_delivery_status: current?.delivery_status,
-        p_new_delivery_status: newDelivery,
-        p_action_type: 'delivery_update',
-        p_actor_id: user?.id,
-        p_actor_name: getActorName(),
-        p_actor_role: 'admin',
-        p_reason: reason || null,
-      });
 
       showToast(`Delivery status updated to ${newDelivery}`, 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
@@ -256,15 +227,6 @@ export default function OrdersPage() {
       }).eq('id', orderId);
       if (error) throw error;
 
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId, p_previous_status: current?.status, p_new_status: 'paid',
-        p_previous_payment_status: current?.payment_status, p_new_payment_status: 'paid',
-        p_previous_delivery_status: current?.delivery_status, p_new_delivery_status: current?.delivery_status,
-        p_action_type: 'payment_verified', p_actor_id: user?.id, p_actor_name: getActorName(),
-        p_actor_role: 'admin', p_reason: null,
-      });
-
       showToast('Payment verified', 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: 'paid', status: 'paid' } : o));
       if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, payment_status: 'paid', status: 'paid' } : prev);
@@ -274,19 +236,10 @@ export default function OrdersPage() {
     }
   }
 
-  async function rejectPayment(orderId: string, reason: string) {
+  async function rejectPayment(orderId: string, _reason: string) {
     try {
       const { error } = await supabase.from('orders').update({ payment_status: 'failed' }).eq('id', orderId);
       if (error) throw error;
-
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId, p_previous_status: current?.status, p_new_status: current?.status,
-        p_previous_payment_status: current?.payment_status, p_new_payment_status: 'failed',
-        p_previous_delivery_status: current?.delivery_status, p_new_delivery_status: current?.delivery_status,
-        p_action_type: 'payment_rejected', p_actor_id: user?.id, p_actor_name: getActorName(),
-        p_actor_role: 'admin', p_reason: reason,
-      });
 
       showToast('Payment rejected', 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: 'failed' } : o));
@@ -299,21 +252,12 @@ export default function OrdersPage() {
   }
 
   /* ── refund ── */
-  async function processRefund(orderId: string, amount: number, reason: string) {
+  async function processRefund(orderId: string, amount: number, _reason: string) {
     try {
       const { error } = await supabase.from('orders').update({
         refund_status: 'refunded', refund_amount: amount, status: 'refunded',
       }).eq('id', orderId);
       if (error) throw error;
-
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId, p_previous_status: current?.status, p_new_status: 'refunded',
-        p_previous_payment_status: current?.payment_status, p_new_payment_status: 'refunded',
-        p_previous_delivery_status: current?.delivery_status, p_new_delivery_status: current?.delivery_status,
-        p_action_type: 'refund_processed', p_actor_id: user?.id, p_actor_name: getActorName(),
-        p_actor_role: 'admin', p_reason: reason,
-      });
 
       showToast(`Refund of ${formatCurrency(amount)} processed`, 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, refund_status: 'refunded', refund_amount: amount, status: 'refunded' } : o));
@@ -334,15 +278,6 @@ export default function OrdersPage() {
       }).eq('id', orderId);
       if (error) throw error;
 
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId, p_previous_status: current?.status, p_new_status: current?.status,
-        p_previous_payment_status: current?.payment_status, p_new_payment_status: current?.payment_status,
-        p_previous_delivery_status: current?.delivery_status, p_new_delivery_status: current?.delivery_status,
-        p_action_type: 'problem_flagged', p_actor_id: user?.id, p_actor_name: getActorName(),
-        p_actor_role: 'admin', p_reason: `${type}: ${notes}`,
-      });
-
       showToast('Order flagged as problematic', 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, is_problematic: true, problem_type: type, problem_notes: notes } : o));
       if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, is_problematic: true, problem_type: type, problem_notes: notes } : prev);
@@ -360,15 +295,6 @@ export default function OrdersPage() {
         is_problematic: false, problem_resolution: res,
       }).eq('id', orderId);
       if (error) throw error;
-
-      const { data: current } = await supabase.from('orders').select('status, payment_status, delivery_status').eq('id', orderId).single();
-      await supabase.rpc('log_order_change', {
-        p_order_id: orderId, p_previous_status: current?.status, p_new_status: current?.status,
-        p_previous_payment_status: current?.payment_status, p_new_payment_status: current?.payment_status,
-        p_previous_delivery_status: current?.delivery_status, p_new_delivery_status: current?.delivery_status,
-        p_action_type: 'problem_resolved', p_actor_id: user?.id, p_actor_name: getActorName(),
-        p_actor_role: 'admin', p_reason: res,
-      });
 
       showToast('Problem resolved', 'success');
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, is_problematic: false, problem_resolution: res } : o));
@@ -395,15 +321,16 @@ export default function OrdersPage() {
   const fetchActivityLogs = useCallback(async () => {
     if (!selectedOrder) { setActivityLogs([]); return; }
     const { data } = await supabase
-      .from('order_activity_log')
+      .from('activity_log')
       .select('*')
-      .eq('order_id', selectedOrder.id)
-      .order('created_at', { ascending: false });
-    setActivityLogs((data || []) as OrderActivityLog[]);
+      .eq('entity_type', 'orders')
+      .eq('entity_id', selectedOrder.id)
+      .order('occurred_at', { ascending: false });
+    setActivityLogs((data || []) as ActivityLogRecord[]);
   }, [selectedOrder]);
 
   useEffect(() => { queueMicrotask(() => { void fetchActivityLogs(); }); }, [fetchActivityLogs]);
-  usePortalRealtimeRefresh(['order_activity_log'], fetchActivityLogs);
+  usePortalRealtimeRefresh(['activity_log'], fetchActivityLogs);
 
   useEffect(() => {
     if (!selectedOrder) { setReturnRequest(null); return; }
@@ -878,26 +805,25 @@ export default function OrdersPage() {
                             <div key={log.id} style={{ display: 'flex', gap: '14px', padding: '12px 0', borderBottom: '1px solid #F0EBE4' }}>
                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#FDF5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                                  {log.action_type.includes('payment') ? 'P' : log.action_type.includes('delivery') ? 'D' : log.action_type.includes('refund') ? 'R' : log.action_type.includes('problem') ? '!' : 'A'}
+                                  {log.event_name.includes('payment') ? 'P' : log.event_name.includes('delivery') ? 'D' : log.event_name.includes('refund') ? 'R' : log.event_name.includes('problem') ? '!' : 'A'}
                                 </span>
                               </div>
                               <div style={{ flex: 1 }}>
                                 <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>
-                                  {log.action_type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                  {formatActivityLabel(log.event_name)}
                                 </p>
-                                {log.reason && <p style={{ fontSize: '0.78rem', color: '#8C7B6E', marginTop: '2px' }}>Reason: {log.reason}</p>}
-                                {(log.previous_status || log.new_status) && log.previous_status !== log.new_status && (
+                                {Boolean(log.before_data?.status || log.after_data?.status) && log.before_data?.status !== log.after_data?.status && (
                                   <p style={{ fontSize: '0.78rem', color: '#8C7B6E', marginTop: '2px' }}>
-                                    Status: {log.previous_status || '--'} → {log.new_status || '--'}
+                                    Status: {String(log.before_data?.status || '--')} → {String(log.after_data?.status || '--')}
                                   </p>
                                 )}
-                                {(log.previous_delivery_status || log.new_delivery_status) && log.previous_delivery_status !== log.new_delivery_status && (
+                                {Boolean(log.before_data?.delivery_status || log.after_data?.delivery_status) && log.before_data?.delivery_status !== log.after_data?.delivery_status && (
                                   <p style={{ fontSize: '0.78rem', color: '#8C7B6E', marginTop: '2px' }}>
-                                    Delivery: {log.previous_delivery_status || '--'} → {log.new_delivery_status || '--'}
+                                    Delivery: {String(log.before_data?.delivery_status || '--')} → {String(log.after_data?.delivery_status || '--')}
                                   </p>
                                 )}
                                 <p style={{ fontSize: '0.75rem', color: '#A89688', marginTop: '4px' }}>
-                                  by {log.actor_name || 'Unknown'} ({log.actor_role || 'system'}) &middot; {formatDate(log.created_at)}
+                                  by {log.actor_label || 'Unknown'} ({log.actor_context}) &middot; {formatDate(log.occurred_at)}
                                 </p>
                               </div>
                             </div>

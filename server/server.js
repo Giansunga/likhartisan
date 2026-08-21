@@ -10,6 +10,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
 import { getLikhAIProviderHealth, validateLikhAIConfiguration } from './services/groqService.js';
+import { getSupabaseAuthConfigurationState, verifySupabaseAuthConfiguration } from './services/supabaseAuthConfig.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
@@ -23,6 +24,7 @@ import {
 import { createOrderNotifications, decrementStockForItems } from './services/orderFulfillmentService.js';
 import { createCustomOrderCheckout } from './services/customOrderCheckoutService.js';
 import { resolveNotificationRecipient } from './services/notificationService.js';
+import { createActivityRouter } from './routes/activity.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -61,7 +63,14 @@ if (FRONTEND_URL.includes('localhost') || FRONTEND_URL.includes('127.0.0.1')) {
   );
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+});
+void verifySupabaseAuthConfiguration({
+  backendUrl: process.env.SUPABASE_URL,
+  frontendUrl: process.env.LIKHAI_FRONTEND_SUPABASE_URL,
+  serviceKey: process.env.SUPABASE_SERVICE_KEY,
+});
 
 const WARN_MISSING_R2 = '[WARN] Missing R2 env var';
 const r2 = new S3Client({
@@ -134,6 +143,7 @@ app.get('/health', (req, res) => {
 app.get('/health/likhai', (req, res) => {
   res.status(200).json({
     ...getLikhAIProviderHealth(),
+    authConfigurationState: getSupabaseAuthConfigurationState(),
     timestamp: new Date().toISOString(),
   });
 });
@@ -702,6 +712,8 @@ async function verifyAuth(req, res) {
   }
   return user.id;
 }
+
+app.use('/api/activity', createActivityRouter({ supabase, verifyAuth, requireSuperAdmin }));
 
 // ── Admin: Assign role (with auto-create shop for shop_owner) ────────────────
 app.post('/api/admin/assign-role', async (req, res) => {

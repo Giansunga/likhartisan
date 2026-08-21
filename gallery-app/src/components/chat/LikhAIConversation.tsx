@@ -31,6 +31,12 @@ function AssistantExtras({ message, compact }: { message: LikhAIMessage; compact
     <>
       {message.generationStatus === 'fallback' && <div className="likhai-generation-note">Live summary unavailable — showing verified information.</div>}
       {message.groundingStatus === 'partial' && <div className="likhai-grounding-note">Some live information was unavailable.</div>}
+      {message.resolution && (
+        <div className={`likhai-resolution likhai-resolution--${message.resolution.state}`}>
+          <span>Next step</span>
+          <p>{message.resolution.label}</p>
+        </div>
+      )}
       {!!message.cards?.length && <div className="likhai-results">{message.cards.map(card => <ResultCard key={`${card.type}-${card.id}`} card={card} />)}</div>}
       {!!message.actions?.length && (
         <div className="likhai-actions">

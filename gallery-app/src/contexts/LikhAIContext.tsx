@@ -1,25 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { LikhAIContext } from './likhai-context';
-import { LikhAIRequestError, requestLikhAI, submitLikhAIFeedback } from '../services/likhaiClient';
+import { LikhAIRequestError, submitLikhAIFeedback } from '../services/likhaiClient';
+import { requestLikhAIWithSession } from '../services/likhaiAuthenticatedRequest';
 import type { LikhAIMessage } from '../types/likhai';
-import { supabase } from '../lib/supabase';
 
 const STORAGE_KEY = 'likhai:conversation:v1';
 const MAX_MESSAGES = 20;
 type StoredConversation = { identity: string; messages: LikhAIMessage[] };
 function makeId() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
-async function getLikhAIAccessToken(forceRefresh = false) {
-  const sessionResult = forceRefresh
-    ? await supabase.auth.refreshSession()
-    : await supabase.auth.getSession();
-  let token = sessionResult.data.session?.access_token;
-  if (!token && !forceRefresh) {
-    const refreshResult = await supabase.auth.refreshSession();
-    token = refreshResult.data.session?.access_token;
-  }
-  return token;
-}
 function readStored(identity: string): LikhAIMessage[] {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null') as StoredConversation | null;
@@ -28,7 +17,7 @@ function readStored(identity: string): LikhAIMessage[] {
 }
 
 export function LikhAIProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, getAccessToken } = useAuth();
   const identity = user?.id || 'anonymous';
   const [messages, setMessages] = useState<LikhAIMessage[]>(() => readStored(identity));
   const [loadedIdentity, setLoadedIdentity] = useState(identity);
@@ -61,22 +50,17 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setLoadingPhase('waking');
     try {
-      let token = await getLikhAIAccessToken();
-      let result;
-      try {
-        result = await requestLikhAI(text, history, token);
-      } catch (error) {
-        if (error instanceof LikhAIRequestError && error.kind === 'auth') {
-          token = await getLikhAIAccessToken(true);
-          if (token) result = await requestLikhAI(text, history, token);
-        }
-        if (!result) throw error;
-      }
+      const result = await requestLikhAIWithSession({
+        message: text,
+        history,
+        signedIn: Boolean(user),
+        getAccessToken,
+      });
       const assistantMessage: LikhAIMessage = {
         id: makeId(), role: 'assistant', content: result.reply, timestamp: new Date().toISOString(),
         responseId: result.responseId, groundingStatus: result.groundingStatus, cards: result.cards,
         generationStatus: result.generationStatus,
-        actions: result.actions, suggestions: result.suggestions,
+        actions: result.actions, suggestions: result.suggestions, resolution: result.resolution,
       };
       setMessages(current => [
         ...current.filter(item => item.id !== retryAssistantId),
@@ -98,7 +82,7 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       setLoadingPhase('idle');
     }
-  }, []);
+  }, [getAccessToken, user]);
 
   const sendMessage = useCallback(async (rawText: string) => {
     const text = rawText.trim();

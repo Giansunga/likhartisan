@@ -29,13 +29,17 @@ describe('LikhAIConversation', () => {
     messages = [{
       id: 'assistant-1', role: 'assistant', content: 'Your paid order is ready for the seller.', timestamp: '2026-08-14T00:00:00Z',
       responseId: 'response-1', groundingStatus: 'grounded', generationStatus: 'fallback',
-      cards: [{ type: 'order', id: 'order-1', shortId: 'order-1', status: 'to-ship', deliveryStatus: 'pending', total: 300, createdAt: '2026-08-14T00:00:00Z', itemCount: 1, href: '/dashboard?tab=purchases&order=order-1' }],
+      resolution: { state: 'action_needed', label: 'Open the order to resume payment.' },
+      cards: [{ type: 'order', id: 'order-1', shortId: 'order-1', status: 'to-ship', deliveryStatus: 'pending', total: 300, createdAt: '2026-08-14T00:00:00Z', itemCount: 1, trackingNumber: 'TRACK-123', deliveryProvider: 'LBC', href: '/dashboard?tab=purchases&order=order-1' }],
       actions: [{ id: 'purchases', label: 'View my purchases', href: '/dashboard?tab=purchases' }],
       suggestions: ['How do I contact the seller?'],
     }];
     render(<MemoryRouter><LikhAIConversation /></MemoryRouter>);
     expect(screen.getByText('Live summary unavailable — showing verified information.')).toBeInTheDocument();
+    expect(screen.getByText('Open the order to resume payment.')).toBeInTheDocument();
+    expect(screen.getByText('Tracking: TRACK-123')).toBeInTheDocument();
     expect(screen.getByText('To Ship')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View order' })).toHaveAttribute('href', '/dashboard?tab=purchases&order=order-1');
     expect(screen.getByRole('link', { name: 'View my purchases' })).toHaveAttribute('href', '/dashboard?tab=purchases');
     fireEvent.click(screen.getByRole('button', { name: 'How do I contact the seller?' }));
     expect(sendMessage).toHaveBeenCalledWith('How do I contact the seller?');

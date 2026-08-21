@@ -6,6 +6,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
+    "check:auth-config": "node scripts/check-likhai-auth-config.js",
     "payments:reconcile": "node scripts/reconcile-payments.js"
   },
   "dependencies": {

@@ -52,6 +52,15 @@ const INTENT_PATTERNS = Object.freeze({
 });
 
 const INTENT_PRIORITY = ['returns', 'order', 'checkout', 'shipping', 'product', 'shop', 'freeform', 'account'];
+const SUPPORT_GOAL_PATTERNS = Object.freeze({
+  contact_seller: /\b(contact|message|talk to|chat with|seller|artisan|kausapin|i-message|messagehin)\b/i,
+  account_recovery: /\b(forgot|reset|recover|password|nakalimutan|limot)\b/i,
+  cancel_order: /\b(cancel|cancellation|kansela|kanselahin)\b/i,
+  return_status: /\b(return|refund|exchange|ibalik|palitan)\b/i,
+  payment_status: /\b(payment|pay|paid|gcash|maya|qr\s*ph|card|bayad|magbayad|binayaran)\b/i,
+  delivery_details: /\b(track|tracking|courier|ship|shipped|delivery|deliver|pickup|package|parcel|where is|where's|nasaan|dumating|darating|padala)\b/i,
+  clarify: /^\s*(help|help me|tulong|patulong|may problem|problem|support)\s*[!?.,]*\s*$/i,
+});
 const PRODUCT_STOP_WORDS = new Set([
   'show', 'find', 'browse', 'recommend', 'suggest', 'want', 'need', 'have', 'with', 'under', 'over', 'about', 'what', 'which', 'your',
   'product', 'products', 'pottery', 'price', 'cost', 'available', 'please', 'ako', 'ang', 'mga', 'may',
@@ -66,7 +75,19 @@ export function detectIntent(message) {
   const all = INTENT_PRIORITY.filter(intent => INTENT_PATTERNS[intent].some(pattern => pattern.test(message)));
   if (all.includes('returns') && /\b(my|order|purchase|aking|ko|kong|binili)\b/i.test(message) && !all.includes('order')) all.push('order');
   if (all.includes('shipping') && /\border\b|\baking\b/i.test(message) && !all.includes('order')) all.push('order');
+  if (all.includes('checkout') && /\b(my|order|purchase|aking|ko|kong|binili)\b/i.test(message) && !all.includes('order')) all.push('order');
   return { primary: all[0] || 'general', all: all.length ? all : ['general'] };
+}
+
+export function detectSupportGoal(message, primary = detectIntent(message).primary) {
+  if (SUPPORT_GOAL_PATTERNS.clarify.test(message)) return 'clarify';
+  if (SUPPORT_GOAL_PATTERNS.account_recovery.test(message)) return 'account_recovery';
+  if (SUPPORT_GOAL_PATTERNS.contact_seller.test(message)) return 'contact_seller';
+  if (SUPPORT_GOAL_PATTERNS.cancel_order.test(message)) return 'cancel_order';
+  if (SUPPORT_GOAL_PATTERNS.return_status.test(message)) return 'return_status';
+  if (SUPPORT_GOAL_PATTERNS.payment_status.test(message)) return 'payment_status';
+  if (SUPPORT_GOAL_PATTERNS.delivery_details.test(message)) return 'delivery_details';
+  return primary === 'order' ? 'order_status' : 'information';
 }
 
 export function normalizeHistory(history, currentMessage) {
@@ -124,21 +145,56 @@ export function rankProducts(rows, message) {
   return ranked.slice(0, 5).map(entry => entry.product);
 }
 
+const INVALID_AUTH_CODES = new Set([
+  'bad_jwt',
+  'invalid_token',
+  'jwt_expired',
+  'session_not_found',
+  'user_not_found',
+]);
+
+const AUTH_CONFIGURATION_CODES = new Set([
+  'invalid_api_key',
+  'api_key_not_found',
+  'apikey_not_found',
+]);
+
+export function classifyAuthVerificationError(error) {
+  const status = Number(error?.status);
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  if (AUTH_CONFIGURATION_CODES.has(code) || /invalid\s+(api\s*)?key|api\s*key.*(?:invalid|missing|not found)/i.test(message)) return 'configuration';
+  if (status === 429 || status >= 500) return 'unavailable';
+  if (INVALID_AUTH_CODES.has(code) || [400, 401, 403, 422].includes(status)) return 'invalid';
+  return 'unavailable';
+}
+
+function authenticationError(kind) {
+  const error = new Error(kind === 'invalid' ? 'Invalid or expired token' : 'Authentication verification unavailable');
+  error.status = kind === 'invalid' ? 401 : 503;
+  error.code = kind === 'invalid'
+    ? 'AUTH_SESSION_INVALID'
+    : kind === 'configuration' ? 'AUTH_CONFIGURATION_INVALID' : 'AUTH_VERIFICATION_UNAVAILABLE';
+  error.authResult = kind;
+  return error;
+}
+
 async function optionalAuthenticatedUser(req) {
-  const header = req.headers.authorization;
-  if (!header) return null;
+  const header = req.headers?.authorization;
+  if (!header) return { user: null, authResult: 'anonymous' };
   if (!header.startsWith('Bearer ') || header.length <= 7) {
-    const error = new Error('Invalid authorization header');
-    error.status = 401;
-    throw error;
+    throw authenticationError('invalid');
   }
-  const { data: { user }, error } = await supabase.auth.getUser(header.slice(7));
-  if (error || !user) {
-    const authError = new Error('Invalid or expired token');
-    authError.status = 401;
-    throw authError;
+  let result;
+  try {
+    result = await supabase.auth.getUser(header.slice(7));
+  } catch (error) {
+    throw authenticationError(classifyAuthVerificationError(error));
   }
-  return user;
+  const { data: { user } = {}, error } = result || {};
+  if (error) throw authenticationError(classifyAuthVerificationError(error));
+  if (!user) throw authenticationError('invalid');
+  return { user, authResult: 'verified' };
 }
 
 function orderCard(order) {
@@ -150,6 +206,11 @@ function orderCard(order) {
     deliveryStatus: order.delivery_status || 'pending', total: Number(order.total || 0),
     createdAt: order.created_at, itemCount: items.length, image: first.image || null,
     productName: first.product_name || first.productName || null,
+    paymentStatus: order.payment_status || 'pending', deliveryOption: order.delivery_option || 'pickup',
+    deliveryProvider: order.delivery_provider || null, trackingNumber: order.tracking_number || null,
+    estimatedDelivery: order.estimated_delivery || null, deliveryNotes: order.delivery_notes || null,
+    cancellationEligible: order.status === 'pending' && (order.payment_status || 'pending') !== 'paid',
+    returnStatus: order.returnStatus || null, returnEligibility: order.returnEligibility || 'unknown',
     href: `/dashboard?tab=purchases&order=${encodeURIComponent(order.id)}`,
   };
 }
@@ -173,6 +234,15 @@ function shopCard(shop) {
     type: 'shop', id: shop.id, name: shop.name, description: shop.description || '',
     location: shop.location || '', href: `/shop/${encodeURIComponent(shop.id)}`,
   };
+}
+
+function returnEligibilityForSupport(order, activity = []) {
+  if (!['delivered', 'completed'].includes(order.delivery_status) && order.status !== 'completed') return 'not_yet';
+  const completion = activity.find(item => item.new_status === 'completed' || item.new_delivery_status === 'completed' || item.action_type === 'legacy_completion');
+  if (!completion && order.delivery_status === 'delivered') return 'eligible';
+  const completedAt = new Date(completion?.created_at || Date.now());
+  const deadline = new Date(completedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return deadline >= new Date() ? 'eligible' : 'expired';
 }
 
 async function buildContext(intents, message, user) {
@@ -205,14 +275,35 @@ async function buildContext(intents, message, user) {
       actions.push({ id: 'view-purchases', label: 'View my purchases', href: '/dashboard?tab=purchases' });
       jobs.push((async () => {
         const { data, error } = await supabase.from('orders')
-          .select('id,status,payment_status,delivery_status,total,created_at,items')
+          .select('id,status,payment_status,delivery_status,delivery_option,delivery_provider,tracking_number,estimated_delivery,delivery_notes,total,created_at,items')
           .eq('user_id', user.id).order('created_at', { ascending: false }).limit(5);
         if (error) throw new Error('orders_unavailable');
-        const orderCards = (data || []).map(orderCard);
+        const orders = [...(data || [])];
+        if (intents.includes('returns') && orders.length) {
+          const orderIds = orders.map(order => order.id);
+          const [returnsResult, activityResult] = await Promise.all([
+            supabase.from('order_return_requests').select('order_id,status,created_at').in('order_id', orderIds).neq('status', 'draft').order('created_at', { ascending: false }),
+            supabase.from('order_activity_log').select('order_id,action_type,new_status,new_delivery_status,created_at').in('order_id', orderIds).order('created_at', { ascending: true }),
+          ]);
+          if (returnsResult.error || activityResult.error) throw new Error('orders_unavailable');
+          const returnByOrder = new Map();
+          for (const request of returnsResult.data || []) if (!returnByOrder.has(request.order_id)) returnByOrder.set(request.order_id, request.status);
+          const activityByOrder = new Map();
+          for (const activity of activityResult.data || []) {
+            const entries = activityByOrder.get(activity.order_id) || [];
+            entries.push(activity);
+            activityByOrder.set(activity.order_id, entries);
+          }
+          for (const order of orders) {
+            order.returnStatus = returnByOrder.get(order.id) || null;
+            order.returnEligibility = order.returnStatus ? 'active' : returnEligibilityForSupport(order, activityByOrder.get(order.id) || []);
+          }
+        }
+        const orderCards = orders.map(orderCard);
         cards.push(...orderCards);
         grounding.order = orderCards.length ? 'available' : 'empty';
         context.push(orderCards.length
-          ? `<DATA type="customer_orders">${JSON.stringify(orderCards.map(({ id: _id, image: _image, href: _href, ...safe }) => safe))}</DATA>`
+          ? `<DATA type="customer_orders">${JSON.stringify(orderCards.map(({ id: _id, image: _image, href: _href, deliveryNotes: _deliveryNotes, ...safe }) => safe))}</DATA>`
           : 'No orders were found for the authenticated customer.');
       })().catch(error => errors.push(error.message)));
     }
@@ -297,13 +388,104 @@ const STATIC_FALLBACKS = Object.freeze({
   },
 });
 
-export function fallbackReply(primary, requiresAuth, message, cards = [], grounding = {}) {
-  const filipino = /\b(ako|aking|ko|po|ba|paano|nasaan|magkano|gusto|hanap|bayad|order ko)\b/i.test(message);
+function usesFilipino(message) {
+  return /\b(ako|aking|ko|po|ba|paano|nasaan|magkano|gusto|hanap|bayad|order ko|tulong|kansela)\b/i.test(message);
+}
+
+function uniqueSupportItems(items, key) {
+  return [...new Map(items.filter(Boolean).map(item => [item[key], item])).values()].slice(0, 3);
+}
+
+export function buildSupportExperience(primary, supportGoal, message, grounded) {
+  const filipino = usesFilipino(message);
+  const latestOrder = grounded.cards.find(card => card.type === 'order');
+  const action = (id, label, href) => ({ id, label, href });
+  if (grounded.requiresAuth) return {
+    resolution: { state: 'sign_in', label: filipino ? 'Mag-sign in para makita ang order details.' : 'Sign in to view your order details.' },
+    actions: [SIGN_IN_ACTION], suggestions: [filipino ? 'Paano mag-sign in?' : 'How do I sign in?'],
+  };
+  if (supportGoal === 'clarify') return {
+    resolution: { state: 'clarify', label: filipino ? 'Sabihin kung order, delivery, payment, return, o account ang kailangan mo.' : 'Tell me whether you need help with an order, delivery, payment, return, or account.' },
+    actions: [], suggestions: ['Track my order', 'Payment help', 'Returns and refunds'],
+  };
+  if (supportGoal === 'account_recovery') return {
+    resolution: { state: 'action_needed', label: filipino ? 'I-reset ang password sa account page.' : 'Reset your password from the account page.' },
+    actions: [action('reset-password', filipino ? 'I-reset ang password' : 'Reset password', '/forgot-password')],
+    suggestions: [filipino ? 'Saan ang dashboard ko?' : 'Where is my dashboard?'],
+  };
+  if (supportGoal === 'contact_seller') {
+    const href = latestOrder ? `/chat?order=${encodeURIComponent(latestOrder.id)}` : '/chat';
+    return {
+      resolution: { state: 'action_needed', label: filipino ? 'I-message ang seller para sa order-specific na tulong.' : 'Message the seller for order-specific help.' },
+      actions: [action('contact-seller', filipino ? 'I-message ang seller' : 'Contact seller', href)],
+      suggestions: latestOrder ? [filipino ? 'I-track ang order na ito' : 'Track this order'] : ['Track my order'],
+    };
+  }
+  if (latestOrder) {
+    const openOrder = action('open-order', filipino ? 'Buksan ang order' : 'Open order', latestOrder.href);
+    if (supportGoal === 'payment_status') return {
+      resolution: { state: 'action_needed', label: latestOrder.status === 'to-pay'
+        ? (filipino ? 'Pending pa ang payment ng pinakabagong order.' : 'Your newest order is still waiting for payment.')
+        : (filipino ? 'Na-check ang payment status ng pinakabagong order.' : 'Payment status found for your newest order.') },
+      actions: [latestOrder.status === 'to-pay' ? action('resume-payment', filipino ? 'Ituloy ang payment' : 'Resume payment', latestOrder.href) : openOrder],
+      suggestions: [filipino ? 'I-track ang order na ito' : 'Track this order'],
+    };
+    if (supportGoal === 'cancel_order') return {
+      resolution: { state: 'action_needed', label: latestOrder.cancellationEligible
+        ? (filipino ? 'Puwede mong tingnan ang cancellation option ng order na ito.' : 'You can review the cancellation option for this order.')
+        : (filipino ? 'Hindi na available ang cancellation para sa status na ito.' : 'Cancellation is not available for this order status.') },
+      actions: [openOrder, action('contact-seller', filipino ? 'I-message ang seller' : 'Contact seller', `/chat?order=${encodeURIComponent(latestOrder.id)}`)],
+      suggestions: [filipino ? 'Ano ang return options ko?' : 'What are my return options?'],
+    };
+    if (supportGoal === 'return_status') {
+      const label = latestOrder.returnStatus
+        ? (filipino ? `May ${latestOrder.returnStatus.replaceAll('_', ' ')} return request ang order na ito.` : `This order has a ${latestOrder.returnStatus.replaceAll('_', ' ')} return request.`)
+        : latestOrder.returnEligibility === 'eligible'
+          ? (filipino ? 'Puwede mong tingnan ang return options ng order na ito.' : 'You can review return options for this order.')
+          : (filipino ? 'Buksan ang order para makita ang available na return options.' : 'Open the order to review the available return options.');
+      return { resolution: { state: 'action_needed', label }, actions: [action('view-return', filipino ? 'Tingnan ang return options' : 'View return options', latestOrder.href)], suggestions: [filipino ? 'I-message ang seller' : 'Contact the seller'] };
+    }
+    if (supportGoal === 'delivery_details' || supportGoal === 'order_status') return {
+      resolution: { state: 'resolved', label: latestOrder.trackingNumber
+        ? (filipino ? 'May verified tracking detail ang order na ito.' : 'Verified tracking details are available for this order.')
+        : (filipino ? 'Tingnan ang buong order para sa latest delivery updates.' : 'Open the order for the latest delivery updates.') },
+      actions: [openOrder, action('contact-seller', filipino ? 'I-message ang seller' : 'Contact seller', `/chat?order=${encodeURIComponent(latestOrder.id)}`)],
+      suggestions: [filipino ? 'Kailan darating ang order ko?' : 'When will my order arrive?'],
+    };
+  }
+  return {
+    resolution: { state: grounded.groundingStatus === 'unavailable' ? 'unavailable' : 'resolved', label: filipino ? 'Narito ang verified na impormasyon at susunod na hakbang.' : 'Here is the verified information and the best next step.' },
+    actions: [], suggestions: [],
+  };
+}
+
+export function fallbackReply(primary, requiresAuth, message, cards = [], grounding = {}, supportGoal = detectSupportGoal(message, primary)) {
+  const filipino = usesFilipino(message);
+  if (supportGoal === 'clarify') return filipino
+    ? 'Matutulungan kita sa order, delivery, payment, return, o account. Ano ang gusto mong ayusin?'
+    : 'I can help with an order, delivery, payment, return, or account. What would you like to sort out?';
   if (requiresAuth) return filipino
     ? 'Mag-sign in muna para ligtas kong makita ang iyong order details. Hindi ako gumagamit ng ID na ipinapadala lang ng browser.'
     : 'Please sign in so I can securely look up your order details.';
 
   const matchingCards = cards.filter(card => card.type === primary);
+  const orderCards = cards.filter(card => card.type === 'order');
+  const relevantOrder = orderCards[0];
+  if (['payment_status', 'cancel_order', 'return_status', 'delivery_details'].includes(supportGoal) && relevantOrder) {
+    const status = ORDER_STATUS_LABELS[relevantOrder.status] || ORDER_STATUS_LABELS.pending;
+    if (supportGoal === 'payment_status') return relevantOrder.status === 'to-pay'
+      ? (filipino ? `Pending pa ang payment ng order #${relevantOrder.shortId}. Buksan ang order para ituloy ang payment.` : `Payment for order #${relevantOrder.shortId} is still pending. Open the order to resume payment.`)
+      : (filipino ? `Na-check ang payment status ng order #${relevantOrder.shortId}. Buksan ang order para sa buong detalye.` : `I found the payment status for order #${relevantOrder.shortId}. Open the order for the full details.`);
+    if (supportGoal === 'cancel_order') return relevantOrder.cancellationEligible
+      ? (filipino ? `Puwede mong tingnan ang cancellation option ng order #${relevantOrder.shortId}. Buksan ang order para magpatuloy.` : `You can review the cancellation option for order #${relevantOrder.shortId}. Open the order to continue.`)
+      : (filipino ? `Hindi na available ang cancellation para sa current status ng order #${relevantOrder.shortId}. Maaari mong i-message ang seller para sa tulong.` : `Cancellation is no longer available for the current status of order #${relevantOrder.shortId}. Contact the seller for help.`);
+    if (supportGoal === 'return_status') return relevantOrder.returnStatus
+      ? (filipino ? `Ang return request para sa order #${relevantOrder.shortId} ay ${relevantOrder.returnStatus.replaceAll('_', ' ')}. Buksan ang order para sa updates.` : `The return request for order #${relevantOrder.shortId} is ${relevantOrder.returnStatus.replaceAll('_', ' ')}. Open the order for updates.`)
+      : (filipino ? `Buksan ang order #${relevantOrder.shortId} para makita ang return options at eligibility.` : `Open order #${relevantOrder.shortId} to review its return options and eligibility.`);
+    if (supportGoal === 'delivery_details' && relevantOrder.trackingNumber) return filipino
+      ? `Ang order #${relevantOrder.shortId} ay ${status}. Tracking number: ${relevantOrder.trackingNumber}${relevantOrder.deliveryProvider ? ` via ${relevantOrder.deliveryProvider}` : ''}. Buksan ang order para sa latest delivery details.`
+      : `Order #${relevantOrder.shortId} is ${status}. Tracking number: ${relevantOrder.trackingNumber}${relevantOrder.deliveryProvider ? ` via ${relevantOrder.deliveryProvider}` : ''}. Open the order for the latest delivery details.`;
+  }
   if (primary === 'order') {
     if (grounding.order === 'unavailable') return filipino
       ? 'Verified fallback: hindi ko ma-check ang live order data ngayon, kaya hindi ako mag-a-assume ng status. Buksan ang My Purchases para sa pinakabagong order details o subukan ulit mamaya.'
@@ -311,6 +493,23 @@ export function fallbackReply(primary, requiresAuth, message, cards = [], ground
     const latest = matchingCards[0];
     if (latest) {
       const status = ORDER_STATUS_LABELS[latest.status] || ORDER_STATUS_LABELS.pending;
+      if (supportGoal === 'payment_status') return latest.status === 'to-pay'
+        ? (filipino ? `Pending pa ang payment ng order #${latest.shortId}. Buksan ang order para ituloy ang payment.` : `Payment for order #${latest.shortId} is still pending. Open the order to resume payment.`)
+        : (filipino ? `Na-check ang payment status ng order #${latest.shortId}. Buksan ang order para sa buong detalye.` : `I found the payment status for order #${latest.shortId}. Open the order for the full details.`);
+      if (supportGoal === 'cancel_order') return latest.cancellationEligible
+        ? (filipino ? `Puwede mong tingnan ang cancellation option ng order #${latest.shortId}. Buksan ang order para magpatuloy.` : `You can review the cancellation option for order #${latest.shortId}. Open the order to continue.`)
+        : (filipino ? `Hindi na available ang cancellation para sa current status ng order #${latest.shortId}. Maaari mong i-message ang seller para sa tulong.` : `Cancellation is no longer available for the current status of order #${latest.shortId}. Contact the seller for help.`);
+      if (supportGoal === 'return_status') {
+        if (latest.returnStatus) return filipino
+          ? `Ang return request para sa order #${latest.shortId} ay ${latest.returnStatus.replaceAll('_', ' ')}. Buksan ang order para sa updates.`
+          : `The return request for order #${latest.shortId} is ${latest.returnStatus.replaceAll('_', ' ')}. Open the order for updates.`;
+        return filipino
+          ? `Buksan ang order #${latest.shortId} para makita ang return options at eligibility.`
+          : `Open order #${latest.shortId} to review its return options and eligibility.`;
+      }
+      if (supportGoal === 'delivery_details' && latest.trackingNumber) return filipino
+        ? `Ang order #${latest.shortId} ay ${status}. Tracking number: ${latest.trackingNumber}${latest.deliveryProvider ? ` via ${latest.deliveryProvider}` : ''}. Buksan ang order para sa latest delivery details.`
+        : `Order #${latest.shortId} is ${status}. Tracking number: ${latest.trackingNumber}${latest.deliveryProvider ? ` via ${latest.deliveryProvider}` : ''}. Open the order for the latest delivery details.`;
       return filipino
         ? `May nahanap akong ${matchingCards.length} verified order${matchingCards.length === 1 ? '' : 's'}. Ang pinakabago, order #${latest.shortId}, ay ${status}. Buksan ang order card para sa buong detalye.`
         : `I found ${matchingCards.length} verified order${matchingCards.length === 1 ? '' : 's'}. Your newest order, #${latest.shortId}, is ${status}. Open the order card for the full details.`;
@@ -359,6 +558,8 @@ function logLikhAIResponse({
   groundingStatus,
   attemptCount,
   latencyMs,
+  authResult,
+  authRetryCount,
 }) {
   console.info(JSON.stringify({
     event: 'likhai_response',
@@ -370,6 +571,8 @@ function logLikhAIResponse({
     groundingStatus,
     attemptCount,
     latencyMs,
+    authResult,
+    authRetryCount,
   }));
 }
 
@@ -381,29 +584,47 @@ async function recordMetric(metric) {
 export async function handleChat(req, res) {
   const responseId = crypto.randomUUID();
   const startedAt = Date.now();
+  const authRetryCount = req.headers?.['x-likhai-auth-retry'] === '1' ? 1 : 0;
+  let authResult = 'not_checked';
   let metric = null;
   try {
     const { message, history = [] } = req.body || {};
     if (typeof message !== 'string' || !message.trim()) return res.status(400).json({ error: 'Message is required' });
     if (message.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
 
-    const user = await optionalAuthenticatedUser(req);
+    const authentication = await optionalAuthenticatedUser(req);
+    const user = authentication.user;
+    authResult = authentication.authResult;
     const sanitized = xss(message.trim());
     const { primary, all } = detectIntent(sanitized);
     const grounded = await buildContext(all, sanitized, user);
+    const supportGoal = detectSupportGoal(sanitized, primary);
+    const support = buildSupportExperience(primary, supportGoal, sanitized, grounded);
+    const actions = uniqueSupportItems([...support.actions, ...grounded.actions], 'id');
+    const suggestions = [...new Set([...support.suggestions, ...grounded.suggestions])].slice(0, 3);
     const messages = normalizeHistory(history, sanitized);
     let generated;
     let generationStatus = 'generated';
     let errorCode = grounded.errors[0] || null;
     let providerErrorCode = null;
     try {
-      generated = await chatWithGroq(messages, grounded.context);
+      generated = await chatWithGroq(
+        messages,
+        `${grounded.context}\n\n<SUPPORT_GOAL>${supportGoal}</SUPPORT_GOAL>`,
+      );
     } catch (error) {
       errorCode = error.code || 'provider_error';
       providerErrorCode = errorCode;
       generationStatus = 'fallback';
       generated = {
-        reply: fallbackReply(primary, grounded.requiresAuth, sanitized, grounded.cards, grounded.grounding),
+        reply: fallbackReply(
+          primary,
+          grounded.requiresAuth,
+          sanitized,
+          grounded.cards,
+          grounded.grounding,
+          supportGoal,
+        ),
         model: error.model || GROQ_MODEL,
         latencyMs: Date.now() - startedAt,
         attemptCount: error.attemptCount || 0,
@@ -417,7 +638,7 @@ export async function handleChat(req, res) {
       latency_ms: latencyMs, provider_latency_ms: generated.latencyMs,
       input_tokens: generated.usage.inputTokens, output_tokens: generated.usage.outputTokens,
       grounding_status: grounded.groundingStatus, card_types: [...new Set(grounded.cards.map(card => card.type))],
-      action_ids: grounded.actions.map(action => action.id), error_code: errorCode,
+      action_ids: actions.map(action => action.id), error_code: errorCode,
     };
     await recordMetric(metric);
     logLikhAIResponse({
@@ -429,12 +650,14 @@ export async function handleChat(req, res) {
       groundingStatus: grounded.groundingStatus,
       attemptCount: generated.attemptCount || 0,
       latencyMs,
+      authResult,
+      authRetryCount,
     });
 
     const payload = {
       responseId, reply: generated.reply, intent: primary, groundingStatus: grounded.groundingStatus,
       generationStatus,
-      cards: grounded.cards, actions: grounded.actions, suggestions: grounded.suggestions,
+      cards: grounded.cards, actions, suggestions, resolution: support.resolution,
       requiresAuth: grounded.requiresAuth,
     };
     if (process.env.LIKHAI_LEGACY_RESPONSE_CONTRACT === 'true') {
@@ -444,8 +667,34 @@ export async function handleChat(req, res) {
     return res.json(payload);
   } catch (error) {
     const status = error.status || 500;
-    if (status >= 500) console.error('Chatbot request failed:', error.message);
-    if (status === 401) return res.status(401).json({ error: 'Your session is invalid or expired. Please sign in again.' });
+    if (error.authResult) authResult = error.authResult;
+    if (status === 401 || (status === 503 && ['AUTH_VERIFICATION_UNAVAILABLE', 'AUTH_CONFIGURATION_INVALID'].includes(error.code))) {
+      logLikhAIResponse({
+        responseId,
+        intent: 'not_detected',
+        generationStatus: 'not_started',
+        providerErrorCode: null,
+        model: null,
+        groundingStatus: 'not_started',
+        attemptCount: 0,
+        latencyMs: Date.now() - startedAt,
+        authResult,
+        authRetryCount,
+      });
+    }
+    if (status >= 500 && !['AUTH_VERIFICATION_UNAVAILABLE', 'AUTH_CONFIGURATION_INVALID'].includes(error.code)) {
+      console.error('Chatbot request failed:', error.message);
+    }
+    if (status === 401) return res.status(401).json({
+      responseId,
+      code: 'AUTH_SESSION_INVALID',
+      error: 'Your session is invalid or expired. Please sign in again.',
+    });
+    if (status === 503 && ['AUTH_VERIFICATION_UNAVAILABLE', 'AUTH_CONFIGURATION_INVALID'].includes(error.code)) return res.status(503).json({
+      responseId,
+      code: error.code,
+      error: 'Your signed-in session could not be verified right now. Please retry in a moment.',
+    });
     return res.status(status).json({ error: 'LikhAI is temporarily unavailable. Please try again later.' });
   }
 }

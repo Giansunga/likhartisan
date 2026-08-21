@@ -97,7 +97,6 @@
   --mobile-nav-content-height: 64px;
   --mobile-nav-safe-area: env(safe-area-inset-bottom, 0px);
   --mobile-nav-total-height: calc(var(--mobile-nav-content-height) + var(--mobile-nav-safe-area));
-  --mobile-visible-bottom-offset: 0px;
   --mobile-nav-reserved-height: var(--mobile-nav-total-height);
   --container-width: 1320px;
 }
@@ -3985,7 +3984,7 @@ body {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     position: fixed;
-    bottom: var(--mobile-visible-bottom-offset);
+    bottom: 0;
     left: 0;
     right: 0;
     width: 100%;

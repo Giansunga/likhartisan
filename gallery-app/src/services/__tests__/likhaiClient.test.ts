@@ -23,8 +23,34 @@ describe('requestLikhAI', () => {
   });
 
   it('turns an unauthorized response into an auth-specific error', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: 'Session expired' }), { status: 401 }));
-    await expect(requestLikhAI('Track my order', [])).rejects.toMatchObject({ kind: 'auth' });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: 'Session expired', code: 'AUTH_SESSION_INVALID' }), { status: 401 }));
+    await expect(requestLikhAI('Track my order', [])).rejects.toMatchObject({ kind: 'auth', code: 'AUTH_SESSION_INVALID' });
+  });
+
+  it('keeps temporary authentication verification failures retryable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      error: 'Verification unavailable', code: 'AUTH_VERIFICATION_UNAVAILABLE',
+    }), { status: 503 }));
+    await expect(requestLikhAI('Track my order', [])).rejects.toMatchObject({ kind: 'auth-unavailable' });
+  });
+
+  it('keeps rejected backend authentication configuration retryable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      error: 'Verification unavailable', code: 'AUTH_CONFIGURATION_INVALID',
+    }), { status: 503 }));
+    await expect(requestLikhAI('Track my order', [])).rejects.toMatchObject({
+      kind: 'auth-unavailable', code: 'AUTH_CONFIGURATION_INVALID',
+    });
+  });
+
+  it('marks the one allowed authentication retry without exposing session data', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      responseId: 'response-id', reply: 'Verified reply', intent: 'order', groundingStatus: 'grounded',
+      generationStatus: 'generated', cards: [], actions: [], suggestions: [], requiresAuth: false,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await requestLikhAI('Track my order', [], 'new-token', { authRetryCount: 1 });
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init?.headers as Record<string, string>)['X-LikhAI-Auth-Retry']).toBe('1');
   });
 
   it('aborts stalled requests after the frontend timeout', async () => {
