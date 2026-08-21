@@ -89,8 +89,20 @@ test('does not refer to a missing order card in the provider fallback reply', ()
   assert.doesNotMatch(reply, /card below/i);
 });
 
+test('distinguishes unavailable order grounding from no matching order', () => {
+  const reply = fallbackReply('order', false, 'Nasaan ang order ko?', [], { order: 'unavailable' });
+  assert.match(reply, /hindi ko ma-check ang live order data/i);
+  assert.doesNotMatch(reply, /Wala akong nakitang verified order/i);
+});
+
 test('does not refer to unavailable verified options for a general fallback reply', () => {
   assert.doesNotMatch(fallbackReply('general', false, 'Hello', []), /below/i);
+});
+
+test('has deterministic bilingual fallbacks for support topics beyond records', () => {
+  assert.match(fallbackReply('shipping', false, 'Paano delivery po?', []), /local pickup o courier delivery/i);
+  assert.match(fallbackReply('checkout', false, 'How do I pay?', []), /GCash, Maya, QR Ph, and cards/i);
+  assert.match(fallbackReply('freeform', false, 'What can I customize?', []), /3D pottery design/i);
 });
 
 test('requires sign-in for order lookup without querying customer orders', async () => {

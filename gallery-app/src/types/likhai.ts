@@ -32,4 +32,5 @@ export type LikhAIMessage = {
   generationStatus?: LikhAIGenerationStatus;
   actions?: LikhAIAction[]; suggestions?: string[]; rating?: 'positive' | 'negative';
   errorKind?: 'auth' | 'rate-limit' | 'provider' | 'connection';
+  retryText?: string;
 };

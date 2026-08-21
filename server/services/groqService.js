@@ -1,8 +1,8 @@
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 export const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
-export const GROQ_FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'llama-3.1-8b-instant';
-const REQUEST_TIMEOUT_MS = 12_000;
+export const GROQ_FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'qwen/qwen3.6-27b';
+const PROVIDER_BUDGET_MS = 10_000;
 
 const SYSTEM_PROMPT = `You are LikhAI, the official customer support assistant of LikhArtisan, an online marketplace for handcrafted Filipino pottery.
 
@@ -16,29 +16,55 @@ You are read-only: never claim to cancel, refund, pay, submit, edit, or otherwis
 Be warm and concise. Prefer 2 to 4 short sentences; use a short list only when it materially improves clarity.`;
 
 export class GroqServiceError extends Error {
-  constructor(message, { code = 'provider_error', status = 502 } = {}) {
+  constructor(message, { code = 'provider_error', status = 502, attemptCount = 0, model = null } = {}) {
     super(message);
     this.name = 'GroqServiceError';
     this.code = code;
     this.status = status;
+    this.attemptCount = attemptCount;
+    this.model = model;
   }
 }
 
-function retryableStatus(status) {
-  return status === 429 || [502, 503, 504].includes(status);
-}
+const providerState = {
+  configured: Boolean(GROQ_API_KEY),
+  models: [],
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  lastErrorCode: null,
+  lastModel: null,
+  lastAttemptCount: 0,
+};
 
 function providerFailureCode(status, body) {
   if (status === 401) return 'provider_invalid_api_key';
-  if (body?.error?.code === 'model_permission_blocked_project' || body?.error?.code === 'model_permission_blocked_org') {
-    return 'provider_model_permission';
-  }
-  return status === 429 ? 'provider_rate_limited' : 'provider_error';
+  if (status === 403 || body?.error?.code === 'model_permission_blocked_project' || body?.error?.code === 'model_permission_blocked_org') return 'provider_model_permission';
+  if (status === 404) return 'provider_model_unavailable';
+  if (status === 400 || status === 413) return 'provider_invalid_request';
+  if (status === 422) return 'provider_unprocessable';
+  if (status === 429) return 'provider_rate_limited';
+  if (status === 498) return 'provider_capacity';
+  if ([500, 502, 503, 504].includes(status)) return 'provider_retryable_error';
+  return 'provider_error';
 }
 
-function retryDelay(response) {
+function retryableCode(code) {
+  return [
+    'provider_model_permission',
+    'provider_model_unavailable',
+    'provider_unprocessable',
+    'provider_rate_limited',
+    'provider_capacity',
+    'provider_retryable_error',
+    'provider_unavailable',
+    'provider_timeout',
+    'provider_malformed',
+  ].includes(code);
+}
+
+function retryDelayMs(response) {
   const seconds = Number(response.headers.get('retry-after'));
-  return Number.isFinite(seconds) ? Math.min(seconds * 1000, 2000) : 250;
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 250;
 }
 
 function wait(ms) {
@@ -49,30 +75,89 @@ function configuredModels() {
   return [...new Set([GROQ_MODEL, GROQ_FALLBACK_MODEL].filter(Boolean))];
 }
 
-function canFailOver(error) {
-  return error instanceof GroqServiceError && [
-    'provider_model_permission',
-    'provider_rate_limited',
-    'provider_error',
-    'provider_unavailable',
-    'provider_timeout',
-    'provider_malformed',
-  ].includes(error.code);
+providerState.models = configuredModels();
+
+function remainingBudget(deadline) {
+  return Math.max(0, deadline - Date.now());
+}
+
+function rememberSuccess(model, attemptCount) {
+  providerState.lastSuccessAt = new Date().toISOString();
+  providerState.lastFailureAt = null;
+  providerState.lastErrorCode = null;
+  providerState.lastModel = model;
+  providerState.lastAttemptCount = attemptCount;
+}
+
+function rememberFailure(error) {
+  providerState.lastFailureAt = new Date().toISOString();
+  providerState.lastErrorCode = error?.code || 'provider_error';
+  providerState.lastModel = error?.model || null;
+  providerState.lastAttemptCount = error?.attemptCount || providerState.lastAttemptCount;
+}
+
+export function getLikhAIProviderHealth() {
+  const latestProviderFailure = providerState.lastFailureAt &&
+    (!providerState.lastSuccessAt || providerState.lastFailureAt > providerState.lastSuccessAt);
+  return {
+    status: providerState.configured
+      ? (latestProviderFailure ? 'degraded' : 'ready')
+      : 'fallback',
+    configured: providerState.configured,
+    models: providerState.models,
+    lastSuccessAt: providerState.lastSuccessAt,
+    lastFailureAt: providerState.lastFailureAt,
+    lastErrorCode: providerState.lastErrorCode,
+    lastModel: providerState.lastModel,
+    lastAttemptCount: providerState.lastAttemptCount,
+  };
+}
+
+export function validateLikhAIConfiguration() {
+  if (!GROQ_API_KEY) {
+    console.warn('[WARN] GROQ_API_KEY is not set. LikhAI will use verified fallback replies.');
+  }
+  return getLikhAIProviderHealth();
+}
+
+async function fetchCompletion(fetchImpl, payload, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(GROQ_API_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function chatWithGroq(messages, context = '', {
   fetchImpl = fetch,
-  timeoutMs = REQUEST_TIMEOUT_MS,
+  timeoutMs = PROVIDER_BUDGET_MS,
   waitImpl = wait,
 } = {}) {
   if (!GROQ_API_KEY) {
-    throw new GroqServiceError('Groq is not configured', { code: 'provider_unconfigured', status: 503 });
+    const error = new GroqServiceError('Groq is not configured', { code: 'provider_unconfigured', status: 503 });
+    rememberFailure(error);
+    throw error;
   }
 
   const startedAt = Date.now();
+  const deadline = startedAt + Math.min(timeoutMs, PROVIDER_BUDGET_MS);
+  const models = configuredModels();
+  const attempts = models.length > 1 ? models.slice(0, 2) : [models[0], models[0]].filter(Boolean);
+  let attemptCount = 0;
   let lastError = null;
 
-  for (const model of configuredModels()) {
+  for (const model of attempts) {
+    const budget = remainingBudget(deadline);
+    if (budget <= 0) break;
+    attemptCount += 1;
+
     const payload = {
       model,
       messages: [
@@ -90,60 +175,59 @@ export async function chatWithGroq(messages, context = '', {
       stream: false,
     };
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetchImpl(GROQ_API_URL, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+    try {
+      const response = await fetchCompletion(fetchImpl, payload, budget);
+      if (!response.ok) {
+        let body = null;
+        try { body = await response.json(); } catch { /* The HTTP status is enough for safe classification. */ }
+        const code = providerFailureCode(response.status, body);
+        const error = new GroqServiceError(`Groq request failed with status ${response.status}`, {
+          code,
+          status: response.status === 429 ? 429 : 502,
+          attemptCount,
+          model,
         });
-
-        if (!response.ok) {
-          if (attempt === 0 && retryableStatus(response.status)) {
-            await waitImpl(retryDelay(response));
-            continue;
-          }
-          let body = null;
-          try { body = await response.json(); } catch { /* The HTTP status is sufficient for safe classification. */ }
-          throw new GroqServiceError(`Groq request failed with status ${response.status}`, {
-            code: providerFailureCode(response.status, body),
-            status: response.status === 429 ? 429 : 502,
-          });
-        }
-
-        const data = await response.json();
-        const reply = data.choices?.[0]?.message?.content?.trim();
-        if (!reply) throw new GroqServiceError('Groq returned an empty response', { code: 'provider_malformed' });
-        return {
-          reply,
-          model: data.model || model,
-          latencyMs: Date.now() - startedAt,
-          usage: {
-            inputTokens: Number(data.usage?.prompt_tokens || 0),
-            outputTokens: Number(data.usage?.completion_tokens || 0),
-          },
-        };
-      } catch (error) {
-        if (error?.name === 'AbortError') {
-          lastError = new GroqServiceError('Groq request timed out', { code: 'provider_timeout', status: 504 });
-        } else if (error instanceof GroqServiceError) {
-          lastError = error;
-        } else {
-          lastError = new GroqServiceError('Groq request failed', { code: 'provider_unavailable' });
-        }
-
-        if (attempt === 0 && (error?.name === 'AbortError' || !(error instanceof GroqServiceError))) continue;
-        break;
-      } finally {
-        clearTimeout(timeout);
+        error.retryAfterMs = response.status === 429 ? retryDelayMs(response) : 0;
+        throw error;
       }
-    }
 
-    if (!canFailOver(lastError)) throw lastError;
+      const data = await response.json();
+      const reply = data.choices?.[0]?.message?.content?.trim();
+      if (!reply) throw new GroqServiceError('Groq returned an empty response', { code: 'provider_malformed', attemptCount, model });
+      const finalModel = data.model || model;
+      rememberSuccess(finalModel, attemptCount);
+      return {
+        reply,
+        model: finalModel,
+        latencyMs: Date.now() - startedAt,
+        attemptCount,
+        usage: {
+          inputTokens: Number(data.usage?.prompt_tokens || 0),
+          outputTokens: Number(data.usage?.completion_tokens || 0),
+        },
+      };
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        lastError = new GroqServiceError('Groq request timed out', { code: 'provider_timeout', status: 504, attemptCount, model });
+      } else if (error instanceof GroqServiceError) {
+        lastError = error;
+        lastError.attemptCount = attemptCount;
+        lastError.model = model;
+      } else {
+        lastError = new GroqServiceError('Groq request failed', { code: 'provider_unavailable', attemptCount, model });
+      }
+
+      if (!retryableCode(lastError.code)) {
+        rememberFailure(lastError);
+        throw lastError;
+      }
+
+      const delay = Math.min(Number(lastError.retryAfterMs || 0), remainingBudget(deadline));
+      if (delay > 0 && attemptCount < attempts.length) await waitImpl(delay);
+    }
   }
 
-  throw lastError || new GroqServiceError('Groq request failed', { code: 'provider_unavailable' });
+  const error = lastError || new GroqServiceError('Groq request failed', { code: 'provider_unavailable', attemptCount });
+  rememberFailure(error);
+  throw error;
 }

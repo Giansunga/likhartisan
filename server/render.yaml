@@ -23,7 +23,7 @@ envVars:
   - key: GROQ_MODEL
     value: openai/gpt-oss-20b
   - key: GROQ_FALLBACK_MODEL
-    value: llama-3.1-8b-instant
+    value: qwen/qwen3.6-27b
   - key: LALAMOVE_API_KEY
     sync: false
   - key: LALAMOVE_API_SECRET

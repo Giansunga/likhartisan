@@ -20,10 +20,14 @@
    LALAMOVE_API_KEY=your_lalamove_key
    LALAMOVE_API_SECRET=your_lalamove_secret
    GROQ_API_KEY=your_groq_key
+   GROQ_MODEL=openai/gpt-oss-20b
+   GROQ_FALLBACK_MODEL=qwen/qwen3.6-27b
    GOOGLE_MAPS_API_KEY=your_maps_key
    FRONTEND_URL=your_vercel_url
    PORT=3001
    ```
+
+LikhAI keeps serving verified fallback replies if Groq is unconfigured or unavailable. Use `/health/likhai` after backend deploy to confirm the configured model IDs and recent provider state. This endpoint only returns readiness fields; it does not expose keys, prompts, customer text, or order data.
 
 ## 2. Set Up Auto-Ping
 After deployment, Render gives you a URL like:

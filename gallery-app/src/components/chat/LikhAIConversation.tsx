@@ -17,7 +17,7 @@ function ResultCard({ card }: { card: LikhAICard }) {
 }
 
 function AssistantExtras({ message, compact }: { message: LikhAIMessage; compact: boolean }) {
-  const { sendMessage, rateMessage, loading } = useLikhAI();
+  const { sendMessage, retryMessage, rateMessage, loading } = useLikhAI();
   const [ratingPending, setRatingPending] = useState(false);
 
   async function rate(rating: 'positive' | 'negative') {
@@ -42,6 +42,11 @@ function AssistantExtras({ message, compact }: { message: LikhAIMessage; compact
           {message.suggestions.map(suggestion => (
             <button key={suggestion} type="button" disabled={loading} onClick={() => void sendMessage(suggestion)}>{suggestion}</button>
           ))}
+        </div>
+      )}
+      {message.retryText && (
+        <div className="likhai-actions">
+          <button type="button" disabled={loading} onClick={() => void retryMessage(message.id)}>Retry message</button>
         </div>
       )}
       {message.responseId && (
@@ -97,7 +102,10 @@ export default function LikhAIConversation({ compact = false, autoFocus = false 
         {loading && (
           <div className="likhai-message likhai-message--assistant" aria-label="LikhAI is responding">
             <img className="likhai-avatar" src="/images/likhai-logo.png" alt="" />
-            <div className="likhai-typing"><span /><span /><span /></div>
+            <div className="likhai-typing">
+              <span className="likhai-typing__label">LikhAI is typing...</span>
+              <span /><span /><span />
+            </div>
           </div>
         )}
         <div ref={endRef} />

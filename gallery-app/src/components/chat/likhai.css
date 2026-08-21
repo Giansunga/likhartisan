@@ -33,7 +33,7 @@
 .likhai-card__content span { color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .likhai-card__price { color: #823e0b; }
 .likhai-card__actions { display: flex; gap: 7px; padding: 0 12px 10px; }
-.likhai-card__actions a, .likhai-actions a { border: 1px solid #823e0b; border-radius: 8px; padding: 7px 10px; color: #823e0b; text-decoration: none; font-size: .75rem; font-weight: 700; text-align: center; }
+.likhai-card__actions a, .likhai-actions a, .likhai-actions button { border: 1px solid #823e0b; border-radius: 8px; padding: 7px 10px; color: #823e0b; text-decoration: none; font-size: .75rem; font-weight: 700; text-align: center; background: #fff; cursor: pointer; }
 .likhai-card__actions a { flex: 1; }
 .likhai-card__actions .likhai-card__secondary { border-color: #e2d6ca; color: var(--text-dark); }
 .likhai-shop-card__icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #f2eae1; color: #823e0b; }
@@ -43,9 +43,10 @@
 .likhai-feedback { display: flex; align-items: center; gap: 4px; color: var(--text-light); font-size: .7rem; margin-top: 7px; }
 .likhai-feedback button { border: 0; background: transparent; opacity: .55; cursor: pointer; border-radius: 5px; padding: 2px 4px; }
 .likhai-feedback button:hover, .likhai-feedback button.is-selected { opacity: 1; background: #f2eae1; }
-.likhai-typing { display: flex; gap: 4px; padding: 13px 17px; border: 1px solid #e8e0d8; border-radius: 16px; background: #fff; }
-.likhai-typing span { width: 6px; height: 6px; border-radius: 50%; background: #823e0b; animation: likhai-bounce 1.4s infinite; }
-.likhai-typing span:nth-child(2) { animation-delay: .2s; } .likhai-typing span:nth-child(3) { animation-delay: .4s; }
+.likhai-typing { display: flex; align-items: center; gap: 4px; padding: 13px 17px; border: 1px solid #e8e0d8; border-radius: 16px; background: #fff; }
+.likhai-typing span:not(.likhai-typing__label) { width: 6px; height: 6px; border-radius: 50%; background: #823e0b; animation: likhai-bounce 1.4s infinite; }
+.likhai-typing .likhai-typing__label { margin-right: 5px; color: var(--text-light); font-size: .78rem; }
+.likhai-typing span:not(.likhai-typing__label):nth-of-type(3) { animation-delay: .2s; } .likhai-typing span:not(.likhai-typing__label):nth-of-type(4) { animation-delay: .4s; }
 .likhai-composer { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid #e8e0d8; background: #fff; }
 .likhai-composer input { flex: 1; min-width: 0; border: 1px solid #e2d6ca; border-radius: 999px; background: #faf8f5; padding: 11px 14px; color: var(--text-dark); font: inherit; outline: none; }
 .likhai-composer input:focus { border-color: #823e0b; }
@@ -60,6 +61,6 @@
 .likhai-conversation--compact .likhai-quick-actions button { width: 100%; border-radius: 9px; text-align: left; }
 .likhai-conversation--compact .likhai-message__content { max-width: 86%; }
 .likhai-conversation--compact .likhai-bubble { font-size: .8rem; padding: 9px 12px; }
-.likhai-conversation--compact .likhai-actions a, .likhai-conversation--compact .likhai-suggestions button { width: 100%; box-sizing: border-box; }
+.likhai-conversation--compact .likhai-actions a, .likhai-conversation--compact .likhai-actions button, .likhai-conversation--compact .likhai-suggestions button { width: 100%; box-sizing: border-box; }
 
 @media (max-width: 600px) { .likhai-message__content { max-width: 88%; } .likhai-messages { padding: 14px; } }

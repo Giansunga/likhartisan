@@ -4,12 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LikhAIMessage } from '../../../types/likhai';
 
 const sendMessage = vi.fn();
+const retryMessage = vi.fn();
 const rateMessage = vi.fn();
 const clearConversation = vi.fn();
 let messages: LikhAIMessage[] = [];
+let loading = false;
+let loadingPhase: 'idle' | 'waking' | 'responding' = 'idle';
 
 vi.mock('../../../hooks/useLikhAI', () => ({
-  useLikhAI: () => ({ messages, loading: false, sendMessage, rateMessage, clearConversation }),
+  useLikhAI: () => ({ messages, loading, loadingPhase, sendMessage, retryMessage, rateMessage, clearConversation }),
 }));
 
 import LikhAIConversation from '../LikhAIConversation';
@@ -18,6 +21,8 @@ describe('LikhAIConversation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     messages = [];
+    loading = false;
+    loadingPhase = 'idle';
   });
 
   it('renders verified cards, actions, suggestions, and feedback controls', () => {
@@ -46,5 +51,19 @@ describe('LikhAIConversation', () => {
     expect(sendMessage).toHaveBeenCalledWith('Magkano ang paso?');
     fireEvent.click(screen.getByRole('button', { name: 'Clear LikhAI conversation' }));
     expect(clearConversation).toHaveBeenCalledOnce();
+  });
+
+  it('renders a retry control for retryable failures', () => {
+    messages = [{ id: 'assistant-error', role: 'assistant', content: 'LikhAI could not finish that request.', timestamp: '2026-08-14T00:00:00Z', errorKind: 'connection', retryText: 'Shipping info' }];
+    render(<MemoryRouter><LikhAIConversation /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
+    expect(retryMessage).toHaveBeenCalledWith('assistant-error');
+  });
+
+  it('shows the standard typing status while loading', () => {
+    loading = true;
+    loadingPhase = 'waking';
+    render(<MemoryRouter><LikhAIConversation /></MemoryRouter>);
+    expect(screen.getByText('LikhAI is typing...')).toBeInTheDocument();
   });
 });

@@ -181,6 +181,7 @@ async function buildContext(intents, message, user) {
   const actions = [];
   const suggestions = [];
   const errors = [];
+  const grounding = { order: 'not_requested', product: 'not_requested', shop: 'not_requested' };
   let requiresAuth = false;
 
   for (const intent of intents) {
@@ -196,9 +197,11 @@ async function buildContext(intents, message, user) {
   if (intents.includes('order')) {
     if (!user) {
       requiresAuth = true;
+      grounding.order = 'auth_required';
       context.push('The customer is not authenticated. Do not provide order information; ask them to sign in.');
       actions.unshift(SIGN_IN_ACTION);
     } else {
+      grounding.order = 'unavailable';
       actions.push({ id: 'view-purchases', label: 'View my purchases', href: '/dashboard?tab=purchases' });
       jobs.push((async () => {
         const { data, error } = await supabase.from('orders')
@@ -207,6 +210,7 @@ async function buildContext(intents, message, user) {
         if (error) throw new Error('orders_unavailable');
         const orderCards = (data || []).map(orderCard);
         cards.push(...orderCards);
+        grounding.order = orderCards.length ? 'available' : 'empty';
         context.push(orderCards.length
           ? `<DATA type="customer_orders">${JSON.stringify(orderCards.map(({ id: _id, image: _image, href: _href, ...safe }) => safe))}</DATA>`
           : 'No orders were found for the authenticated customer.');
@@ -215,6 +219,7 @@ async function buildContext(intents, message, user) {
   }
 
   if (intents.includes('product')) {
+    grounding.product = 'unavailable';
     jobs.push((async () => {
       const { data, error } = await supabase.from('products')
         .select('id,name,description,category,materials,price,image,stock')
@@ -222,6 +227,7 @@ async function buildContext(intents, message, user) {
       if (error) throw new Error('products_unavailable');
       const productCards = rankProducts(data, message).map(productCard);
       cards.push(...productCards);
+      grounding.product = productCards.length ? 'available' : 'empty';
       context.push(productCards.length
         ? `<DATA type="catalog_products">${JSON.stringify(productCards.map(({ image: _image, href: _href, ...safe }) => safe))}</DATA>`
         : 'No matching active products were found.');
@@ -231,6 +237,7 @@ async function buildContext(intents, message, user) {
   }
 
   if (intents.includes('shop')) {
+    grounding.shop = 'unavailable';
     jobs.push((async () => {
       const { data, error } = await supabase.from('shops').select('id,name,description,location').limit(10);
       if (error) throw new Error('shops_unavailable');
@@ -240,6 +247,7 @@ async function buildContext(intents, message, user) {
         return score(b) - score(a);
       }).slice(0, 5).map(shopCard);
       cards.push(...ranked);
+      grounding.shop = ranked.length ? 'available' : 'empty';
       context.push(ranked.length
         ? `<DATA type="artisan_shops">${JSON.stringify(ranked.map(({ href: _href, ...safe }) => safe))}</DATA>`
         : 'No artisan shops were found.');
@@ -258,11 +266,38 @@ async function buildContext(intents, message, user) {
   const uniqueSuggestions = [...new Set(suggestions)].slice(0, 3);
   return {
     context: context.join('\n\n'), cards, actions: uniqueActions, suggestions: uniqueSuggestions,
-    requiresAuth, groundingStatus: errors.length ? (context.length ? 'partial' : 'unavailable') : 'grounded', errors,
+    requiresAuth, groundingStatus: errors.length ? (context.length ? 'partial' : 'unavailable') : 'grounded', errors, grounding,
   };
 }
 
-export function fallbackReply(primary, requiresAuth, message, cards = []) {
+const STATIC_FALLBACKS = Object.freeze({
+  shipping: {
+    en: 'Verified LikhArtisan info: delivery is handled through local pickup or courier delivery. Pickup has no delivery fee, while courier fees and timing depend on the destination and artisan order. Check My Purchases or message the seller for order-specific delivery details.',
+    fil: 'Verified LikhArtisan info: puwedeng local pickup o courier delivery. Walang delivery fee ang pickup; ang courier fee at timing ay depende sa destination at artisan order. Tingnan ang My Purchases o i-message ang seller para sa detalye ng order.',
+  },
+  checkout: {
+    en: 'Verified LikhArtisan info: checkout supports GCash, Maya, QR Ph, and cards through PayMongo. Payment has to be verified by LikhArtisan before the order is treated as paid. Start or resume checkout from your cart or purchase record.',
+    fil: 'Verified LikhArtisan info: tumatanggap ang checkout ng GCash, Maya, QR Ph, at cards through PayMongo. Kailangang ma-verify muna ang payment bago ituring na paid ang order. Simulan o ituloy ang checkout mula sa cart o purchase record.',
+  },
+  returns: {
+    en: 'Verified LikhArtisan info: returns, refunds, exchanges, and cancellations are reviewed per order. I cannot change an order, but you can open the purchase and message the seller through LikhArtisan Messages.',
+    fil: 'Verified LikhArtisan info: nire-review ang returns, refunds, exchanges, at cancellations per order. Hindi ako makakapagbago ng order, pero puwede mong buksan ang purchase at i-message ang seller sa LikhArtisan Messages.',
+  },
+  freeform: {
+    en: 'Verified LikhArtisan info: Freeform lets you customize a 3D pottery design, including shape, curvature, finish, color, patterns, effects, and supported attachments. I cannot edit or submit it for you, but you can open Freeform and send the saved snapshot to an artisan for a quote.',
+    fil: 'Verified LikhArtisan info: sa Freeform, puwede kang mag-customize ng 3D pottery design gaya ng shape, curvature, finish, color, patterns, effects, at supported attachments. Hindi ko ito mae-edit o maisu-submit para sa iyo, pero puwede mong buksan ang Freeform at ipadala ang saved snapshot sa artisan for quote.',
+  },
+  account: {
+    en: 'Verified LikhArtisan info: use the dashboard to manage your profile and review purchases. Sign-in, password recovery, and account creation each use the dedicated account pages.',
+    fil: 'Verified LikhArtisan info: gamitin ang dashboard para sa profile at purchases. May hiwalay na pages para sa sign-in, password recovery, at account creation.',
+  },
+  general: {
+    en: 'Verified LikhArtisan info: I can help with pottery products, artisan shops, orders, checkout, delivery, returns, accounts, and the Freeform Designer. Choose a suggested action or ask a more specific question.',
+    fil: 'Verified LikhArtisan info: makakatulong ako tungkol sa pottery products, artisan shops, orders, checkout, delivery, returns, accounts, at Freeform Designer. Pumili ng action o magtanong nang mas specific.',
+  },
+});
+
+export function fallbackReply(primary, requiresAuth, message, cards = [], grounding = {}) {
   const filipino = /\b(ako|aking|ko|po|ba|paano|nasaan|magkano|gusto|hanap|bayad|order ko)\b/i.test(message);
   if (requiresAuth) return filipino
     ? 'Mag-sign in muna para ligtas kong makita ang iyong order details. Hindi ako gumagamit ng ID na ipinapadala lang ng browser.'
@@ -270,6 +305,9 @@ export function fallbackReply(primary, requiresAuth, message, cards = []) {
 
   const matchingCards = cards.filter(card => card.type === primary);
   if (primary === 'order') {
+    if (grounding.order === 'unavailable') return filipino
+      ? 'Verified fallback: hindi ko ma-check ang live order data ngayon, kaya hindi ako mag-a-assume ng status. Buksan ang My Purchases para sa pinakabagong order details o subukan ulit mamaya.'
+      : 'Verified fallback: I could not check live order data right now, so I will not guess your status. Open My Purchases for the latest order details or try again shortly.';
     const latest = matchingCards[0];
     if (latest) {
       const status = ORDER_STATUS_LABELS[latest.status] || ORDER_STATUS_LABELS.pending;
@@ -282,15 +320,57 @@ export function fallbackReply(primary, requiresAuth, message, cards = []) {
       : 'I could not find a verified order for this account. Check My Purchases for the latest details.';
   }
 
+  if (primary === 'product' && grounding.product === 'unavailable') return filipino
+    ? 'Verified fallback: hindi ko ma-check ang live catalog ngayon, kaya hindi ako mag-a-assume ng availability o presyo. I-browse ang gallery o subukan ulit mamaya.'
+    : 'Verified fallback: I could not check the live catalog right now, so I will not guess availability or prices. Browse the gallery or try again shortly.';
+
+  if (primary === 'shop' && grounding.shop === 'unavailable') return filipino
+    ? 'Verified fallback: hindi ko ma-check ang live shop list ngayon. Maaari mong buksan ang Shops page para mag-explore ng artisans o subukan ulit mamaya.'
+    : 'Verified fallback: I could not check the live shop list right now. Open the Shops page to explore artisans or try again shortly.';
+
   const replies = {
     product: matchingCards.length
-      ? `I found ${matchingCards.length} verified matching product${matchingCards.length === 1 ? '' : 's'}. Review the product cards for the latest details.`
-      : 'I could not find a verified matching product. Try broadening your search or browse all pottery.',
+      ? (filipino
+        ? `May nahanap akong ${matchingCards.length} verified matching product${matchingCards.length === 1 ? '' : 's'}. Tingnan ang product cards para sa latest details.`
+        : `I found ${matchingCards.length} verified matching product${matchingCards.length === 1 ? '' : 's'}. Review the product cards for the latest details.`)
+      : (filipino
+        ? 'Wala akong nakitang verified matching product. Subukang palawakin ang search o i-browse ang lahat ng pottery.'
+        : 'I could not find a verified matching product. Try broadening your search or browse all pottery.'),
     shop: matchingCards.length
-      ? `I found ${matchingCards.length} verified artisan shop${matchingCards.length === 1 ? '' : 's'}. Review the shop cards for the latest details.`
-      : 'I could not find a verified artisan shop for that request. Browse all shops to explore more makers.',
+      ? (filipino
+        ? `May nahanap akong ${matchingCards.length} verified artisan shop${matchingCards.length === 1 ? '' : 's'}. Tingnan ang shop cards para sa latest details.`
+        : `I found ${matchingCards.length} verified artisan shop${matchingCards.length === 1 ? '' : 's'}. Review the shop cards for the latest details.`)
+      : (filipino
+        ? 'Wala akong nakitang verified artisan shop para sa request na iyon. I-browse ang lahat ng shops para makakita pa ng makers.'
+        : 'I could not find a verified artisan shop for that request. Browse all shops to explore more makers.'),
   };
-  return replies[primary] || 'LikhAI is temporarily unable to write a full reply. Please try again shortly.';
+  if (replies[primary]) return replies[primary];
+
+  const staticReply = STATIC_FALLBACKS[primary] || STATIC_FALLBACKS.general;
+  return filipino ? staticReply.fil : staticReply.en;
+}
+
+function logLikhAIResponse({
+  responseId,
+  intent,
+  generationStatus,
+  providerErrorCode,
+  model,
+  groundingStatus,
+  attemptCount,
+  latencyMs,
+}) {
+  console.info(JSON.stringify({
+    event: 'likhai_response',
+    responseId,
+    intent,
+    generationStatus,
+    providerErrorCode,
+    model,
+    groundingStatus,
+    attemptCount,
+    latencyMs,
+  }));
 }
 
 async function recordMetric(metric) {
@@ -315,22 +395,41 @@ export async function handleChat(req, res) {
     let generated;
     let generationStatus = 'generated';
     let errorCode = grounded.errors[0] || null;
+    let providerErrorCode = null;
     try {
       generated = await chatWithGroq(messages, grounded.context);
     } catch (error) {
       errorCode = error.code || 'provider_error';
+      providerErrorCode = errorCode;
       generationStatus = 'fallback';
-      generated = { reply: fallbackReply(primary, grounded.requiresAuth, sanitized, grounded.cards), model: GROQ_MODEL, latencyMs: Date.now() - startedAt, usage: { inputTokens: 0, outputTokens: 0 } };
+      generated = {
+        reply: fallbackReply(primary, grounded.requiresAuth, sanitized, grounded.cards, grounded.grounding),
+        model: error.model || GROQ_MODEL,
+        latencyMs: Date.now() - startedAt,
+        attemptCount: error.attemptCount || 0,
+        usage: { inputTokens: 0, outputTokens: 0 },
+      };
     }
 
+    const latencyMs = Date.now() - startedAt;
     metric = {
       response_id: responseId, intent: primary, authenticated: Boolean(user), model: generated.model,
-      latency_ms: Date.now() - startedAt, provider_latency_ms: generated.latencyMs,
+      latency_ms: latencyMs, provider_latency_ms: generated.latencyMs,
       input_tokens: generated.usage.inputTokens, output_tokens: generated.usage.outputTokens,
       grounding_status: grounded.groundingStatus, card_types: [...new Set(grounded.cards.map(card => card.type))],
       action_ids: grounded.actions.map(action => action.id), error_code: errorCode,
     };
     await recordMetric(metric);
+    logLikhAIResponse({
+      responseId,
+      intent: primary,
+      generationStatus,
+      providerErrorCode,
+      model: generated.model,
+      groundingStatus: grounded.groundingStatus,
+      attemptCount: generated.attemptCount || 0,
+      latencyMs,
+    });
 
     const payload = {
       responseId, reply: generated.reply, intent: primary, groundingStatus: grounded.groundingStatus,

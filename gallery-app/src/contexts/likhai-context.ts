@@ -4,7 +4,9 @@ import type { LikhAIMessage } from '../types/likhai';
 export type LikhAIContextValue = {
   messages: LikhAIMessage[];
   loading: boolean;
+  loadingPhase: 'idle' | 'waking' | 'responding';
   sendMessage: (text: string) => Promise<void>;
+  retryMessage: (messageId: string) => Promise<void>;
   rateMessage: (messageId: string, rating: 'positive' | 'negative') => Promise<void>;
   clearConversation: () => void;
 };

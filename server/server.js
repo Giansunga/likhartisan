@@ -9,6 +9,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import chatbotRoutes from './routes/chatbot.js';
 import { initChatbotController } from './controllers/chatbotController.js';
+import { getLikhAIProviderHealth, validateLikhAIConfiguration } from './services/groqService.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation } from './services/lalamoveService.js';
@@ -130,8 +131,16 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/health/likhai', (req, res) => {
+  res.status(200).json({
+    ...getLikhAIProviderHealth(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Initialize chatbot controller with Supabase
 initChatbotController(supabase);
+validateLikhAIConfiguration();
 
 // Chatbot routes
 app.use('/api/chatbot', chatbotLimiter, chatbotRoutes);

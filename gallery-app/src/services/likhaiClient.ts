@@ -8,20 +8,30 @@ export class LikhAIRequestError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function responseJson(response: Response) {
   try { return await response.json(); } catch { return {}; }
 }
 
 export async function requestLikhAI(message: string, history: LikhAIMessage[], accessToken?: string): Promise<LikhAIResponse> {
   let response: Response;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     response = await fetch(`${API_BASE}/api/chatbot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ message, history: history.slice(-20).map(item => ({ role: item.role, content: item.content })) }),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new LikhAIRequestError('LikhAI could not finish that request. Your message is saved; please retry in a moment.', 'connection');
+    }
     throw new LikhAIRequestError('I could not connect to LikhAI. Check your connection and try again.', 'connection');
+  } finally {
+    window.clearTimeout(timeout);
   }
 
   const data = await responseJson(response);
