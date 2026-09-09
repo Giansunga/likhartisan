@@ -28,6 +28,7 @@ export interface ProductVariation {
   dimensions: string;
   height: string;
   openingDiameter: string;
+  weightKg?: number;
   price?: number;
   stock: number;
   sortOrder: number;

@@ -206,14 +206,14 @@ export default function ProductDetailPage() {
 
         const { data: varData, error: varErr } = await supabase
           .from('product_variations')
-          .select('id, product_id, dimensions, height, opening_diameter, price, stock, sort_order')
+          .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order')
           .eq('product_id', id)
           .order('sort_order');
         if (varErr) console.error('Variations fetch error:', varErr);
         if (varData) {
           const mappedVars = varData.map((v: any) => ({
             id: v.id, productId: v.product_id,
-            dimensions: v.dimensions, height: v.height, openingDiameter: v.opening_diameter,
+            dimensions: v.dimensions, height: v.height, openingDiameter: v.opening_diameter, weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
             price: v.price, stock: v.stock, sortOrder: v.sort_order,
           }));
           setVariations(mappedVars);
@@ -431,6 +431,9 @@ export default function ProductDetailPage() {
                 )}
                 {selectedVariation && selectedVariation.dimensions && selectedVariation.dimensions !== 'N/A' && (
                   <div className="attr-item"><span className="attr-label">Dimensions:</span> <span className="attr-val">{selectedVariation.dimensions}</span></div>
+                )}
+                {selectedVariation && selectedVariation.weightKg != null && (
+                  <div className="attr-item"><span className="attr-label">Weight:</span> <span className="attr-val">{selectedVariation.weightKg} kg</span></div>
                 )}
                 <div className="attr-item"><span className="attr-label">Material:</span> <span className="attr-val">{product.materials || 'Terracotta Clay'}</span></div>
                 <div className="attr-item"><span className="attr-label">Technique:</span> <span className="attr-val">{product.technique || 'Handcrafted & Kiln-Fired'}</span></div>

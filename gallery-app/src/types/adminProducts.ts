@@ -18,6 +18,7 @@ export interface ProductVariationDraft {
   dimensions: string;
   height: string;
   openingDiameter: string;
+  weightKg: string;
   price: string;
   stock: string;
 }

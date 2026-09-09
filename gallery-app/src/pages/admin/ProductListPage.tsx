@@ -128,7 +128,7 @@ export default function ProductListPage() {
     if (productError) throw new Error(productError.message || 'Could not save product details.');
     const keptIds: string[] = [];
     for (const [index, variation] of data.variations.entries()) {
-      const variationData = { dimensions: variation.dimensions.trim() || 'N/A', height: variation.height.trim() || 'N/A', opening_diameter: variation.openingDiameter.trim() || 'N/A', price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0 };
+      const variationData = { dimensions: variation.dimensions.trim() || 'N/A', height: variation.height.trim() || 'N/A', opening_diameter: variation.openingDiameter.trim() || 'N/A', weight_kg: variation.weightKg === '' ? null : Number(variation.weightKg), price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0 };
       if (variation.id) {
         const { error: variationError } = await supabase.from('product_variations').update(variationData).eq('id', variation.id);
         if (variationError) throw new Error(variationError.message || 'Could not save a product variation.');

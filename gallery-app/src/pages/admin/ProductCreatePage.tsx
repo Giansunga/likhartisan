@@ -17,6 +17,7 @@ interface VariationDraft {
   dimensions: string;
   height: string;
   openingDiameter: string;
+  weightKg: string;
   price: string;
   stock: string;
 }
@@ -109,7 +110,7 @@ export default function ProductCreatePage() {
   };
 
   function addVariation() {
-    setVariations(prev => [...prev, { dimensions: '', height: '', openingDiameter: '', price: '', stock: '' }]);
+    setVariations(prev => [...prev, { dimensions: '', height: '', openingDiameter: '', weightKg: '', price: '', stock: '' }]);
   }
 
   function updateVariation(index: number, field: keyof VariationDraft, value: string) {
@@ -135,6 +136,9 @@ export default function ProductCreatePage() {
     setSubmitError('');
 
     try {
+      if (variations.some((variation) => variation.weightKg !== '' && (!Number.isFinite(Number(variation.weightKg)) || Number(variation.weightKg) < 0))) {
+        throw new Error('Variation weight must be a non-negative number.');
+      }
       const imageUrl = imageFile ? await uploadFile(imageFile) : '/placeholder.svg';
       const model3dUrl = glbFile ? await uploadFile(glbFile) : null;
       const totalStock = variations.reduce((s, v) => s + (Number(v.stock) || 0), 0);
@@ -165,12 +169,13 @@ export default function ProductCreatePage() {
 
       if (productData && variations.length > 0) {
         const variationRows = variations
-          .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim())
+          .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim() || v.weightKg.trim())
           .map((v, i) => ({
             product_id: productData.id,
             dimensions: v.dimensions.trim() || 'N/A',
             height: v.height.trim() || 'N/A',
             opening_diameter: v.openingDiameter.trim() || 'N/A',
+            weight_kg: v.weightKg === '' ? null : Number(v.weightKg),
             price: v.price ? Number(v.price) : null,
             stock: Number(v.stock) || 0,
             sort_order: i,
@@ -295,7 +300,12 @@ export default function ProductCreatePage() {
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                      <div>
+                        <label style={varLabelStyle}>Weight (kg)</label>
+                        <input type="number" min="0" step="0.001" value={v.weightKg} onChange={e => updateVariation(i, 'weightKg', e.target.value)} placeholder="e.g. 1.5"
+                          style={varInputStyle} {...varInputFocusProps} />
+                      </div>
                       <div>
                         <label style={varLabelStyle}>Price</label>
                         <input type="number" value={v.price} onChange={e => updateVariation(i, 'price', e.target.value)} placeholder="0.00"
