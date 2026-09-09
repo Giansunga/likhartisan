@@ -48,7 +48,7 @@ export default function HomeShopRail({ shops, loading, error }: HomeShopRailProp
     <section className="home-section home-shops" aria-labelledby="home-shops-title">
       <div className="home-container">
         <div className="home-section-heading home-section-heading--split">
-          <div><span>Makers directory · Volume 01</span><h2 id="home-shops-title">Shops keeping the <em>craft in motion</em></h2></div>
+          <div><h2 id="home-shops-title">Shops keeping the <em>craft in motion</em></h2></div>
           <div className="home-section-heading__actions">
             <div className="home-rail-controls" aria-label="Shop carousel controls">
               <button type="button" aria-label="Show previous shops" onClick={() => move(-1)} disabled={loading || edges.start}><ArrowLeft aria-hidden="true" /></button>

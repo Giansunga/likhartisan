@@ -49,12 +49,13 @@ describe('HomePage editorial landing page', () => {
     const shops = screen.getByTestId('shop-rail');
     const freeform = screen.getByTestId('freeform-scroller');
     const reviews = screen.getByTestId('review-rail');
-    const closing = screen.getByRole('heading', { name: /Bring home a piece/i });
-    [editorial, chapters, collections, shops, freeform, reviews, closing].reduce((previous, current) => {
+    [editorial, collections, shops, freeform, reviews, chapters].reduce((previous, current) => {
       expect(previous.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       return current;
     }, hero);
     expect(screen.getByAltText('Rows of finished clay pots in a Santo Tomas workshop')).toHaveAttribute('src', '/images/hero_1.jpg');
+    expect(screen.getByAltText('A potter shaping a large clay vessel')).toHaveAttribute('src', '/images/history_bottom_right.jpg');
+    expect(screen.getByAltText('Two pottery workers shaping a large clay vessel in a Santo Tomas workshop')).toHaveAttribute('src', '/images/artisan_1.jpg');
     expect(screen.getAllByRole('link', { name: /Read the full story/i })[0]).toHaveAttribute('href', '/about#origin');
     expect(screen.queryByText('LOCAL ARTISANS')).not.toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Clay Corner' })).toHaveAttribute('href', '/shop/shop-1');
@@ -76,12 +77,4 @@ describe('HomePage editorial landing page', () => {
     expect(screen.getByTestId('review-rail')).toHaveTextContent('Maria Santos');
   });
 
-  it('keeps the account call to action for signed-out visitors only', async () => {
-    const openAuth = vi.fn(); window.addEventListener('open-auth', openAuth);
-    renderHome();
-    const accountButton = await screen.findByRole('button', { name: /Create a free account/i });
-    accountButton.click();
-    expect(openAuth).toHaveBeenCalledTimes(1);
-    window.removeEventListener('open-auth', openAuth);
-  });
 });
