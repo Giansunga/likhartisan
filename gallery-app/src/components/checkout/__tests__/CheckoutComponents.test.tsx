@@ -61,6 +61,26 @@ describe('checkout components', () => {
     expect(onRetryQuote).toHaveBeenCalledOnce();
   });
 
+  it('shows a calculating state while a courier quote is loading', () => {
+    render(
+      <DeliveryCard
+        value="courier"
+        shopAddress="Santo Tomas, Pampanga"
+        vehicleLabel="Motorcycle"
+        itemCount={1}
+        totalKg={2}
+        quoteFee={null}
+        quoteDistanceKm={null}
+        quoteLoading
+        quoteError={null}
+        onChange={vi.fn()}
+        onRetryQuote={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Calculating delivery fee…');
+  });
+
   it('explains why payment is unavailable and totals only the reviewed items', () => {
     render(
       <OrderReview

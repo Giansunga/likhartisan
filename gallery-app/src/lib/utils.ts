@@ -60,6 +60,12 @@ export function mapSupabaseProduct(row: any) {
     ratingCount: row.rating_count || 0,
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || '',
+    productWeightG: row.product_weight_g == null ? undefined : Number(row.product_weight_g),
+    packagingWeightG: row.packaging_weight_g == null ? undefined : Number(row.packaging_weight_g),
+    shippingWeightG: row.shipping_weight_g == null ? undefined : Number(row.shipping_weight_g),
+    shippingLengthIn: row.shipping_length_in == null ? undefined : Number(row.shipping_length_in),
+    shippingWidthIn: row.shipping_width_in == null ? undefined : Number(row.shipping_width_in),
+    shippingHeightIn: row.shipping_height_in == null ? undefined : Number(row.shipping_height_in),
   };
 }
 

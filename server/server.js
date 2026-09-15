@@ -13,7 +13,8 @@ import { getLikhAIProviderHealth, validateLikhAIConfiguration } from './services
 import { getSupabaseAuthConfigurationState, verifySupabaseAuthConfiguration } from './services/supabaseAuthConfig.js';
 import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
-import { getQuotation } from './services/lalamoveService.js';
+import { getQuotation, isValidCoordinates, mapLalamoveError } from './services/lalamoveService.js';
+import { calculateShipment, createShipmentFingerprint, getShipmentConfig, ShipmentDataError } from './services/shipmentService.js';
 import { createPurchasesRouter } from './routes/purchases.js';
 import {
   createCheckoutSession,
@@ -67,6 +68,29 @@ if (FRONTEND_URL.includes('localhost') || FRONTEND_URL.includes('127.0.0.1')) {
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
 });
+app.locals.supabase = supabase;
+
+const PRODUCT_SELECT_WITH_SHIPPING = 'id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit, product_weight_g, packaging_weight_g, shipping_weight_g, shipping_length_in, shipping_width_in, shipping_height_in';
+const PRODUCT_SELECT_LEGACY = 'id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit';
+const VARIATION_SELECT_WITH_SHIPPING = 'id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit, weight_kg, product_weight_g, packaging_weight_g, shipping_weight_g, shipping_length_in, shipping_width_in, shipping_height_in';
+const VARIATION_SELECT_LEGACY = 'id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit, weight_kg';
+const schemaColumnError = (error) => Boolean(
+  error?.code === 'PGRST204' ||
+    error?.code === '42703' ||
+    /column .* (does not exist|not found)|could not find .* column|schema cache/i.test(error?.message || ''),
+);
+async function fetchProductForCheckout(id) {
+  const full = await supabase.from('products').select(PRODUCT_SELECT_WITH_SHIPPING).eq('id', id).single();
+  return full.error && schemaColumnError(full.error)
+    ? supabase.from('products').select(PRODUCT_SELECT_LEGACY).eq('id', id).single()
+    : full;
+}
+async function fetchVariationForCheckout(id) {
+  const full = await supabase.from('product_variations').select(VARIATION_SELECT_WITH_SHIPPING).eq('id', id).single();
+  return full.error && schemaColumnError(full.error)
+    ? supabase.from('product_variations').select(VARIATION_SELECT_LEGACY).eq('id', id).single()
+    : full;
+}
 void verifySupabaseAuthConfiguration({
   backendUrl: process.env.SUPABASE_URL,
   frontendUrl: process.env.LIKHAI_FRONTEND_SUPABASE_URL,
@@ -192,7 +216,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
     const authUserId = await verifyAuth(req, res);
     if (!authUserId) return;
-    const { items, userName, userPhone, userAddress, userEmail, deliveryOption, lalamoveQuoteId, pickupCoords, dropoffCoords, serviceType, shopAddress } = req.body;
+    const { items, userName, userPhone, userAddress, userEmail, deliveryOption, shipmentFingerprint: clientShipmentFingerprint, pickupCoords, dropoffCoords, shopAddress } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
@@ -214,7 +238,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     // Server-side price verification: fetch real prices from Supabase
     const validatedItems = items.map(item => {
       const qty = Number(item.qty) || 0;
-      if (!item.productId || qty <= 0) {
+      if (!item.productId || !Number.isInteger(qty) || qty <= 0) {
         return { valid: false, error: 'Invalid cart item' };
       }
       return { valid: true, item, qty };
@@ -228,9 +252,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     // Fetch all products in parallel
     const productIds = [...new Set(validatedItems.map(v => v.item.productId))];
     const productResults = await Promise.all(
-      productIds.map(id =>
-        supabase.from('products').select('id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit').eq('id', id).single()
-      )
+      productIds.map(fetchProductForCheckout)
     );
 
     const productMap = new Map();
@@ -244,12 +266,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     // Fetch all variations in parallel (for items that have variationId)
     const variationItems = validatedItems.filter(v => v.item.variationId);
     const variationResults = await Promise.all(
-      variationItems.map(v =>
-        supabase.from('product_variations')
-          .select('id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit')
-          .eq('id', v.item.variationId)
-          .single()
-      )
+      variationItems.map(v => fetchVariationForCheckout(v.item.variationId))
     );
 
     const variationMap = new Map();
@@ -288,6 +305,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       let unitPrice = Number(product.price) || 0;
       let variationLabel = item.variation || '';
       let measurementSource = product;
+      let shippingSource = product;
 
       if (item.variationId) {
         const variation = variationMap.get(item.variationId);
@@ -298,6 +316,9 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
           unitPrice = Number(variation.price) || unitPrice;
         }
         measurementSource = variation;
+        // A selected variation is a separate sellable package. Require its
+        // own shipping facts instead of borrowing the base product silently.
+        shippingSource = variation;
         variationLabel = [
           variation.dimensions ? normalizeCatalogMeasurement(variation.dimensions, variation.measurement_unit === 'in' ? 'in' : 'cm') : '',
           variation.height ? `H: ${normalizeCatalogMeasurement(variation.height, variation.measurement_unit === 'in' ? 'in' : 'cm')}` : '',
@@ -324,48 +345,94 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
          height,
          opening_diameter: openingDiameter,
          measurement_unit: measurementUnit,
-         price: unitPrice,
-        qty,
-      });
+          price: unitPrice,
+         qty,
+         weight_kg: shippingSource.weight_kg,
+         shipping_weight_g: shippingSource.shipping_weight_g,
+         product_weight_g: shippingSource.product_weight_g,
+         packaging_weight_g: shippingSource.packaging_weight_g,
+         shipping_length_in: shippingSource.shipping_length_in,
+         shipping_width_in: shippingSource.shipping_width_in,
+         shipping_height_in: shippingSource.shipping_height_in,
+       });
     }
 
     // ── Server-authorized shipping fee ───────────────────────────────────────
-    // The client may NOT dictate the fee it is charged. Only the cart subtotal
-    // was previously server-verified; shippingFee arrived verbatim from the
-    // browser, so a buyer could send 0 on a courier order and underpay.
-    //   pickup    → always free (server-enforced, ignores any client value)
-    //   courier   → re-quote server-side via Lalamove (sandbox) using the same
-    //               pickup/dropoff coords + serviceType the client used, so the
-    //               charged amount matches what the buyer saw on the checkout
-    //               screen. If we can't compute a quote, fail loudly — never
-    //               silently charge ₱0.
+    // The browser supplies only cart identities. Weight, package dimensions,
+    // vehicle selection, and the final Lalamove fee are recomputed here.
     let verifiedShippingFee = 0;
+    let verifiedShipment = null;
+    let verifiedShipmentFingerprint = null;
+    let verifiedQuote = null;
     if (deliveryOption === 'courier') {
-      const validCoords =
-        pickupCoords && typeof pickupCoords.lat === 'number' && typeof pickupCoords.lng === 'number' &&
-        dropoffCoords && typeof dropoffCoords.lat === 'number' && typeof dropoffCoords.lng === 'number';
-      if (!validCoords || !serviceType) {
-        return res.status(400).json({ error: 'Courier orders require geocoded pickup/dropoff coordinates and a vehicle type' });
+      if (new Set(verifiedItems.map(item => item.shopId).filter(Boolean)).size > 1) {
+        return res.status(422).json({ error: 'Please check out items from one artisan shop at a time for courier delivery.', code: 'ERR_MULTIPLE_SHOPS' });
+      }
+      const validCoords = isValidCoordinates(pickupCoords) && isValidCoordinates(dropoffCoords);
+      if (!validCoords) {
+        return res.status(400).json({ error: 'Courier orders require geocoded pickup/dropoff coordinates' });
       }
       try {
-        const quote = await getQuotation({
+        verifiedShipment = calculateShipment(verifiedItems, getShipmentConfig());
+        verifiedQuote = await getQuotation({
           pickupCoords,
           dropoffCoords,
           pickupAddress: shopAddress || '',     // seller (shop) address label
           dropoffAddress: userAddress || '',      // buyer address label
-          serviceType,
+          serviceType: verifiedShipment.recommendedVehicle.serviceType,
         });
-        const fee = parseFloat(quote?.priceBreakdown?.total);
+        const fee = parseFloat(verifiedQuote?.priceBreakdown?.total);
         if (!fee || fee <= 0) {
           return res.status(400).json({ error: 'Unable to compute shipping fee. Please try again.' });
         }
         verifiedShippingFee = fee;
+        verifiedShipmentFingerprint = createShipmentFingerprint({
+          items: verifiedItems,
+          shipment: verifiedShipment,
+          pickupCoords,
+          dropoffCoords,
+          serviceType: verifiedQuote.serviceType,
+        });
+        if (clientShipmentFingerprint && clientShipmentFingerprint !== verifiedShipmentFingerprint) {
+          return res.status(409).json({ error: 'Your cart or delivery route changed. Please refresh the courier fee and try again.', code: 'ERR_STALE_SHIPMENT' });
+        }
       } catch (err) {
-        console.error('[create-checkout] Lalamove re-quote failed:', err.message);
-        return res.status(400).json({ error: 'Shipping quote unavailable right now. Please try again.' });
+        console.error('[create-checkout] shipment or Lalamove re-quote failed:', {
+          code: err?.code || null,
+          status: err?.status || null,
+          requestId: err?.requestId || null,
+          message: err?.message || null,
+        });
+        const status = Number.isInteger(err?.status) ? err.status : err instanceof ShipmentDataError ? 422 : 400;
+        return res.status(status).json({
+          error: mapLalamoveError(err),
+          code: err?.code || 'LALAMOVE_QUOTE_FAILED',
+          requestId: err?.requestId || null,
+        });
       }
     }
     const serverTotal = verifiedSubtotal + verifiedShippingFee;
+    const shippingDistanceMeters = verifiedQuote?.distance?.value == null
+      ? null
+      : String(verifiedQuote.distance.unit || '').toLowerCase().startsWith('km')
+        ? Math.round(Number(verifiedQuote.distance.value) * 1000)
+        : Math.round(Number(verifiedQuote.distance.value));
+    const shippingQuoteSnapshot = verifiedQuote && verifiedShipment ? {
+      provider: 'lalamove',
+      quotationId: verifiedQuote.quotationId,
+      serviceType: verifiedQuote.serviceType,
+      priceBreakdown: verifiedQuote.priceBreakdown,
+      currency: verifiedQuote.currency || 'PHP',
+      distance: verifiedQuote.distance || null,
+      distanceMeters: Number.isFinite(shippingDistanceMeters) ? shippingDistanceMeters : null,
+      expiresAt: verifiedQuote.expiresAt || null,
+      totalWeightG: verifiedShipment.totalWeightG,
+      totalVolumeCm3: verifiedShipment.totalVolumeCm3,
+      itemCount: verifiedShipment.itemCount,
+      pickupCoords,
+      dropoffCoords,
+      fingerprint: verifiedShipmentFingerprint,
+    } : null;
 
     const lineItems = verifiedItems.map(item => ({
       name: item.productName,
@@ -402,7 +469,8 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
               userAddress: userAddress || '',
               userEmail: userEmail || '',
               deliveryOption: deliveryOption || '',
-              lalamoveQuoteId: (lalamoveQuoteId || '').toString(),
+              lalamoveQuoteId: (verifiedQuote?.quotationId || '').toString(),
+              shipmentFingerprint: verifiedShipmentFingerprint || '',
               items: JSON.stringify(verifiedItems),
               verifiedSubtotal: verifiedSubtotal.toString(),
               verifiedShippingFee: verifiedShippingFee.toString(),
@@ -424,7 +492,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       variation_id: item.variationId || null,
       variation: item.variation || '',
     }));
-    const { error: orderError } = await supabase.from('orders').insert({
+    const orderData = {
       id: orderId,
       user_id: authUserId,
       user_name: userName.trim(),
@@ -441,8 +509,22 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
       payment_status: 'pending',
       payment_reference: referenceNumber,
       checkout_session_id: sessionId,
-      lalamove_quote_id: lalamoveQuoteId || null,
-    });
+      lalamove_quote_id: verifiedQuote?.quotationId || null,
+      shipping_quote_snapshot: shippingQuoteSnapshot,
+      shipment_fingerprint: verifiedShipmentFingerprint,
+      shipping_service_type: verifiedQuote?.serviceType || null,
+      shipping_distance_m: Number.isFinite(shippingDistanceMeters) ? shippingDistanceMeters : null,
+      shipping_total_weight_g: verifiedShipment?.totalWeightG || null,
+      shipping_total_volume_cm3: verifiedShipment?.totalVolumeCm3 || null,
+    };
+    let { error: orderError } = await supabase.from('orders').insert(orderData);
+    // Keep checkout compatible during the expand window before the audit
+    // columns are applied. Courier pricing itself remains fully revalidated.
+    if (orderError && schemaColumnError(orderError)) {
+      for (const field of ['shipping_quote_snapshot', 'shipment_fingerprint', 'shipping_service_type', 'shipping_distance_m', 'shipping_total_weight_g', 'shipping_total_volume_cm3']) delete orderData[field];
+      ({ error: orderError } = await supabase.from('orders').insert(orderData));
+      if (!orderError) console.warn('[create-checkout] Order audit columns are not deployed yet; saved without the courier snapshot.');
+    }
     if (orderError) {
       console.error('[create-checkout] Pending order insert failed:', orderError.message);
       return res.status(500).json({ error: 'Unable to save the order before payment. Please try again.' });

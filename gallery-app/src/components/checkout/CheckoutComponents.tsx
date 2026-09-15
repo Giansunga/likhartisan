@@ -227,7 +227,7 @@ export function DeliveryCard({
             <span className="checkout-icon-tile"><Truck size={20} aria-hidden="true" /></span>
             <div>
               <strong>{vehicleLabel}</strong>
-              <p>{itemCount} {itemCount === 1 ? 'item' : 'items'}{totalKg !== null ? ` · approximately ${totalKg.toFixed(1)} kg` : ''}{quoteDistanceKm ? ` · ${quoteDistanceKm} km` : ''}</p>
+              <p>{itemCount} {itemCount === 1 ? 'item' : 'items'}{totalKg !== null ? ` · ${totalKg.toFixed(1)} kg` : ''}{quoteDistanceKm ? ` · ${quoteDistanceKm} km` : ''}</p>
             </div>
             {quoteLoading ? <LoaderCircle className="checkout-spin" size={19} aria-label="Calculating courier fee" /> : null}
           </div>
@@ -236,6 +236,10 @@ export function DeliveryCard({
               <CircleAlert size={17} aria-hidden="true" />
               <span>{quoteError}</span>
               <button type="button" onClick={onRetryQuote}>Retry</button>
+            </div>
+          ) : quoteLoading ? (
+            <div className="checkout-notice" role="status">
+              <LoaderCircle className="checkout-spin" size={16} aria-hidden="true" /> Calculating delivery fee…
             </div>
           ) : quoteFee !== null ? (
             <div className="checkout-notice checkout-notice--success">

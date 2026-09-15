@@ -36,7 +36,7 @@ vi.mock('../../components/freeform/AttachmentTab', () => ({
 }));
 
 vi.mock('../../components/freeform/ShopSelectModal', () => ({
-  default: () => null,
+  default: ({ open }: { open: boolean }) => open ? <div role="dialog" aria-label="Select a Shop" /> : null,
 }));
 
 vi.mock('../../components/freeform/SavedDesignsModal', () => ({
@@ -61,6 +61,16 @@ describe('FreeformPage send-to-shop flow', () => {
       removeEventListener: vi.fn(),
     });
     HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('opens the shop selector on a fresh Freeform entry', async () => {
+    render(
+      <MemoryRouter initialEntries={['/freeform']}>
+        <FreeformPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('dialog', { name: 'Select a Shop' })).toBeInTheDocument();
   });
 
   it('only shows Send to Shop on Review and hides it again when navigating backward', async () => {

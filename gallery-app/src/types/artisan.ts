@@ -18,6 +18,8 @@ export interface ArtisanShop {
   description?: string;
   about?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   last_seen_at?: string;
   created_at?: string;
 }

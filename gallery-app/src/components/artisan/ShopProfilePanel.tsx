@@ -19,6 +19,7 @@ import type { ArtisanShop } from '../../types/artisan';
 import { useArtisanPortal } from './artisanContextValue';
 import { getShopProfileCompletion, makeShopProfileDraft, SHOP_PROFILE_LIMITS, validateShopProfile, type ShopProfileDraft } from './shopProfile';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { geocodeAddress } from '../../lib/geocoder';
 
 type Feedback = { tone: 'success' | 'error'; text: string } | null;
 type MediaKind = 'profile' | 'cover';
@@ -129,7 +130,7 @@ export default function ShopProfilePanel() {
         profileFile ? uploadImage(profileFile, 'profile') : Promise.resolve(null),
         coverFile ? uploadImage(coverFile, 'cover') : Promise.resolve(null),
       ]);
-      const payload = {
+      const payload: Record<string, unknown> = {
         name: draft.name.trim(),
         description: draft.description.trim(),
         about: draft.about.trim(),
@@ -137,7 +138,20 @@ export default function ShopProfilePanel() {
         image: uploadedProfile ?? (draft.image.startsWith('blob:') ? saved.image : draft.image),
         banner: uploadedCover ?? (draft.banner.startsWith('blob:') ? saved.banner : draft.banner),
       };
-      const { data, error } = await supabase.from('shops').update(payload).eq('id', shop.id).select('*').single();
+      const coordinates = draft.location.trim() ? await geocodeAddress(draft.location.trim()) : null;
+      if (coordinates) {
+        payload.latitude = coordinates.lat;
+        payload.longitude = coordinates.lng;
+      } else {
+        payload.latitude = null;
+        payload.longitude = null;
+      }
+      let { data, error } = await supabase.from('shops').update(payload).eq('id', shop.id).select('*').single();
+      if (error && /column .* does not exist|schema cache/i.test(error.message || '')) {
+        delete payload.latitude;
+        delete payload.longitude;
+        ({ data, error } = await supabase.from('shops').update(payload).eq('id', shop.id).select('*').single());
+      }
       if (error) throw error;
       const updatedShop = data as ArtisanShop;
       const nextDraft = makeShopProfileDraft(updatedShop);

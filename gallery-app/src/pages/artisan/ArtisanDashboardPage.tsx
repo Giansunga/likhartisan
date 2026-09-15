@@ -21,6 +21,7 @@ import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { signOutWithActivity } from '../../lib/activityApi';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
+import { geocodeAddress } from '../../lib/geocoder';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -2387,10 +2388,14 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
       if (profileUrl) imageUrl = profileUrl;
       if (coverUrl) bannerUrl = coverUrl;
 
-      const { error } = await supabase
-        .from('shops')
-        .update({ name, description, about, image: imageUrl, banner: bannerUrl, location })
-        .eq('id', shopData.id);
+      const coordinates = location.trim() ? await geocodeAddress(location.trim()) : null;
+      const shopPayload: Record<string, unknown> = { name, description, about, image: imageUrl, banner: bannerUrl, location, latitude: coordinates?.lat ?? null, longitude: coordinates?.lng ?? null };
+      let { error } = await supabase.from('shops').update(shopPayload).eq('id', shopData.id);
+      if (error && /column .* does not exist|schema cache/i.test(error.message || '')) {
+        delete shopPayload.latitude;
+        delete shopPayload.longitude;
+        ({ error } = await supabase.from('shops').update(shopPayload).eq('id', shopData.id));
+      }
 
       if (error) throw error;
       setProfileFile(null);

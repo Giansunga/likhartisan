@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type { Product } from '../../types';
 import type { ProductEditorErrors, ProductVariationDraft } from '../../types/adminProducts';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
+import { kgToGrams, positiveInches } from '../../lib/shipping';
 
 const CATEGORIES = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
 
@@ -12,6 +13,11 @@ export interface ProductEditorSave {
   category: string;
   materials: string;
   technique: string;
+  productWeightKg: string;
+  packagingWeightKg: string;
+  packedLengthIn: string;
+  packedWidthIn: string;
+  packedHeightIn: string;
   variations: ProductVariationDraft[];
   imageFile: File | null;
   modelFile: File | null;
@@ -23,7 +29,7 @@ interface ProductEditorDialogProps {
   onSave: (product: Product, data: ProductEditorSave) => Promise<void>;
 }
 
-function emptyDraft(): ProductVariationDraft { return { dimensions: '', height: '', openingDiameter: '', weightKg: '', price: '', stock: '' }; }
+function emptyDraft(): ProductVariationDraft { return { dimensions: '', height: '', openingDiameter: '', weightKg: '', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '', stock: '' }; }
 function totalStock(variations: ProductVariationDraft[]) { return variations.reduce((sum, item) => sum + (Number(item.stock) || 0), 0); }
 
 function trapFocus(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
@@ -37,7 +43,7 @@ function trapFocus(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
 }
 
 export default function ProductEditorDialog({ product, onClose, onSave }: ProductEditorDialogProps) {
-  const [form, setForm] = useState({ name: '', category: '', materials: '', technique: '' });
+  const [form, setForm] = useState({ name: '', category: '', materials: '', technique: '', productWeightKg: '', packagingWeightKg: '', packedLengthIn: '', packedWidthIn: '', packedHeightIn: '' });
   const [variations, setVariations] = useState<ProductVariationDraft[]>([]);
   const [variationLoading, setVariationLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -53,12 +59,12 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
   useEffect(() => {
     if (!product) return;
     const request = ++sequence.current;
-    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '' });
+    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', productWeightKg: product.productWeightG == null ? '' : String(product.productWeightG / 1000), packagingWeightKg: product.packagingWeightG == null ? '' : String(product.packagingWeightG / 1000), packedLengthIn: product.shippingLengthIn == null ? '' : String(product.shippingLengthIn), packedWidthIn: product.shippingWidthIn == null ? '' : String(product.shippingWidthIn), packedHeightIn: product.shippingHeightIn == null ? '' : String(product.shippingHeightIn) });
     setVariations([]); setImageFile(null); setImagePreview(product.image || ''); setModelFile(null); setErrors({}); setDirty(false); setConfirmDiscard(false); setVariationLoading(true);
     void supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order').then(({ data, error }) => {
       if (request !== sequence.current) return;
       if (error) setErrors({ save: error.message || 'Could not load product variations.' });
-  else setVariations((data ?? []).map((item: any) => ({ id: item.id, dimensions: normalizeCatalogMeasurement(item.dimensions, item.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(item.height, item.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(item.opening_diameter, item.measurement_unit === 'in' ? 'in' : 'cm'), weightKg: item.weight_kg == null ? '' : String(item.weight_kg), price: item.price == null ? '' : String(item.price), stock: String(item.stock ?? 0) })));
+  else setVariations((data ?? []).map((item: any) => ({ id: item.id, dimensions: normalizeCatalogMeasurement(item.dimensions, item.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(item.height, item.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(item.opening_diameter, item.measurement_unit === 'in' ? 'in' : 'cm'), weightKg: item.product_weight_g == null ? (item.weight_kg == null ? '' : String(item.weight_kg)) : String(item.product_weight_g / 1000), packagingWeightKg: item.packaging_weight_g == null ? '' : String(item.packaging_weight_g / 1000), shippingLengthIn: item.shipping_length_in == null ? '' : String(item.shipping_length_in), shippingWidthIn: item.shipping_width_in == null ? '' : String(item.shipping_width_in), shippingHeightIn: item.shipping_height_in == null ? '' : String(item.shipping_height_in), price: item.price == null ? '' : String(item.price), stock: String(item.stock ?? 0) })));
       setVariationLoading(false);
     });
   }, [product]);
@@ -88,9 +94,17 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
     const nextErrors: ProductEditorErrors = {};
     if (!form.name.trim()) nextErrors.name = 'Product name is required.';
     if (!form.category) nextErrors.category = 'Select a category.';
-    const meaningful = variations.filter((item) => item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg || item.price || item.stock);
-    const invalidVariation = meaningful.some((item) => !(item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg) || (item.weightKg !== '' && (!Number.isFinite(Number(item.weightKg)) || Number(item.weightKg) < 0)) || (item.price !== '' && Number(item.price) < 0) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
-    if (invalidVariation) nextErrors.variations = 'Each variation needs a measurement or weight. Weight and price cannot be negative, and stock must be a whole number.';
+    const meaningful = variations.filter((item) => item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg || item.packagingWeightKg || item.shippingLengthIn || item.price || item.stock);
+    const validShippingData = (item: ProductVariationDraft) => {
+      const hasWeight = (kgToGrams(item.weightKg) || 0) > 0;
+      const hasExplicitDimensions = positiveInches(item.shippingLengthIn) !== null
+        && positiveInches(item.shippingWidthIn) !== null
+        && positiveInches(item.shippingHeightIn) !== null;
+      const hasCatalogDimensions = /\d/.test(item.dimensions) && /\d/.test(item.height);
+      return hasWeight && (hasExplicitDimensions || hasCatalogDimensions);
+    };
+    const invalidVariation = meaningful.some((item) => !validShippingData(item) || (item.price !== '' && Number(item.price) < 0) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
+    if (invalidVariation) nextErrors.variations = 'Add product weight plus length, width, and height for every sellable item.';
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
     setSaving(true); setErrors({});
     try {
@@ -107,7 +121,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
       <div className="product-editor__body">
         <section className="product-editor__section product-editor__details"><h3>Product details</h3><div className="product-editor__fields"><label className="product-editor__wide"><span>Name</span><input value={form.name} onChange={(event) => change('name', event.target.value)} aria-invalid={Boolean(errors.name)} />{errors.name && <em>{errors.name}</em>}</label><label><span>Category</span><select value={form.category} onChange={(event) => change('category', event.target.value)} aria-invalid={Boolean(errors.category)}><option value="">Select category</option>{CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select>{errors.category && <em>{errors.category}</em>}</label><label><span>Material</span><input value={form.materials} placeholder="e.g. Terracotta clay" onChange={(event) => change('materials', event.target.value)} /></label><label className="product-editor__wide"><span>Technique</span><input value={form.technique} placeholder="e.g. Handcrafted & kiln-fired" onChange={(event) => change('technique', event.target.value)} /></label></div></section>
         <section className="product-editor__section product-editor__media"><h3>Media</h3><label className="product-upload"><ImagePlus aria-hidden="true" /><strong>{imageFile ? imageFile.name : 'Replace product image'}</strong><small>JPG or PNG · up to 5 MB</small><input type="file" accept="image/jpeg,image/png" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>{errors.image && <em>{errors.image}</em>}{imagePreview && <img className="product-editor__preview" src={imagePreview} alt="Product preview" />}<label className="product-upload"><FileBox aria-hidden="true" /><strong>{modelFile ? modelFile.name : product.model3d ? 'Replace 3D model' : 'Add 3D model'}</strong><small>GLB format</small><input type="file" accept=".glb,model/gltf-binary" onChange={(event) => chooseModel(event.target.files?.[0])} /></label>{errors.model && <em>{errors.model}</em>}</section>
-<section className="product-editor__section product-editor__variations"><div className="product-editor__section-heading"><div><h3>Variations</h3><p>Stock is totalled across every saved variation.</p></div><b>Total stock: {totalStock(variations)}</b></div>{variationLoading ? <div className="product-editor__loading">Loading variations…</div> : <><div className="product-editor__variation-list">{variations.map((variation, index) => <article className="product-variation" key={variation.id ?? index}><header><strong>Variation {index + 1}</strong><button type="button" aria-label={`Remove variation ${index + 1}`} onClick={() => { setDirty(true); setVariations((current) => current.filter((_, itemIndex) => itemIndex !== index)); }}><Trash2 aria-hidden="true" /></button></header><div className="product-variation__fields"><label><span>Dimensions (in)</span><input value={variation.dimensions} onChange={(event) => updateVariation(index, 'dimensions', event.target.value)} placeholder="e.g. 4 × 4 in" /></label><label><span>Height (in)</span><input value={variation.height} onChange={(event) => updateVariation(index, 'height', event.target.value)} placeholder="e.g. 8 in" /></label><label><span>Opening (in)</span><input value={variation.openingDiameter} onChange={(event) => updateVariation(index, 'openingDiameter', event.target.value)} placeholder="e.g. 3 in" /></label><label><span>Weight (kg)</span><input type="number" min="0" step="0.001" value={variation.weightKg} onChange={(event) => updateVariation(index, 'weightKg', event.target.value)} placeholder="e.g. 1.5" /></label><label><span>Price</span><input type="number" min="0" step="0.01" value={variation.price} onChange={(event) => updateVariation(index, 'price', event.target.value)} /></label><label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={(event) => updateVariation(index, 'stock', event.target.value)} /></label></div></article>)}</div>{errors.variations && <em>{errors.variations}</em>}<button className="product-editor__add" type="button" onClick={() => { setDirty(true); setVariations((current) => [...current, emptyDraft()]); }}><Plus aria-hidden="true" />Add variation</button></>}</section>
+<section className="product-editor__section product-editor__variations"><div className="product-editor__section-heading"><div><h3>Variations</h3><p>Stock is totalled across every saved variation.</p></div><b>Total stock: {totalStock(variations)}</b></div>{variationLoading ? <div className="product-editor__loading">Loading variations…</div> : <><div className="product-editor__variation-list">{variations.map((variation, index) => <article className="product-variation" key={variation.id ?? index}><header><strong>Variation {index + 1}</strong><button type="button" aria-label={`Remove variation ${index + 1}`} onClick={() => { setDirty(true); setVariations((current) => current.filter((_, itemIndex) => itemIndex !== index)); }}><Trash2 aria-hidden="true" /></button></header><div className="product-variation__fields"><label><span>Dimensions (in)</span><input value={variation.dimensions} onChange={(event) => updateVariation(index, 'dimensions', event.target.value)} placeholder="e.g. 4 × 4 in" /></label><label><span>Height (in)</span><input value={variation.height} onChange={(event) => updateVariation(index, 'height', event.target.value)} placeholder="e.g. 8 in" /></label><label><span>Opening (in)</span><input value={variation.openingDiameter} onChange={(event) => updateVariation(index, 'openingDiameter', event.target.value)} placeholder="e.g. 3 in" /></label><label><span>Product weight (kg)</span><input type="number" min="0.001" step="0.001" value={variation.weightKg} onChange={(event) => updateVariation(index, 'weightKg', event.target.value)} placeholder="e.g. 1.5" /></label><label><span>Length (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingLengthIn} onChange={(event) => updateVariation(index, 'shippingLengthIn', event.target.value)} /></label><label><span>Width (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingWidthIn} onChange={(event) => updateVariation(index, 'shippingWidthIn', event.target.value)} /></label><label><span>Height (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingHeightIn} onChange={(event) => updateVariation(index, 'shippingHeightIn', event.target.value)} /></label><label><span>Price</span><input type="number" min="0" step="0.01" value={variation.price} onChange={(event) => updateVariation(index, 'price', event.target.value)} /></label><label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={(event) => updateVariation(index, 'stock', event.target.value)} /></label></div></article>)}</div>{errors.variations && <em>{errors.variations}</em>}<button className="product-editor__add" type="button" onClick={() => { setDirty(true); setVariations((current) => [...current, emptyDraft()]); }}><Plus aria-hidden="true" />Add variation</button></>}</section>
       </div>
       {errors.save && <div className="product-editor__error" role="alert"><AlertCircle aria-hidden="true" />{errors.save}</div>}
       <footer className="product-editor__footer"><button type="button" className="product-editor__cancel" onClick={requestClose} disabled={saving}>Cancel</button><button type="button" className="product-editor__save" onClick={() => void submit()} disabled={saving || variationLoading}>{saving ? 'Saving changes…' : 'Save changes'}</button></footer>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { toast } from 'sonner';
@@ -79,7 +79,37 @@ interface VariationCatalogRow {
 
 interface ShopLocationRow {
   id: string;
-  location?: string;
+  location?: string | { address?: string; lat?: number; lng?: number };
+  latitude?: number;
+  longitude?: number;
+  lat?: number;
+  lng?: number;
+}
+
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+function validCoordinates(value: unknown): Coordinates | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as { lat?: unknown; lng?: unknown };
+  const lat = Number(candidate.lat);
+  const lng = Number(candidate.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180 || (lat === 0 && lng === 0)) return null;
+  return { lat, lng };
+}
+
+function shopLocationAddress(location: ShopLocationRow['location']): string {
+  return typeof location === 'string' ? location : location?.address || '';
+}
+
+function shopLocationCoordinates(shop: ShopLocationRow): Coordinates | null {
+  return validCoordinates({
+    lat: shop.latitude ?? shop.lat ?? (typeof shop.location === 'object' ? shop.location.lat : undefined),
+    lng: shop.longitude ?? shop.lng ?? (typeof shop.location === 'object' ? shop.location.lng : undefined),
+  });
 }
 
 function parseDimensionToTransportCm(value: string): number {
@@ -108,11 +138,14 @@ export default function CartPage() {
   const [catalog, setCatalog] = useState<Record<string, CatalogLineState>>({});
   const [validationStatus, setValidationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [shopAddresses, setShopAddresses] = useState<Record<string, string>>({});
+  const [shopCoordinates, setShopCoordinates] = useState<Record<string, Coordinates | null>>({});
   const [deliveryOption, setDeliveryOption] = useState<'pickup' | 'courier' | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<DeliveryEstimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState('');
+  const estimateRequestSequence = useRef(0);
+  const estimateAbortController = useRef<AbortController | null>(null);
 
   const effectiveAddress = address ?? user?.user_metadata?.address ?? '';
 
@@ -142,7 +175,7 @@ export default function CartPage() {
             ? supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height, measurement_unit').in('id', variationIds)
             : Promise.resolve({ data: [], error: null }),
           shopIds.length
-            ? supabase.from('shops').select('id, location').in('id', shopIds)
+            ? supabase.from('shops').select('*').in('id', shopIds)
             : Promise.resolve({ data: [], error: null }),
         ]);
 
@@ -188,7 +221,8 @@ export default function CartPage() {
         });
 
         setCatalog(nextCatalog);
-        setShopAddresses(Object.fromEntries(shopRows.map(shop => [shop.id, shop.location || ''])));
+        setShopAddresses(Object.fromEntries(shopRows.map(shop => [shop.id, shopLocationAddress(shop.location)])));
+        setShopCoordinates(Object.fromEntries(shopRows.map(shop => [shop.id, shopLocationCoordinates(shop)])));
         setValidationStatus('ready');
         if (cartChanged) {
           setCart(revisedItems);
@@ -262,8 +296,12 @@ export default function CartPage() {
   }, [catalog, selectedItems]);
 
   function invalidateEstimate() {
+    estimateRequestSequence.current += 1;
+    estimateAbortController.current?.abort();
+    estimateAbortController.current = null;
     setEstimate(null);
     setEstimateError('');
+    setEstimateLoading(false);
   }
 
   function commitItems(nextItems: CartItem[]) {
@@ -335,7 +373,8 @@ export default function CartPage() {
 
   async function requestEstimate() {
     if (deliveryOption !== 'courier' || !activeGroup || selectedItems.length === 0) return;
-    const shopAddress = activeGroup.items[0]?.shopId ? shopAddresses[activeGroup.items[0].shopId!] : '';
+    const shopId = activeGroup.items[0]?.shopId;
+    const shopAddress = shopId ? shopAddresses[shopId] : '';
     if (!shopAddress) {
       setEstimateError('This artisan has not provided a pickup address yet. Delivery can still be arranged at checkout.');
       return;
@@ -345,43 +384,81 @@ export default function CartPage() {
       return;
     }
 
+    const sequence = ++estimateRequestSequence.current;
+    estimateAbortController.current?.abort();
+    const controller = new AbortController();
+    estimateAbortController.current = controller;
     setEstimateLoading(true);
     setEstimateError('');
     try {
       const [pickupCoords, dropoffCoords] = await Promise.all([
-        geocodeAddress(shopAddress),
+        shopId ? Promise.resolve(shopCoordinates[shopId] || geocodeAddress(shopAddress)) : geocodeAddress(shopAddress),
         geocodeAddress(effectiveAddress.trim()),
       ]);
-      if (!pickupCoords || !dropoffCoords) throw new Error('Address not found');
+      if (sequence !== estimateRequestSequence.current) return;
+      const validPickup = validCoordinates(pickupCoords);
+      const validDropoff = validCoordinates(dropoffCoords);
+      if (!validPickup || !validDropoff) throw new Error('Address not found');
 
       const response = await fetch(`${API_BASE}/api/lalamove/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           pickupAddress: shopAddress,
           dropoffAddress: effectiveAddress.trim(),
-          serviceType: selectedVehicle.serviceType,
-          pickupCoords,
-          dropoffCoords,
+          pickupCoords: validPickup,
+          dropoffCoords: validDropoff,
+          items: selectedItems.map(item => ({
+            productId: item.productId,
+            variationId: item.variationId || null,
+            quantity: item.qty,
+          })),
         }),
       });
       const result = await response.json();
       const fee = Number.parseFloat(result?.priceBreakdown?.total);
-      if (!response.ok || !Number.isFinite(fee)) throw new Error('Quote unavailable');
+      if (!response.ok || !result?.quotationId || !Number.isFinite(fee)) {
+        const error = new Error(result?.error || 'Quote unavailable') as Error & { code?: string };
+        error.code = result?.code;
+        throw error;
+      }
+      if (sequence !== estimateRequestSequence.current) return;
       setEstimate({
         quotationId: result.quotationId,
         fee,
-        serviceType: selectedVehicle.serviceType,
-        vehicleLabel: selectedVehicle.label,
-        coordinates: dropoffCoords,
+        serviceType: result.serviceType || result.shipment?.recommendedVehicle?.serviceType || selectedVehicle.serviceType,
+        vehicleLabel: result.shipment?.recommendedVehicle?.label || selectedVehicle.label,
+        coordinates: validDropoff,
         quotedAt: new Date().toISOString(),
       });
-    } catch {
-      setEstimateError('A courier estimate is unavailable right now. You can continue and try again at checkout.');
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      if (sequence !== estimateRequestSequence.current) return;
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      if (code === 'ERR_OUT_OF_SERVICE_AREA') {
+        setEstimateError("This delivery address is outside Lalamove's service area.");
+      } else if (code === 'ERR_INVALID_SERVICE_TYPE') {
+        setEstimateError('Courier delivery is currently unavailable for this route.');
+      } else if (code === 'ERR_INVALID_COORDINATES' || code === 'ERR_REVERSE_GEOCODE_FAILURE' || code === 'ERR_INVALID_LOCATION') {
+        setEstimateError('Please adjust the delivery address to a valid road-accessible location.');
+      } else if (error instanceof Error && error.message && error.message !== 'Address not found') {
+        setEstimateError(error.message);
+      } else {
+        setEstimateError('A courier estimate is unavailable right now. You can continue and try again at checkout.');
+      }
     } finally {
-      setEstimateLoading(false);
+      if (sequence === estimateRequestSequence.current) {
+        estimateAbortController.current = null;
+        setEstimateLoading(false);
+      }
     }
   }
+
+  useEffect(() => () => {
+    estimateRequestSequence.current += 1;
+    estimateAbortController.current?.abort();
+  }, []);
 
   function beginCheckout() {
     if (!resolvedActiveShopKey || selectedItems.length === 0) return;

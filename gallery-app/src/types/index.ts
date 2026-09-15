@@ -29,6 +29,12 @@ export interface ProductVariation {
   height: string;
   openingDiameter: string;
   weightKg?: number;
+  productWeightG?: number;
+  packagingWeightG?: number;
+  shippingWeightG?: number;
+  shippingLengthIn?: number;
+  shippingWidthIn?: number;
+  shippingHeightIn?: number;
   price?: number;
   stock: number;
   sortOrder: number;
@@ -73,6 +79,12 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   measurementUnit?: 'cm' | 'in';
+  productWeightG?: number;
+  packagingWeightG?: number;
+  shippingWeightG?: number;
+  shippingLengthIn?: number;
+  shippingWidthIn?: number;
+  shippingHeightIn?: number;
 }
 
 export interface OrderItem {

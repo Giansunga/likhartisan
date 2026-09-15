@@ -7,6 +7,7 @@ import { uploadToR2 } from '../../lib/r2';
 import { recomputeProductStock } from '../../lib/stockSync';
 import { mapSupabaseProduct } from '../../lib/utils';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
+import { kgToGrams, positiveInches } from '../../lib/shipping';
 import { DEFAULT_PRODUCT_FILTERS, filterAndSortProducts, getProductInventoryCounts, mergeProductFilters, paginateProducts, productFiltersFromSearch } from '../../lib/adminProducts';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import ProductTable from '../../components/admin/ProductTable';
@@ -114,7 +115,17 @@ export default function ProductListPage() {
   };
 
   const saveProduct = async (product: Product, data: ProductEditorSave) => {
-    const updateData: Record<string, unknown> = { name: data.name, category: data.category, materials: data.materials, technique: data.technique };
+    const productWeightG = kgToGrams(data.productWeightKg);
+    const packagingWeightG = kgToGrams(data.packagingWeightKg);
+    const updateData: Record<string, unknown> = {
+      name: data.name, category: data.category, materials: data.materials, technique: data.technique,
+      product_weight_g: productWeightG,
+      packaging_weight_g: packagingWeightG,
+      shipping_weight_g: productWeightG != null && packagingWeightG != null ? productWeightG + packagingWeightG : null,
+      shipping_length_in: positiveInches(data.packedLengthIn),
+      shipping_width_in: positiveInches(data.packedWidthIn),
+      shipping_height_in: positiveInches(data.packedHeightIn),
+    };
     if (data.imageFile) {
       const url = await uploadToR2(data.imageFile, 'products');
       if (!url) throw new Error('Product image upload failed.');
@@ -129,7 +140,23 @@ export default function ProductListPage() {
     if (productError) throw new Error(productError.message || 'Could not save product details.');
     const keptIds: string[] = [];
     for (const [index, variation] of data.variations.entries()) {
-      const variationData = { dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'), height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'), opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'), measurement_unit: 'in' as const, weight_kg: variation.weightKg === '' ? null : Number(variation.weightKg), price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0 };
+      const variationProductWeightG = kgToGrams(variation.weightKg);
+      const variationPackagingWeightG = kgToGrams(variation.packagingWeightKg);
+      const variationData = {
+        dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'),
+        height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'),
+        opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'),
+        measurement_unit: 'in' as const,
+        weight_kg: variation.weightKg === '' ? null : Number(variation.weightKg),
+        product_weight_g: variationProductWeightG,
+        packaging_weight_g: variationPackagingWeightG,
+        shipping_weight_g: variationProductWeightG != null && variationPackagingWeightG != null ? variationProductWeightG + variationPackagingWeightG : null,
+        shipping_length_in: positiveInches(variation.shippingLengthIn),
+        shipping_width_in: positiveInches(variation.shippingWidthIn),
+        shipping_height_in: positiveInches(variation.shippingHeightIn),
+        price: variation.price ? Number(variation.price) : null,
+        stock: Number(variation.stock) || 0,
+      };
       if (variation.id) {
         const { error: variationError } = await supabase.from('product_variations').update(variationData).eq('id', variation.id);
         if (variationError) throw new Error(variationError.message || 'Could not save a product variation.');

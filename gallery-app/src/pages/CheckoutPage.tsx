@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { API_BASE } from '../lib/api';
-import { inchesToCm, normalizeCatalogMeasurement, parseDimensionToInches } from '../lib/measurements';
 import type { CartCheckoutDraft, CartItem } from '../types';
 import {
   getCartLineKey,
@@ -30,21 +29,6 @@ import './CheckoutPage.css';
 
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
 
-const VEHICLE_TIERS = [
-  { serviceType: 'MOTORCYCLE', label: 'Motorcycle', maxL: 50, maxW: 40, maxH: 50, maxKg: 20 },
-  { serviceType: 'SEDAN', label: 'Sedan', maxL: 100, maxW: 60, maxH: 70, maxKg: 200 },
-  { serviceType: 'MPV', label: 'Subcompact SUV', maxL: 150, maxW: 120, maxH: 100, maxKg: 300 },
-  { serviceType: 'SMALL_VAN', label: '7-Seater SUV / Small Van', maxL: 210, maxW: 120, maxH: 110, maxKg: 600 },
-  { serviceType: 'PICKUP', label: 'Pickup', maxL: 270, maxW: 150, maxH: 50, maxKg: 800 },
-  { serviceType: 'VAN', label: 'L300 / Cargo Van', maxL: 210, maxW: 120, maxH: 120, maxKg: 1000 },
-  { serviceType: '1000KG_FB', label: 'FB Van', maxL: 300, maxW: 170, maxH: 170, maxKg: 2000 },
-  { serviceType: '2000KG_ALUMINUM', label: 'Aluminum Van', maxL: 300, maxW: 170, maxH: 170, maxKg: 2000 },
-  { serviceType: '3000KG', label: '3-Ton Truck', maxL: 430, maxW: 180, maxH: 210, maxKg: 3000 },
-  { serviceType: '5000KG', label: '5-Ton Truck', maxL: 430, maxW: 180, maxH: 210, maxKg: 5000 },
-  { serviceType: '7000KG', label: '7-Ton Truck', maxL: 640, maxW: 200, maxH: 240, maxKg: 7000 },
-  { serviceType: '12000KG', label: '10-Wheel Truck', maxL: 1000, maxW: 240, maxH: 230, maxKg: 12000 },
-] as const;
-
 interface CheckoutRouteState {
   buyNowItem?: CartItem;
   checkoutDraft?: CartCheckoutDraft;
@@ -58,34 +42,42 @@ interface Coordinates {
 
 interface LalamoveQuote {
   quotationId?: string;
-  priceBreakdown?: { total?: string };
-  distance?: { value?: string };
+  serviceType?: string;
+  expiresAt?: string;
+  currency?: string;
+  priceBreakdown?: { total?: string | number; currency?: string };
+  distance?: { value?: string | number; unit?: string };
+  distanceMeters?: number | null;
+  shipment?: {
+    totalWeightG: number;
+    totalWeightKg: number;
+    totalVolumeCm3: number;
+    itemCount: number;
+    largestPackageCm: number[];
+    recommendedVehicle: { serviceType: string; label: string };
+    fingerprint: string;
+  };
 }
 
-interface VariationDimensions {
-  id: string;
-  dimensions?: string;
-  height?: string;
-  measurement_unit?: 'cm' | 'in';
+function validCoordinates(value: Coordinates | null | undefined): Coordinates | null {
+  if (!value) return null;
+  const lat = Number(value.lat);
+  const lng = Number(value.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180 || (lat === 0 && lng === 0)) return null;
+  return { lat, lng };
 }
 
-interface CartDimensions {
-  totalL: number;
-  totalW: number;
-  totalH: number;
-  totalKg: number;
-  itemCount: number;
-}
-
-function parseDimensionToTransportCm(dimension: string): number {
-  return inchesToCm(parseDimensionToInches(dimension, 'in'));
-}
-
-function estimateWeight(length: number, width: number, height: number): number {
-  if (length <= 0 || width <= 0 || height <= 0) return 2;
-  // Finished pottery is hollow; approximate clay as 5% of its bounding volume.
-  const volume = length * width * height * 0.05;
-  return Math.max(1, (volume * 2.5) / 1000);
+function quoteErrorMessage(error: unknown): string {
+  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+  if (code === 'ERR_OUT_OF_SERVICE_AREA') return "This delivery address is outside Lalamove's service area.";
+  if (code === 'ERR_INVALID_SERVICE_TYPE') return 'Motorcycle delivery is currently unavailable for this route.';
+  if (code === 'ERR_REVERSE_GEOCODE_FAILURE' || code === 'ERR_INVALID_LOCATION') {
+    return 'Please adjust the delivery pin to a valid road-accessible location.';
+  }
+  if (code === 'ERR_INVALID_COORDINATES') return 'Please adjust the delivery pin to a valid location.';
+  if (error instanceof Error && error.message) return error.message;
+  return 'We could not confirm a courier fee. Check the address and try again.';
 }
 
 export default function CheckoutPage() {
@@ -124,68 +116,112 @@ export default function CheckoutPage() {
   const [lalamoveQuote, setLalamoveQuote] = useState<LalamoveQuote | null>(null);
   const [lalamoveLoading, setLalamoveLoading] = useState(false);
   const [lalamoveError, setLalamoveError] = useState<string | null>(null);
-  const [selectedVehicle, setSelectedVehicle] = useState<(typeof VEHICLE_TIERS)[number]>(VEHICLE_TIERS[0]);
-  const [cartDimensions, setCartDimensions] = useState<CartDimensions | null>(null);
+  const [pickupReady, setPickupReady] = useState(false);
   const [shopAddress, setShopAddress] = useState(DEFAULT_PICKUP_ADDRESS);
+  const [storedPickupCoordinates, setStoredPickupCoordinates] = useState<Coordinates | null>(null);
   const [mapCoords, setMapCoords] = useState<{ pickup: Coordinates; dropoff: Coordinates | null }>({
     pickup: { lat: 15.026, lng: 120.691 },
     dropoff: cartDraft?.destination?.coordinates || null,
   });
   const mapRef = useRef<google.maps.Map | null>(null);
+  const quoteRequestSequence = useRef(0);
+  const quoteAbortController = useRef<AbortController | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [mapReady, setMapReady] = useState(false);
 
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.price * item.qty, 0), [items]);
-  const shippingFee = deliveryOption === 'courier'
-    ? Number.parseFloat(lalamoveQuote?.priceBreakdown?.total || '0') || 0
+  const quoteExpiryMs = lalamoveQuote?.expiresAt ? Date.parse(lalamoveQuote.expiresAt) : Number.NaN;
+  const quoteExpired = Boolean(lalamoveQuote?.expiresAt && Number.isFinite(quoteExpiryMs) && quoteExpiryMs <= currentTime);
+  const hasValidCourierQuote = deliveryOption === 'courier'
+    && Boolean(lalamoveQuote?.quotationId)
+    && Number(lalamoveQuote?.priceBreakdown?.total) > 0
+    && !quoteExpired;
+  const shippingFee = hasValidCourierQuote
+    ? Number(lalamoveQuote?.priceBreakdown?.total) || 0
     : 0;
   const total = subtotal + shippingFee;
-  const quoteDistanceKm = lalamoveQuote?.distance?.value
-    ? (Number.parseFloat(lalamoveQuote.distance.value) / 1000).toFixed(1)
+  const quoteDistanceKm = lalamoveQuote?.distanceMeters != null
+    ? (Number(lalamoveQuote.distanceMeters) / 1000).toFixed(1)
+    : lalamoveQuote?.distance?.value
+      ? (Number(lalamoveQuote.distance.value) / 1000).toFixed(1)
     : null;
+  const quoteShipment = lalamoveQuote?.shipment;
 
   const fetchLalamoveQuote = useCallback(async (
     pickup: string,
     dropoff: string,
-    serviceType: string,
     pickupCoordinates: Coordinates,
+    confirmedDropoffCoordinates: Coordinates | null,
   ) => {
-    if (!pickup || dropoff.trim().length < 5) {
+    const sequence = ++quoteRequestSequence.current;
+    quoteAbortController.current?.abort();
+    quoteAbortController.current = null;
+
+    const validPickup = validCoordinates(pickupCoordinates);
+    const validDropoff = validCoordinates(confirmedDropoffCoordinates);
+    if (!pickup || dropoff.trim().length < 5 || !validPickup) {
       setLalamoveQuote(null);
       setLalamoveError(null);
+      setLalamoveLoading(false);
       return;
     }
 
     setLalamoveLoading(true);
     setLalamoveError(null);
     try {
-      const dropoffCoordinates = await geocodeAddress(dropoff);
-      if (!dropoffCoordinates) throw new Error('Address could not be located');
+      const dropoffCoordinates = validDropoff || validCoordinates(await geocodeAddress(dropoff));
+      if (!dropoffCoordinates) {
+        const error = new Error('Please adjust the delivery pin to a valid road-accessible location.') as Error & { code?: string };
+        error.code = 'ERR_INVALID_LOCATION';
+        throw error;
+      }
+      if (!validDropoff) {
+        setMapCoords(current => ({ ...current, dropoff: dropoffCoordinates }));
+      }
+      if (sequence !== quoteRequestSequence.current) return;
+
+      const controller = new AbortController();
+      quoteAbortController.current = controller;
 
       const response = await fetch(`${API_BASE}/api/lalamove/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           pickupAddress: pickup,
           dropoffAddress: dropoff,
-          serviceType,
-          pickupCoords: pickupCoordinates,
+          pickupCoords: validPickup,
           dropoffCoords: dropoffCoordinates,
+          items: items.map(item => ({
+            productId: item.productId,
+            variationId: item.variationId || null,
+            quantity: item.qty,
+          })),
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Courier quote unavailable');
+      if (!response.ok) {
+        const error = new Error(data.error || 'Courier quote unavailable') as Error & { code?: string };
+        error.code = data.code;
+        throw error;
+      }
+      if (!data?.quotationId || Number(data?.priceBreakdown?.total) <= 0) {
+        throw new Error('Courier quote was incomplete. Please retry.');
+      }
+      if (sequence !== quoteRequestSequence.current) return;
 
-      setMapCoords(current => ({ ...current, dropoff: dropoffCoordinates }));
       setLalamoveQuote(data as LalamoveQuote);
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      if (sequence !== quoteRequestSequence.current) return;
       console.error('Lalamove quote error:', error);
       setLalamoveQuote(null);
-      setLalamoveError('We could not confirm a courier fee. Check the address and try again.');
+      setLalamoveError(quoteErrorMessage(error));
     } finally {
-      setLalamoveLoading(false);
+      if (sequence === quoteRequestSequence.current) setLalamoveLoading(false);
     }
-  }, []);
+  }, [items]);
 
   useEffect(() => {
     if (items.length === 0) navigate('/cart', { replace: true });
@@ -208,13 +244,16 @@ export default function CheckoutPage() {
       setEditForm({ name, phone, address });
       setUserId(user!.id);
 
-      if (cartDraft?.destination?.coordinates) {
-        setMapCoords(current => ({ ...current, dropoff: cartDraft.destination!.coordinates! }));
+      const draftCoordinates = validCoordinates(cartDraft?.destination?.coordinates);
+      if (draftCoordinates) {
+        setMapCoords(current => ({ ...current, dropoff: draftCoordinates }));
       } else if (metadata.address_lat && metadata.address_lng) {
-        setMapCoords(current => ({
-          ...current,
-          dropoff: { lat: metadata.address_lat, lng: metadata.address_lng },
-        }));
+        const coordinates = validCoordinates({ lat: Number(metadata.address_lat), lng: Number(metadata.address_lng) });
+        if (coordinates) setMapCoords(current => ({ ...current, dropoff: coordinates }));
+        else if (address) {
+          const geocoded = await geocodeAddress(address);
+          if (geocoded && !cancelled) setMapCoords(current => ({ ...current, dropoff: geocoded }));
+        }
       } else if (address) {
         const coordinates = await geocodeAddress(address);
         if (coordinates && !cancelled) setMapCoords(current => ({ ...current, dropoff: coordinates }));
@@ -231,8 +270,15 @@ export default function CheckoutPage() {
     let cancelled = false;
 
     async function loadShopAddress() {
-      const { data } = await supabase.from('shops').select('name, location').eq('id', shopId).single();
-      if (data?.location && !cancelled) setShopAddress(data.location);
+      const { data } = await supabase.from('shops').select('*').eq('id', shopId).single();
+      if (cancelled || !data) return;
+      const location = typeof data.location === 'string' ? data.location : data.location?.address;
+      if (location) setShopAddress(location);
+      const coordinates = validCoordinates({
+        lat: data.latitude ?? data.lat ?? data.location?.lat,
+        lng: data.longitude ?? data.lng ?? data.location?.lng,
+      });
+      setStoredPickupCoordinates(coordinates);
     }
 
     void loadShopAddress();
@@ -240,91 +286,89 @@ export default function CheckoutPage() {
   }, [items]);
 
   useEffect(() => {
-    if (!shopAddress || !isLoaded) return;
+    if (storedPickupCoordinates) {
+      // Prefer stored artisan coordinates when the shop record provides them.
+      setMapCoords(current => ({ ...current, pickup: storedPickupCoordinates }));
+      setPickupReady(true);
+      return;
+    }
+    if (!shopAddress || !isLoaded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPickupReady(false);
+      return;
+    }
     let cancelled = false;
 
     async function locateShop() {
       const coordinates = await geocodeAddress(shopAddress);
-      if (coordinates && !cancelled) setMapCoords(current => ({ ...current, pickup: coordinates }));
+      if (cancelled) return;
+      if (coordinates) {
+        setMapCoords(current => ({ ...current, pickup: coordinates }));
+        setPickupReady(true);
+      } else {
+        setPickupReady(false);
+      }
     }
 
     void locateShop();
     return () => { cancelled = true; };
-  }, [isLoaded, shopAddress]);
+  }, [isLoaded, shopAddress, storedPickupCoordinates]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function calculateVehicle() {
-      if (items.length === 0) return;
-      const variationIds = items.flatMap(item => item.variationId ? [item.variationId] : []);
-      const variations: Record<string, { dimensions: string; height: string }> = {};
-
-      if (variationIds.length > 0) {
-        const { data } = await supabase
-          .from('product_variations')
-          .select('id, dimensions, height, measurement_unit')
-          .in('id', variationIds);
-        (data as VariationDimensions[] | null)?.forEach(variation => {
-          variations[variation.id] = {
-            dimensions: normalizeCatalogMeasurement(variation.dimensions, variation.measurement_unit || 'cm'),
-            height: normalizeCatalogMeasurement(variation.height, variation.measurement_unit || 'cm'),
-          };
-        });
-      }
-
-      let totalVolume = 0;
-      let totalKg = 0;
-      let totalQty = 0;
-      let longestItem = 0;
-      let widestItem = 0;
-      let tallestItem = 0;
-
-      for (const item of items) {
-        const variation = item.variationId ? variations[item.variationId] : null;
-         const parts = (variation?.dimensions || '').split(/x|×/i).map(part => parseDimensionToTransportCm(part));
-        const length = parts[0] || 30;
-        const width = parts[1] || length;
-         const height = parseDimensionToTransportCm(variation?.height || '') || 30;
-        totalVolume += length * width * height * item.qty;
-        totalKg += estimateWeight(length, width, height) * item.qty;
-        totalQty += item.qty;
-        longestItem = Math.max(longestItem, length);
-        widestItem = Math.max(widestItem, width);
-        tallestItem = Math.max(tallestItem, height);
-      }
-
-      const vehicle = VEHICLE_TIERS.find(tier => (
-        totalVolume <= tier.maxL * tier.maxW * tier.maxH && totalKg <= tier.maxKg
-      )) || VEHICLE_TIERS[VEHICLE_TIERS.length - 1];
-
-      if (!cancelled) {
-        setCartDimensions({
-          totalL: longestItem,
-          totalW: widestItem,
-          totalH: tallestItem,
-          totalKg,
-          itemCount: totalQty,
-        });
-        setSelectedVehicle(vehicle);
-      }
-    }
-
-    void calculateVehicle();
-    return () => { cancelled = true; };
-  }, [items]);
-
-  useEffect(() => {
-    if (deliveryOption === 'courier' && userAddress.trim().length >= 5 && isLoaded) {
-      // This effect intentionally synchronizes the authoritative courier quote
-      // with the current delivery inputs.
+    if (deliveryOption !== 'courier') {
+      quoteAbortController.current?.abort();
+      quoteAbortController.current = null;
+      quoteRequestSequence.current += 1;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      void fetchLalamoveQuote(shopAddress, userAddress, selectedVehicle.serviceType, mapCoords.pickup);
-    } else {
       setLalamoveQuote(null);
       setLalamoveError(null);
+      setLalamoveLoading(false);
+      return;
     }
-  }, [deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.pickup, selectedVehicle.serviceType, shopAddress, userAddress]);
+    if (!isLoaded || !pickupReady || userAddress.trim().length < 5 || !validCoordinates(mapCoords.pickup)) {
+      quoteAbortController.current?.abort();
+      quoteAbortController.current = null;
+      quoteRequestSequence.current += 1;
+      setLalamoveQuote(null);
+      setLalamoveError(null);
+      setLalamoveLoading(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchLalamoveQuote(
+        shopAddress,
+        userAddress,
+        mapCoords.pickup,
+        mapCoords.dropoff,
+      );
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.dropoff, mapCoords.pickup, pickupReady, shopAddress, userAddress]);
+
+  useEffect(() => {
+    if (deliveryOption !== 'courier' || !lalamoveQuote?.expiresAt || !hasValidCourierQuote) return;
+    const expiresAt = Date.parse(lalamoveQuote.expiresAt);
+    if (!Number.isFinite(expiresAt)) return;
+    const refreshIn = Math.max(0, expiresAt - Date.now() - 10_000);
+    const timer = window.setTimeout(() => {
+      void fetchLalamoveQuote(
+        shopAddress,
+        userAddress,
+        mapCoords.pickup,
+        mapCoords.dropoff,
+      );
+    }, refreshIn);
+    return () => window.clearTimeout(timer);
+  }, [deliveryOption, fetchLalamoveQuote, hasValidCourierQuote, lalamoveQuote?.expiresAt, mapCoords.dropoff, mapCoords.pickup, shopAddress, userAddress]);
+
+  useEffect(() => {
+    if (!lalamoveQuote?.expiresAt) return;
+    const expiresAt = Date.parse(lalamoveQuote.expiresAt);
+    if (!Number.isFinite(expiresAt)) return;
+    const timer = window.setTimeout(() => setCurrentTime(Date.now()), Math.max(0, expiresAt - Date.now() + 1));
+    return () => window.clearTimeout(timer);
+  }, [lalamoveQuote?.expiresAt]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -341,23 +385,29 @@ export default function CheckoutPage() {
   }, [isLoaded, mapCoords, mapReady]);
 
   const handleMarkerDragEnd = useCallback(async (lat: number, lng: number) => {
+    const coordinates = validCoordinates({ lat, lng });
+    if (!coordinates) return;
     const address = await reverseGeocodeCoords(lat, lng);
     if (!address) return;
-    setMapCoords(current => ({ ...current, dropoff: { lat, lng } }));
+    setMapCoords(current => ({ ...current, dropoff: coordinates }));
     setUserAddress(address);
     setEditForm(current => ({ ...current, address }));
     if (user) await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
   }, [user]);
 
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
+    const coordinates = validCoordinates({ lat, lng });
+    if (!coordinates) return;
     const address = await reverseGeocodeCoords(lat, lng);
-    setConfirmMapClick({ lat, lng, address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}` });
+    setConfirmMapClick({ ...coordinates, address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}` });
   }, []);
 
   const confirmMapLocation = useCallback(async () => {
     if (!confirmMapClick) return;
     const { lat, lng, address } = confirmMapClick;
-    setMapCoords(current => ({ ...current, dropoff: { lat, lng } }));
+    const coordinates = validCoordinates({ lat, lng });
+    if (!coordinates) return;
+    setMapCoords(current => ({ ...current, dropoff: coordinates }));
     setUserAddress(address);
     setEditForm(current => ({ ...current, address }));
     if (user) await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
@@ -386,10 +436,15 @@ export default function CheckoutPage() {
     setSaving(true);
     try {
       const coordinates = address ? await geocodeAddress(address) : null;
+      const resolvedCoordinates = validCoordinates(coordinates);
+      if (deliveryOption === 'courier' && !resolvedCoordinates) {
+        toast.error('Please provide an address that can be located on the map.');
+        return;
+      }
       const updateData: Record<string, string | number> = { name, phone, address };
-      if (coordinates) {
-        updateData.address_lat = coordinates.lat;
-        updateData.address_lng = coordinates.lng;
+      if (resolvedCoordinates) {
+        updateData.address_lat = resolvedCoordinates.lat;
+        updateData.address_lng = resolvedCoordinates.lng;
       }
       const { error } = await supabase.auth.updateUser({ data: updateData });
       if (error) throw error;
@@ -397,7 +452,7 @@ export default function CheckoutPage() {
       setUserName(name);
       setUserPhone(phone);
       setUserAddress(address);
-      if (coordinates) setMapCoords(current => ({ ...current, dropoff: coordinates }));
+      if (resolvedCoordinates) setMapCoords(current => ({ ...current, dropoff: resolvedCoordinates }));
       setEditAddress(false);
       toast.success('Checkout details updated.');
     } catch (error) {
@@ -414,9 +469,10 @@ export default function CheckoutPage() {
     if (userName.trim().length < 2 || userPhone.trim().length < 7) return 'Add your full name and phone number.';
     if (deliveryOption === 'courier' && userAddress.trim().length < 5) return 'Add a complete delivery address.';
     if (deliveryOption === 'courier' && lalamoveLoading) return 'Confirming the courier fee…';
-    if (deliveryOption === 'courier' && !lalamoveQuote) return 'A confirmed courier quote is required.';
+    if (deliveryOption === 'courier' && quoteExpired) return 'Refreshing the courier fee…';
+    if (deliveryOption === 'courier' && !hasValidCourierQuote) return 'A confirmed courier quote is required.';
     return null;
-  }, [deliveryOption, lalamoveLoading, lalamoveQuote, userAddress, userId, userName, userPhone]);
+  }, [deliveryOption, hasValidCourierQuote, lalamoveLoading, quoteExpired, userAddress, userId, userName, userPhone]);
 
   async function handlePlaceOrder() {
     if (disabledReason || !deliveryOption || items.length === 0 || !userId) {
@@ -450,7 +506,7 @@ export default function CheckoutPage() {
           lalamoveQuoteId: lalamoveQuote?.quotationId || null,
           pickupCoords: mapCoords.pickup,
           dropoffCoords: mapCoords.dropoff,
-          serviceType: selectedVehicle.serviceType,
+          shipmentFingerprint: lalamoveQuote?.shipment?.fingerprint || null,
           shopAddress,
         }),
       });
@@ -503,15 +559,15 @@ export default function CheckoutPage() {
             <DeliveryCard
               value={deliveryOption}
               shopAddress={shopAddress}
-              vehicleLabel={selectedVehicle.label}
-              itemCount={itemCount}
-              totalKg={cartDimensions?.totalKg ?? null}
-              quoteFee={lalamoveQuote ? shippingFee : null}
+               vehicleLabel={quoteShipment?.recommendedVehicle?.label || 'Calculating delivery vehicle…'}
+               itemCount={itemCount}
+               totalKg={quoteShipment?.totalWeightKg ?? null}
+              quoteFee={hasValidCourierQuote ? shippingFee : null}
               quoteDistanceKm={quoteDistanceKm}
               quoteLoading={lalamoveLoading}
               quoteError={lalamoveError}
               onChange={setDeliveryOption}
-              onRetryQuote={() => void fetchLalamoveQuote(shopAddress, userAddress, selectedVehicle.serviceType, mapCoords.pickup)}
+               onRetryQuote={() => void fetchLalamoveQuote(shopAddress, userAddress, mapCoords.pickup, mapCoords.dropoff)}
             />
 
             {deliveryOption === 'courier' ? (
@@ -554,7 +610,7 @@ export default function CheckoutPage() {
               total={total}
               deliveryOption={deliveryOption}
               quoteLoading={lalamoveLoading}
-              hasCourierQuote={Boolean(lalamoveQuote)}
+              hasCourierQuote={hasValidCourierQuote}
               placing={placing}
               disabledReason={disabledReason}
               onPlaceOrder={() => void handlePlaceOrder()}

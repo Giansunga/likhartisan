@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import { Component, useState, useEffect, useMemo, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart, getCart, onCartUpdate } from '../data/store';
 import { toast } from 'sonner';
@@ -42,6 +42,18 @@ function renderStars(rating: number, size = 14): ReactElement[] {
 }
 
 const ModelViewer = lazy(() => import('../components/ModelViewer'));
+
+class ProductMediaErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -158,93 +170,104 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     async function fetchProduct() {
-      const { data, error } = await supabase
-        .from('products')
-          .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
-        .eq('id', id)
-        .single();
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('products')
+            .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+          .eq('id', id)
+          .single();
 
-      if (error) {
-        console.error('Product fetch error:', error);
-        setLoading(false);
-        return;
-      }
+        if (error) {
+          console.error('Product fetch error:', error);
+          return;
+        }
 
-      if (data) {
-        const mapped: Product = mapSupabaseProduct(data);
-        setProduct(mapped);
+        if (data) {
+          const mapped: Product = mapSupabaseProduct(data);
+          setProduct(mapped);
 
-        if (mapped.shopId) {
-          const shopId = mapped.shopId;
-          // Fetch shop image, product count, and shop product ids in parallel
-          const [shopData, countRes, shopProducts] = await Promise.all([
-            supabase.from('shops').select('image').eq('id', shopId).single(),
-            supabase.from('products').select('id', { count: 'exact', head: true })
-              .eq('shop_id', shopId).eq('status', 'active'),
-            supabase.from('products').select('id').eq('shop_id', shopId).eq('status', 'active'),
-          ]);
-          if (shopData.data?.image) setShopImage(shopData.data.image);
-          setShopProductCount(countRes.count || 0);
-          if (shopProducts.data && shopProducts.data.length > 0) {
-            const productIds = shopProducts.data.map(p => p.id);
-            const { data: shopReviews } = await supabase
-              .from('product_reviews')
-              .select('rating')
-              .in('product_id', productIds);
-            if (shopReviews && shopReviews.length > 0) {
-              const avg = shopReviews.reduce((s: number, r: any) => s + r.rating, 0) / shopReviews.length;
-              setShopRating({ avg, count: shopReviews.length });
+          if (mapped.shopId) {
+            const shopId = mapped.shopId;
+            // Fetch shop image, product count, and shop product ids in parallel
+            const [shopData, countRes, shopProducts] = await Promise.all([
+              supabase.from('shops').select('image').eq('id', shopId).single(),
+              supabase.from('products').select('id', { count: 'exact', head: true })
+                .eq('shop_id', shopId).eq('status', 'active'),
+              supabase.from('products').select('id').eq('shop_id', shopId).eq('status', 'active'),
+            ]);
+            if (shopData.data?.image) setShopImage(shopData.data.image);
+            setShopProductCount(countRes.count || 0);
+            if (shopProducts.data && shopProducts.data.length > 0) {
+              const productIds = shopProducts.data.map(p => p.id);
+              const { data: shopReviews } = await supabase
+                .from('product_reviews')
+                .select('rating')
+                .in('product_id', productIds);
+              if (shopReviews && shopReviews.length > 0) {
+                const avg = shopReviews.reduce((s: number, r: any) => s + r.rating, 0) / shopReviews.length;
+                setShopRating({ avg, count: shopReviews.length });
+              }
             }
           }
+
+          // Atomic view increment (avoids read-modify-write race)
+          supabase.rpc('increment_views', { p_id: id });
+
+          // Safe server-side sold count (no full-order download / privacy leak)
+          const { data: soldRes } = await supabase.rpc('get_product_sold_count', { p_product_id: id });
+          setSoldCount(soldRes || 0);
+
+          const { data: varData, error: varErr } = await supabase
+            .from('product_variations')
+            .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order, measurement_unit')
+            .eq('product_id', id)
+            .order('sort_order');
+          if (varErr) console.error('Variations fetch error:', varErr);
+          if (varData) {
+            const mappedVars = varData.map((v: any) => ({
+              id: v.id, productId: v.product_id,
+              dimensions: normalizeCatalogMeasurement(v.dimensions, v.measurement_unit === 'in' ? 'in' : 'cm'),
+              height: normalizeCatalogMeasurement(v.height, v.measurement_unit === 'in' ? 'in' : 'cm'),
+              openingDiameter: normalizeCatalogMeasurement(v.opening_diameter, v.measurement_unit === 'in' ? 'in' : 'cm'),
+              measurementUnit: 'in' as const,
+              weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
+              productWeightG: v.product_weight_g == null ? undefined : Number(v.product_weight_g),
+              packagingWeightG: v.packaging_weight_g == null ? undefined : Number(v.packaging_weight_g),
+              shippingWeightG: v.shipping_weight_g == null ? undefined : Number(v.shipping_weight_g),
+              shippingLengthIn: v.shipping_length_in == null ? undefined : Number(v.shipping_length_in),
+              shippingWidthIn: v.shipping_width_in == null ? undefined : Number(v.shipping_width_in),
+              shippingHeightIn: v.shipping_height_in == null ? undefined : Number(v.shipping_height_in),
+              price: v.price, stock: v.stock, sortOrder: v.sort_order,
+            }));
+            setVariations(mappedVars);
+            if (mappedVars.length > 0) setSelectedVariation(mappedVars[0]);
+          }
+
+          const { data: revData } = await supabase
+            .from('product_reviews')
+            .select('id, product_id, user_id, user_name, rating, title, body, images, seller_service_rating, delivery_service_rating, created_at')
+            .eq('product_id', id)
+            .order('created_at', { ascending: false });
+          if (revData) {
+            const mappedRevs = revData.map((r: any) => ({
+              id: r.id, productId: r.product_id, userId: r.user_id,
+              userName: r.user_name, rating: r.rating, title: r.title,
+              body: r.body, images: r.images || [],
+              sellerServiceRating: r.seller_service_rating || 0,
+              deliveryServiceRating: r.delivery_service_rating || 0,
+              createdAt: r.created_at,
+            }));
+            setAllReviews(mappedRevs);
+          }
         }
-
-        // Atomic view increment (avoids read-modify-write race)
-        supabase.rpc('increment_views', { p_id: id });
-
-        // Safe server-side sold count (no full-order download / privacy leak)
-        const { data: soldRes } = await supabase.rpc('get_product_sold_count', { p_product_id: id });
-        setSoldCount(soldRes || 0);
-
-        const { data: varData, error: varErr } = await supabase
-          .from('product_variations')
-          .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order, measurement_unit')
-          .eq('product_id', id)
-          .order('sort_order');
-        if (varErr) console.error('Variations fetch error:', varErr);
-        if (varData) {
-          const mappedVars = varData.map((v: any) => ({
-            id: v.id, productId: v.product_id,
-             dimensions: normalizeCatalogMeasurement(v.dimensions, v.measurement_unit === 'in' ? 'in' : 'cm'),
-             height: normalizeCatalogMeasurement(v.height, v.measurement_unit === 'in' ? 'in' : 'cm'),
-             openingDiameter: normalizeCatalogMeasurement(v.opening_diameter, v.measurement_unit === 'in' ? 'in' : 'cm'),
-             measurementUnit: 'in' as const,
-             weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
-            price: v.price, stock: v.stock, sortOrder: v.sort_order,
-          }));
-          setVariations(mappedVars);
-          if (mappedVars.length > 0) setSelectedVariation(mappedVars[0]);
-        }
-
-        const { data: revData } = await supabase
-          .from('product_reviews')
-          .select('id, product_id, user_id, user_name, rating, title, body, images, seller_service_rating, delivery_service_rating, created_at')
-          .eq('product_id', id)
-          .order('created_at', { ascending: false });
-        if (revData) {
-          const mappedRevs = revData.map((r: any) => ({
-            id: r.id, productId: r.product_id, userId: r.user_id,
-            userName: r.user_name, rating: r.rating, title: r.title,
-            body: r.body, images: r.images || [],
-            sellerServiceRating: r.seller_service_rating || 0,
-            deliveryServiceRating: r.delivery_service_rating || 0,
-            createdAt: r.created_at,
-          }));
-          setAllReviews(mappedRevs);
-        }
+      } catch (error) {
+        console.error('Product detail load error:', error);
+      } finally {
+        setLoading(false);
       }
     }
-    setLoading(false);
-    fetchProduct();
+    void fetchProduct();
   }, [id]);
 
   if (loading && !product) {
@@ -365,18 +388,23 @@ export default function ProductDetailPage() {
             <div className="product-image-container">
               <div className="product-viewer-img-frame" data-product-cart-source>
                 {product.model3d ? (
-                  <div className="w-full h-full">
-                    <Suspense fallback={
-                      <div className="w-full h-full flex items-center justify-center bg-cream-secondary">
-                        <div className="text-brown-medium text-center">
-                          <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
-                          <p className="text-sm">Loading 3D model...</p>
+                  <ProductMediaErrorBoundary
+                    key={product.model3d}
+                    fallback={<img src={product.image} alt={product.name} id="viewer-main-img" />}
+                  >
+                    <div className="w-full h-full">
+                      <Suspense fallback={
+                        <div className="w-full h-full flex items-center justify-center bg-cream-secondary">
+                          <div className="text-brown-medium text-center">
+                            <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
+                            <p className="text-sm">Loading 3D model...</p>
+                          </div>
                         </div>
-                      </div>
-                    }>
-                      <ModelViewer url={product.model3d} />
-                    </Suspense>
-                  </div>
+                      }>
+                        <ModelViewer url={product.model3d} />
+                      </Suspense>
+                    </div>
+                  </ProductMediaErrorBoundary>
                 ) : (
                   <img src={product.image} alt={product.name} id="viewer-main-img" />
                 )}

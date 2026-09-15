@@ -96,4 +96,24 @@ describe('CartPage guest shop flow', () => {
     expect(screen.getByText('At checkout')).toBeInTheDocument();
     expect(screen.queryByText(/Estimated Motorcycle delivery/)).not.toBeInTheDocument();
   });
+
+  it('sends the selected cart lines to the authoritative quotation endpoint', async () => {
+    render(<MemoryRouter><CartPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText('Moon Vase')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /Courier.*Get estimate/ }));
+    fireEvent.change(screen.getByLabelText('Delivery address'), { target: { value: 'San Pablo City' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Estimate delivery' }));
+    await waitFor(() => expect(screen.getByText(/Estimated Motorcycle delivery/)).toBeInTheDocument());
+
+    const request = JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.body));
+    expect(request).toMatchObject({
+      pickupAddress: 'Santo Tomas',
+      dropoffAddress: 'San Pablo City',
+      pickupCoords: { lat: 14.1, lng: 121.1 },
+      dropoffCoords: { lat: 14.1, lng: 121.1 },
+      items: [{ productId: 'p1', variationId: null, quantity: 1 }],
+    });
+    expect(request.serviceType).toBeUndefined();
+  });
 });

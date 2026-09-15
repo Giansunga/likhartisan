@@ -19,6 +19,10 @@ export interface ProductVariationDraft {
   height: string;
   openingDiameter: string;
   weightKg: string;
+  packagingWeightKg: string;
+  shippingLengthIn: string;
+  shippingWidthIn: string;
+  shippingHeightIn: string;
   price: string;
   stock: string;
   measurementUnit?: 'cm' | 'in';

@@ -338,7 +338,11 @@ function applyDesign(design: {
         return;
       }
 
-      // Default: do nothing — user sees empty state with Start/Load buttons
+      // Fresh Design Studio entries must choose a shop before browsing models.
+      if (!revisionMode && !designId && !shopModalShownRef.current) {
+        shopModalShownRef.current = true;
+        setShopSelectOpen(true);
+      }
     }
 
     bootstrap();
