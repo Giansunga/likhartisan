@@ -651,10 +651,17 @@ body:has(.freeform-page) .likhai-dock {
   transition: all 0.25s ease;
 }
 
-.freeform-summary-send-btn:hover {
+.freeform-summary-send-btn:not(:disabled):hover {
   background: var(--accent-color);
   box-shadow: 0 6px 18px rgba(130, 62, 11, 0.3);
   transform: translateY(-1px);
+}
+
+.freeform-summary-send-btn:disabled,
+.freeform-summary-save:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+  transform: none;
 }
 
 .freeform-summary-note {
@@ -857,7 +864,7 @@ body:has(.freeform-page) .likhai-dock {
   white-space: nowrap;
 }
 
-.freeform-summary-save:hover {
+.freeform-summary-save:not(:disabled):hover {
   background: var(--accent-color);
   box-shadow: 0 6px 18px rgba(130, 62, 11, 0.3);
   transform: translateY(-1px);

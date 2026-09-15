@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { API_BASE } from '../lib/api';
+import { inchesToCm, normalizeCatalogMeasurement, parseDimensionToInches } from '../lib/measurements';
 import type { CartCheckoutDraft, CartItem } from '../types';
 import {
   getCartLineKey,
@@ -65,6 +66,7 @@ interface VariationDimensions {
   id: string;
   dimensions?: string;
   height?: string;
+  measurement_unit?: 'cm' | 'in';
 }
 
 interface CartDimensions {
@@ -75,15 +77,8 @@ interface CartDimensions {
   itemCount: number;
 }
 
-function parseDimensionToCm(dimension: string): number {
-  if (!dimension) return 0;
-  const normalized = dimension.toLowerCase().trim();
-  const cmMatch = normalized.match(/([\d.]+)\s*cm/);
-  if (cmMatch) return Number.parseFloat(cmMatch[1]);
-  const inchMatch = normalized.match(/([\d.]+)\s*(?:"|in)/);
-  if (inchMatch) return Number.parseFloat(inchMatch[1]) * 2.54;
-  const value = Number.parseFloat(normalized);
-  return Number.isFinite(value) ? value : 0;
+function parseDimensionToTransportCm(dimension: string): number {
+  return inchesToCm(parseDimensionToInches(dimension, 'in'));
 }
 
 function estimateWeight(length: number, width: number, height: number): number {
@@ -268,12 +263,12 @@ export default function CheckoutPage() {
       if (variationIds.length > 0) {
         const { data } = await supabase
           .from('product_variations')
-          .select('id, dimensions, height')
+          .select('id, dimensions, height, measurement_unit')
           .in('id', variationIds);
         (data as VariationDimensions[] | null)?.forEach(variation => {
           variations[variation.id] = {
-            dimensions: variation.dimensions || '',
-            height: variation.height || '',
+            dimensions: normalizeCatalogMeasurement(variation.dimensions, variation.measurement_unit || 'cm'),
+            height: normalizeCatalogMeasurement(variation.height, variation.measurement_unit || 'cm'),
           };
         });
       }
@@ -287,10 +282,10 @@ export default function CheckoutPage() {
 
       for (const item of items) {
         const variation = item.variationId ? variations[item.variationId] : null;
-        const parts = (variation?.dimensions || '').split(/x/i).map(part => parseDimensionToCm(part));
+         const parts = (variation?.dimensions || '').split(/x|×/i).map(part => parseDimensionToTransportCm(part));
         const length = parts[0] || 30;
         const width = parts[1] || length;
-        const height = parseDimensionToCm(variation?.height || '') || 30;
+         const height = parseDimensionToTransportCm(variation?.height || '') || 30;
         totalVolume += length * width * height * item.qty;
         totalKg += estimateWeight(length, width, height) * item.qty;
         totalQty += item.qty;

@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { uploadToR2 } from '../../lib/r2';
 import { recomputeProductStock } from '../../lib/stockSync';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { normalizeCatalogMeasurement } from '../../lib/measurements';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
 
@@ -156,7 +157,8 @@ export default function ProductCreatePage() {
           materials: form.materials,
           dimensions: '',
           height: '',
-          opening_diameter: '',
+           opening_diameter: '',
+           measurement_unit: 'in',
           technique: form.technique || 'Handcrafted & Kiln-Fired',
           shop_id: form.shopId,
           shop_name: shop.name,
@@ -172,9 +174,10 @@ export default function ProductCreatePage() {
           .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim() || v.weightKg.trim())
           .map((v, i) => ({
             product_id: productData.id,
-            dimensions: v.dimensions.trim() || 'N/A',
-            height: v.height.trim() || 'N/A',
-            opening_diameter: v.openingDiameter.trim() || 'N/A',
+            dimensions: normalizeCatalogMeasurement(v.dimensions.trim() || 'N/A', 'in'),
+            height: normalizeCatalogMeasurement(v.height.trim() || 'N/A', 'in'),
+            opening_diameter: normalizeCatalogMeasurement(v.openingDiameter.trim() || 'N/A', 'in'),
+            measurement_unit: 'in',
             weight_kg: v.weightKg === '' ? null : Number(v.weightKg),
             price: v.price ? Number(v.price) : null,
             stock: Number(v.stock) || 0,
@@ -286,17 +289,17 @@ export default function ProductCreatePage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                       <div>
                         <label style={varLabelStyle}>Dimensions</label>
-                        <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 15cm x 10cm"
+                        <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 6 in × 4 in"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                       <div>
                         <label style={varLabelStyle}>Height</label>
-                        <input value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 20cm"
+                        <input value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 8 in"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                       <div>
                         <label style={varLabelStyle}>Opening Diameter</label>
-                        <input value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 8cm"
+                        <input value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 3 in"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                     </div>

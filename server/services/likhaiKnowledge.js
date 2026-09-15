@@ -24,7 +24,7 @@ export const LIKHAI_KNOWLEDGE = Object.freeze({
     suggestions: ['Show my recent orders', 'How do I message the seller?'],
   },
   freeform: {
-    context: 'The Freeform Designer is a 3D pottery customization tool. A buyer can choose a model, adjust shape dimensions and curvature, select a finish and color, apply available patterns and effects, add supported attachments, save the design, and submit the current design snapshot to an artisan for a quote. LikhAI cannot edit or submit a design for the customer.',
+    context: 'The Freeform Designer is a 3D pottery customization tool. All LikhArtisan pottery measurements are expressed in inches (in). A buyer can choose a model, adjust shape dimensions and curvature, select a finish and color, apply available patterns and effects, add supported attachments, save the design, and submit the current design snapshot to an artisan for a quote. LikhAI should not output centimeters unless the customer specifically asks for a conversion. LikhAI cannot edit or submit a design for the customer.',
     actions: [{ id: 'open-freeform', label: 'Open Freeform Designer', href: '/freeform' }],
     suggestions: ['How do I submit a design request?', 'What can I customize?'],
   },

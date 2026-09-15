@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { applyFinishToScene, generateCylindricalUVs } from '../components/freeform/finishMaterials';
 import type { MaterialParams } from '../components/freeform/materials';
+import { inchesToCm } from '../lib/measurements';
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
+type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in' };
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -99,6 +100,15 @@ function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBou
 }
 
 function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): void {
+  const geometryShapeParams = shapeParams.unit === 'in'
+    ? {
+      ...shapeParams,
+      height: inchesToCm(shapeParams.height),
+      bodyWidth: inchesToCm(shapeParams.bodyWidth),
+      neckWidth: inchesToCm(shapeParams.neckWidth),
+      rimSize: inchesToCm(shapeParams.rimSize),
+    }
+    : shapeParams;
   clone.updateMatrixWorld(true);
 
   const geometrySnapshots = new Map<THREE.BufferGeometry, GeometrySnapshot>();
@@ -113,7 +123,7 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
   if (geometrySnapshots.size === 0) return;
 
   const modelBounds = getBoundsFromSnapshots(geometrySnapshots.values());
-  const hScale = THREE.MathUtils.clamp(shapeParams.height / 25, 0.35, 1.8);
+  const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / 25, 0.35, 1.8);
   const { minY, rangeY, centerX, centerY, centerZ } = modelBounds;
   const rootVertex = new THREE.Vector3();
   const localVertex = new THREE.Vector3();
@@ -134,7 +144,7 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
       const oz = rootPositions[i * 3 + 2];
 
       const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
-      const scaleXZ = getProfileScale(t, shapeParams);
+    const scaleXZ = getProfileScale(t, geometryShapeParams);
 
       rootVertex.set(
         centerX + (ox - centerX) * scaleXZ,
@@ -212,9 +222,10 @@ export function downloadGLB(buffer: ArrayBuffer, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function exportSnapshotDimensions(shapeParams: ShapeParams): { width: number; height_cm: number } {
+export function exportSnapshotDimensions(shapeParams: ShapeParams): { widthIn: number; heightIn: number; unit: 'in' } {
   return {
-    width: shapeParams.bodyWidth,
-    height_cm: shapeParams.height,
+    widthIn: shapeParams.bodyWidth,
+    heightIn: shapeParams.height,
+    unit: 'in',
   };
 }

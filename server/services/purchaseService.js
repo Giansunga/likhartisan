@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { normalizeCatalogMeasurement } from './measurements.js';
 
 export const PURCHASE_PAGE_SIZE = 10;
 export const PURCHASE_STATUSES = new Set(['all', 'to-pay', 'to-ship', 'to-receive', 'completed', 'return-refund', 'cancelled']);
@@ -66,7 +67,9 @@ export function mapPurchase(order, activeReturn = null) {
   return {
     id: order.id,
     shortId: String(order.id).replaceAll('-', '').slice(0, 8).toUpperCase(),
-    items: items.map((item, index) => ({
+    items: items.map((item, index) => {
+      const sourceUnit = item.measurement_unit === 'in' ? 'in' : 'cm';
+      return {
       index,
       productId: item.product_id || item.productId || '',
       variationId: item.variation_id || item.variationId || '',
@@ -74,11 +77,15 @@ export function mapPurchase(order, activeReturn = null) {
       image: item.image || '',
       quantity: Number(item.qty) || 1,
       price: Number(item.price) || 0,
-      dimensions: item.dimensions || '',
-      variation: item.variation || '',
+      dimensions: normalizeCatalogMeasurement(item.dimensions, sourceUnit),
+      height: normalizeCatalogMeasurement(item.height, sourceUnit),
+      openingDiameter: normalizeCatalogMeasurement(item.opening_diameter || item.openingDiameter, sourceUnit),
+      measurementUnit: item.measurement_unit || 'in',
+      variation: normalizeCatalogMeasurement(item.variation, sourceUnit),
       shopId: item.shop_id || item.shopId || '',
       shopName: item.shop_name || item.shopName || 'LikhArtisan Shop',
-    })),
+      };
+    }),
     shops: shopsFor(items),
     subtotal: Number(order.subtotal) || 0,
     shippingFee: Number(order.shipping_fee) || 0,
@@ -225,9 +232,9 @@ export async function reorderPlan(supabase, orderId, userId) {
     let stock = Number(product.stock) || 0;
     let variation;
     if (variationId) {
-      const { data } = await supabase.from('product_variations').select('id, price, stock, dimensions').eq('id', variationId).eq('product_id', productId).maybeSingle();
+      const { data } = await supabase.from('product_variations').select('id, price, stock, dimensions, measurement_unit').eq('id', variationId).eq('product_id', productId).maybeSingle();
       if (!data) { unavailable.push({ productId, productName: product.name, reason: 'Variation is unavailable' }); continue; }
-      price = Number(data.price) || price; stock = Number(data.stock) || 0; variation = data.dimensions || item.variation || '';
+      price = Number(data.price) || price; stock = Number(data.stock) || 0; variation = normalizeCatalogMeasurement(data.dimensions || item.variation || '', data.measurement_unit === 'in' ? 'in' : 'cm');
     }
     if (stock < 1) { unavailable.push({ productId, productName: product.name, reason: 'Out of stock' }); continue; }
     available.push({ productId, variationId: variationId || undefined, productName: product.name, image: product.image || '', price, qty: Math.min(Number(item.qty) || 1, stock), shopId: product.shop_id, shopName: product.shop_name, variation });

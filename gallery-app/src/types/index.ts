@@ -32,6 +32,7 @@ export interface ProductVariation {
   price?: number;
   stock: number;
   sortOrder: number;
+  measurementUnit?: 'cm' | 'in';
 }
 
 export interface ProductReview {
@@ -71,6 +72,7 @@ export interface Product {
   ratingCount: number;
   createdAt: string;
   updatedAt: string;
+  measurementUnit?: 'cm' | 'in';
 }
 
 export interface OrderItem {
@@ -83,6 +85,10 @@ export interface OrderItem {
   shop_name?: string;
   variation_id?: string;
   variation?: string;
+  dimensions?: string;
+  height?: string;
+  opening_diameter?: string;
+  measurement_unit?: 'cm' | 'in';
 }
 
 export interface Order {

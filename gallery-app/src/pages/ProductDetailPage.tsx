@@ -8,6 +8,7 @@ import { SITE_URL } from '../config';
 import type { Product, ProductVariation, ProductReview, CartItem } from '../types';
 import type { ReactElement } from 'react';
 import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
+import { normalizeCatalogMeasurement } from '../lib/measurements';
 import RecommendationsSection from '../components/RecommendationsSection';
 import { animateProductToCart } from '../lib/cartAnimation';
 
@@ -159,7 +160,7 @@ export default function ProductDetailPage() {
     async function fetchProduct() {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
+          .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
         .eq('id', id)
         .single();
 
@@ -206,14 +207,18 @@ export default function ProductDetailPage() {
 
         const { data: varData, error: varErr } = await supabase
           .from('product_variations')
-          .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order')
+          .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order, measurement_unit')
           .eq('product_id', id)
           .order('sort_order');
         if (varErr) console.error('Variations fetch error:', varErr);
         if (varData) {
           const mappedVars = varData.map((v: any) => ({
             id: v.id, productId: v.product_id,
-            dimensions: v.dimensions, height: v.height, openingDiameter: v.opening_diameter, weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
+             dimensions: normalizeCatalogMeasurement(v.dimensions, v.measurement_unit === 'in' ? 'in' : 'cm'),
+             height: normalizeCatalogMeasurement(v.height, v.measurement_unit === 'in' ? 'in' : 'cm'),
+             openingDiameter: normalizeCatalogMeasurement(v.opening_diameter, v.measurement_unit === 'in' ? 'in' : 'cm'),
+             measurementUnit: 'in' as const,
+             weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
             price: v.price, stock: v.stock, sortOrder: v.sort_order,
           }));
           setVariations(mappedVars);

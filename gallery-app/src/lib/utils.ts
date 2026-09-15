@@ -1,4 +1,5 @@
 const FAVORITES_KEY = 'likhartisan_favorites';
+import { normalizeCatalogMeasurement, type MeasurementUnit } from './measurements';
 
 export function loadFavorites(): string[] {
   try {
@@ -34,6 +35,7 @@ export function formatTime(dateStr: string) {
 }
 
 export function mapSupabaseProduct(row: any) {
+  const measurementUnit: MeasurementUnit = row.measurement_unit === 'in' ? 'in' : 'cm';
   return {
     id: row.id,
     name: row.name,
@@ -45,9 +47,10 @@ export function mapSupabaseProduct(row: any) {
     image: row.image || '',
     model3d: row.model3d || undefined,
     materials: row.materials || '',
-    dimensions: row.dimensions || '',
-    height: row.height || '',
-    openingDiameter: row.opening_diameter || '',
+    dimensions: normalizeCatalogMeasurement(row.dimensions, measurementUnit),
+    height: normalizeCatalogMeasurement(row.height, measurementUnit),
+    openingDiameter: normalizeCatalogMeasurement(row.opening_diameter, measurementUnit),
+    measurementUnit: 'in' as const,
     technique: row.technique || '',
     shopId: row.shop_id || '',
     shopName: row.shop_name || '',
@@ -64,17 +67,18 @@ export function fmtRating(r: number) {
   return r.toFixed(1);
 }
 
-export function formatVariation(v: { dimensions?: string; height?: string; openingDiameter?: string } | null | undefined): string {
+export function formatVariation(v: { dimensions?: string; height?: string; openingDiameter?: string; measurementUnit?: MeasurementUnit } | null | undefined): string {
   if (!v) return '';
-  if (v.dimensions && v.dimensions !== 'N/A') return v.dimensions;
+  const sourceUnit = v.measurementUnit || 'cm';
+  if (v.dimensions && v.dimensions !== 'N/A') return normalizeCatalogMeasurement(v.dimensions, sourceUnit);
   const parts: string[] = [];
-  if (v.height && v.height !== 'N/A') parts.push(v.height);
-  if (v.openingDiameter && v.openingDiameter !== 'N/A') parts.push(v.openingDiameter);
+  if (v.height && v.height !== 'N/A') parts.push(normalizeCatalogMeasurement(v.height, sourceUnit));
+  if (v.openingDiameter && v.openingDiameter !== 'N/A') parts.push(normalizeCatalogMeasurement(v.openingDiameter, sourceUnit));
   return parts.join(' \u2022 ');
 }
 
 export function displayVariation(raw: string): string {
   if (!raw) return '';
-  if (raw.includes(' \u2022 ')) return raw.split(' \u2022 ')[0];
-  return raw;
+  const first = raw.includes(' \u2022 ') ? raw.split(' \u2022 ')[0] : raw;
+  return normalizeCatalogMeasurement(first, 'cm');
 }

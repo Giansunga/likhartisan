@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { getPattern } from '../freeform/decor';
 import { getFinishDefinition } from '../freeform/materials';
 import type { DesignRequest, DesignRequestMessagePayload, DesignRequestOrderSummary } from '../../types/designRequest';
-import { isDesignRequestMessage, REQUEST_STATUS_LABELS } from '../../types/designRequest';
+import { isDesignRequestMessage, normalizeDesignRequestSnapshot, REQUEST_STATUS_LABELS } from '../../types/designRequest';
+import { formatInches, normalizeShapeParams } from '../../lib/measurements';
 
 type RequestWithOrder = DesignRequest & { order?: DesignRequestOrderSummary | DesignRequestOrderSummary[] | null };
 
@@ -83,14 +84,14 @@ export default function DesignMessageCard({ data, audience = 'buyer' }: { data: 
   }
 
   if (requestPayload) {
-    const summary = request?.design_snapshot || null;
+    const summary = request?.design_snapshot ? normalizeDesignRequestSnapshot(request.design_snapshot) : null;
     const status = request?.status || requestPayload.status || requestPayload.summary?.status || 'pending';
     const order = normalizedOrder(request);
     const unpaidApproved = request?.status === 'approved' && request.order_id && order?.payment_status !== 'paid';
     return <div className="chat-design-request-card">
       <div className="chat-design-request-card__head"><span style={{ background: summary?.material.color || requestPayload.summary?.color || '#BE734F' }}>{summary?.model.thumbnail ? <img src={summary.model.thumbnail} alt="" /> : <span>3D</span>}</span><div><small>CUSTOM DESIGN REQUEST</small><strong>{summary?.model.name || requestPayload.summary?.model || 'Custom pottery'}</strong><b className={`is-${status}`}>{REQUEST_STATUS_LABELS[status]}</b></div></div>
       {loading ? <div className="chat-design-request-loading"><LoaderCircle className="seller-spin" /> Loading request…</div> : request && summary ? <>
-        <dl><div><dt>Finish</dt><dd>{getFinishDefinition(summary.material.finish).label}</dd></div><div><dt>Pattern</dt><dd>{getPattern(summary.decoration.patternId)?.name || 'None'}</dd></div><div><dt>Quantity</dt><dd>{request.quantity}</dd></div><div><dt>Dimensions</dt><dd>H {summary.dimensions.heightCm} · W {summary.dimensions.widthCm} cm</dd></div></dl>
+        <dl><div><dt>Finish</dt><dd>{getFinishDefinition(summary.material.finish).label}</dd></div><div><dt>Pattern</dt><dd>{getPattern(summary.decoration.patternId)?.name || 'None'}</dd></div><div><dt>Quantity</dt><dd>{request.quantity}</dd></div><div><dt>Dimensions</dt><dd>H {formatInches(summary.dimensions.heightIn)} · W {formatInches(summary.dimensions.widthIn)}</dd></div></dl>
         {request.status === 'quoted' ? <div className="chat-design-quote"><span><small>TOTAL QUOTE</small><strong>₱{Number(request.quoted_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></span><span><small>LEAD TIME</small><strong>{request.lead_time_days} days</strong></span>{request.shop_response ? <p>{request.shop_response}</p> : null}</div> : request.shop_response ? <p className="chat-design-response">{request.shop_response}</p> : null}
         {audience === 'buyer' && request.status === 'quoted' ? <button type="button" className="chat-design-approve" disabled={approving || paying} onClick={() => void approveQuote()}>{approving || paying ? <LoaderCircle className="seller-spin" /> : <CheckCircle2 />} {approving ? 'Approving…' : paying ? 'Opening payment…' : 'Approve Quote & Pay'}</button> : null}
         {audience === 'buyer' && request.status === 'changes_requested' ? <a className="chat-design-open" href={`/freeform?revise=1&requestId=${encodeURIComponent(request.id)}`}><Pencil size={14} /> Revise Design</a> : null}
@@ -105,8 +106,9 @@ export default function DesignMessageCard({ data, audience = 'buyer' }: { data: 
   if (!design) return null;
   const shape = design.shape || {}; const material = design.material || {}; const decor = design.decor || {};
   const color = typeof material.color === 'string' ? material.color : '#BE734F';
-  const height = typeof shape.height === 'number' || typeof shape.height === 'string' ? shape.height : '—';
-  const width = typeof shape.bodyWidth === 'number' || typeof shape.bodyWidth === 'string' ? shape.bodyWidth : '—';
+  const normalizedShape = normalizeShapeParams(shape as any);
+  const height = typeof shape.height === 'number' || typeof shape.height === 'string' ? formatInches(normalizedShape.height) : '—';
+  const width = typeof shape.bodyWidth === 'number' || typeof shape.bodyWidth === 'string' ? formatInches(normalizedShape.bodyWidth) : '—';
   const patternId = typeof decor.patternId === 'string' ? decor.patternId : '';
-  return <div className="chat-product-card chat-design-legacy-card"><div className="chat-product-img" style={{ background: color }}><span>3D</span></div><div className="chat-product-info"><span className="chat-product-name">{design.model || 'Custom Design'}</span><span className="chat-product-variant">{getFinishDefinition(material.finish).label} · H {height}cm · W {width}cm</span><span className="chat-product-variant">Pattern: {getPattern(patternId)?.name || 'None'}</span></div></div>;
+  return <div className="chat-product-card chat-design-legacy-card"><div className="chat-product-img" style={{ background: color }}><span>3D</span></div><div className="chat-product-info"><span className="chat-product-name">{design.model || 'Custom Design'}</span><span className="chat-product-variant">{getFinishDefinition(material.finish).label} · H {height} · W {width}</span><span className="chat-product-variant">Pattern: {getPattern(patternId)?.name || 'None'}</span></div></div>;
 }
