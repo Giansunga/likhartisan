@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { DecorationParams } from '../components/freeform/decor';
+import type { ShapeParamsInches } from '../lib/measurements';
 
 export type SavedDesign = {
   id: string;
@@ -9,7 +10,8 @@ export type SavedDesign = {
   model_name: string;
   model_file: string;
   model_id?: string | null;
-  shape_params: { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
+  shape_params: Partial<ShapeParamsInches> & { unit?: 'cm' | 'in' };
+  measurement_unit?: 'cm' | 'in' | null;
   material_params: { finish: string; color: string };
   decor_params?: DecorationParams;
   attachment_params?: unknown;

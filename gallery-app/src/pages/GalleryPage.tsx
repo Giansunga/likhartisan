@@ -115,7 +115,7 @@ export default function GalleryPage() {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
+      .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -569,12 +569,12 @@ export default function GalleryPage() {
           <form onSubmit={e => { e.preventDefault(); }}>
             <div className="form-row">
               <div className="form-group">
-                <label>Height (cm)</label>
-                <input type="number" min="10" max="200" placeholder="e.g. 35" required />
+                <label>Height (in)</label>
+                <input type="number" min="3.94" max="78.74" step="0.1" placeholder="e.g. 13.8" required />
               </div>
               <div className="form-group">
-                <label>Diameter (cm)</label>
-                <input type="number" min="5" max="150" placeholder="e.g. 20" required />
+                <label>Diameter (in)</label>
+                <input type="number" min="1.97" max="59.06" step="0.1" placeholder="e.g. 7.9" required />
               </div>
             </div>
             <div className="form-row">

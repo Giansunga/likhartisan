@@ -8,6 +8,7 @@ import SellerListingCard from './SellerListingCard';
 import SellerListingToolbar from './SellerListingToolbar';
 import { useArtisanPortal } from './artisanContextValue';
 import { filterAndSortListings, getListingCounts, type ListingFilters } from './listingUtils';
+import { normalizeCatalogMeasurement } from '../../lib/measurements';
 
 interface VariationDraft {
   id?: string;
@@ -50,7 +51,7 @@ export default function SellerListings() {
     const { data, error } = await supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order');
     if (error) setFeedback({ tone: 'error', text: error.message });
     const rows = data || [];
-    setVariations(rows.map(row => ({ id: row.id, dimensions: row.dimensions || '', height: row.height || '', openingDiameter: row.opening_diameter || '', price: row.price == null ? '' : String(row.price), stock: String(row.stock ?? 0) })));
+    setVariations(rows.map(row => ({ id: row.id, dimensions: normalizeCatalogMeasurement(row.dimensions, row.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(row.height, row.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(row.opening_diameter, row.measurement_unit === 'in' ? 'in' : 'cm'), price: row.price == null ? '' : String(row.price), stock: String(row.stock ?? 0) })));
     setOriginalVariationIds(rows.map(row => row.id));
     setEditLoading(false);
   }
@@ -71,7 +72,7 @@ export default function SellerListings() {
       const retainedIds = variations.flatMap(variation => variation.id ? [variation.id] : []);
       const removedIds = originalVariationIds.filter(id => !retainedIds.includes(id));
       const operations = variations.filter(variation => variation.dimensions.trim() || variation.height.trim() || variation.openingDiameter.trim()).map((variation, sortOrder) => {
-        const payload = { dimensions: variation.dimensions.trim() || 'N/A', height: variation.height.trim() || 'N/A', opening_diameter: variation.openingDiameter.trim() || 'N/A', price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0, sort_order: sortOrder };
+        const payload = { dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'), height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'), opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'), measurement_unit: 'in' as const, price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0, sort_order: sortOrder };
         return variation.id ? supabase.from('product_variations').update(payload).eq('id', variation.id) : supabase.from('product_variations').insert({ ...payload, product_id: editing.id });
       });
       const results = await Promise.all(operations);
@@ -127,7 +128,7 @@ export default function SellerListings() {
       {editLoading ? <div className="seller-edit-loading">Loading listing details…</div> : <div className="seller-listing-editor">
         <section><h3>Product specifications</h3><div className="seller-editor-grid"><label><span>Materials</span><input value={materials} onChange={event => setMaterials(event.target.value)} placeholder="e.g. Stoneware clay" /></label><label><span>Technique</span><input value={technique} onChange={event => setTechnique(event.target.value)} placeholder="e.g. Hand-thrown" /></label></div></section>
         <section><div className="seller-editor-section-heading"><div><h3>Variations</h3><p>Keep pricing and stock accurate for every option.</p></div><button type="button" onClick={() => setVariations(current => [...current, emptyVariation()])}><Plus size={15} /> Add variation</button></div>
-          {variations.length ? <div className="seller-variation-list">{variations.map((variation, index) => <div className="seller-variation-card" key={variation.id || `new-${index}`}><header><strong>Variation {index + 1}</strong><button type="button" onClick={() => setVariations(current => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove variation ${index + 1}`}><Trash2 size={15} /></button></header><div className="seller-editor-grid seller-editor-grid--three"><label><span>Dimensions</span><input value={variation.dimensions} onChange={event => updateVariation(index, 'dimensions', event.target.value)} /></label><label><span>Height</span><input value={variation.height} onChange={event => updateVariation(index, 'height', event.target.value)} /></label><label><span>Opening diameter</span><input value={variation.openingDiameter} onChange={event => updateVariation(index, 'openingDiameter', event.target.value)} /></label><label><span>Price</span><input type="number" min="0" value={variation.price} onChange={event => updateVariation(index, 'price', event.target.value)} /></label><label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={event => updateVariation(index, 'stock', event.target.value)} /></label></div></div>)}</div> : <div className="seller-editor-empty"><p>No variations yet.</p><button type="button" onClick={() => setVariations([emptyVariation()])}><Plus size={15} /> Add the first variation</button></div>}
+           {variations.length ? <div className="seller-variation-list">{variations.map((variation, index) => <div className="seller-variation-card" key={variation.id || `new-${index}`}><header><strong>Variation {index + 1}</strong><button type="button" onClick={() => setVariations(current => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove variation ${index + 1}`}><Trash2 size={15} /></button></header><div className="seller-editor-grid seller-editor-grid--three"><label><span>Dimensions (in)</span><input value={variation.dimensions} onChange={event => updateVariation(index, 'dimensions', event.target.value)} placeholder="e.g. 4 × 4 in" /></label><label><span>Height (in)</span><input value={variation.height} onChange={event => updateVariation(index, 'height', event.target.value)} placeholder="e.g. 8 in" /></label><label><span>Opening diameter (in)</span><input value={variation.openingDiameter} onChange={event => updateVariation(index, 'openingDiameter', event.target.value)} placeholder="e.g. 3 in" /></label><label><span>Price</span><input type="number" min="0" value={variation.price} onChange={event => updateVariation(index, 'price', event.target.value)} /></label><label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={event => updateVariation(index, 'stock', event.target.value)} /></label></div></div>)}</div> : <div className="seller-editor-empty"><p>No variations yet.</p><button type="button" onClick={() => setVariations([emptyVariation()])}><Plus size={15} /> Add the first variation</button></div>}
         </section>
       </div>}
     </SellerOverlay>

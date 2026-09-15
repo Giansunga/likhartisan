@@ -40,6 +40,7 @@ export interface ArtisanProduct {
   views: number;
   created_at: string;
   updated_at?: string;
+  measurement_unit?: 'cm' | 'in';
 }
 
 export interface ArtisanProductVariation {
@@ -51,6 +52,7 @@ export interface ArtisanProductVariation {
   price: number;
   stock: number;
   sort_order?: number;
+  measurement_unit?: 'cm' | 'in';
 }
 
 export interface ArtisanOrderItem {
@@ -64,6 +66,10 @@ export interface ArtisanOrderItem {
   qty?: number;
   quantity?: number;
   variation?: string;
+  dimensions?: string;
+  height?: string;
+  opening_diameter?: string;
+  measurement_unit?: 'cm' | 'in';
 }
 
 export interface ArtisanOrder {

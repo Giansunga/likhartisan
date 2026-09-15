@@ -21,6 +21,7 @@ export interface ProductVariationDraft {
   weightKg: string;
   price: string;
   stock: string;
+  measurementUnit?: 'cm' | 'in';
 }
 
 export interface ProductEditorErrors {

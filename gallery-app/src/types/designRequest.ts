@@ -1,16 +1,18 @@
 import { normalizeAttachmentSelections, type AttachmentSelection } from '../components/freeform/attachments';
 import type { DecorationParams } from '../components/freeform/decor';
 import { normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
+import {
+  DEFAULT_SHAPE_PARAMS_IN,
+  cmToInches,
+  normalizeShapeParams,
+  type ShapeParamsInches,
+} from '../lib/measurements';
 
 export type DesignRequestStatus = 'pending' | 'changes_requested' | 'quoted' | 'declined' | 'approved';
 
-export type DesignShapeParams = {
-  height: number;
-  bodyWidth: number;
-  neckWidth: number;
-  rimSize: number;
-  curvature: number;
-};
+export type DesignShapeParams = ShapeParamsInches;
+
+export type LegacyDesignShapeParams = Omit<DesignShapeParams, 'unit'> & { unit?: 'cm' | 'in' };
 
 export interface DesignRequestSnapshotV1 {
   version: 1;
@@ -19,9 +21,16 @@ export interface DesignRequestSnapshotV1 {
   material: MaterialParams;
   decoration: DecorationParams;
   attachments: AttachmentSelection[];
-  dimensions: { heightCm: number; widthCm: number };
+  dimensions: { heightIn: number; widthIn: number; unit: 'in' };
   estimate: { price: number; productionDays: number };
 }
+
+export type LegacyDesignRequestSnapshotV1 = Omit<DesignRequestSnapshotV1, 'shape' | 'dimensions'> & {
+  shape: LegacyDesignShapeParams;
+  dimensions: { heightCm: number; widthCm: number };
+};
+
+export type StoredDesignRequestSnapshot = DesignRequestSnapshotV1 | LegacyDesignRequestSnapshotV1;
 
 export interface DesignRequest {
   id: string;
@@ -29,7 +38,7 @@ export interface DesignRequest {
   buyer_id: string;
   shop_id: string;
   conversation_id: string | null;
-  design_snapshot: DesignRequestSnapshotV1;
+  design_snapshot: StoredDesignRequestSnapshot;
   quantity: number;
   buyer_note: string;
   status: DesignRequestStatus;
@@ -49,7 +58,7 @@ export interface DesignRequestRevision {
   request_id: string;
   revision_number: number;
   client_token: string;
-  design_snapshot: DesignRequestSnapshotV1;
+  design_snapshot: StoredDesignRequestSnapshot;
   quantity: number;
   buyer_note: string;
   created_by: string;
@@ -118,15 +127,48 @@ export const REQUEST_STATUS_LABELS: Record<DesignRequestStatus, string> = {
   pending: 'Pending', changes_requested: 'Changes Requested', quoted: 'Quoted', declined: 'Declined', approved: 'Approved',
 };
 
+export function normalizeDesignRequestSnapshot(value: unknown): DesignRequestSnapshotV1 {
+  const record = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const rawShape = (record.shape && typeof record.shape === 'object' ? record.shape : {}) as Partial<DesignShapeParams> & { unit?: unknown };
+  const rawDimensions = (record.dimensions && typeof record.dimensions === 'object' ? record.dimensions : {}) as Record<string, unknown>;
+  const legacyUnit = 'cm' as const;
+  const shape = normalizeShapeParams(rawShape, DEFAULT_SHAPE_PARAMS_IN, legacyUnit);
+  const heightIn = Number.isFinite(Number(rawDimensions.heightIn))
+    ? Number(rawDimensions.heightIn)
+    : Number.isFinite(Number(rawDimensions.height)) && rawDimensions.unit === 'in'
+      ? Number(rawDimensions.height)
+      : Number.isFinite(Number(rawDimensions.heightCm))
+        ? cmToInches(Number(rawDimensions.heightCm))
+        : shape.height;
+  const widthIn = Number.isFinite(Number(rawDimensions.widthIn))
+    ? Number(rawDimensions.widthIn)
+    : Number.isFinite(Number(rawDimensions.width)) && rawDimensions.unit === 'in'
+      ? Number(rawDimensions.width)
+      : Number.isFinite(Number(rawDimensions.widthCm))
+        ? cmToInches(Number(rawDimensions.widthCm))
+        : shape.bodyWidth;
+
+  return {
+    version: 1,
+    model: (record.model || {}) as DesignRequestSnapshotV1['model'],
+    shape,
+    material: normalizeMaterialParams(record.material || {}),
+    decoration: (record.decoration || {}) as DecorationParams,
+    attachments: normalizeAttachmentSelections(record.attachments),
+    dimensions: { heightIn, widthIn, unit: 'in' },
+    estimate: (record.estimate || { price: 0, productionDays: 0 }) as DesignRequestSnapshotV1['estimate'],
+  };
+}
+
 export function createDesignRequestSnapshot(input: Omit<DesignRequestSnapshotV1, 'version'>): DesignRequestSnapshotV1 {
   return {
     version: 1,
     model: { ...input.model },
-    shape: { ...input.shape },
+    shape: normalizeShapeParams(input.shape, DEFAULT_SHAPE_PARAMS_IN, 'in'),
     material: normalizeMaterialParams(input.material),
     decoration: { ...input.decoration },
     attachments: normalizeAttachmentSelections(input.attachments),
-    dimensions: { ...input.dimensions },
+    dimensions: { ...input.dimensions, unit: 'in' },
     estimate: { ...input.estimate },
   };
 }

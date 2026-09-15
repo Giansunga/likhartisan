@@ -19,7 +19,8 @@ import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../compon
 import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
-import { createDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
+import { createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
+import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams } from '../lib/measurements';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -39,8 +40,18 @@ const STEPS: { key: Step; label: string; sublabel: string; num: number }[] = [
   { key: 'review', label: 'Review', sublabel: 'Review & share', num: 6 },
 ];
 
-const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
+const DEFAULT_SHAPE = DEFAULT_SHAPE_PARAMS_IN;
 const DEFAULT_MATERIAL: MaterialParams = { finish: 'raw_clay', color: '#BE734F' };
+
+function hasValidDesign(modelFile: string, shapeParams: typeof DEFAULT_SHAPE, materialParams: MaterialParams): boolean {
+  const dimensions = [shapeParams.height, shapeParams.bodyWidth, shapeParams.neckWidth, shapeParams.rimSize];
+  return Boolean(modelFile && materialParams.finish && materialParams.color)
+    && dimensions.every((value) => Number.isFinite(value) && value > 0)
+    && Number.isFinite(shapeParams.curvature)
+    && shapeParams.curvature >= 0
+    && shapeParams.curvature <= 100;
+}
+
 function getFinishLabel(finishId: string): string {
   return getFinishDefinition(finishId).label;
 }
@@ -120,6 +131,7 @@ export default function FreeformPage() {
   const revisionMode = searchParams.get('revise') === '1' && Boolean(revisionRequestId);
 
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
+  const isReviewStep = activeStep === 'review';
 
   /* ─── Helpers ─── */
 
@@ -154,6 +166,7 @@ function applyDesign(design: {
     shop_id?: string;
     shop_name?: string;
     shape_params: typeof DEFAULT_SHAPE;
+    measurement_unit?: 'cm' | 'in' | null;
     material_params: Partial<{ finish: unknown; color: unknown }>;
     decor_params?: DecorationParams;
     attachment_params?: unknown;
@@ -161,7 +174,7 @@ function applyDesign(design: {
     setSelectedModel(design.model_file);
     setSelectedModelId(design.model_id || null);
     setModelName(design.model_name);
-    setShapeParams(design.shape_params || DEFAULT_SHAPE);
+    setShapeParams(normalizeShapeParams(design.shape_params, DEFAULT_SHAPE, design.measurement_unit === 'in' ? 'in' : 'cm'));
     setMaterialParams(normalizeMaterialParams(design.material_params));
     setDecorationParams(design.decor_params || DEFAULT_DECORATION);
     setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
@@ -201,7 +214,7 @@ function applyDesign(design: {
       setModelCategory(design.models_3d?.category || 'Vase');
       setModelThumbnail(design.models_3d?.thumbnail || design.thumbnail || '');
 
-      setShapeParams(design.shape_params || DEFAULT_SHAPE);
+      setShapeParams(normalizeShapeParams(design.shape_params, DEFAULT_SHAPE, design.measurement_unit === 'in' ? 'in' : 'cm'));
       setMaterialParams(normalizeMaterialParams(design.material_params));
       setDecorationParams(design.decor_params || DEFAULT_DECORATION);
       setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
@@ -247,7 +260,7 @@ function applyDesign(design: {
           toast.error('This design request is not available for revision.');
           return;
         }
-        const snapshot = request.design_snapshot as DesignRequestSnapshotV1;
+        const snapshot = normalizeDesignRequestSnapshot(request.design_snapshot);
         const requestShop = Array.isArray(request.shops) ? request.shops[0] : request.shops;
         setSelectedModel(snapshot.model.file);
         setSelectedModelId(snapshot.model.id);
@@ -377,6 +390,11 @@ function applyDesign(design: {
     setActiveStep(STEPS[nextIndex].key);
   }
 
+  function handleNextStep() {
+    if (isReviewStep || !canAdvanceToNext) return;
+    goToAdjacentStep(1);
+  }
+
   function handleResetDesign() {
     const shouldReset = !selectedModel || window.confirm('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
@@ -438,7 +456,8 @@ function applyDesign(design: {
       model_name: modelName,
       model_id: selectedModelId,
       model_file: selectedModel,
-      shape_params: shapeParams,
+       shape_params: { ...shapeParams, unit: 'in' },
+       measurement_unit: 'in',
       material_params: materialParams,
       decor_params: decorationParams,
       attachment_params: attachmentParams,
@@ -460,6 +479,11 @@ function applyDesign(design: {
   /* ─── Send to shop ─── */
 
   async function handleCheckout() {
+    if (!isReviewStep) return;
+    if (!isDesignValid) {
+      toast.error('Complete the required design selections before sending to a shop.');
+      return;
+    }
     if (!selectedModel) {
       toast.error('Please select a model before sending to a shop.');
       setActiveStep('model');
@@ -529,13 +553,15 @@ function applyDesign(design: {
   const attachmentEstimate = attachmentTotals(attachmentParams);
   const estimatedPrice = basePrice + attachmentEstimate.price;
   const estimatedDays = baseDays + attachmentEstimate.productionDays;
+  const isDesignValid = hasValidDesign(selectedModel, shapeParams, materialParams);
+  const canAdvanceToNext = !isReviewStep && isDesignValid && canGoTo(stepIndex + 1);
   const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
     model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
     shape: { ...shapeParams },
     material: { ...materialParams },
     decoration: { ...decorationParams },
     attachments: attachmentParams,
-    dimensions: { heightCm: shapeParams.height, widthCm: shapeParams.bodyWidth },
+    dimensions: { heightIn: shapeParams.height, widthIn: shapeParams.bodyWidth, unit: 'in' },
     estimate: { price: estimatedPrice, productionDays: estimatedDays },
   });
 
@@ -641,7 +667,7 @@ function applyDesign(design: {
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (
-                  <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightCm={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
+                  <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightIn={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
                 )}
                 {activeStep === 'review' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', paddingTop: '80px' }}>
@@ -846,7 +872,7 @@ function applyDesign(design: {
                 </div>
                 <div className="freeform-summary-row-info">
                   <span className="freeform-summary-row-label">DIMENSIONS</span>
-                  <span className="freeform-summary-row-value">H {shapeParams.height}cm &middot; W {shapeParams.bodyWidth}cm</span>
+                  <span className="freeform-summary-row-value">H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</span>
                 </div>
               </div>
 </div>
@@ -877,12 +903,21 @@ function applyDesign(design: {
                 </div>
               </div>
 
-              <button onClick={handleCheckout} className="freeform-summary-send-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
-                </svg>
-                Send to Shop
-              </button>
+              {isReviewStep ? (
+                <button onClick={handleCheckout} disabled={!isDesignValid} className="freeform-summary-send-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
+                  </svg>
+                  Send to Shop
+                </button>
+              ) : (
+                <button onClick={handleNextStep} disabled={!canAdvanceToNext} className="freeform-summary-send-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                    <path d="M5 12h14M13 6l6 6-6 6" />
+                  </svg>
+                  Next
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -905,16 +940,16 @@ function applyDesign(design: {
         {activeStep === 'review' ? (
           <div className="freeform-mobile-review-actions">
             <button type="button" className="freeform-mobile-save" onClick={openSaveModal}>Save</button>
-            <button type="button" className="freeform-mobile-next" onClick={handleCheckout}>Send</button>
+            <button type="button" className="freeform-mobile-next" onClick={handleCheckout} disabled={!isDesignValid}>Send</button>
           </div>
         ) : (
           <button
             type="button"
             className="freeform-mobile-next"
-            onClick={() => goToAdjacentStep(1)}
-            disabled={!selectedModel || stepIndex === STEPS.length - 1}
+            onClick={handleNextStep}
+            disabled={!canAdvanceToNext}
           >
-            Continue <span aria-hidden="true">&#8594;</span>
+            Next <span aria-hidden="true">&#8594;</span>
           </button>
         )}
       </nav>
@@ -974,7 +1009,7 @@ function applyDesign(design: {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Dimensions</span>
-                <span className="freeform-summary-field-value">H {shapeParams.height}cm &middot; W {shapeParams.bodyWidth}cm</span>
+                <span className="freeform-summary-field-value">H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</span>
               </div>
             </div>
 
@@ -1008,12 +1043,21 @@ function applyDesign(design: {
           </div>
 
           <div className="freeform-summary-actions">
-            <button onClick={handleCheckout} className="freeform-summary-save" title="Send to Shop">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
-                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
-              </svg>
-              Send to Shop
-            </button>
+            {isReviewStep ? (
+              <button onClick={handleCheckout} disabled={!isDesignValid} className="freeform-summary-save" title="Send to Shop">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
+                </svg>
+                Send to Shop
+              </button>
+            ) : (
+              <button onClick={handleNextStep} disabled={!canAdvanceToNext} className="freeform-summary-save" title="Next">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+                Next
+              </button>
+            )}
           </div>
         </div>
 

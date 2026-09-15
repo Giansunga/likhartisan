@@ -23,7 +23,7 @@ import '../styles/shop-profile.css';
 type ActionStatus = { tone: 'success' | 'error'; text: string } | null;
 
 const SHOP_FIELDS = 'id, name, owner_name, email, description, about, image, banner, location, created_at';
-const PRODUCT_FIELDS = 'id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at';
+const PRODUCT_FIELDS = 'id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at';
 const ARTISAN_FIELDS = 'id, name, specialty, experience, description, cover_image';
 
 export default function ShopPage() {

@@ -23,6 +23,7 @@ import {
 } from './services/paymongoService.js';
 import { createOrderNotifications, decrementStockForItems } from './services/orderFulfillmentService.js';
 import { createCustomOrderCheckout } from './services/customOrderCheckoutService.js';
+import { normalizeCatalogMeasurement } from './services/measurements.js';
 import { resolveNotificationRecipient } from './services/notificationService.js';
 import { createActivityRouter } from './routes/activity.js';
 
@@ -228,7 +229,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const productIds = [...new Set(validatedItems.map(v => v.item.productId))];
     const productResults = await Promise.all(
       productIds.map(id =>
-        supabase.from('products').select('id, name, price, image, shop_id, shop_name, stock').eq('id', id).single()
+        supabase.from('products').select('id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit').eq('id', id).single()
       )
     );
 
@@ -245,7 +246,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     const variationResults = await Promise.all(
       variationItems.map(v =>
         supabase.from('product_variations')
-          .select('id, product_id, price, stock, dimensions, height, opening_diameter')
+          .select('id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit')
           .eq('id', v.item.variationId)
           .single()
       )
@@ -286,6 +287,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
 
       let unitPrice = Number(product.price) || 0;
       let variationLabel = item.variation || '';
+      let measurementSource = product;
 
       if (item.variationId) {
         const variation = variationMap.get(item.variationId);
@@ -295,12 +297,19 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         if (variation.price !== null && variation.price !== undefined) {
           unitPrice = Number(variation.price) || unitPrice;
         }
+        measurementSource = variation;
         variationLabel = [
-          variation.dimensions,
-          variation.height ? `H: ${variation.height}` : '',
-          variation.opening_diameter ? `Opening: ${variation.opening_diameter}` : '',
+          variation.dimensions ? normalizeCatalogMeasurement(variation.dimensions, variation.measurement_unit === 'in' ? 'in' : 'cm') : '',
+          variation.height ? `H: ${normalizeCatalogMeasurement(variation.height, variation.measurement_unit === 'in' ? 'in' : 'cm')}` : '',
+          variation.opening_diameter ? `Opening: ${normalizeCatalogMeasurement(variation.opening_diameter, variation.measurement_unit === 'in' ? 'in' : 'cm')}` : '',
         ].filter(Boolean).join(' | ');
       }
+
+      const measurementUnit = 'in';
+      const measurementSourceUnit = measurementSource.measurement_unit === 'in' ? 'in' : 'cm';
+      const dimensions = normalizeCatalogMeasurement(measurementSource.dimensions, measurementSourceUnit);
+      const height = normalizeCatalogMeasurement(measurementSource.height, measurementSourceUnit);
+      const openingDiameter = normalizeCatalogMeasurement(measurementSource.opening_diameter, measurementSourceUnit);
 
       verifiedSubtotal += unitPrice * qty;
       verifiedItems.push({
@@ -309,9 +318,13 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         image: product.image || item.image || '',
         shopId: product.shop_id || null,
         shopName: product.shop_name || item.shopName || '',
-        variationId: item.variationId || null,
-        variation: variationLabel,
-        price: unitPrice,
+         variationId: item.variationId || null,
+         variation: variationLabel,
+         dimensions,
+         height,
+         opening_diameter: openingDiameter,
+         measurement_unit: measurementUnit,
+         price: unitPrice,
         qty,
       });
     }

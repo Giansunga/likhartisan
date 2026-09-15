@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SellerDesignDetails from '../SellerDesignDetails';
-import type { DesignRequestSnapshotV1 } from '../../../types/designRequest';
+import type { StoredDesignRequestSnapshot } from '../../../types/designRequest';
 import { DEFAULT_ATTACHMENT_TRANSFORM } from '../../freeform/attachments';
 
 const viewerSpies = vi.hoisted(() => ({ reset: vi.fn(), update: vi.fn() }));
@@ -16,7 +16,7 @@ vi.mock('../../freeform/FreeformViewer', () => ({
   },
 }));
 
-const snapshot: DesignRequestSnapshotV1 = {
+const snapshot: StoredDesignRequestSnapshot = {
   version: 1,
   model: { id: 'model-1', name: 'Bamboo Vase', file: '/vase.glb', thumbnail: '/vase.png', category: 'Vases' },
   shape: { height: 30, bodyWidth: 22, neckWidth: 14, rimSize: 12, curvature: 55 },
@@ -73,10 +73,10 @@ describe('SellerDesignDetails', () => {
     expect(screen.getByText('Gian Rafael Sunga')).toBeInTheDocument();
     expect(screen.getAllByText('Bamboo Vase').length).toBeGreaterThan(0);
     expect(screen.getByText('model-1')).toBeInTheDocument();
-    expect(screen.getByText('30 cm')).toBeInTheDocument();
-    expect(screen.getByText('22 cm')).toBeInTheDocument();
-    expect(screen.getByText('14 cm')).toBeInTheDocument();
-    expect(screen.getByText('12 cm')).toBeInTheDocument();
+  expect(screen.getByText('11.81 in')).toBeInTheDocument();
+  expect(screen.getByText('8.66 in')).toBeInTheDocument();
+  expect(screen.getByText('5.51 in')).toBeInTheDocument();
+  expect(screen.getByText('4.72 in')).toBeInTheDocument();
     expect(screen.getByText('55%')).toBeInTheDocument();
     expect(screen.getByText('Glossy')).toBeInTheDocument();
     expect(screen.getByText('#C65A2E')).toBeInTheDocument();
