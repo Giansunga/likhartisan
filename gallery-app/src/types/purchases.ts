@@ -9,9 +9,6 @@ export interface PurchaseItem {
   quantity: number;
   price: number;
   dimensions?: string;
-  height?: string;
-  openingDiameter?: string;
-  measurementUnit?: 'cm' | 'in';
   variation?: string;
   shopId: string;
   shopName: string;

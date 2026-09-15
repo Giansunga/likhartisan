@@ -29,15 +29,15 @@ describe('formatVariation', () => {
   });
 
   it('returns dimensions if present', () => {
-    expect(formatVariation({ dimensions: '10 x 5 in' })).toBe('10.00 in x 5.00 in');
+    expect(formatVariation({ dimensions: '10 x 5 in' })).toBe('10 x 5 in');
   });
 
   it('ignores N/A dimensions', () => {
-    expect(formatVariation({ dimensions: 'N/A', height: '20cm' })).toBe('7.87 in');
+    expect(formatVariation({ dimensions: 'N/A', height: '20cm' })).toBe('20cm');
   });
 
   it('joins height and opening with bullet', () => {
-    expect(formatVariation({ height: '20cm', openingDiameter: '10cm' })).toBe('7.87 in \u2022 3.94 in');
+    expect(formatVariation({ height: '20cm', openingDiameter: '10cm' })).toBe('20cm \u2022 10cm');
   });
 });
 
@@ -47,11 +47,11 @@ describe('displayVariation', () => {
   });
 
   it('returns first part before bullet', () => {
-    expect(displayVariation('10 x 5 in \u2022 20cm')).toBe('10.00 in x 5.00 in');
+    expect(displayVariation('10 x 5 in \u2022 20cm')).toBe('10 x 5 in');
   });
 
   it('returns raw string if no bullet', () => {
-    expect(displayVariation('10 x 5 in')).toBe('10.00 in x 5.00 in');
+    expect(displayVariation('10 x 5 in')).toBe('10 x 5 in');
   });
 });
 
@@ -83,7 +83,7 @@ describe('mapSupabaseProduct', () => {
     const result = mapSupabaseProduct(row);
     expect(result.id).toBe('1');
     expect(result.name).toBe('Vase');
-    expect(result.openingDiameter).toBe('3.94 in');
+    expect(result.openingDiameter).toBe('10cm');
     expect(result.shopId).toBe('s1');
   });
 

@@ -10,14 +10,13 @@ import {
 import { GENERATED_ATTACHMENT_RECIPES } from '../../components/freeform/generatedAttachmentCatalog';
 import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
-import { DEFAULT_SHAPE_PARAMS_IN } from '../../lib/measurements';
 
 type Shop = { id: string; name: string };
 type Model = { id: string; name: string; file_url: string; status: string };
 type GlobalDraft = { active: boolean; price: number; days: number };
 type OverrideDraft = { mode: 'inherit' | 'enabled' | 'disabled'; price: string; days: string };
 
-const DEFAULT_SHAPE = DEFAULT_SHAPE_PARAMS_IN;
+const DEFAULT_SHAPE = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
 
 export default function AttachmentManagePanel({ onBack }: { onBack: () => void }) {
   const [shops, setShops] = useState<Shop[]>([]);

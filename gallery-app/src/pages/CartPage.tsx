@@ -22,7 +22,6 @@ import {
   type CartLineAvailability,
 } from '../components/cart/CartComponents';
 import { fmt } from '../lib/utils';
-import { inchesToCm, normalizeCatalogMeasurement, parseDimensionToInches } from '../lib/measurements';
 import './CartPage.css';
 
 const VEHICLE_TIERS = [
@@ -64,7 +63,6 @@ interface ProductCatalogRow {
   status: string;
   dimensions?: string;
   height?: string;
-  measurement_unit?: 'cm' | 'in';
 }
 
 interface VariationCatalogRow {
@@ -74,7 +72,6 @@ interface VariationCatalogRow {
   stock: number;
   dimensions?: string;
   height?: string;
-  measurement_unit?: 'cm' | 'in';
 }
 
 interface ShopLocationRow {
@@ -82,8 +79,15 @@ interface ShopLocationRow {
   location?: string;
 }
 
-function parseDimensionToTransportCm(value: string): number {
-  return inchesToCm(parseDimensionToInches(value, 'in'));
+function parseDimensionToCm(value: string): number {
+  if (!value) return 0;
+  const normalized = value.toLowerCase().trim();
+  const cm = normalized.match(/([\d.]+)\s*cm/);
+  if (cm) return Number(cm[1]);
+  const inches = normalized.match(/([\d.]+)\s*(?:"|in)/);
+  if (inches) return Number(inches[1]) * 2.54;
+  const number = Number.parseFloat(normalized);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function initialShopSelection(items: CartItem[]): { shopKey: string | null; lineKeys: Set<string> } {
@@ -136,10 +140,10 @@ export default function CartPage() {
       try {
         const [productsResult, variationsResult, shopsResult] = await Promise.all([
           supabase.from('products')
-            .select('id, name, price, image, shop_id, shop_name, stock, status, dimensions, height, measurement_unit')
+            .select('id, name, price, image, shop_id, shop_name, stock, status, dimensions, height')
             .in('id', productIds),
           variationIds.length
-            ? supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height, measurement_unit').in('id', variationIds)
+            ? supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height').in('id', variationIds)
             : Promise.resolve({ data: [], error: null }),
           shopIds.length
             ? supabase.from('shops').select('id, location').in('id', shopIds)
@@ -177,8 +181,8 @@ export default function CartPage() {
             stock,
             available,
             priceChanged,
-            dimensions: normalizeCatalogMeasurement(variation?.dimensions || product?.dimensions || '', variation?.measurement_unit || product?.measurement_unit || 'cm'),
-            height: normalizeCatalogMeasurement(variation?.height || product?.height || '', variation?.measurement_unit || product?.measurement_unit || 'cm'),
+            dimensions: variation?.dimensions || product?.dimensions || '',
+            height: variation?.height || product?.height || '',
           };
 
           if (!priceChanged && !quantityChanged) return item;
@@ -249,10 +253,10 @@ export default function CartPage() {
     let weight = 0;
     for (const item of selectedItems) {
       const info = catalog[getCartLineKey(item)];
-       const parts = (info?.dimensions || '').split(/x|×/i).map(part => parseDimensionToTransportCm(part));
+      const parts = (info?.dimensions || '').split(/x/i).map(part => parseDimensionToCm(part));
       const length = parts[0] || 30;
       const width = parts[1] || length;
-       const height = parseDimensionToTransportCm(info?.height || '') || 30;
+      const height = parseDimensionToCm(info?.height || '') || 30;
       volume += length * width * height * item.qty;
       // Finished pottery is hollow; approximate clay as 5% of its bounding volume.
       weight += Math.max(1, (length * width * height * 0.05 * 2.5) / 1000) * item.qty;

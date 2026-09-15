@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS products (
   dimensions TEXT DEFAULT '',
   height TEXT DEFAULT '',
   opening_diameter TEXT DEFAULT '',
-  measurement_unit TEXT NOT NULL DEFAULT 'in',
   technique TEXT DEFAULT 'Handcrafted & Kiln-Fired',
   shop_id UUID REFERENCES shops(id) ON DELETE CASCADE,
   shop_name TEXT NOT NULL,
@@ -65,7 +64,6 @@ CREATE TABLE IF NOT EXISTS product_variations (
   dimensions TEXT DEFAULT '',
   height TEXT DEFAULT '',
   opening_diameter TEXT DEFAULT '',
-  measurement_unit TEXT NOT NULL DEFAULT 'in',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -174,7 +172,6 @@ CREATE TABLE IF NOT EXISTS designs (
   shape_params JSONB DEFAULT '{}',
   material_params JSONB DEFAULT '{}',
   decor_params JSONB DEFAULT '{}',
-  measurement_unit TEXT NOT NULL DEFAULT 'in',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

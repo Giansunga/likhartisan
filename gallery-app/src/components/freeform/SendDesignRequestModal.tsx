@@ -5,7 +5,6 @@ import { getFinishDefinition } from './materials';
 import FreeformViewer from './FreeformViewer';
 import type { DesignRequestSnapshotV1 } from '../../types/designRequest';
 import { useOverlayA11y } from '../artisan/useOverlayA11y';
-import { formatInches } from '../../lib/measurements';
 
 export type RequestShop = { id: string; name: string; image?: string; location?: string };
 
@@ -72,7 +71,7 @@ export default function SendDesignRequestModal({
                   <div><dt>Finish</dt><dd><i style={{ background: snapshot.material.color }} />{getFinishDefinition(snapshot.material.finish).label}</dd></div>
                   <div><dt>Pattern</dt><dd>{pattern}</dd></div>
                   <div><dt>Attachments</dt><dd>{snapshot.attachments.length || 'None'}</dd></div>
-                  <div><dt>Dimensions</dt><dd>H {formatInches(snapshot.dimensions.heightIn)} · W {formatInches(snapshot.dimensions.widthIn)}</dd></div>
+                  <div><dt>Dimensions</dt><dd>H {snapshot.dimensions.heightCm} cm · W {snapshot.dimensions.widthCm} cm</dd></div>
                 </dl>
                 <div className="freeform-request-estimate"><span><small>ESTIMATED PRICE</small><strong>₱{snapshot.estimate.price.toLocaleString()}</strong></span><span><small>EST. PRODUCTION</small><strong>{snapshot.estimate.productionDays} days</strong></span><p>Final price and timing are set by the shop.</p></div>
                 <label className="freeform-request-field"><span>Quantity</span><input type="number" min={1} max={100} value={quantity} onChange={event => setQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></label>

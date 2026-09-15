@@ -28,7 +28,6 @@ import {
 } from './attachmentPlacement';
 import { GENERATED_ATTACHMENT_RECIPES, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import PanelSection from './PanelSection';
-import { formatInches } from '../../lib/measurements';
 
 type SocketGroup = { key: string; name: string; sockets: GeneratedAttachmentSocket[] };
 type ControlKey = keyof AttachmentPlacementTransform;
@@ -43,9 +42,9 @@ const CONTROL_CONFIG: Array<{ key: ControlKey; label: string }> = [
   { key: 'thicknessMultiplier', label: 'Handle Thickness' },
 ];
 
-function formatControlValue(key: ControlKey, value: number, modelHeightIn: number) {
+function formatControlValue(key: ControlKey, value: number, modelHeightCm: number) {
   if (key === 'horizontalDegrees' || key === 'twistDegrees') return `${Math.round(value)}°`;
-  if (key === 'verticalRatio' || key === 'surfaceOffsetRatio') return formatInches(value * modelHeightIn, 1);
+  if (key === 'verticalRatio' || key === 'surfaceOffsetRatio') return `${(value * modelHeightCm).toFixed(1)} cm`;
   return `${Math.round(value * 100)}%`;
 }
 
@@ -53,11 +52,11 @@ function rangesEqualTransform(a: AttachmentPlacementTransform, b: AttachmentPlac
   return CONTROL_CONFIG.every(({ key }) => Math.abs(a[key] - b[key]) < 0.000001);
 }
 
-export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn, value, placementLimits, onChange, onCompatibilityWarning }: {
+export default function AttachmentTab({ shopId, modelId, sockets, modelHeightCm, value, placementLimits, onChange, onCompatibilityWarning }: {
   shopId: string | null;
   modelId: string | null;
   sockets: GeneratedAttachmentSocket[];
-  modelHeightIn: number;
+  modelHeightCm: number;
   value: AttachmentSelection[];
   placementLimits?: AttachmentPlacementLimitMap;
   onChange: (attachments: AttachmentSelection[]) => void;
@@ -199,7 +198,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
     const range = limits[key] as TransformRange;
     const inputId = `attachment-${selection.id}-${socketId}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
     return <div className="attachment-offset-control" key={key}>
-      <span><label htmlFor={inputId}><strong>{label}</strong></label><output htmlFor={inputId}>{formatControlValue(key, transform[key], modelHeightIn)}</output></span>
+      <span><label htmlFor={inputId}><strong>{label}</strong></label><output htmlFor={inputId}>{formatControlValue(key, transform[key], modelHeightCm)}</output></span>
       <input id={inputId} aria-label={label} type="range" min={range.min} max={range.max} step={key === 'thicknessMultiplier' ? range.step : 'any'} value={transform[key]} onChange={(event) => updateControl(selection, socketId, key, Number(event.target.value), limits)} />
     </div>;
   }

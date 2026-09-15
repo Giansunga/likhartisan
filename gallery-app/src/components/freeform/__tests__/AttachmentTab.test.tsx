@@ -30,7 +30,7 @@ const sockets: GeneratedAttachmentSocket[] = [
 describe('AttachmentTab guided workflow', () => {
   it('advances through selection and placement, then exposes independent controls', async () => {
     const onChange = vi.fn();
-    const { rerender } = render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={[]} onChange={onChange} />);
+    const { rerender } = render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightCm={25} value={[]} onChange={onChange} />);
     const attachmentCard = await screen.findByRole('button', { name: /Bamboo Loop/ });
     expect(screen.getByRole('button', { name: /Choose Attachment/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: /Choose Position/ })).toBeDisabled();
@@ -48,7 +48,7 @@ describe('AttachmentTab guided workflow', () => {
 
     function Harness() {
       const [value, setValue] = useState<AttachmentSelection[]>([selection]);
-      return <AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={value} onChange={(next) => { onChange(next); setValue(next); }} />;
+      return <AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightCm={25} value={value} onChange={(next) => { onChange(next); setValue(next); }} />;
     }
     rerender(<Harness />);
     await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
@@ -102,7 +102,7 @@ describe('AttachmentTab guided workflow', () => {
       priceAdjustment: 80,
       productionDaysAdjustment: 1,
     };
-    render(<AttachmentTab shopId={null} modelId="model-1" sockets={[bodySocket]} modelHeightIn={10} value={[bodySelection]} onChange={() => {}} />);
+    render(<AttachmentTab shopId={null} modelId="model-1" sockets={[bodySocket]} modelHeightCm={25} value={[bodySelection]} onChange={() => {}} />);
     await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
     expect(screen.queryByLabelText('Handle Thickness')).not.toBeInTheDocument();
   });

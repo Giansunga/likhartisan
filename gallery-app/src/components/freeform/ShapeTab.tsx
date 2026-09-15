@@ -1,24 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_SHAPE_PARAMS_IN, formatInches, type ShapeParamsInches } from '../../lib/measurements';
 
-type ShapeParams = ShapeParamsInches;
-type ShapeControlKey = Exclude<keyof ShapeParams, 'unit'>;
+interface ShapeParams {
+  height: number;
+  bodyWidth: number;
+  neckWidth: number;
+  rimSize: number;
+  curvature: number;
+}
 
 const SLIDERS: {
-  key: ShapeControlKey;
+  key: keyof ShapeParams;
   label: string;
   description: string;
   min: number;
   max: number;
 }[] = [
-  { key: 'height', label: 'Height', description: 'Full pottery height', min: 2, max: 20 },
-  { key: 'bodyWidth', label: 'Body Width', description: 'Widest part / mid-part', min: 2, max: 16 },
-  { key: 'neckWidth', label: 'Neck Width', description: 'Narrow neck opening', min: 1, max: 12 },
-  { key: 'rimSize', label: 'Rim Size', description: 'Mouth rim / flare diameter', min: 1, max: 10 },
+  { key: 'height', label: 'Height', description: 'Full pottery height', min: 0, max: 50 },
+  { key: 'bodyWidth', label: 'Body Width', description: 'Widest part / mid-part', min: 0, max: 40 },
+  { key: 'neckWidth', label: 'Neck Width', description: 'Narrow neck opening', min: 0, max: 30 },
+  { key: 'rimSize', label: 'Rim Size', description: 'Mouth rim / flare diameter', min: 0, max: 25 },
   { key: 'curvature', label: 'Curvature', description: 'Base bulge -- low = straight, high = curved', min: 0, max: 100 },
 ];
 
-const DEFAULTS: ShapeParams = DEFAULT_SHAPE_PARAMS_IN;
+const DEFAULTS: ShapeParams = { height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 };
 
 export default function ShapeTab({
   shapeParams,
@@ -87,7 +91,7 @@ export default function ShapeTab({
             <div key={s.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.label}</label>
-                <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{s.key === 'curvature' ? `${val.toFixed(0)}%` : formatInches(val)}</span>
+                <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{val.toFixed(0)} cm</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
               <input
@@ -105,7 +109,6 @@ export default function ShapeTab({
                   if (interactingRef.current) endInteraction();
                 }}
                 onChange={(e) => handleChange(s.key, Number(e.target.value))}
-                step={s.key === 'curvature' ? 1 : 0.1}
                 className="freeform-tab-slider"
                 style={{
                   background: `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${pct}%, var(--bg-tertiary) ${pct}%, var(--bg-tertiary) 100%)`,

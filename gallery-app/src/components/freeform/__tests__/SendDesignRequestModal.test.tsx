@@ -8,10 +8,10 @@ vi.mock('../FreeformViewer', () => ({ default: () => <div data-testid="request-v
 const snapshot: DesignRequestSnapshotV1 = {
   version: 1,
   model: { id: 'model-1', name: 'Regala Vase', file: '/vase.glb', thumbnail: '', category: 'Vase' },
-  shape: { height: 30, bodyWidth: 22, neckWidth: 14, rimSize: 12, curvature: 55, unit: 'in' },
+  shape: { height: 30, bodyWidth: 22, neckWidth: 14, rimSize: 12, curvature: 55 },
   material: { finish: 'raw_clay', color: '#BE734F' },
   decoration: { patternId: 'floral', placement: 'full', scale: 1, color: '#315A9F', effect: 'painted' },
-  attachments: [], dimensions: { heightIn: 30, widthIn: 22, unit: 'in' }, estimate: { price: 1250, productionDays: 5 },
+  attachments: [], dimensions: { heightCm: 30, widthCm: 22 }, estimate: { price: 1250, productionDays: 5 },
 };
 
 describe('SendDesignRequestModal', () => {

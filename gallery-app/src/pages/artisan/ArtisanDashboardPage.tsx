@@ -20,7 +20,6 @@ import { SellerConfirmDialog } from '../../components/artisan/Overlay';
 import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { signOutWithActivity } from '../../lib/activityApi';
-import { normalizeCatalogMeasurement } from '../../lib/measurements';
 
 // Shimmer keyframes & classes are defined globally in src/index.css
 
@@ -829,7 +828,7 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
       .order('sort_order');
     if (data) {
       setVariations(data.map((v: any) => ({
-        id: v.id, dimensions: normalizeCatalogMeasurement(v.dimensions, v.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(v.height, v.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(v.opening_diameter, v.measurement_unit === 'in' ? 'in' : 'cm'),
+        id: v.id, dimensions: v.dimensions, height: v.height, openingDiameter: v.opening_diameter,
         price: v.price != null ? String(v.price) : '', stock: String(v.stock),
       })));
     } else {
@@ -871,19 +870,17 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
       if (!v.dimensions.trim() && !v.height.trim() && !v.openingDiameter.trim()) return;
       if (v.id) {
         await supabase.from('product_variations').update({
-          dimensions: normalizeCatalogMeasurement(v.dimensions.trim() || 'N/A', 'in'),
-          height: normalizeCatalogMeasurement(v.height.trim() || 'N/A', 'in'),
-          opening_diameter: normalizeCatalogMeasurement(v.openingDiameter.trim() || 'N/A', 'in'),
-          measurement_unit: 'in',
+          dimensions: v.dimensions.trim() || 'N/A',
+          height: v.height.trim() || 'N/A',
+          opening_diameter: v.openingDiameter.trim() || 'N/A',
           price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
         }).eq('id', v.id);
       } else {
         await supabase.from('product_variations').insert({
           product_id: editing.id,
-          dimensions: normalizeCatalogMeasurement(v.dimensions.trim() || 'N/A', 'in'),
-          height: normalizeCatalogMeasurement(v.height.trim() || 'N/A', 'in'),
-          opening_diameter: normalizeCatalogMeasurement(v.openingDiameter.trim() || 'N/A', 'in'),
-          measurement_unit: 'in',
+          dimensions: v.dimensions.trim() || 'N/A',
+          height: v.height.trim() || 'N/A',
+          opening_diameter: v.openingDiameter.trim() || 'N/A',
           price: v.price ? Number(v.price) : null, stock: Number(v.stock) || 0,
           sort_order: variations.indexOf(v),
         });
@@ -1117,8 +1114,8 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Dimensions (in)</label>
-                            <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 6 in × 4 in"
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Dimensions</label>
+                            <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 15cm x 10cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -1129,8 +1126,8 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Height (in)</label>
-                            <input value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 8 in"
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Height</label>
+                            <input value={v.height} onChange={e => updateVariation(i, 'height', e.target.value)} placeholder="e.g. 20cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',
@@ -1141,8 +1138,8 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Opening Diameter (in)</label>
-                            <input value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 3 in"
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', marginBottom: '5px' }}>Opening Diameter</label>
+                            <input value={v.openingDiameter} onChange={e => updateVariation(i, 'openingDiameter', e.target.value)} placeholder="e.g. 8cm"
                               style={{
                                 width: '100%', padding: '9px 12px', border: '1.5px solid #E8E0D8', borderRadius: '8px',
                                 fontSize: '0.85rem', boxSizing: 'border-box', color: '#2C1810', background: '#fff',

@@ -19,7 +19,6 @@ import {
 import { applyGeneratedAttachmentThickness, disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensurePhysicalMaterials, generateCylindricalUVs } from './finishMaterials';
 import type { MaterialParams } from './materials';
-import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -44,7 +43,7 @@ function LoadingIndicator() {
   );
 }
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in' };
+type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
 
 type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
@@ -242,18 +241,6 @@ function Scene({
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
   const modelBoundsRef = useRef<ModelBounds>({ minY: 0, rangeY: 1, centerX: 0, centerY: 0, centerZ: 0 });
 
-  // Keep the established Three.js geometry scale in centimeters while the
-  // user-facing and persisted shape values are canonical inches.
-  const geometryShapeParams = shapeParams.unit === 'in'
-    ? {
-      ...shapeParams,
-      height: inchesToCm(shapeParams.height),
-      bodyWidth: inchesToCm(shapeParams.bodyWidth),
-      neckWidth: inchesToCm(shapeParams.neckWidth),
-      rimSize: inchesToCm(shapeParams.rimSize),
-    }
-    : shapeParams;
-
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
     clonedScene.traverse((child) => {
@@ -349,20 +336,20 @@ function Scene({
       morphChecked.current = true;
     }
 
-    const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}`;
+    const shapeKey = `${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`;
     const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
     const shapeChanged = appliedShapeRef.current !== shapeKey;
     const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
-    const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / 25, 0.35, 1.8);
-    const bodyDelta = normalizeParam(geometryShapeParams.bodyWidth, 20);
-    const neckDelta = normalizeParam(geometryShapeParams.neckWidth, 15);
-    const rimDelta = normalizeParam(geometryShapeParams.rimSize, 12);
-    const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
+    const hScale = THREE.MathUtils.clamp(shapeParams.height / 25, 0.35, 1.8);
+    const bodyDelta = normalizeParam(shapeParams.bodyWidth, 20);
+    const neckDelta = normalizeParam(shapeParams.neckWidth, 15);
+    const rimDelta = normalizeParam(shapeParams.rimSize, 12);
+    const curvatureDelta = normalizeParam(shapeParams.curvature, 50);
     const { minY, rangeY, centerX, centerY, centerZ } = modelBoundsRef.current;
     const decorProjection = getDecorationProjection(
       { minY, rangeY, centerY },
       hScale,
-      geometryShapeParams.bodyWidth,
+      shapeParams.bodyWidth,
       decorationParams.scale,
     );
     const rootVertex = new THREE.Vector3();
@@ -529,8 +516,8 @@ function Scene({
       <primitive object={scene} />
       {showAttachmentSockets && attachmentSockets.map((socket) => <AttachmentSocketMarker key={socket.id} socket={socket} baseScene={scene} selected={selectedSocketIds.includes(socket.id)} />)}
       {attachmentParams.flatMap((attachment) => attachment.placements.map((placement) => (
-          <AttachmentErrorBoundary key={`${attachment.recipeKey}-${attachment.recipeVersion}-${placement.socket.id}`} onError={() => onAttachmentError?.(attachment)}>
-          <AttachmentModel attachment={attachment} placement={placement} currentSocket={attachmentSockets.find((socket) => socket.id === placement.socket.id)} material={materialParams} baseScene={scene} shapeKey={`${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}`} />
+        <AttachmentErrorBoundary key={`${attachment.recipeKey}-${attachment.recipeVersion}-${placement.socket.id}`} onError={() => onAttachmentError?.(attachment)}>
+          <AttachmentModel attachment={attachment} placement={placement} currentSocket={attachmentSockets.find((socket) => socket.id === placement.socket.id)} material={materialParams} baseScene={scene} shapeKey={`${shapeParams.height}|${shapeParams.bodyWidth}|${shapeParams.neckWidth}|${shapeParams.rimSize}|${shapeParams.curvature}`} />
         </AttachmentErrorBoundary>
       )))}
     </group>

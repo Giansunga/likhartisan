@@ -38,7 +38,7 @@ export default function RecommendationsSection({
     if (preferredCategories.length > 0) {
       const { data } = await supabase
         .from('products')
-      .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+        .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
         .in('category', preferredCategories)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -56,7 +56,7 @@ export default function RecommendationsSection({
       const existingIds = new Set(results.map(p => p.id));
       const { data } = await supabase
         .from('products')
-      .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+        .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
         .in('shop_id', preferredShopIds)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -75,7 +75,7 @@ export default function RecommendationsSection({
       const existingIds = new Set(results.map(p => p.id));
       const { data } = await supabase
         .from('products')
-      .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+        .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, technique, shop_id, shop_name, status, views, created_at, updated_at')
         .eq('status', 'active')
         .order('views', { ascending: false })
         .limit(limit + excludeProductIds.length + 10);
