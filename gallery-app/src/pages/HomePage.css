@@ -124,6 +124,19 @@
 .home-rail-state p { margin: 0; font-size: .86rem; }
 .home-rail-state a { color: #813d0d; font-size: .8rem; font-weight: 800; }
 
+/* Santo Tomas shop tour */
+.home-shop-tour { position: relative; overflow: hidden; background: #f4ece3; }
+.home-shop-tour::before { position: absolute; top: 84px; left: max(-170px, calc(50% - 860px)); width: 330px; height: 330px; border: 1px solid rgba(141,72,26,.22); border-radius: 50%; content: ""; }
+.home-shop-tour::after { position: absolute; right: max(-115px, calc(50% - 830px)); bottom: 62px; width: 230px; height: 230px; border: 1px solid rgba(141,72,26,.16); border-radius: 50%; content: ""; }
+.home-shop-tour .home-container { position: relative; z-index: 1; }
+.home-shop-tour__intro { margin: 0 auto clamp(34px, 4vw, 52px); }
+.home-shop-tour__heading { max-width: none; margin: 0; }
+.home-shop-tour__heading h2 { white-space: nowrap; }
+.home-shop-tour__video-wrap { width: min(1290px, calc(100% + clamp(0px, 5vw, 90px))); margin: 0 auto; }
+.home-shop-tour__frame { position: relative; overflow: hidden; aspect-ratio: 16 / 9; border: 8px solid #fffaf5; border-radius: 3px; background: #2a1c15; box-shadow: 0 22px 48px rgba(61,34,15,.16), 0 0 0 1px rgba(103,57,29,.14); }
+.home-shop-tour__frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+.home-shop-tour__caption { margin: 16px 0 0; color: #806957 !important; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
 /* Reader notes / Reviews */
 .home-reviews { background: var(--home-paper); overflow: hidden; }
 .home-reviews .home-section-heading { margin-bottom: 38px; }
@@ -166,6 +179,8 @@
   .home-editorial-details > div { grid-template-columns: 70px 1fr; padding-inline: 4px; }
   .home-editorial-details > div + div { border-top: 1px solid var(--home-rule); border-left: 0; }
   .home-section-heading--split { align-items: flex-start; flex-direction: column; gap: 18px; }
+  .home-shop-tour__frame { border-width: 5px; }
+  .home-shop-tour__heading h2 { white-space: normal; }
   .home-section-heading--split > p { margin: 0; }
   .home-chapter-grid { grid-template-columns: 1fr; border-bottom: 0; }
   .home-chapter-grid li + li { border-top: 1px solid rgba(255,255,255,.2); border-left: 0; }
@@ -184,6 +199,7 @@
   .home-editorial-photo figcaption { font-size: .64rem; }
   .home-editorial-details > div { grid-template-columns: 58px 1fr; }
   .home-section-heading--split h2 { font-size: 2.25rem; }
+  .home-shop-tour__caption { align-items: flex-start; font-size: .64rem; line-height: 1.45; }
   .home-rail-controls button { width: 38px; height: 38px; }
   .home-section-heading__actions > .home-text-link { display: none; }
   .home-collection-card,.home-collection-card--1,.home-collection-card--4 { width: 83vw; min-width: 83vw; height: 320px; }

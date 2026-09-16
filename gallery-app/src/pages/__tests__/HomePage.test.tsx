@@ -48,11 +48,16 @@ describe('HomePage editorial landing page', () => {
     const collections = screen.getByRole('heading', { name: /Pottery for everyday rituals/i });
     const shops = screen.getByTestId('shop-rail');
     const freeform = screen.getByTestId('freeform-scroller');
+    const shopTour = screen.getByRole('heading', { name: 'A Tour of Santo Tomas: Inside the Shops' }).closest('section');
     const reviews = screen.getByTestId('review-rail');
     [editorial, collections, shops, freeform, reviews, chapters].reduce((previous, current) => {
       expect(previous.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       return current;
     }, hero);
+    expect(shopTour).not.toBeNull();
+    expect(shopTour?.nextElementSibling).toBe(reviews);
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/yrfUUl-jhAQ');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('loading', 'lazy');
     expect(screen.getByAltText('Rows of finished clay pots in a Santo Tomas workshop')).toHaveAttribute('src', '/images/hero_1.jpg');
     expect(screen.getByAltText('A potter shaping a large clay vessel')).toHaveAttribute('src', '/images/history_bottom_right.jpg');
     expect(screen.getByAltText('Two pottery workers shaping a large clay vessel in a Santo Tomas workshop')).toHaveAttribute('src', '/images/artisan_1.jpg');

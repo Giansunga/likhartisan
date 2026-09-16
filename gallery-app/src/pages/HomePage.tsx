@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HomeReviewRail, { type HomeReview } from '../components/home/HomeReviewRail';
 import HomeShopRail, { type HomeShop } from '../components/home/HomeShopRail';
+import HomeShopTourSection from '../components/home/HomeShopTourSection';
 import FreeformScrollSection from '../components/freeform/FreeformScrollSection';
 import { supabase } from '../lib/supabase';
 import './HomePage.css';
@@ -129,6 +130,8 @@ export default function HomePage() {
 
     {/* Freeform scroller: intentionally unchanged, repositioned as the design feature. */}
     <FreeformScrollSection />
+
+    <HomeShopTourSection />
 
     <HomeReviewRail reviews={reviews} />
 
