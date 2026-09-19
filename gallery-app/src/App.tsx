@@ -20,6 +20,7 @@ import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import LikhAIDock from './components/LikhAIDock';
+import { QuoteReviewProvider } from './components/chat/QuoteReviewContext';
 import AdminLayout from './components/admin/AdminLayout';
 import ArtisanLayout from './components/artisan/ArtisanLayout';
 import {
@@ -164,7 +165,7 @@ function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <QuoteReviewProvider><AppShell /></QuoteReviewProvider>
       <SpeedInsights />
     </BrowserRouter>
   );

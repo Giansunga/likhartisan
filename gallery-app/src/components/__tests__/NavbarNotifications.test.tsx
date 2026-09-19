@@ -6,16 +6,20 @@ import type { NotificationContext, NotificationRecord } from '../../types/notifi
 const markRead = vi.fn(async () => undefined);
 const markAllRead = vi.fn(async () => undefined);
 const reload = vi.fn(async () => undefined);
+const openQuoteReview = vi.fn();
 let requestedContext: NotificationContext | undefined;
+let buyerNotifications: NotificationRecord[] = [];
 
 const buyerOrder: NotificationRecord = { id: 'buyer-order', user_id: 'user-1', type: 'shipped', title: 'Shipped out', message: 'Order update', order_id: 'order / 1', recipient_context: 'buyer', read: false, created_at: '2026-08-15T08:00:00Z' };
 const artisanMessage: NotificationRecord = { id: 'artisan-message', user_id: 'user-1', type: 'message', title: 'New message', message: 'Buyer replied', conversation_id: 'conversation / 1', recipient_context: 'artisan', read: false, created_at: '2026-08-15T08:00:00Z' };
+const buyerQuote: NotificationRecord = { id: 'buyer-quote', user_id: 'user-1', type: 'design_request', title: 'Your design has a quote', message: 'Review the shop quote in Messages.', design_request_id: 'request-1', recipient_context: 'buyer', read: false, created_at: '2026-08-15T08:00:00Z' };
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1', email: 'buyer@example.test', user_metadata: {} } }) }));
+vi.mock('../chat/QuoteReviewContext', () => ({ useQuoteReview: () => openQuoteReview }));
 vi.mock('../../hooks/useNotifications', () => ({
   useNotifications: (_userId: string, context: NotificationContext) => {
     requestedContext = context;
-    const notifications = context === 'artisan' ? [artisanMessage] : [buyerOrder];
+    const notifications = context === 'artisan' ? [artisanMessage] : buyerNotifications;
     return { notifications, unreadCount: 1, loading: false, error: '', reload, markRead, markAllRead, deleteNotification: vi.fn(), clearError: vi.fn() };
   },
 }));
@@ -44,6 +48,7 @@ describe('Navbar notification routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requestedContext = undefined;
+    buyerNotifications = [buyerOrder];
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })) });
   });
 
@@ -62,6 +67,16 @@ describe('Navbar notification routing', () => {
     renderNavbar('/artisan-dashboard');
     expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'User menu' })).not.toBeInTheDocument();
+  });
+
+  it('opens the exact quoted request from the navbar and marks its notification read', () => {
+    buyerNotifications = [buyerQuote];
+    renderNavbar('/gallery');
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    fireEvent.click(screen.getByRole('button', { name: /Your design has a quote/ }));
+    expect(openQuoteReview).toHaveBeenCalledWith('request-1');
+    expect(markRead).toHaveBeenCalledWith('buyer-quote');
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/gallery');
   });
 
   it('routes View all according to the current surface', async () => {

@@ -21,9 +21,7 @@ export default function DecorTab({ decoration, onChange }: { decoration: Decorat
 
   return (
     <div className="decor-tab">
-      <div className="freeform-tab-heading">Pattern decoration</div>
-      <p className="decor-help">Choose a category, then select one of five original motifs to wrap around your pottery.</p>
-
+      <h3 className="freeform-tab-heading">Pattern Controls</h3>
       <div className="guided-panel-list">
         <PanelSection number={1} title="Choose Pattern" summary={selectedPattern ? `${selectedPattern.name}${categoryLabel ? ` · ${categoryLabel}` : ''}` : 'Select a motif'} expanded={visibleSection === 1} completed={Boolean(selectedPattern)} onToggle={() => setActiveSection(1)} regionId="pattern-choose-section">
           <div className="decor-category-nav">

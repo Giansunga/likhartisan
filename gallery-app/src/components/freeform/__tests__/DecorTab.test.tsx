@@ -12,6 +12,7 @@ function Harness({ initial = DEFAULT_DECORATION }: { initial?: DecorationParams 
 describe('DecorTab guided workflow', () => {
   it('gates customization and advances after choosing a motif', () => {
     render(<Harness />);
+    expect(screen.getByRole('heading', { name: 'Pattern Controls' })).toBeInTheDocument();
     const choose = screen.getByRole('button', { name: /Choose Pattern/ });
     const customize = screen.getByRole('button', { name: /Customize Pattern/ });
     expect(choose).toHaveAttribute('aria-expanded', 'true');

@@ -18,18 +18,24 @@ export function useNotifications(userId: string | undefined, context: Notificati
       return;
     }
     if (!silent) setLoading(true);
-    let query = supabase
-      .from('notifications')
-      .select('id, user_id, type, title, message, product_image, order_id, conversation_id, recipient_context, read, created_at')
-      .eq('user_id', userId)
-      .eq('recipient_context', context)
-      .order('created_at', { ascending: false });
-    if (limit) query = query.limit(limit);
-    const { data, error: loadError } = await query;
+    const selectNotifications = async (includeRequestId: boolean) => {
+      let query = supabase
+        .from('notifications')
+        .select(`id, user_id, type, title, message, product_image, order_id, conversation_id, ${includeRequestId ? 'design_request_id, ' : ''}recipient_context, read, created_at`)
+        .eq('user_id', userId)
+        .eq('recipient_context', context)
+        .order('created_at', { ascending: false });
+      if (limit) query = query.limit(limit);
+      return query;
+    };
+    let { data, error: loadError } = await selectNotifications(true);
+    if (loadError?.code === '42703' || loadError?.code === 'PGRST204') {
+      ({ data, error: loadError } = await selectNotifications(false));
+    }
     if (loadError) setError(loadError.message);
     else {
       setError('');
-      const normalized = (data || []).map(notification => normalizeNotification(notification as NotificationRecord));
+      const normalized = (data || []).map(notification => normalizeNotification(notification as unknown as NotificationRecord));
       setNotifications(normalized);
       if (limit) {
         const { count, error: countError } = await supabase

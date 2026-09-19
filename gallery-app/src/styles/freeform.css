@@ -285,7 +285,6 @@ body:has(.freeform-page) .likhai-dock {
 
 /* Decor tab */
 .decor-tab { padding: 2px 0 16px; }
-.decor-help { font-size: 0.78rem; line-height: 1.45; color: var(--text-muted); margin: -4px 0 16px; }
 .decor-category-nav { display: flex; align-items: center; gap: 4px; margin: 0 -2px 10px; }
 .decor-category-tabs { display: flex; flex: 1; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding: 1px 0 7px; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--primary-color) transparent; }
 .decor-category-tabs::-webkit-scrollbar { height: 4px; }

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { filterNotifications, groupNotifications, notificationCategory, notificationCounts, notificationDestination, relativeNotificationTime } from '../../lib/notifications';
 import type { NotificationContext, NotificationFilter, NotificationRecord } from '../../types/notifications';
 import NotificationIcon from './NotificationIcon';
+import { useQuoteReview } from '../chat/QuoteReviewContext';
 import './notifications.css';
 
 export interface NotificationCenterData {
@@ -24,6 +25,7 @@ const tabs: Array<{ key: NotificationFilter; label: string }> = [
 
 export default function NotificationCenter({ context, data }: { context: NotificationContext; data: NotificationCenterData }) {
   const navigate = useNavigate();
+  const openQuoteReview = useQuoteReview();
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [deleteTarget, setDeleteTarget] = useState<NotificationRecord | null>(null);
   const counts = useMemo(() => notificationCounts(data.notifications), [data.notifications]);
@@ -32,7 +34,8 @@ export default function NotificationCenter({ context, data }: { context: Notific
 
   const openNotification = (notification: NotificationRecord) => {
     if (!notification.read) void data.markRead(notification.id);
-    navigate(notificationDestination(notification));
+    if (context === 'buyer' && notification.title === 'Your design has a quote' && notification.design_request_id) openQuoteReview(notification.design_request_id);
+    else navigate(notification.type === 'design_request' && notification.title === 'Your design has a quote' && !notification.design_request_id ? '/chat' : notificationDestination(notification));
   };
 
   return (

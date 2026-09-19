@@ -11,6 +11,7 @@ export interface NotificationRecord {
   product_image?: string | null;
   order_id?: string | null;
   conversation_id?: string | null;
+  design_request_id?: string | null;
   recipient_context: NotificationContext;
   read: boolean;
   created_at: string;

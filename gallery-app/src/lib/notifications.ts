@@ -17,6 +17,7 @@ export function normalizeNotification(value: Partial<NotificationRecord> & Pick<
     product_image: value.product_image || null,
     order_id: value.order_id || null,
     conversation_id: value.conversation_id || null,
+    design_request_id: value.design_request_id || null,
     recipient_context: inferNotificationContext(value),
     read: Boolean(value.read),
     created_at: value.created_at,

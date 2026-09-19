@@ -205,6 +205,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
   }
 
   return <section className="attachment-tab">
+    <h3 className="freeform-tab-heading">Attachment Controls</h3>
     <div className="guided-panel-list">
       <PanelSection number={1} title="Choose Attachment" summary={selectedAsset?.recipe.name || 'Select a 3D detail'} expanded={visibleStage === 1} completed={Boolean(selectedAsset)} onToggle={() => setActiveStage(1)} regionId="attachment-choose-section">
         <div className="attachment-filter" role="tablist" aria-label="Attachment families">{ATTACHMENT_FAMILIES.map((family) => <button type="button" role="tab" aria-selected={activeFamily === family.id} className={activeFamily === family.id ? 'active' : ''} key={family.id} onClick={() => { setActiveFamily(family.id); setSelectedRecipeKey(''); setActiveStage(1); }}>{family.label}</button>)}</div>

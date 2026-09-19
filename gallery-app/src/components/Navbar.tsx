@@ -12,6 +12,7 @@ import NotificationDropdown from './notifications/NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { notificationDestination, notificationViewAllDestination } from '../lib/notifications';
 import type { NotificationContext, NotificationRecord } from '../types/notifications';
+import { useQuoteReview } from './chat/QuoteReviewContext';
 
 function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
   return (
@@ -32,6 +33,7 @@ function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const openQuoteReview = useQuoteReview();
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisanDashboard = location.pathname.startsWith('/artisan-dashboard');
   const isFreeform = location.pathname.startsWith('/freeform');
@@ -162,7 +164,8 @@ export default function Navbar() {
   const openNotification = (notification: NotificationRecord) => {
     if (!notification.read) void notificationData.markRead(notification.id);
     closeNotifications();
-    navigate(notificationDestination(notification));
+    if (notificationContext === 'buyer' && notification.title === 'Your design has a quote' && notification.design_request_id) openQuoteReview(notification.design_request_id);
+    else navigate(notification.type === 'design_request' && notification.title === 'Your design has a quote' && !notification.design_request_id ? '/chat' : notificationDestination(notification));
   };
 
   const notifDropdown = (

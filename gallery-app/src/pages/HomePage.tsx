@@ -116,11 +116,6 @@ export default function HomePage() {
             <figure className="home-editorial-photo home-editorial-photo--workshop"><img src="/images/artisan_1.jpg" alt="Two pottery workers shaping a large clay vessel in a Santo Tomas workshop" loading="lazy" /></figure>
           </div>
         </div>
-        <dl className="home-editorial-details">
-          <div><dt>Place</dt><dd><strong>Rooted in Santo Tomas</strong><span>Pampanga, Philippines</span></dd></div>
-          <div><dt>Practice</dt><dd><strong>Formed through skilled hands</strong><span>Shaped, finished, and shared locally</span></dd></div>
-          <div><dt>Purpose</dt><dd><strong>Made easier to discover</strong><span>Stories, shops, objects, and custom ideas</span></dd></div>
-        </dl>
       </div>
     </section>
 
