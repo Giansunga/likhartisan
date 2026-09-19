@@ -179,8 +179,14 @@
   .home-editorial-details > div { grid-template-columns: 70px 1fr; padding-inline: 4px; }
   .home-editorial-details > div + div { border-top: 1px solid var(--home-rule); border-left: 0; }
   .home-section-heading--split { align-items: flex-start; flex-direction: column; gap: 18px; }
-  .home-shop-tour__frame { border-width: 5px; }
-  .home-shop-tour__heading h2 { white-space: normal; }
+  .home-shop-tour { padding-block: 58px; }
+  .home-shop-tour::before { top: 20px; left: -178px; width: 270px; height: 270px; }
+  .home-shop-tour::after { right: -142px; bottom: 30px; width: 205px; height: 205px; }
+  .home-shop-tour__intro { margin-bottom: 28px; }
+  .home-shop-tour__heading h2 { max-width: 15ch; white-space: normal; }
+  .home-shop-tour__video-wrap { width: 100%; }
+  .home-shop-tour__frame { border-width: 5px; border-radius: 2px; box-shadow: 0 15px 32px rgba(61,34,15,.14), 0 0 0 1px rgba(103,57,29,.14); }
+  .home-shop-tour__caption { margin-top: 12px; letter-spacing: .065em; }
   .home-section-heading--split > p { margin: 0; }
   .home-chapter-grid { grid-template-columns: 1fr; border-bottom: 0; }
   .home-chapter-grid li + li { border-top: 1px solid rgba(255,255,255,.2); border-left: 0; }
@@ -199,7 +205,11 @@
   .home-editorial-photo figcaption { font-size: .64rem; }
   .home-editorial-details > div { grid-template-columns: 58px 1fr; }
   .home-section-heading--split h2 { font-size: 2.25rem; }
-  .home-shop-tour__caption { align-items: flex-start; font-size: .64rem; line-height: 1.45; }
+  .home-shop-tour { padding-block: 46px; }
+  .home-shop-tour__heading > span { margin-bottom: 9px; font-size: .63rem; }
+  .home-shop-tour__heading h2 { max-width: 13ch; font-size: clamp(2.05rem, 10.4vw, 2.55rem); line-height: 1.02; }
+  .home-shop-tour__frame { border-width: 4px; }
+  .home-shop-tour__caption { font-size: .64rem; line-height: 1.45; }
   .home-rail-controls button { width: 38px; height: 38px; }
   .home-section-heading__actions > .home-text-link { display: none; }
   .home-collection-card,.home-collection-card--1,.home-collection-card--4 { width: 83vw; min-width: 83vw; height: 320px; }

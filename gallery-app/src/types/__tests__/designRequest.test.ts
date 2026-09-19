@@ -5,10 +5,10 @@ describe('design request snapshots', () => {
   it('creates an immutable versioned copy with exact design values', () => {
     const attachments = [{
       version: 4 as const,
-      id: 'round-loop-handle@1:left+right',
-      recipeKey: 'round-loop-handle',
+      id: 'bamboo-loop@1:left+right',
+      recipeKey: 'bamboo-loop',
       recipeVersion: 1,
-      name: 'Round Loop Handle',
+      name: 'Bamboo Loop',
       family: 'handle' as const,
       shopId: null,
       placements: [{

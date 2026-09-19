@@ -19,7 +19,6 @@ const left: GeneratedAttachmentSocket = { id: 'left', name: 'Left', family: 'han
 const right: GeneratedAttachmentSocket = { ...left, id: 'right', name: 'Right', azimuth: 90 };
 const bamboo = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.key === 'bamboo-loop')!;
 const square = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.key === 'square-bridge')!;
-const roundLoop = GENERATED_ATTACHMENT_RECIPES.find((recipe) => recipe.key === 'round-loop-handle')!;
 const asset = { recipe: bamboo, shopId: 'shop-a', priceAdjustment: 100, productionDaysAdjustment: 2 };
 
 describe('generated attachment selections', () => {
@@ -52,10 +51,10 @@ describe('generated attachment selections', () => {
     expect(attachmentTotals([createAttachmentSelection(asset, [left, right])])).toEqual({ price: 200, productionDays: 2 });
   });
 
-  it('fits Round Loop Handle sockets and prices a left/right pair per physical handle', () => {
-    expect(recipeFitsSocket(roundLoop, left)).toBe(true);
-    expect(recipeFitsSocket(roundLoop, right)).toBe(true);
-    const selection = createAttachmentSelection({ ...asset, recipe: roundLoop }, [left, right]);
+  it('fits handle sockets and prices a left/right pair per physical handle', () => {
+    expect(recipeFitsSocket(bamboo, left)).toBe(true);
+    expect(recipeFitsSocket(bamboo, right)).toBe(true);
+    const selection = createAttachmentSelection(asset, [left, right]);
     expect(selection.placements.map((placement) => placement.socket.id)).toEqual(['left', 'right']);
     expect(attachmentTotals([selection])).toEqual({ price: 200, productionDays: 2 });
   });

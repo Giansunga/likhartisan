@@ -139,7 +139,7 @@ describe('automatic attachment socket placement', () => {
   it('fits both handle contacts to a rounded live surface', () => {
     const scene = roundedVase();
     const socket = analyzeAttachmentSockets(scene).find((candidate) => candidate.family === 'handle')!;
-    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'round-loop-handle')!;
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'bamboo-loop')!;
     const centerPlacement = resolveAttachmentPlacement(scene, socket, DEFAULT_ATTACHMENT_TRANSFORM)!;
     const mount = resolveAttachmentMount(scene, socket, recipe, DEFAULT_ATTACHMENT_TRANSFORM)!;
     const centerRadius = new THREE.Vector2(centerPlacement.position.x, centerPlacement.position.z).length();

@@ -74,7 +74,6 @@ insert into public.generated_attachment_catalog_settings
 values
   ('bamboo-loop', false, 0, 0),
   ('square-bridge', false, 0, 0),
-  ('round-loop-handle', false, 0, 0),
   ('sampaguita-medallion', false, 0, 0),
   ('faceted-disc', false, 0, 0),
   ('banig-diamond-crest', false, 0, 0),

@@ -3,23 +3,38 @@ import * as THREE from 'three';
 import { applyGeneratedAttachmentThickness, countRecipeTriangles, disposeGeneratedAttachment, GENERATED_ATTACHMENT_RECIPES } from '../generatedAttachmentCatalog';
 
 describe('generated attachment catalog', () => {
-  it('contains the seven stable, unique versioned recipes', () => {
-    expect(GENERATED_ATTACHMENT_RECIPES).toHaveLength(7);
-    expect(new Set(GENERATED_ATTACHMENT_RECIPES.map((recipe) => `${recipe.key}@${recipe.version}`)).size).toBe(7);
+  it('contains the eight stable, unique versioned recipes', () => {
+    expect(GENERATED_ATTACHMENT_RECIPES).toHaveLength(8);
+    expect(new Set(GENERATED_ATTACHMENT_RECIPES.map((recipe) => `${recipe.key}@${recipe.version}`)).size).toBe(8);
   });
 
-  it('defines the Round Loop Handle mounting contract', () => {
-    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'round-loop-handle');
+  it('builds the Twisted Rope Loop from two intertwined tube strands', () => {
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'twisted-rope-loop');
     expect(recipe).toMatchObject({
       version: 1,
-      name: 'Round Loop Handle',
+      name: 'Twisted Rope Loop',
       family: 'handle',
-      style: 'minimal',
-      scaleRatio: 0.075,
-      envelope: { width: 0.9, height: 3.2, depth: 2.2, contactRadius: 0.32, triangleBudget: 3000 },
+      style: 'filipino',
+      mountContactY: [-1.42, 1.42],
     });
     const object = recipe!.build();
-    expect(object.children.some((child) => child instanceof THREE.Mesh && child.geometry.type === 'TubeGeometry')).toBe(true);
+    const strands = object.children.filter((child) => child instanceof THREE.Mesh && child.geometry.type === 'TubeGeometry');
+    expect(strands).toHaveLength(2);
+    disposeGeneratedAttachment(object);
+  });
+
+  it('builds the Ornate Scroll Loop with an open ring and curled flourish', () => {
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'ornate-scroll-loop');
+    expect(recipe).toMatchObject({
+      version: 1,
+      name: 'Ornate Scroll Loop',
+      family: 'handle',
+      style: 'filipino',
+      mountContactY: [-1.18, 0.58],
+    });
+    const object = recipe!.build();
+    const tubes = object.children.filter((child) => child instanceof THREE.Mesh && child.geometry.type === 'TubeGeometry');
+    expect(tubes.length).toBeGreaterThanOrEqual(4);
     disposeGeneratedAttachment(object);
   });
 

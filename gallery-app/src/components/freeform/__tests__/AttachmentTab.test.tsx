@@ -31,6 +31,8 @@ describe('AttachmentTab guided workflow', () => {
   it('advances through selection and placement, then exposes independent controls', async () => {
     const onChange = vi.fn();
     const { rerender } = render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={[]} onChange={onChange} />);
+    expect(screen.queryByText('Generated Attachments')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose an ornament and position, then fine-tune how it sits on your pottery.')).not.toBeInTheDocument();
     const attachmentCard = await screen.findByRole('button', { name: /Bamboo Loop/ });
     expect(screen.getByRole('button', { name: /Choose Attachment/ })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: /Choose Position/ })).toBeDisabled();

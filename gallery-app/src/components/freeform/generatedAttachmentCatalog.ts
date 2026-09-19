@@ -154,25 +154,92 @@ function buildSquareBridge() {
   return orientHandleOutward(group);
 }
 
-function buildRoundLoopHandle() {
+function buildTwistedRopeLoop() {
   const group = new THREE.Group();
-  const curve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0.18, -1.3, 0),
-    new THREE.Vector3(0.78, -1.24, 0),
-    new THREE.Vector3(1.48, -0.72, 0),
-    new THREE.Vector3(1.7, 0, 0),
-    new THREE.Vector3(1.48, 0.72, 0),
-    new THREE.Vector3(0.78, 1.24, 0),
-    new THREE.Vector3(0.18, 1.3, 0),
+  const centerCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.18, -1.42, 0),
+    new THREE.Vector3(0.86, -1.24, 0),
+    new THREE.Vector3(1.48, -0.68, 0),
+    new THREE.Vector3(1.68, 0, 0),
+    new THREE.Vector3(1.48, 0.68, 0),
+    new THREE.Vector3(0.86, 1.24, 0),
+    new THREE.Vector3(0.18, 1.42, 0),
   ], false, 'centripetal');
-  const tubularSegments = 48;
-  const radialSegments = 10;
-  const loop = new THREE.Mesh(new THREE.TubeGeometry(curve, tubularSegments, 0.17, radialSegments, false), clay());
-  group.add(loop);
-  registerTubeThickness(group, loop, curve, tubularSegments, radialSegments);
+  const tubularSegments = 72;
+  const radialSegments = 8;
+  const turns = 7;
+  const strandOffset = 0.105;
 
-  addHandleLug(group, -1.3, 0.18, 0.19, 0.19);
-  addHandleLug(group, 1.3, 0.18, 0.19, 0.19);
+  [0, Math.PI].forEach((phaseOffset) => {
+    const points: THREE.Vector3[] = [];
+    for (let index = 0; index <= tubularSegments; index++) {
+      const t = index / tubularSegments;
+      const center = centerCurve.getPointAt(t);
+      const tangent = centerCurve.getTangentAt(t).normalize();
+      const inPlaneNormal = new THREE.Vector3(-tangent.y, tangent.x, 0).normalize();
+      const phase = t * Math.PI * 2 * turns + phaseOffset;
+      points.push(center
+        .addScaledVector(inPlaneNormal, Math.cos(phase) * strandOffset)
+        .add(new THREE.Vector3(0, 0, Math.sin(phase) * strandOffset)));
+    }
+    const strandCurve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+    const strand = new THREE.Mesh(
+      new THREE.TubeGeometry(strandCurve, tubularSegments, 0.115, radialSegments, false),
+      clay(),
+    );
+    group.add(strand);
+    registerTubeThickness(group, strand, strandCurve, tubularSegments, radialSegments);
+  });
+
+  addHandleLug(group, -1.42, 0.19, 0.19, 0.2);
+  addHandleLug(group, 1.42, 0.19, 0.19, 0.2);
+  return orientHandleOutward(group);
+}
+
+function buildOrnateScrollLoop() {
+  const group = new THREE.Group();
+  const addTube = (curve: THREE.Curve<THREE.Vector3>, tubularSegments: number, radius = 0.15) => {
+    const radialSegments = 8;
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, tubularSegments, radius, radialSegments, curve instanceof THREE.CatmullRomCurve3 && curve.closed), clay());
+    group.add(tube);
+    registerTubeThickness(group, tube, curve, tubularSegments, radialSegments);
+  };
+
+  const ringPoints: THREE.Vector3[] = [];
+  const ringCenter = new THREE.Vector3(1.03, -0.22, 0);
+  for (let index = 0; index < 16; index++) {
+    const angle = index / 16 * Math.PI * 2;
+    ringPoints.push(new THREE.Vector3(
+      ringCenter.x + Math.cos(angle) * 0.58,
+      ringCenter.y + Math.sin(angle) * 0.58,
+      0,
+    ));
+  }
+  addTube(new THREE.CatmullRomCurve3(ringPoints, true, 'centripetal'), 64, 0.16);
+
+  addTube(new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.18, -1.18, 0),
+    new THREE.Vector3(0.48, -1.05, 0),
+    new THREE.Vector3(0.72, -0.78, 0),
+  ], false, 'centripetal'), 24, 0.17);
+  addTube(new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.18, 0.58, 0),
+    new THREE.Vector3(0.43, 0.48, 0),
+    new THREE.Vector3(0.69, 0.28, 0),
+  ], false, 'centripetal'), 24, 0.17);
+
+  const flourish = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.18, 0.58, 0),
+    new THREE.Vector3(0.55, 0.7, 0),
+    new THREE.Vector3(1.13, 1.24, 0),
+    new THREE.Vector3(1.08, 1.58, 0),
+    new THREE.Vector3(0.8, 1.68, 0),
+    new THREE.Vector3(0.67, 1.47, 0),
+  ], false, 'centripetal');
+  addTube(flourish, 48, 0.17);
+
+  addHandleLug(group, -1.18, 0.19, 0.19, 0.2);
+  addHandleLug(group, 0.58, 0.19, 0.19, 0.2);
   return orientHandleOutward(group);
 }
 
@@ -240,7 +307,8 @@ function buildMinimalCollarBar() {
 export const GENERATED_ATTACHMENT_RECIPES: GeneratedAttachmentRecipe[] = [
   { key: 'bamboo-loop', version: 1, name: 'Bamboo Loop', family: 'handle', style: 'filipino', description: 'A segmented side handle inspired by bamboo joints.', thumbnail: thumbnailSvg('Bamboo Loop', '<path d="M48 82V38c45 0 62 12 62 22S93 82 48 82"/><path d="M72 43v34M94 49v22"/>'), envelope: { width: 1, height: 3.4, depth: 2.2, contactRadius: 0.3, triangleBudget: 7000 }, scaleRatio: 0.075, mountContactY: [-1.38, 1.38], build: buildBambooLoop },
   { key: 'square-bridge', version: 1, name: 'Square Bridge', family: 'handle', style: 'minimal', description: 'A clean angular bridge handle.', thumbnail: thumbnailSvg('Square Bridge', '<path d="M48 84V36h58v48H48"/><path d="M48 48h42v24H48"/>'), envelope: { width: 0.8, height: 3.2, depth: 2.2, contactRadius: 0.35, triangleBudget: 1200 }, scaleRatio: 0.075, mountContactY: [-1.25, 1.25], build: buildSquareBridge },
-  { key: 'round-loop-handle', version: 1, name: 'Round Loop Handle', family: 'handle', style: 'minimal', description: 'A smooth minimal D-loop with two rounded mounting contacts.', thumbnail: thumbnailSvg('Round Loop', '<path d="M50 82V38c39 0 61 9 61 22S89 82 50 82"/><circle cx="50" cy="38" r="7"/><circle cx="50" cy="82" r="7"/>'), envelope: { width: 0.9, height: 3.2, depth: 2.2, contactRadius: 0.32, triangleBudget: 3000 }, scaleRatio: 0.075, mountContactY: [-1.3, 1.3], build: buildRoundLoopHandle },
+  { key: 'twisted-rope-loop', version: 1, name: 'Twisted Rope Loop', family: 'handle', style: 'filipino', description: 'A sculpted double-strand loop inspired by hand-twisted ceramic rope handles.', thumbnail: thumbnailSvg('Twisted Rope', '<path d="M49 84c30-2 59-10 62-24-3-14-32-22-62-24"/><path d="M49 78c26-2 50-8 55-18-5-10-29-16-55-18"/><path d="M57 39l-8 8m18-5-14 14m27-10L59 67m33-17L68 74m34-16L82 78m23-10L94 79"/>'), envelope: { width: 0.9, height: 3.5, depth: 2.2, contactRadius: 0.34, triangleBudget: 5000 }, scaleRatio: 0.075, mountContactY: [-1.42, 1.42], build: buildTwistedRopeLoop },
+  { key: 'ornate-scroll-loop', version: 1, name: 'Ornate Scroll Loop', family: 'handle', style: 'filipino', description: 'A circular openwork handle crowned with a hand-sculpted curling flourish.', thumbnail: thumbnailSvg('Ornate Scroll', '<circle cx="80" cy="66" r="23"/><path d="M57 82L47 91M57 50L47 45M47 45c20-3 37-12 39-27 13 6 13 18 3 24"/>'), envelope: { width: 0.9, height: 3.2, depth: 2.1, contactRadius: 0.34, triangleBudget: 5000 }, scaleRatio: 0.075, mountContactY: [-1.18, 0.58], build: buildOrnateScrollLoop },
   { key: 'sampaguita-medallion', version: 1, name: 'Sampaguita Medallion', family: 'body', style: 'filipino', description: 'A raised five-petal floral medallion.', thumbnail: thumbnailSvg('Sampaguita', '<path d="M80 30c8 12 13 19 25 10-1 14 1 22 16 22-13 8-18 14-8 26-14-3-22-2-26 12-5-13-11-18-24-10 3-14 1-22-14-24 13-7 18-13 9-25 14 2 21 0 22-11z"/>'), envelope: { width: 2.9, height: 2.9, depth: 0.75, contactRadius: 0.55, triangleBudget: 5000 }, scaleRatio: 0.06, build: buildSampaguitaMedallion },
   { key: 'faceted-disc', version: 1, name: 'Faceted Disc', family: 'body', style: 'minimal', description: 'A low-poly circular body ornament.', thumbnail: thumbnailSvg('Faceted Disc', '<path d="M80 28l28 12 12 28-12 20-28 8-28-8-12-20 12-28z"/><path d="M80 45l18 9 5 20-23 10-23-10 5-20z"/>'), envelope: { width: 3, height: 3, depth: 0.8, contactRadius: 0.6, triangleBudget: 1500 }, scaleRatio: 0.058, build: buildFacetedDisc },
   { key: 'banig-diamond-crest', version: 1, name: 'Banig Diamond Crest', family: 'neck', style: 'filipino', description: 'Layered diamonds inspired by woven banig patterns.', thumbnail: thumbnailSvg('Banig Crest', '<path d="M48 62l16-24 16 24-16 24zM72 62l16-24 16 24-16 24zM96 62l16-24 16 24-16 24z"/>'), envelope: { width: 2.6, height: 1.7, depth: 0.6, contactRadius: 0.45, triangleBudget: 1800 }, scaleRatio: 0.055, build: buildBanigDiamondCrest },
