@@ -493,6 +493,11 @@ function applyDesign(design: {
       setActiveStep('model');
       return;
     }
+    if (!selectedShopId) {
+      shopModalShownRef.current = true;
+      setShopSelectOpen(true);
+      return;
+    }
     if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;

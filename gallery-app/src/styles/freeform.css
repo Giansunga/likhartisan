@@ -1619,6 +1619,7 @@ body:has(.freeform-page) .likhai-dock {
 .attachment-adjust-toggle svg { flex: 0 0 auto; width: 17px; height: 17px; fill: none; stroke: var(--text-muted); stroke-width: 1.8; transition: transform .18s ease; }
 .attachment-adjust-card.expanded .attachment-adjust-toggle svg { transform: rotate(180deg); }
 .attachment-instance-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 3px; margin: 10px 0; border-radius: 9px; background: var(--bg-tertiary); }
+.attachment-instance-tabs:has(> button:nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .attachment-instance-tabs button { min-width: 0; border: 0; border-radius: 7px; padding: 7px; background: transparent; color: var(--text-muted); font-size: .75rem; font-weight: 700; }
 .attachment-instance-tabs button.active { background: #fff; color: var(--primary-color); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .attachment-offset-controls { display: grid; gap: 10px; margin-top: 11px; min-width: 0; }

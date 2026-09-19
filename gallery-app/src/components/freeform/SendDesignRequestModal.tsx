@@ -28,7 +28,7 @@ export default function SendDesignRequestModal({
   onClose: () => void;
   onOpenMessages: () => void;
 }) {
-  const [changingShop, setChangingShop] = useState(!selectedShopId && !revisionMode);
+  const [changingShop, setChangingShop] = useState(false);
   const [quantity, setQuantity] = useState(initialQuantity);
   const [note, setNote] = useState(initialNote);
   const panelRef = useOverlayA11y(open, onClose, submitting);

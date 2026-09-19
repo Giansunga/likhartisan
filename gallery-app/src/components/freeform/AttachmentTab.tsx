@@ -33,6 +33,23 @@ import { formatInches } from '../../lib/measurements';
 type SocketGroup = { key: string; name: string; sockets: GeneratedAttachmentSocket[] };
 type ControlKey = keyof AttachmentPlacementTransform;
 type AttachmentStage = 1 | 2 | 3;
+type PairEditMode = 'linked' | string;
+
+const MIRRORED_CONTROLS: ControlKey[] = ['horizontalDegrees', 'twistDegrees'];
+
+function linkedLimits(first: AttachmentTransformLimits, second: AttachmentTransformLimits): AttachmentTransformLimits {
+  const result = { ...first };
+  for (const { key } of CONTROL_CONFIG) {
+    const other = second[key];
+    const mirrored = MIRRORED_CONTROLS.includes(key);
+    result[key] = {
+      ...first[key],
+      min: Math.max(first[key].min, mirrored ? -other.max : other.min),
+      max: Math.min(first[key].max, mirrored ? -other.min : other.max),
+    };
+  }
+  return result;
+}
 
 const CONTROL_CONFIG: Array<{ key: ControlKey; label: string }> = [
   { key: 'horizontalDegrees', label: 'Horizontal Position' },
@@ -70,6 +87,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
   const [selectedRecipeKey, setSelectedRecipeKey] = useState(() => loadedSelection?.recipeKey || '');
   const [activeStage, setActiveStage] = useState<AttachmentStage>(() => value.length ? 3 : 1);
   const [activePlacementBySelection, setActivePlacementBySelection] = useState<Record<string, string>>({});
+  const [pairEditModeBySelection, setPairEditModeBySelection] = useState<Record<string, PairEditMode>>({});
   const [expandedSelectionId, setExpandedSelectionId] = useState(() => loadedSelection?.id || '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -190,9 +208,29 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
     const step = limits[key].step;
     const snappedValue = Math.round(rawValue / step) * step;
     const nextTransform = clampAttachmentTransform({ ...placement.transform, [key]: snappedValue }, limits);
-    onChange(key === 'thicknessMultiplier'
-      ? updateHandleThickness(value, selection.id, nextTransform.thicknessMultiplier)
-      : updateAttachmentPlacement(value, selection.id, socketId, nextTransform));
+    if (key === 'thicknessMultiplier') {
+      onChange(updateHandleThickness(value, selection.id, nextTransform.thicknessMultiplier));
+      return;
+    }
+    const isPair = selection.family === 'handle' && selection.placements.length === 2
+      && !!selection.placements[0].socket.pairGroup
+      && selection.placements[0].socket.pairGroup === selection.placements[1].socket.pairGroup;
+    if (!isPair || (pairEditModeBySelection[selection.id] || 'linked') !== 'linked') {
+      onChange(updateAttachmentPlacement(value, selection.id, socketId, nextTransform));
+      return;
+    }
+    let next = value;
+    for (const candidate of selection.placements) {
+      const candidateSocket = sockets.find((socket) => socket.id === candidate.socket.id);
+      const candidateKey = attachmentPlacementKey(selection.id, candidate.socket.id);
+      const measured = placementLimits && Object.prototype.hasOwnProperty.call(placementLimits, candidateKey);
+      const candidateLimits = candidateSocket && (measured ? placementLimits![candidateKey] : getSocketTransformLimits(getGeneratedAttachmentRecipe(selection.recipeKey, selection.recipeVersion)!, candidateSocket));
+      if (!candidateLimits) return;
+      const candidateValue = candidate.socket.id === socketId || !MIRRORED_CONTROLS.includes(key) ? nextTransform[key] : -nextTransform[key];
+      next = updateAttachmentPlacement(next, selection.id, candidate.socket.id,
+        clampAttachmentTransform({ ...candidate.transform, [key]: candidateValue }, candidateLimits));
+    }
+    onChange(next);
   }
 
   function renderControl(selection: AttachmentSelection, socketId: string, transform: AttachmentPlacementTransform, limits: AttachmentTransformLimits, key: ControlKey, label: string) {
@@ -227,11 +265,21 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
         <div className="attachment-selected-list">{value.map((selection) => {
           const recipe = getGeneratedAttachmentRecipe(selection.recipeKey, selection.recipeVersion);
           const requestedSocketId = activePlacementBySelection[selection.id];
-          const activePlacement = selection.placements.find((placement) => placement.socket.id === requestedSocketId) || selection.placements[0];
+          const isPair = selection.family === 'handle' && selection.placements.length === 2
+            && !!selection.placements[0].socket.pairGroup
+            && selection.placements[0].socket.pairGroup === selection.placements[1].socket.pairGroup;
+          const pairMode = isPair ? pairEditModeBySelection[selection.id] || 'linked' : '';
+          const activePlacement = selection.placements.find((placement) => placement.socket.id === (isPair && pairMode !== 'linked' ? pairMode : requestedSocketId)) || selection.placements[0];
           const liveSocket = sockets.find((socket) => socket.id === activePlacement.socket.id);
           const limitKey = attachmentPlacementKey(selection.id, activePlacement.socket.id);
           const hasMeasuredLimits = placementLimits ? Object.prototype.hasOwnProperty.call(placementLimits, limitKey) : false;
-          const limits = recipe && liveSocket ? (hasMeasuredLimits ? placementLimits![limitKey] : getSocketTransformLimits(recipe, liveSocket)) : null;
+          const activeLimits = recipe && liveSocket ? (hasMeasuredLimits ? placementLimits![limitKey] : getSocketTransformLimits(recipe, liveSocket)) : null;
+          const partner = isPair ? selection.placements.find((placement) => placement.socket.id !== activePlacement.socket.id) : undefined;
+          const partnerSocket = partner && sockets.find((socket) => socket.id === partner.socket.id);
+          const partnerKey = partner && attachmentPlacementKey(selection.id, partner.socket.id);
+          const hasPartnerLimits = partnerKey && placementLimits ? Object.prototype.hasOwnProperty.call(placementLimits, partnerKey) : false;
+          const partnerLimits = recipe && partnerSocket ? (hasPartnerLimits ? placementLimits![partnerKey!] : getSocketTransformLimits(recipe, partnerSocket)) : null;
+          const limits = pairMode === 'linked' ? (activeLimits && partnerLimits ? linkedLimits(activeLimits, partnerLimits) : null) : activeLimits;
           const adjustmentExpanded = expandedSelectionId === selection.id;
           const adjustmentRegionId = `attachment-adjust-${selection.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
           return <article className={`attachment-selected attachment-adjust-card${adjustmentExpanded ? ' expanded' : ''}`} key={selection.id}>
@@ -240,9 +288,17 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
               <button type="button" onClick={() => removeSelection(selection.id)}>Remove</button>
             </div>
             <div id={adjustmentRegionId} hidden={!adjustmentExpanded}>
-              {selection.placements.length > 1 && <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} instances`}>{selection.placements.map((placement) => <button type="button" role="tab" aria-selected={placement.socket.id === activePlacement.socket.id} className={placement.socket.id === activePlacement.socket.id ? 'active' : ''} key={placement.socket.id} onClick={() => setActivePlacementBySelection((current) => ({ ...current, [selection.id]: placement.socket.id }))}>{placement.socket.name}</button>)}</div>}
+              {isPair ? <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} editing mode`}>{[{ id: 'linked', name: 'Linked' }, ...selection.placements.map((placement) => ({ id: placement.socket.id, name: placement.socket.name }))].map((mode) => <button type="button" role="tab" aria-selected={mode.id === pairMode} className={mode.id === pairMode ? 'active' : ''} key={mode.id} onClick={() => setPairEditModeBySelection((current) => ({ ...current, [selection.id]: mode.id }))}>{mode.name}</button>)}</div>
+                : selection.placements.length > 1 && <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} instances`}>{selection.placements.map((placement) => <button type="button" role="tab" aria-selected={placement.socket.id === activePlacement.socket.id} className={placement.socket.id === activePlacement.socket.id ? 'active' : ''} key={placement.socket.id} onClick={() => setActivePlacementBySelection((current) => ({ ...current, [selection.id]: placement.socket.id }))}>{placement.socket.name}</button>)}</div>}
               {limits ? <div className="attachment-offset-controls">{CONTROL_CONFIG.filter(({ key }) => selection.family === 'handle' || key !== 'thicknessMultiplier').map(({ key, label }) => renderControl(selection, activePlacement.socket.id, activePlacement.transform, limits, key, label))}<button type="button" className="attachment-reset-position" onClick={() => {
-                const reset = updateAttachmentPlacement(value, selection.id, activePlacement.socket.id, clampAttachmentTransform(getDefaultAttachmentTransform(activePlacement.socket.family), limits));
+                const placementsToReset = pairMode === 'linked' ? selection.placements : [activePlacement];
+                const reset = placementsToReset.reduce((current, placement) => {
+                  const socket = sockets.find((candidate) => candidate.id === placement.socket.id);
+                  const key = attachmentPlacementKey(selection.id, placement.socket.id);
+                  const measured = placementLimits && Object.prototype.hasOwnProperty.call(placementLimits, key);
+                  const placementLimitsForSocket = recipe && socket ? (measured ? placementLimits![key] : getSocketTransformLimits(recipe, socket)) : null;
+                  return placementLimitsForSocket ? updateAttachmentPlacement(current, selection.id, placement.socket.id, clampAttachmentTransform(getDefaultAttachmentTransform(placement.socket.family), placementLimitsForSocket)) : current;
+                }, value);
                 onChange(selection.family === 'handle' ? updateHandleThickness(reset, selection.id, 1) : reset);
               }}>Reset Adjustments</button></div> : <p className="attachment-empty">This placement is unavailable for the current shape.</p>}
             </div>

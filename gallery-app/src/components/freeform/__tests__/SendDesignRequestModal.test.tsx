@@ -15,6 +15,19 @@ const snapshot: DesignRequestSnapshotV1 = {
 };
 
 describe('SendDesignRequestModal', () => {
+  it('opens the selected shop review after the initial shop selection', () => {
+    const shops = [{ id: 'shop-1', name: 'Regala Pottery' }, { id: 'shop-2', name: 'Other Shop' }];
+    const props = { shops, snapshot, submitting: false, successConversationId: null, onSelectShop: vi.fn(), onSubmit: vi.fn(), onClose: vi.fn(), onOpenMessages: vi.fn() };
+    const { rerender } = render(<SendDesignRequestModal {...props} open={false} selectedShopId={null} />);
+
+    rerender(<SendDesignRequestModal {...props} open selectedShopId="shop-1" />);
+
+    expect(screen.getByRole('heading', { name: 'Send design to shop' })).toBeInTheDocument();
+    expect(screen.getByText('Regala Pottery')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Choose a shop' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Other Shop')).not.toBeInTheDocument();
+  });
+
   it('reviews the exact design and submits quantity and note', () => {
     const submit = vi.fn();
     render(<SendDesignRequestModal open shops={[{ id: 'shop-1', name: 'Regala Pottery' }]} selectedShopId="shop-1" snapshot={snapshot} submitting={false} successConversationId={null} onSelectShop={() => {}} onSubmit={submit} onClose={() => {}} onOpenMessages={() => {}} />);
