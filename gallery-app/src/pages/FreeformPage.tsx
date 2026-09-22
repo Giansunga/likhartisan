@@ -21,6 +21,7 @@ import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, typ
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import { createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
 import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams } from '../lib/measurements';
+import { estimateModelDesign, modelBaseFromRow, type ModelBase } from '../components/freeform/modelEstimate';
 import * as THREE from 'three';
 import '../styles/freeform.css';
 
@@ -84,6 +85,7 @@ export default function FreeformPage() {
   const [modelName, setModelName] = useState('');
   const [modelCategory, setModelCategory] = useState('Vase');
   const [modelThumbnail, setModelThumbnail] = useState('');
+  const [modelBase, setModelBase] = useState<ModelBase | null>(null);
 
   /* Design params */
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
@@ -142,14 +144,16 @@ export default function FreeformPage() {
     thumbnail = '',
     id: string | null = null,
     resetParams = true,
+    base: ModelBase | null = null,
   ) {
     setSelectedModel(file);
     setSelectedModelId(id);
     setModelName(name);
     setModelCategory(category || 'Vase');
     setModelThumbnail(thumbnail || '');
+    setModelBase(base);
     if (resetParams) {
-      setShapeParams(DEFAULT_SHAPE);
+      setShapeParams(base ? { ...DEFAULT_SHAPE, height: base.height, bodyWidth: base.bodyWidth, neckWidth: base.neckWidth, rimSize: base.rimSize } : DEFAULT_SHAPE);
       setMaterialParams(DEFAULT_MATERIAL);
       setDecorationParams(DEFAULT_DECORATION);
       if (attachmentParams.length) toast.info('Attachments were removed because the base model changed.');
@@ -158,6 +162,19 @@ export default function FreeformPage() {
       setAttachmentPlacementLimits({});
     }
   }
+
+  // Saved designs and revisions retain their customized shape, while estimates
+  // always use the model's current admin-entered baseline.
+  useEffect(() => {
+    if (!selectedModel) return;
+    let cancelled = false;
+    const baseQuery = supabase.from('models_3d').select('base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days');
+    (selectedModelId ? baseQuery.eq('id', selectedModelId) : baseQuery.eq('file_url', selectedModel))
+      .maybeSingle().then(({ data }) => {
+        if (!cancelled) setModelBase(modelBaseFromRow(data));
+      });
+    return () => { cancelled = true; };
+  }, [selectedModel, selectedModelId]);
 
 function applyDesign(design: {
     model_file: string;
@@ -171,6 +188,7 @@ function applyDesign(design: {
     decor_params?: DecorationParams;
     attachment_params?: unknown;
   }) {
+    setModelBase(null);
     setSelectedModel(design.model_file);
     setSelectedModelId(design.model_id || null);
     setModelName(design.model_name);
@@ -208,6 +226,7 @@ function applyDesign(design: {
         setSelectedShopName(design.shops.name);
       }
 
+      setModelBase(null);
       setSelectedModel(design.model_file);
       setSelectedModelId(design.model_id || null);
       setModelName(design.model_name);
@@ -262,6 +281,7 @@ function applyDesign(design: {
         }
         const snapshot = normalizeDesignRequestSnapshot(request.design_snapshot);
         const requestShop = Array.isArray(request.shops) ? request.shops[0] : request.shops;
+        setModelBase(null);
         setSelectedModel(snapshot.model.file);
         setSelectedModelId(snapshot.model.id);
         setModelName(snapshot.model.name);
@@ -320,13 +340,19 @@ function applyDesign(design: {
 
       // Load from navigation state (e.g. from homepage preview) — requires shop selection
       if (navState?.modelUrl) {
+        const modelQuery = navState.modelId
+          ? supabase.from('models_3d').select('*').eq('id', navState.modelId)
+          : supabase.from('models_3d').select('*').eq('file_url', navState.modelUrl);
+        const { data: navModel } = await modelQuery.maybeSingle();
+        const navBase = modelBaseFromRow(navModel);
         selectModel(
           navState.modelUrl,
           navState.modelName || 'Selected Model',
           navState.modelCategory || 'Vase',
           navState.modelThumbnail || '',
           navState.modelId || null,
-          false,
+          true,
+          navBase,
         );
         if (navState.color) {
           setMaterialParams((prev) => ({ ...prev, color: navState.color! }));
@@ -402,7 +428,7 @@ function applyDesign(design: {
   function handleResetDesign() {
     const shouldReset = !selectedModel || window.confirm('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
-    setShapeParams(DEFAULT_SHAPE);
+    setShapeParams(modelBase ? { ...DEFAULT_SHAPE, height: modelBase.height, bodyWidth: modelBase.bodyWidth, neckWidth: modelBase.neckWidth, rimSize: modelBase.rimSize } : DEFAULT_SHAPE);
     setMaterialParams(DEFAULT_MATERIAL);
     setDecorationParams(DEFAULT_DECORATION);
     setAttachmentParams([]);
@@ -551,18 +577,14 @@ function applyDesign(design: {
   /* ─── Derived state ─── */
 
   const completedSteps = STEPS.filter((_, i) => i < stepIndex).map((s) => s.key);
-  const basePrice =
-    materialParams.finish === 'acrylic_paint' ? 1350 :
-    materialParams.finish === 'water_paint' ? 1300 :
-    materialParams.finish === 'glazed' ? 1450 : 1250;
-  const baseDays =
-    materialParams.finish === 'acrylic_paint' ? 6 :
-    materialParams.finish === 'water_paint' ? 6 :
-    materialParams.finish === 'glazed' ? 7 : 5;
   const attachmentEstimate = attachmentTotals(attachmentParams);
-  const estimatedPrice = basePrice + attachmentEstimate.price;
-  const estimatedDays = baseDays + attachmentEstimate.productionDays;
-  const isDesignValid = hasValidDesign(selectedModel, shapeParams, materialParams);
+  const estimate = modelBase ? estimateModelDesign({
+    base: modelBase, shape: shapeParams, material: materialParams, decoration: decorationParams,
+    attachmentPrice: attachmentEstimate.price, attachmentDays: attachmentEstimate.productionDays,
+  }) : null;
+  const estimatedPrice = estimate?.price ?? 0;
+  const estimatedDays = estimate?.productionDays ?? 0;
+  const isDesignValid = Boolean(modelBase) && hasValidDesign(selectedModel, shapeParams, materialParams);
   const canAdvanceToNext = !isReviewStep && isDesignValid && canGoTo(stepIndex + 1);
   const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
     model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
@@ -662,7 +684,7 @@ function applyDesign(design: {
             <div className="freeform-sidebar-scroll">
               <div className="freeform-tab-section">
 {activeStep === 'model' && (selectedShopId ? (
-                  <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id) => selectModel(f, n, c, t, id)} />
+                  <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id, base) => selectModel(f, n, c, t, id, true, base)} />
                 ) : (
                   <div style={{ textAlign: 'center', padding: '24px 0' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 12px', opacity: 0.5 }}>
@@ -672,7 +694,7 @@ function applyDesign(design: {
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} onChange={setShapeParams} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={modelBase ? { ...DEFAULT_SHAPE, height: modelBase.height, bodyWidth: modelBase.bodyWidth, neckWidth: modelBase.neckWidth, rimSize: modelBase.rimSize } : DEFAULT_SHAPE} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (
@@ -881,7 +903,7 @@ function applyDesign(design: {
                 </div>
                 <div className="freeform-summary-row-info">
                   <span className="freeform-summary-row-label">DIMENSIONS</span>
-                  <span className="freeform-summary-row-value">H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</span>
+                  <span className="freeform-summary-row-value">{modelBase ? <>H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</> : '—'}</span>
                 </div>
               </div>
 </div>
@@ -896,7 +918,7 @@ function applyDesign(design: {
                 </div>
                 <div className="freeform-summary-row-info">
                   <span className="freeform-summary-row-label">EST. PRICE</span>
-                  <span className="freeform-price-total">&#8369;{estimatedPrice.toLocaleString()}.00</span>
+                  <span className="freeform-price-total">{estimate ? `₱${estimatedPrice.toLocaleString()}.00` : '—'}</span>
                 </div>
               </div>
 
@@ -908,7 +930,7 @@ function applyDesign(design: {
                 </div>
                 <div className="freeform-summary-row-info">
                   <span className="freeform-summary-row-label">EST. PRODUCTION</span>
-                  <span className="freeform-summary-row-value">{estimatedDays} Days</span>
+                  <span className="freeform-summary-row-value">{estimate ? `${estimatedDays} Days` : '—'}</span>
                 </div>
               </div>
 
@@ -927,6 +949,7 @@ function applyDesign(design: {
                   Next
                 </button>
               )}
+              <p className="freeform-mock-disclaimer">Mock estimate—shop confirms final price and production time</p>
             </div>
           </div>
         </div>
@@ -943,8 +966,8 @@ function applyDesign(design: {
           <span aria-hidden="true">&#8592;</span> Back
         </button>
         <button type="button" className="freeform-mobile-estimate" onClick={() => setMobileSummaryOpen(true)}>
-          <strong>&#8369;{estimatedPrice.toLocaleString()}</strong>
-          <span>{estimatedDays} days · Summary</span>
+          <strong>{estimate ? `₱${estimatedPrice.toLocaleString()}` : '—'}</strong>
+          <span>{estimate ? `${estimatedDays} days` : 'No estimate'} · Summary</span>
         </button>
         {activeStep === 'review' ? (
           <div className="freeform-mobile-review-actions">
@@ -1018,7 +1041,7 @@ function applyDesign(design: {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Dimensions</span>
-                <span className="freeform-summary-field-value">H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</span>
+                <span className="freeform-summary-field-value">{modelBase ? <>H {formatInches(shapeParams.height)} &middot; W {formatInches(shapeParams.bodyWidth)}</> : '—'}</span>
               </div>
             </div>
 
@@ -1032,7 +1055,7 @@ function applyDesign(design: {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Est. Price</span>
-                <span className="freeform-summary-price">&#8369;{estimatedPrice.toLocaleString()}.00</span>
+                <span className="freeform-summary-price">{estimate ? `₱${estimatedPrice.toLocaleString()}.00` : '—'}</span>
               </div>
             </div>
 
@@ -1046,9 +1069,10 @@ function applyDesign(design: {
               </div>
               <div className="freeform-summary-field-text">
                 <span className="freeform-summary-field-label">Est. Production</span>
-                <span className="freeform-summary-field-value">{estimatedDays} Days</span>
+                <span className="freeform-summary-field-value">{estimate ? `${estimatedDays} Days` : '—'}</span>
               </div>
             </div>
+            <p className="freeform-mock-disclaimer">Mock estimate—shop confirms final price and production time</p>
           </div>
 
           <div className="freeform-summary-actions">

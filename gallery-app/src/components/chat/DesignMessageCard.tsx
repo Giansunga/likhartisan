@@ -12,6 +12,51 @@ import { useQuoteReview } from './QuoteReviewContext';
 
 type RequestWithOrder = DesignRequest & { order?: DesignRequestOrderSummary | DesignRequestOrderSummary[] | null };
 
+type DesignRequestListener = () => void;
+type DesignRequestSubscription = {
+  channel: ReturnType<typeof supabase.channel>;
+  listeners: Set<DesignRequestListener>;
+  cleanupTimer: ReturnType<typeof setTimeout> | null;
+};
+
+const designRequestSubscriptions = new Map<string, DesignRequestSubscription>();
+
+function subscribeToDesignRequest(requestId: string, listener: DesignRequestListener) {
+  let subscription = designRequestSubscriptions.get(requestId);
+  if (!subscription) {
+    const listeners = new Set<DesignRequestListener>();
+    const channel = supabase.channel(`design-request-card:${requestId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'design_requests', filter: `id=eq.${requestId}` }, () => {
+        listeners.forEach(callback => callback());
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `design_request_id=eq.${requestId}` }, () => {
+        listeners.forEach(callback => callback());
+      })
+      .subscribe();
+    subscription = { channel, listeners, cleanupTimer: null };
+    designRequestSubscriptions.set(requestId, subscription);
+  }
+  if (subscription.cleanupTimer) {
+    clearTimeout(subscription.cleanupTimer);
+    subscription.cleanupTimer = null;
+  }
+  subscription.listeners.add(listener);
+
+  return () => {
+    const current = designRequestSubscriptions.get(requestId);
+    if (!current) return;
+    current.listeners.delete(listener);
+    if (current.listeners.size > 0 || current.cleanupTimer) return;
+    current.cleanupTimer = setTimeout(() => {
+      const latest = designRequestSubscriptions.get(requestId);
+      if (!latest || latest.listeners.size > 0) return;
+      latest.cleanupTimer = null;
+      designRequestSubscriptions.delete(requestId);
+      void supabase.removeChannel(latest.channel);
+    }, 0);
+  };
+}
+
 function normalizedOrder(request: RequestWithOrder | null) {
   const order = request?.order;
   return Array.isArray(order) ? order[0] ?? null : order ?? null;
@@ -38,11 +83,8 @@ export default function DesignMessageCard({ data, audience = 'buyer' }: { data: 
     if (!requestId) return;
     let active = true;
     queueMicrotask(() => { if (active) void load(); });
-    const channel = supabase.channel(`design-request-card:${requestId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'design_requests', filter: `id=eq.${requestId}` }, () => { if (active) void load(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `design_request_id=eq.${requestId}` }, () => { if (active) void load(); })
-      .subscribe();
-    return () => { active = false; void supabase.removeChannel(channel); };
+    const unsubscribe = subscribeToDesignRequest(requestId, () => { if (active) void load(); });
+    return () => { active = false; unsubscribe(); };
   }, [load, requestId]);
 
   async function checkout(orderId: string) {

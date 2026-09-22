@@ -34,7 +34,13 @@ export default function ShopSelectModal({
       .from('models_3d')
       .select('shop_id, thumbnail, shops!inner(id, name, image)')
       .not('shop_id', 'is', null)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .not('base_height_in', 'is', null)
+      .not('base_body_width_in', 'is', null)
+      .not('base_neck_width_in', 'is', null)
+      .not('base_rim_size_in', 'is', null)
+      .not('base_price_php', 'is', null)
+      .not('base_production_days', 'is', null);
 
     if (!modelRows || modelRows.length === 0) {
       setShops([]);

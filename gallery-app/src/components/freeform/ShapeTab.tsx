@@ -22,10 +22,12 @@ const DEFAULTS: ShapeParams = DEFAULT_SHAPE_PARAMS_IN;
 
 export default function ShapeTab({
   shapeParams,
+  baseShape,
   onChange,
   onInteractionChange,
 }: {
   shapeParams: ShapeParams;
+  baseShape?: ShapeParams;
   onChange: (params: ShapeParams) => void;
   onInteractionChange?: (active: boolean) => void;
 }) {
@@ -121,7 +123,7 @@ export default function ShapeTab({
           cancelAnimationFrame(frameRef.current);
           frameRef.current = null;
         }
-        draftRef.current = { ...DEFAULTS };
+        draftRef.current = { ...(baseShape || DEFAULTS) };
         setDraftParams(draftRef.current);
         onChange(draftRef.current);
       }} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>

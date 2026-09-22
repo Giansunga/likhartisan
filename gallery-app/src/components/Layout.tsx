@@ -3,11 +3,12 @@ import { useEffect, Component, type ReactNode } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
+import { captureException } from '../lib/sentry';
 
 class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(err: unknown) { console.error('Page error:', err); }
+  componentDidCatch(err: unknown) { console.error('Page error:', err); captureException(err); }
   render() {
     if (this.state.hasError) {
       return (

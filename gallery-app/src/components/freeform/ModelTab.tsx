@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { modelBaseFromRow, type ModelBase, type ModelBaseColumns } from './modelEstimate';
 
-interface Model3D {
+interface Model3D extends ModelBaseColumns {
   id: string;
   name: string;
   category: string;
@@ -17,7 +18,7 @@ export default function ModelTab({
 }: {
   selectedModel: string;
   shopId: string;
-  onSelect: (file: string, name: string, category: string, thumbnail: string, id: string) => void;
+  onSelect: (file: string, name: string, category: string, thumbnail: string, id: string, base: ModelBase) => void;
 }) {
   const [models, setModels] = useState<Model3D[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,7 @@ export default function ModelTab({
         .eq('shop_id', shopId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
-      if (data) setModels(data);
+      if (data) setModels((data as Model3D[]).filter((model) => modelBaseFromRow(model) !== null));
       setLoading(false);
     })();
   }, [shopId]);
@@ -57,7 +58,10 @@ export default function ModelTab({
           {models.map((model) => (
             <button
               key={model.id}
-              onClick={() => onSelect(model.file_url, model.name, model.category, model.thumbnail || '', model.id)}
+              onClick={() => {
+                const base = modelBaseFromRow(model);
+                if (base) onSelect(model.file_url, model.name, model.category, model.thumbnail || '', model.id, base);
+              }}
               className={`freeform-tab-option${selectedModel === model.file_url ? ' selected' : ''}`}
             >
               <div style={{

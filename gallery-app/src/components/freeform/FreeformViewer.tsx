@@ -21,10 +21,12 @@ import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensure
 import type { MaterialParams } from './materials';
 import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
+import { captureException } from '../../lib/sentry';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: unknown) { captureException(error); }
   render() {
     if (this.state.hasError) return this.props.fallback;
     return this.props.children;
@@ -137,7 +139,7 @@ function cacheProfileCoefficients(snapshot: GeometrySnapshot, bounds: ModelBound
 class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?: () => void }, { hasError: boolean }> {
   state = { hasError: false };
   static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch() { this.props.onError?.(); }
+  componentDidCatch(error: unknown) { captureException(error); this.props.onError?.(); }
   render() { return this.state.hasError ? null : this.props.children; }
 }
 

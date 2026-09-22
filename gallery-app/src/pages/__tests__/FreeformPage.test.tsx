@@ -8,7 +8,14 @@ vi.mock('../../contexts/AuthContext', () => ({
 }));
 
 vi.mock('../../lib/supabase', () => ({
-  supabase: { from: vi.fn(), rpc: vi.fn() },
+  supabase: { from: vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: {
+        id: 'model-1', file_url: '/models/vase.glb', base_height_in: 10, base_body_width_in: 8,
+        base_neck_width_in: 5, base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5,
+      } })) })),
+    })),
+  })), rpc: vi.fn() },
 }));
 
 vi.mock('../../components/freeform/FreeformViewer', () => ({
@@ -20,7 +27,14 @@ vi.mock('../../components/freeform/ModelTab', () => ({
 }));
 
 vi.mock('../../components/freeform/ShapeTab', () => ({
-  default: () => <div>Shape choices</div>,
+  default: ({ shapeParams, baseShape, onChange }: {
+    shapeParams: { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit: 'in' };
+    baseShape: typeof shapeParams;
+    onChange: (value: typeof shapeParams) => void;
+  }) => <div>Shape choices
+    <button onClick={() => onChange({ ...shapeParams, height: shapeParams.height + 2 })}>Grow height</button>
+    <button onClick={() => onChange(baseShape)}>Reset Shape</button>
+  </div>,
 }));
 
 vi.mock('../../components/freeform/MaterialTab', () => ({
@@ -108,5 +122,25 @@ describe('FreeformPage send-to-shop flow', () => {
     await waitFor(() => expect(attachmentButton).toHaveAttribute('aria-current', 'step'));
     expect(screen.queryByRole('button', { name: /Send to Shop/i })).not.toBeInTheDocument();
     expectNextActionEnabled();
+  });
+
+  it('starts from the model baseline and both resets restore its estimate', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
+      modelUrl: '/models/vase.glb', modelName: 'Test Vase', modelCategory: 'Vase', modelId: 'model-1',
+    } }]}><FreeformPage /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/H 10.00 in/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /Shape Customize shape/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Grow height' }));
+    expect(screen.getAllByText('₱1,410.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/6 Days/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
+    expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Grow height' }));
+    fireEvent.click(screen.getByRole('button', { name: /Reset Design/i }));
+    expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0);
+    vi.restoreAllMocks();
   });
 });

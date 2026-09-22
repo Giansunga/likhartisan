@@ -58,6 +58,8 @@ describe('HomePage editorial landing page', () => {
     expect(shopTour?.nextElementSibling).toBe(reviews);
     expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/yrfUUl-jhAQ');
     expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('loading', 'lazy');
+    expect(screen.queryByText('From sculptural vessels to small moments of light, find a piece that feels at home with you.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Watch the craft unfold', { exact: false })).not.toBeInTheDocument();
     expect(screen.getByAltText('Rows of finished clay pots in a Santo Tomas workshop')).toHaveAttribute('src', '/images/hero_1.jpg');
     expect(screen.getByAltText('A potter shaping a large clay vessel')).toHaveAttribute('src', '/images/history_bottom_right.jpg');
     expect(screen.getByAltText('Two pottery workers shaping a large clay vessel in a Santo Tomas workshop')).toHaveAttribute('src', '/images/artisan_1.jpg');

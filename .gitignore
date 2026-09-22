@@ -52,3 +52,4 @@ gallery-app/*-check.png
 # Hermes agent temp files
 server/.hermes-tmp.*
 .hermes-tmp.*
+server/.model-reset-backups/

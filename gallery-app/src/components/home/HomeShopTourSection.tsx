@@ -6,7 +6,6 @@ export default function HomeShopTourSection() {
       <div className="home-container">
         <div className="home-shop-tour__intro">
           <div className="home-section-heading home-shop-tour__heading">
-            <span>Watch the craft unfold</span>
             <h2 id="home-shop-tour-title" aria-label="A Tour of Santo Tomas: Inside the Shops">A Tour of Santo Tomas: <em>Inside the Shops</em></h2>
           </div>
         </div>

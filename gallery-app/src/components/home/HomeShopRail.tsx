@@ -69,7 +69,6 @@ export default function HomeShopRail({ shops, loading, error }: HomeShopRailProp
                 <span className="home-shop-card__issue">Shop {String(index + 1).padStart(2, '0')}</span>
                 <p className="home-shop-card__location"><MapPin aria-hidden="true" />{shop.location || 'Santo Tomas, Pampanga'}</p>
                 <h3>{shop.name}</h3>
-                <p>{shop.description || 'Discover handmade pottery and locally made pieces from this participating shop.'}</p>
                 <Link to={`/shop/${shop.id}`} className="home-inline-link">Visit shop <ArrowRight aria-hidden="true" /></Link>
               </div>
             </article>)}

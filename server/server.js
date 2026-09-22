@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import 'dotenv/config';
+import { SENTRY_ENABLED, Sentry } from './instrument.js';
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -889,6 +890,8 @@ app.get('/api/admin/users', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+if (SENTRY_ENABLED) Sentry.setupExpressErrorHandler(app);
 
 const server = app.listen(PORT, () => {
   console.log(`LikhArtisan server running on port ${PORT}`);

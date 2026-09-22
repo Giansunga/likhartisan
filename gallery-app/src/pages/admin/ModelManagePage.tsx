@@ -3,8 +3,9 @@ import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
 import AttachmentManagePanel from './AttachmentManagePanel';
+import { MODEL_DIMENSION_LIMITS, modelBaseFromRow, type ModelBaseColumns } from '../../components/freeform/modelEstimate';
 
-interface Model3D {
+interface Model3D extends ModelBaseColumns {
   id: string;
   name: string;
   category: string;
@@ -34,6 +35,7 @@ export default function ModelManagePage() {
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('Vase');
   const [formShopId, setFormShopId] = useState('');
+  const [baseFields, setBaseFields] = useState({ height: '', bodyWidth: '', neckWidth: '', rimSize: '', price: '', productionDays: '' });
   const [glbFile, setGlbFile] = useState<File | null>(null);
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [thumbPreview, setThumbPreview] = useState('');
@@ -71,6 +73,7 @@ export default function ModelManagePage() {
     setFormName('');
     setFormCategory('Vase');
     setFormShopId('');
+    setBaseFields({ height: '', bodyWidth: '', neckWidth: '', rimSize: '', price: '', productionDays: '' });
     setGlbFile(null);
     setThumbFile(null);
     setThumbPreview('');
@@ -83,6 +86,11 @@ export default function ModelManagePage() {
     setFormName(model.name);
     setFormCategory(model.category);
     setFormShopId(model.shop_id || '');
+    setBaseFields({
+      height: model.base_height_in?.toString() || '', bodyWidth: model.base_body_width_in?.toString() || '',
+      neckWidth: model.base_neck_width_in?.toString() || '', rimSize: model.base_rim_size_in?.toString() || '',
+      price: model.base_price_php?.toString() || '', productionDays: model.base_production_days?.toString() || '',
+    });
     setGlbFile(null);
     setThumbFile(null);
     setThumbPreview(model.thumbnail || '');
@@ -105,6 +113,15 @@ export default function ModelManagePage() {
     e.preventDefault();
     if (!formName.trim()) return;
     if (!editingModel && !glbFile) return;
+    const baseColumns: ModelBaseColumns = {
+      base_height_in: Number(baseFields.height), base_body_width_in: Number(baseFields.bodyWidth),
+      base_neck_width_in: Number(baseFields.neckWidth), base_rim_size_in: Number(baseFields.rimSize),
+      base_price_php: Number(baseFields.price), base_production_days: Number(baseFields.productionDays),
+    };
+    if (Object.values(baseFields).some((value) => value.trim() === '') || !modelBaseFromRow(baseColumns)) {
+      setError('Enter valid base dimensions, a price above ₱0, and 1–365 production days.');
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -120,6 +137,7 @@ export default function ModelManagePage() {
           name: formName.trim(),
           category: formCategory,
           shop_id: formShopId || null,
+          ...baseColumns,
         };
         if (glbFile) updateData.file_url = fileUrl;
         if (thumbFile) updateData.thumbnail = thumbnailUrl;
@@ -133,6 +151,7 @@ export default function ModelManagePage() {
           file_url: fileUrl,
           thumbnail: thumbnailUrl,
           shop_id: formShopId || null,
+          ...baseColumns,
         });
         if (insertErr) throw insertErr;
       }
@@ -294,7 +313,7 @@ export default function ModelManagePage() {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-5">
+            <form onSubmit={handleSave} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
               )}
@@ -316,6 +335,36 @@ export default function ModelManagePage() {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-brown-dark">Base dimensions (inches) *</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    ['height', 'Height'], ['bodyWidth', 'Body width'], ['neckWidth', 'Neck width'], ['rimSize', 'Rim size'],
+                  ] as const).map(([key, label]) => {
+                    const [min, max] = MODEL_DIMENSION_LIMITS[key];
+                    return <label key={key} className="text-sm text-brown-dark">{label}
+                      <input type="number" required min={min} max={max} step="0.01" value={baseFields[key]}
+                        onChange={e => setBaseFields(prev => ({ ...prev, [key]: e.target.value }))}
+                        className="mt-1 w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
+                    </label>;
+                  })}
+                </div>
+              </fieldset>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm text-brown-dark">Base price (₱) *
+                  <input type="number" required min="0.01" step="0.01" value={baseFields.price}
+                    onChange={e => setBaseFields(prev => ({ ...prev, price: e.target.value }))}
+                    className="mt-1 w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
+                </label>
+                <label className="text-sm text-brown-dark">Base production (days) *
+                  <input type="number" required min="1" max="365" step="1" value={baseFields.productionDays}
+                    onChange={e => setBaseFields(prev => ({ ...prev, productionDays: e.target.value }))}
+                    className="mt-1 w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
+                </label>
+              </div>
+              <p className="text-xs text-brown-light">These are starting values for a mock estimate; the shop confirms the final quote.</p>
 
               <div>
                 <label className="block text-sm font-medium text-brown-dark mb-1">Assign to Shop *</label>

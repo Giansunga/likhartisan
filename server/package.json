@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node --import ./instrument.js server.js",
+    "dev": "node --watch --import ./instrument.js server.js",
     "test": "node --test",
     "check:auth-config": "node scripts/check-likhai-auth-config.js",
     "payments:reconcile": "node scripts/reconcile-payments.js"
@@ -13,6 +13,7 @@
     "@aws-sdk/client-s3": "^3.1102.0",
     "@aws-sdk/s3-request-presigner": "^3.1102.0",
     "@lalamove/lalamove-js": "^1.1.0",
+    "@sentry/node": "^10.75.1",
     "@supabase/supabase-js": "^2.108.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

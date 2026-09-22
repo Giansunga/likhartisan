@@ -178,7 +178,8 @@ export default function FreeformScrollSection() {
   // Fetch a default model for the preview
   useEffect(() => {
     if (!freeformVisible || previewModel) return;
-    supabase.from('models_3d').select('file_url, name, category, thumbnail').eq('status', 'active').limit(1).maybeSingle()
+    supabase.from('models_3d').select('file_url, name, category, thumbnail').eq('status', 'active')
+      .not('base_price_php', 'is', null).not('base_production_days', 'is', null).limit(1).maybeSingle()
       .then(({ data }) => {
         if (data?.file_url) {
           setPreviewModel(data.file_url);
