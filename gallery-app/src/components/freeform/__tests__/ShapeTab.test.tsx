@@ -52,4 +52,15 @@ describe('ShapeTab', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...initialShape, bodyWidth: 10 });
     expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
   });
+
+  it('keeps a model with 14-inch neck and rim baselines adjustable', () => {
+    const shape = { ...initialShape, neckWidth: 14, rimSize: 14 };
+    render(<ShapeTab shapeParams={shape} baseShape={shape} onChange={vi.fn()} />);
+
+    for (const name of ['Neck Width', 'Rim Size']) {
+      const slider = screen.getByRole('slider', { name });
+      expect(Number(slider.getAttribute('max'))).toBeGreaterThan(14);
+      expect(slider).toHaveValue('14');
+    }
+  });
 });

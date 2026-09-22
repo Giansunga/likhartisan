@@ -15,6 +15,7 @@ OPTIONAL / INCREMENTAL FILES (for existing databases, column additions):
   add-theme-settings.sql           Theme settings table (included in master)
   add-models-3d-table.sql          3D models table (included in master)
   add-model-base-estimates.sql      Base dimensions, price, and days for model-driven mock estimates (included in master)
+  relax-model-base-dimension-ranges.sql  Allow positive dimensions beyond the old slider ranges on existing databases
   add-artisans-table.sql           Artisans table (included in master)
   add-designs-table.sql            Freeform designs table (included in master)
   add-notifications-table.sql      Notifications table (included in master)

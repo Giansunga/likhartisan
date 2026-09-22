@@ -119,7 +119,7 @@ export default function ModelManagePage() {
       base_price_php: Number(baseFields.price), base_production_days: Number(baseFields.productionDays),
     };
     if (Object.values(baseFields).some((value) => value.trim() === '') || !modelBaseFromRow(baseColumns)) {
-      setError('Enter valid base dimensions, a price above ₱0, and 1–365 production days.');
+      setError('Enter positive base dimensions up to 999.99 inches, a price above ₱0, and 1–365 production days.');
       return;
     }
     setSaving(true);

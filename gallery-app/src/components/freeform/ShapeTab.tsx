@@ -84,7 +84,10 @@ export default function ShapeTab({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {SLIDERS.map((s) => {
           const val = draftParams[s.key];
-          const pct = ((val - s.min) / (s.max - s.min)) * 100;
+          const baseline = baseShape?.[s.key] ?? val;
+          const min = s.key === 'curvature' ? s.min : Math.min(s.min, Math.max(0.1, Math.floor(baseline / 2)));
+          const max = s.key === 'curvature' ? s.max : Math.max(s.max, Math.ceil(Math.max(baseline, val) * 1.5));
+          const pct = ((val - min) / (max - min)) * 100;
           return (
             <div key={s.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
@@ -94,8 +97,8 @@ export default function ShapeTab({
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
               <input
                 type="range"
-                min={s.min}
-                max={s.max}
+                min={min}
+                max={max}
                 value={val}
                 aria-label={s.label}
                 onPointerDown={beginInteraction}

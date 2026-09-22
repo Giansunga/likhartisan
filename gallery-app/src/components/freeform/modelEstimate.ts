@@ -20,12 +20,8 @@ export type ModelBaseColumns = {
   base_production_days: number | null;
 };
 
-export const MODEL_DIMENSION_LIMITS = {
-  height: [2, 20],
-  bodyWidth: [2, 16],
-  neckWidth: [1, 12],
-  rimSize: [1, 10],
-} as const;
+// Matches the two decimal places and three integer digits stored by models_3d.
+const MAX_MODEL_DIMENSION = 999.99;
 
 export function modelBaseFromRow(row: Partial<ModelBaseColumns> | null | undefined): ModelBase | null {
   if (!row) return null;
@@ -39,9 +35,8 @@ export function modelBaseFromRow(row: Partial<ModelBaseColumns> | null | undefin
   };
   if ([row.base_height_in, row.base_body_width_in, row.base_neck_width_in, row.base_rim_size_in,
     row.base_price_php, row.base_production_days].some((value) => value == null)) return null;
-  for (const key of Object.keys(MODEL_DIMENSION_LIMITS) as Array<keyof typeof MODEL_DIMENSION_LIMITS>) {
-    const [min, max] = MODEL_DIMENSION_LIMITS[key];
-    if (!Number.isFinite(base[key]) || base[key] < min || base[key] > max) return null;
+  for (const key of ['height', 'bodyWidth', 'neckWidth', 'rimSize'] as const) {
+    if (!Number.isFinite(base[key]) || base[key] <= 0 || base[key] > MAX_MODEL_DIMENSION) return null;
   }
   return Number.isFinite(base.price) && base.price > 0 && Number.isInteger(base.productionDays)
     && base.productionDays >= 1 && base.productionDays <= 365 ? base : null;

@@ -12,12 +12,16 @@ function estimate(overrides: Partial<Parameters<typeof estimateModelDesign>[0]> 
 }
 
 describe('model baseline and mock estimate', () => {
-  it('requires every persisted baseline field and checks slider bounds', () => {
+  it('requires every persisted baseline field and accepts positive dimensions beyond the old slider bounds', () => {
     const row = { base_height_in: 10, base_body_width_in: 8, base_neck_width_in: 5,
       base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5 };
     expect(modelBaseFromRow({ ...row, thumbnail: null } as typeof row)).toEqual(base);
     expect(modelBaseFromRow({ ...row, base_price_php: null })).toBeNull();
-    expect(modelBaseFromRow({ ...row, base_height_in: 21 })).toBeNull();
+    expect(modelBaseFromRow({ ...row, base_height_in: 13, base_body_width_in: 14,
+      base_neck_width_in: 14, base_rim_size_in: 14 })).toEqual({ ...base, height: 13,
+      bodyWidth: 14, neckWidth: 14, rimSize: 14 });
+    expect(modelBaseFromRow({ ...row, base_rim_size_in: 0 })).toBeNull();
+    expect(modelBaseFromRow({ ...row, base_neck_width_in: 1000 })).toBeNull();
     expect(modelBaseFromRow({ ...row, base_production_days: 0 })).toBeNull();
   });
 
