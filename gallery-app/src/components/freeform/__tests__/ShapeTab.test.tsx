@@ -30,7 +30,7 @@ describe('ShapeTab', () => {
     fireEvent.change(height, { target: { value: '10.9' } });
     fireEvent.change(height, { target: { value: '11' } });
 
-    expect(screen.getByText('11.00 in')).toBeInTheDocument();
+    expect(screen.getByText('+1.16 in')).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
     act(() => queuedFrame?.(0));
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -62,5 +62,20 @@ describe('ShapeTab', () => {
       expect(Number(slider.getAttribute('max'))).toBeGreaterThan(14);
       expect(slider).toHaveValue('14');
     }
+  });
+
+  it('starts at zero offset, limits edits to half the baseline, and resets to the saved baseline', () => {
+    const shape = { ...initialShape, height: 13, bodyWidth: 14, neckWidth: 8, rimSize: 10 };
+    const onChange = vi.fn();
+    render(<ShapeTab shapeParams={shape} baseShape={shape} onChange={onChange} />);
+    const height = screen.getByRole('slider', { name: 'Height' });
+    expect(height).toHaveAttribute('min', '6.5');
+    expect(height).toHaveAttribute('max', '19.5');
+    expect(screen.getAllByText('0.00 in')).toHaveLength(4);
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    fireEvent.change(height, { target: { value: '14' } });
+    expect(screen.getByText('+1.00 in')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
+    expect(onChange).toHaveBeenLastCalledWith(shape);
   });
 });

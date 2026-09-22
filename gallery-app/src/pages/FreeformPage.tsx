@@ -20,7 +20,7 @@ import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } fro
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import { createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
-import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams } from '../lib/measurements';
+import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams, shapeFromModelBase } from '../lib/measurements';
 import { estimateModelDesign, modelBaseFromRow, type ModelBase } from '../components/freeform/modelEstimate';
 import * as THREE from 'three';
 import '../styles/freeform.css';
@@ -153,7 +153,7 @@ export default function FreeformPage() {
     setModelThumbnail(thumbnail || '');
     setModelBase(base);
     if (resetParams) {
-      setShapeParams(base ? { ...DEFAULT_SHAPE, height: base.height, bodyWidth: base.bodyWidth, neckWidth: base.neckWidth, rimSize: base.rimSize } : DEFAULT_SHAPE);
+      setShapeParams(base ? shapeFromModelBase(base) : DEFAULT_SHAPE);
       setMaterialParams(DEFAULT_MATERIAL);
       setDecorationParams(DEFAULT_DECORATION);
       if (attachmentParams.length) toast.info('Attachments were removed because the base model changed.');
@@ -428,7 +428,7 @@ function applyDesign(design: {
   function handleResetDesign() {
     const shouldReset = !selectedModel || window.confirm('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
-    setShapeParams(modelBase ? { ...DEFAULT_SHAPE, height: modelBase.height, bodyWidth: modelBase.bodyWidth, neckWidth: modelBase.neckWidth, rimSize: modelBase.rimSize } : DEFAULT_SHAPE);
+    setShapeParams(modelBase ? shapeFromModelBase(modelBase) : DEFAULT_SHAPE);
     setMaterialParams(DEFAULT_MATERIAL);
     setDecorationParams(DEFAULT_DECORATION);
     setAttachmentParams([]);
@@ -694,7 +694,7 @@ function applyDesign(design: {
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={modelBase ? { ...DEFAULT_SHAPE, height: modelBase.height, bodyWidth: modelBase.bodyWidth, neckWidth: modelBase.neckWidth, rimSize: modelBase.rimSize } : DEFAULT_SHAPE} onChange={setShapeParams} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : DEFAULT_SHAPE} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (

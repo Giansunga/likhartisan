@@ -3,8 +3,9 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { applyFinishToScene, generateCylindricalUVs } from '../components/freeform/finishMaterials';
 import type { MaterialParams } from '../components/freeform/materials';
 import { inchesToCm } from '../lib/measurements';
+import { calibrateModelScene, getSectionAnchors, sectionScale } from '../components/freeform/calibrateModel';
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in' };
+type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -15,11 +16,19 @@ function normalizeParam(value: number, midpoint: number): number {
   return THREE.MathUtils.clamp((value - midpoint) / midpoint, -1, 1);
 }
 
-function getProfileScale(t: number, shapeParams: ShapeParams): number {
-  const bodyDelta = normalizeParam(shapeParams.bodyWidth, 20);
-  const neckDelta = normalizeParam(shapeParams.neckWidth, 15);
-  const rimDelta = normalizeParam(shapeParams.rimSize, 12);
+function getProfileScale(t: number, shapeParams: ShapeParams, relativeAnchors: [number, number][] | null): number {
+  const baseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
+  const factor = shapeParams.unit === 'in' ? 2.54 : 1;
+  const bodyDelta = normalizeParam(shapeParams.bodyWidth, baseline ? baseline.bodyWidth * factor : 20);
+  const neckDelta = normalizeParam(shapeParams.neckWidth, baseline ? baseline.neckWidth * factor : 15);
+  const rimDelta = normalizeParam(shapeParams.rimSize, baseline ? baseline.rimSize * factor : 12);
   const curvature = normalizeParam(shapeParams.curvature, 50);
+  if (relativeAnchors) {
+    const shoulderInfluence = smoothstep(0.5, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
+    return THREE.MathUtils.clamp(sectionScale(t, relativeAnchors)
+      + Math.sin(t * Math.PI) * 0.16 * curvature
+      - shoulderInfluence * 0.08 * curvature, 0.25, 1.8);
+  }
 
   const baseInfluence = 1 - smoothstep(0.06, 0.3, t);
   const bodyInfluence = smoothstep(0.1, 0.35, t) * (1 - smoothstep(0.55, 0.75, t));
@@ -123,7 +132,21 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
   if (geometrySnapshots.size === 0) return;
 
   const modelBounds = getBoundsFromSnapshots(geometrySnapshots.values());
-  const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / 25, 0.35, 1.8);
+  const baseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
+  let relativeAnchors: [number, number][] | null = null;
+  if (baseline) {
+    try {
+      const sections = getSectionAnchors(clone);
+      relativeAnchors = ([
+        [sections.body, shapeParams.bodyWidth / baseline.bodyWidth],
+        [sections.neck, shapeParams.neckWidth / baseline.neckWidth],
+        [sections.rim, shapeParams.rimSize / baseline.rimSize],
+      ] as [number, number][]).sort((a, b) => a[0] - b[0]);
+    } catch {
+      relativeAnchors = [[0.45, shapeParams.bodyWidth / baseline.bodyWidth], [0.8, shapeParams.neckWidth / baseline.neckWidth], [0.98, shapeParams.rimSize / baseline.rimSize]];
+    }
+  }
+  const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / (baseline ? baseline.height * (shapeParams.unit === 'in' ? 2.54 : 1) : 25), 0.35, 1.8);
   const { minY, rangeY, centerX, centerY, centerZ } = modelBounds;
   const rootVertex = new THREE.Vector3();
   const localVertex = new THREE.Vector3();
@@ -144,7 +167,7 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
       const oz = rootPositions[i * 3 + 2];
 
       const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
-    const scaleXZ = getProfileScale(t, geometryShapeParams);
+    const scaleXZ = getProfileScale(t, geometryShapeParams, relativeAnchors);
 
       rootVertex.set(
         centerX + (ox - centerX) * scaleXZ,
@@ -172,7 +195,7 @@ export async function exportSceneToGLB(
 ): Promise<ArrayBuffer | null> {
   if (!baseScene) return null;
 
-  const clone = baseScene.clone(true);
+  let clone = baseScene.clone(true);
 
   clone.traverse((child) => {
     if (child instanceof THREE.Mesh) {
@@ -188,6 +211,12 @@ export async function exportSceneToGLB(
 
   generateCylindricalUVs(clone);
   applyDeformationToClone(clone, shapeParams);
+  const baseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
+  if (baseline && (shapeParams.height !== baseline.height || shapeParams.bodyWidth !== baseline.bodyWidth
+    || shapeParams.neckWidth !== baseline.neckWidth || shapeParams.rimSize !== baseline.rimSize
+    || shapeParams.curvature !== 50)) {
+    clone = calibrateModelScene(clone, shapeParams);
+  }
   applyFinishToScene(clone, materialParams);
 
   return new Promise<ArrayBuffer | null>((resolve) => {

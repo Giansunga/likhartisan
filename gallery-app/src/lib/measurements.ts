@@ -10,7 +10,14 @@ export type ShapeParamsInches = {
   rimSize: number;
   curvature: number;
   unit: 'in';
+  geometryMode?: 'baseline';
+  baseline?: Pick<ShapeParamsInches, 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize'>;
 };
+
+export function shapeFromModelBase(base: Pick<ShapeParamsInches, 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize'>): ShapeParamsInches {
+  const baseline = { height: base.height, bodyWidth: base.bodyWidth, neckWidth: base.neckWidth, rimSize: base.rimSize };
+  return { ...baseline, curvature: 50, unit: 'in', geometryMode: 'baseline', baseline };
+}
 
 export const DEFAULT_SHAPE_PARAMS_IN: ShapeParamsInches = Object.freeze({
   // These preserve the previous default geometry: 25, 20, 15, and 12 cm.
@@ -106,6 +113,16 @@ export function normalizeShapeParams<T extends { height: number; bodyWidth: numb
     next[key] = (source === 'cm' ? cmToInches(raw) : raw) as T[typeof key];
   }
   next.curvature = finiteNumber(next.curvature) as T['curvature'];
+  const metadata = input as ShapeParamsInches | null | undefined;
+  const withMetadata = next as T & Pick<ShapeParamsInches, 'geometryMode' | 'baseline'>;
+  if (source === 'in' && metadata?.geometryMode === 'baseline' && metadata.baseline
+    && SHAPE_DIMENSION_KEYS.every((key) => Number.isFinite(metadata.baseline?.[key]) && metadata.baseline![key] > 0)) {
+    withMetadata.geometryMode = 'baseline';
+    withMetadata.baseline = { ...metadata.baseline };
+  } else {
+    delete withMetadata.geometryMode;
+    delete withMetadata.baseline;
+  }
   next.unit = CANONICAL_MEASUREMENT_UNIT;
   return next as T & { unit: 'in' };
 }

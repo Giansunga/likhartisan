@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_SHAPE_PARAMS_IN, formatInches, type ShapeParamsInches } from '../../lib/measurements';
 
 type ShapeParams = ShapeParamsInches;
-type ShapeControlKey = Exclude<keyof ShapeParams, 'unit'>;
+type ShapeControlKey = 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize' | 'curvature';
 
 const SLIDERS: {
   key: ShapeControlKey;
@@ -66,7 +66,7 @@ export default function ShapeTab({
     onInteractionChange?.(false);
   }
 
-  function handleChange(key: keyof ShapeParams, value: number) {
+  function handleChange(key: ShapeControlKey, value: number) {
     const next = { ...draftRef.current, [key]: value };
     draftRef.current = next;
     setDraftParams(next);
@@ -84,15 +84,16 @@ export default function ShapeTab({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {SLIDERS.map((s) => {
           const val = draftParams[s.key];
-          const baseline = baseShape?.[s.key] ?? val;
-          const min = s.key === 'curvature' ? s.min : Math.min(s.min, Math.max(0.1, Math.floor(baseline / 2)));
-          const max = s.key === 'curvature' ? s.max : Math.max(s.max, Math.ceil(Math.max(baseline, val) * 1.5));
+          const baseline = baseShape?.[s.key] ?? DEFAULTS[s.key];
+          const min = s.key === 'curvature' ? s.min : Math.min(Math.max(0.01, baseline * 0.5), val);
+          const max = s.key === 'curvature' ? s.max : Math.max(baseline * 1.5, val);
           const pct = ((val - min) / (max - min)) * 100;
+          const change = val - baseline;
           return (
             <div key={s.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.label}</label>
-                <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{s.key === 'curvature' ? `${val.toFixed(0)}%` : formatInches(val)}</span>
+                <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{s.key === 'curvature' ? `${change > 0 ? '+' : ''}${change.toFixed(0)}%` : `${change > 0 ? '+' : ''}${formatInches(change)}`}</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
               <input

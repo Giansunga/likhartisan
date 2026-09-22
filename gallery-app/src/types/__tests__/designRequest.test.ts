@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDesignRequestSnapshot, isDesignRequestMessage, normalizeDesignRequestSnapshot } from '../designRequest';
+import { shapeFromModelBase } from '../../lib/measurements';
 
 describe('design request snapshots', () => {
   it('creates an immutable versioned copy with exact design values', () => {
@@ -59,5 +60,22 @@ describe('design request snapshots', () => {
     expect(snapshot.shape.height).toBeCloseTo(20 / 2.54, 8);
     expect(snapshot.dimensions.heightIn).toBeCloseTo(20 / 2.54, 8);
     expect(snapshot.dimensions.unit).toBe('in');
+    expect(snapshot.shape.geometryMode).toBeUndefined();
+  });
+
+  it('keeps the new model baseline with a request even if the original shape is edited later', () => {
+    const shape = shapeFromModelBase({ height: 13, bodyWidth: 14, neckWidth: 8, rimSize: 10 });
+    const snapshot = createDesignRequestSnapshot({
+      model: { id: 'model-1', name: 'Pot', file: '/pot.glb', thumbnail: '', category: 'Pot' },
+      shape,
+      material: { finish: 'raw_clay', color: '#BE734F' },
+      decoration: { patternId: '', placement: 'middle', scale: 1, color: '#7A3E12', effect: 'painted' },
+      attachments: [], dimensions: { heightIn: 13, widthIn: 14, unit: 'in' },
+      estimate: { price: 100, productionDays: 1 },
+    });
+    shape.baseline!.height = 99;
+    expect(snapshot.shape.geometryMode).toBe('baseline');
+    expect(snapshot.shape.baseline?.height).toBe(13);
+    expect(normalizeDesignRequestSnapshot(snapshot).shape.baseline?.height).toBe(13);
   });
 });

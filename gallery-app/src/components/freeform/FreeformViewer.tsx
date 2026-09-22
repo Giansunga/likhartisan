@@ -21,6 +21,7 @@ import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensure
 import type { MaterialParams } from './materials';
 import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
+import { getSectionAnchors, sectionScale } from './calibrateModel';
 import { captureException } from '../../lib/sentry';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -46,7 +47,7 @@ function LoadingIndicator() {
   );
 }
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in' };
+type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
 
 type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
@@ -243,6 +244,7 @@ function Scene({
   const appliedAppearanceRef = useRef('');
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
   const modelBoundsRef = useRef<ModelBounds>({ minY: 0, rangeY: 1, centerX: 0, centerY: 0, centerZ: 0 });
+  const sectionAnchorsRef = useRef({ body: 0.45, neck: 0.8, rim: 0.98 });
 
   // Keep the established Three.js geometry scale in centimeters while the
   // user-facing and persisted shape values are canonical inches.
@@ -312,6 +314,7 @@ function Scene({
 
       modelBoundsRef.current = getBoundsFromSnapshots(geometrySnapshotsRef.current.values());
       geometrySnapshotsRef.current.forEach((snapshot) => cacheProfileCoefficients(snapshot, modelBoundsRef.current));
+      try { sectionAnchorsRef.current = getSectionAnchors(scene); } catch { /* Older meshes retain the established profile bands. */ }
 
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
@@ -351,15 +354,22 @@ function Scene({
       morphChecked.current = true;
     }
 
-    const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}`;
+    const relativeBaseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
+    const baselineFactor = shapeParams.unit === 'in' ? 2.54 : 1;
+    const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${relativeBaseline ? Object.values(relativeBaseline).join('|') : 'legacy'}`;
     const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
     const shapeChanged = appliedShapeRef.current !== shapeKey;
     const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
-    const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / 25, 0.35, 1.8);
-    const bodyDelta = normalizeParam(geometryShapeParams.bodyWidth, 20);
-    const neckDelta = normalizeParam(geometryShapeParams.neckWidth, 15);
-    const rimDelta = normalizeParam(geometryShapeParams.rimSize, 12);
+    const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / (relativeBaseline ? relativeBaseline.height * baselineFactor : 25), 0.35, 1.8);
+    const bodyDelta = normalizeParam(geometryShapeParams.bodyWidth, relativeBaseline ? relativeBaseline.bodyWidth * baselineFactor : 20);
+    const neckDelta = normalizeParam(geometryShapeParams.neckWidth, relativeBaseline ? relativeBaseline.neckWidth * baselineFactor : 15);
+    const rimDelta = normalizeParam(geometryShapeParams.rimSize, relativeBaseline ? relativeBaseline.rimSize * baselineFactor : 12);
     const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
+    const relativeAnchors = relativeBaseline ? ([
+      [sectionAnchorsRef.current.body, geometryShapeParams.bodyWidth / (relativeBaseline.bodyWidth * baselineFactor)],
+      [sectionAnchorsRef.current.neck, geometryShapeParams.neckWidth / (relativeBaseline.neckWidth * baselineFactor)],
+      [sectionAnchorsRef.current.rim, geometryShapeParams.rimSize / (relativeBaseline.rimSize * baselineFactor)],
+    ] as [number, number][]).sort((a, b) => a[0] - b[0]) : null;
     const { minY, rangeY, centerX, centerY, centerZ } = modelBoundsRef.current;
     const decorProjection = getDecorationProjection(
       { minY, rangeY, centerY },
@@ -391,17 +401,18 @@ function Scene({
           const ox = rootPositions[i * 3];
           const oy = rootPositions[i * 3 + 1];
           const oz = rootPositions[i * 3 + 2];
+          const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
 
           const coefficientIndex = i * 4;
-          const scaleXZ = THREE.MathUtils.clamp(
-            1
+          const scaleXZ = THREE.MathUtils.clamp(relativeAnchors
+            ? sectionScale(t, relativeAnchors)
+              + profileCoefficients[coefficientIndex + 3] * curvatureDelta
+            : 1
               + profileCoefficients[coefficientIndex] * bodyDelta
               + profileCoefficients[coefficientIndex + 1] * neckDelta
               + profileCoefficients[coefficientIndex + 2] * rimDelta
               + profileCoefficients[coefficientIndex + 3] * curvatureDelta,
-            0.25,
-            1.8,
-          );
+          0.25, 1.8);
 
           rootVertex.set(
             centerX + (ox - centerX) * scaleXZ,
