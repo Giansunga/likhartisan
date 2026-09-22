@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
 import AttachmentManagePanel from './AttachmentManagePanel';
-import { MODEL_DIMENSION_LIMITS, modelBaseFromRow, type ModelBaseColumns } from '../../components/freeform/modelEstimate';
+import { modelBaseFromRow, type ModelBaseColumns } from '../../components/freeform/modelEstimate';
 
 interface Model3D extends ModelBaseColumns {
   id: string;
@@ -342,9 +342,8 @@ export default function ModelManagePage() {
                   {([
                     ['height', 'Height'], ['bodyWidth', 'Body width'], ['neckWidth', 'Neck width'], ['rimSize', 'Rim size'],
                   ] as const).map(([key, label]) => {
-                    const [min, max] = MODEL_DIMENSION_LIMITS[key];
                     return <label key={key} className="text-sm text-brown-dark">{label}
-                      <input type="number" required min={min} max={max} step="0.01" value={baseFields[key]}
+                      <input type="number" required step="0.01" value={baseFields[key]}
                         onChange={e => setBaseFields(prev => ({ ...prev, [key]: e.target.value }))}
                         className="mt-1 w-full px-4 py-2.5 rounded-xl border border-cream-tertiary text-sm focus:outline-none focus:border-accent" />
                     </label>;
