@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
 type View = 'signin' | 'signup' | 'forgot';
@@ -7,7 +8,7 @@ type View = 'signin' | 'signup' | 'forgot';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onAuthChange: (email?: string) => void;
+  onAuthChange: (user: User) => void;
   initialView?: View;
 }
 
@@ -54,6 +55,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
   const [showPw2, setShowPw2]     = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successEmail, setSuccessEmail] = useState('');
+  const [signupNeedsConfirmation, setSignupNeedsConfirmation] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -73,6 +76,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       setShowPw2(false);
       setShowSuccess(false);
       setSuccessEmail('');
+      setSignupNeedsConfirmation(false);
+      setSubmitting(false);
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
 
@@ -124,27 +129,49 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError('');
     const form = e.target as HTMLFormElement;
     const email    = (form.elements.namedItem('email')    as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    if (err) { setError(err.message); return; }
-    onAuthChange(email);
-    onClose();
+    setSubmitting(true);
+    try {
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) { setError(err.message); return; }
+      if (!data.session?.user) { setError('Sign in could not be completed. Please try again.'); return; }
+      onAuthChange(data.session.user);
+      onClose();
+    } catch {
+      setError('Sign in could not be completed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError('');
     const form = e.target as HTMLFormElement;
     const name     = (form.elements.namedItem('name')     as HTMLInputElement).value;
     const email    = (form.elements.namedItem('email')    as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-    const { error: err } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
-    if (err) { setError(err.message); return; }
-    onAuthChange(email);
-    onClose();
+    setSubmitting(true);
+    try {
+      const { data, error: err } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+      if (err) { setError(err.message); return; }
+      if (!data.session) {
+        setSuccessEmail(email);
+        setSignupNeedsConfirmation(true);
+        return;
+      }
+      onAuthChange(data.session.user);
+      onClose();
+    } catch {
+      setError('Account creation could not be completed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
@@ -300,11 +327,12 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
                   <button
                     type="submit"
+                    disabled={submitting}
                     style={S.btn}
                     onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
                     onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
                   >
-                    Log In
+                    {submitting ? 'Signing In...' : 'Log In'}
                   </button>
                 </form>
 
@@ -341,6 +369,14 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
             {/* ════ SIGN UP ════ */}
             {view === 'signup' && (
               <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
+                {signupNeedsConfirmation ? (
+                  <div role="status" style={{ textAlign: 'center', padding: '32px 0', color: '#3D2B1F' }}>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '12px' }}>Check your email</h1>
+                    <p>Check {successEmail} for a confirmation link before signing in.</p>
+                    <button type="button" onClick={onClose} style={{ ...S.btn, marginTop: '24px' }}>Got it</button>
+                  </div>
+                ) : (
+                <>
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '24px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Create Account
                 </h1>
@@ -383,11 +419,11 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   </div>
 
                   <button
-                    type="submit" style={S.btn}
+                    type="submit" disabled={submitting} style={S.btn}
                     onMouseEnter={e => (e.currentTarget.style.background = '#6B3209')}
                     onMouseLeave={e => (e.currentTarget.style.background = '#823E0B')}
                   >
-                    Create Account
+                    {submitting ? 'Creating Account...' : 'Create Account'}
                   </button>
                 </form>
 
@@ -411,6 +447,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   <GoogleIcon />
                   Continue with Google
                 </button>
+                </>
+                )}
               </motion.div>
             )}
 

@@ -8,6 +8,8 @@ import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { consumeCartCheckoutAuthPending } from '../lib/cartCheckout';
+import { getAuthDestination } from '../lib/authDestination';
+import type { User } from '@supabase/supabase-js';
 import NotificationDropdown from './notifications/NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { notificationDestination, notificationViewAllDestination } from '../lib/notifications';
@@ -132,13 +134,8 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function handleAuthChange(email?: string) {
-    const userEmailStr = email || userEmail || '';
-    if (SHOP_EMAILS.includes(userEmailStr) || hasShopRole) {
-      navigate('/artisan-dashboard');
-    } else {
-      window.location.reload();
-    }
+  async function handleAuthChange(user: User) {
+    navigate(await getAuthDestination(user), { replace: true });
   }
 
   async function handleLogout() {
