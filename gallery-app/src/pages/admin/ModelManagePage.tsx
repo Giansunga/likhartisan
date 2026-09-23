@@ -4,7 +4,6 @@ import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefres
 import { uploadToR2 } from '../../lib/r2';
 import AttachmentManagePanel from './AttachmentManagePanel';
 import { modelBaseFromRow, type ModelBaseColumns } from '../../components/freeform/modelEstimate';
-import { calibrateModelFile } from '../../components/freeform/calibrateModel';
 
 interface Model3D extends ModelBaseColumns {
   id: string;
@@ -130,25 +129,7 @@ export default function ModelManagePage() {
       let fileUrl = editingModel?.file_url || '';
       let thumbnailUrl = editingModel?.thumbnail || '';
 
-      const dimensionsChanged = Boolean(editingModel && (
-        Number(editingModel.base_height_in) !== baseColumns.base_height_in
-        || Number(editingModel.base_body_width_in) !== baseColumns.base_body_width_in
-        || Number(editingModel.base_neck_width_in) !== baseColumns.base_neck_width_in
-        || Number(editingModel.base_rim_size_in) !== baseColumns.base_rim_size_in
-      ));
-      let modelSource = glbFile;
-      if (!modelSource && dimensionsChanged && editingModel) {
-        const response = await fetch(editingModel.file_url);
-        if (!response.ok) throw new Error('Could not load the existing GLB for calibration. Upload the model again.');
-        modelSource = new File([await response.blob()], `${editingModel.name}.glb`, { type: 'model/gltf-binary' });
-      }
-      if (modelSource) {
-        const calibrated = await calibrateModelFile(modelSource, {
-          height: baseColumns.base_height_in!, bodyWidth: baseColumns.base_body_width_in!,
-          neckWidth: baseColumns.base_neck_width_in!, rimSize: baseColumns.base_rim_size_in!,
-        });
-        fileUrl = await uploadFile(calibrated, 'models');
-      }
+      if (glbFile) fileUrl = await uploadFile(glbFile, 'models');
       if (thumbFile) thumbnailUrl = await uploadFile(thumbFile, 'models');
 
       if (editingModel) {
@@ -158,7 +139,7 @@ export default function ModelManagePage() {
           shop_id: formShopId || null,
           ...baseColumns,
         };
-        if (modelSource) updateData.file_url = fileUrl;
+        if (glbFile) updateData.file_url = fileUrl;
         if (thumbFile) updateData.thumbnail = thumbnailUrl;
 
         const { error: updateErr } = await supabase.from('models_3d').update(updateData).eq('id', editingModel.id);

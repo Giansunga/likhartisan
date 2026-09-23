@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   inserted: null as Record<string, unknown> | null,
   updated: null as Record<string, unknown> | null,
   uploaded: [] as File[],
-  calibrated: [] as File[],
 }));
 
 vi.mock('../../../lib/supabase', () => ({
@@ -29,11 +28,7 @@ vi.mock('../../../lib/supabase', () => ({
 vi.mock('../../../realtime/usePortalRealtimeRefresh', () => ({ usePortalRealtimeRefresh: () => {} }));
 vi.mock('../../../lib/r2', () => ({ uploadToR2: async (file: File) => {
   state.uploaded.push(file);
-  return 'https://example.com/calibrated.glb';
-} }));
-vi.mock('../../../components/freeform/calibrateModel', () => ({ calibrateModelFile: async (file: File) => {
-  state.calibrated.push(file);
-  return new File(['calibrated'], 'pot-calibrated.glb', { type: 'model/gltf-binary' });
+  return 'https://example.com/original.glb';
 } }));
 vi.mock('../AttachmentManagePanel', () => ({ default: () => null }));
 
@@ -42,11 +37,10 @@ beforeEach(() => {
   state.inserted = null;
   state.updated = null;
   state.uploaded = [];
-  state.calibrated = [];
 });
 
 describe('admin model form', () => {
-  it('calibrates a new GLB using all entered dimensions before saving', async () => {
+  it('uploads the original GLB while saving entered dimensions as the baseline', async () => {
     const { container } = render(<ModelManagePage />);
     fireEvent.click(screen.getByRole('button', { name: 'Upload Model' }));
     const form = container.querySelector('form')!;
@@ -61,10 +55,9 @@ describe('admin model form', () => {
     fireEvent.change(form.querySelector('input[type="file"]')!, { target: { files: [file] } });
     fireEvent.click(within(form).getByRole('button', { name: 'Upload Model' }));
     await waitFor(() => expect(state.inserted).not.toBeNull());
-    expect(state.calibrated).toEqual([file]);
-    expect(state.uploaded[0].name).toBe('pot-calibrated.glb');
+    expect(state.uploaded).toEqual([file]);
     expect(state.inserted).toMatchObject({
-      name: 'Wave Pot', file_url: 'https://example.com/calibrated.glb',
+      name: 'Wave Pot', file_url: 'https://example.com/original.glb',
       base_height_in: 13, base_body_width_in: 14, base_neck_width_in: 8, base_rim_size_in: 10,
       base_price_php: 180, base_production_days: 30,
     });
@@ -82,8 +75,25 @@ describe('admin model form', () => {
     fireEvent.change(within(form).getByPlaceholderText('e.g. Classic Vase'), { target: { value: 'Wave Pot Updated' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Save Changes' }));
     await waitFor(() => expect(state.updated).not.toBeNull());
-    expect(state.calibrated).toHaveLength(0);
+    expect(state.uploaded).toHaveLength(0);
     expect(state.updated?.file_url).toBeUndefined();
     expect(state.updated?.base_neck_width_in).toBe(8);
+  });
+
+  it('updates base measurements without fetching or replacing the existing GLB', async () => {
+    state.models = [{ id: 'model-1', name: 'Wave Pot', category: 'Vase', shop_id: 'shop-1',
+      status: 'active', file_url: 'https://example.com/original.glb', thumbnail: '', created_at: '',
+      base_height_in: 13, base_body_width_in: 14, base_neck_width_in: 8, base_rim_size_in: 10,
+      base_price_php: 180, base_production_days: 30 }];
+    const { container } = render(<ModelManagePage />);
+    await screen.findByText('Wave Pot');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const form = container.querySelector('form')!;
+    fireEvent.change(within(form).getByLabelText('Height'), { target: { value: '15' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(state.updated).not.toBeNull());
+    expect(state.updated?.base_height_in).toBe(15);
+    expect(state.updated?.file_url).toBeUndefined();
+    expect(state.uploaded).toHaveLength(0);
   });
 });
