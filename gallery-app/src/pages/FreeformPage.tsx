@@ -123,6 +123,8 @@ export default function FreeformPage() {
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const controlsScrollRef = useRef<HTMLDivElement>(null);
+  const controlsContentRef = useRef<HTMLDivElement>(null);
   const stepButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const hasMountedStepEffectRef = useRef(false);
   const controlsRef = useRef<ViewerControls | null>(null);
@@ -168,10 +170,12 @@ export default function FreeformPage() {
   useEffect(() => {
     if (!selectedModel) return;
     let cancelled = false;
-    const baseQuery = supabase.from('models_3d').select('base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days');
+    const baseQuery = supabase.from('models_3d').select('file_url,base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days');
     (selectedModelId ? baseQuery.eq('id', selectedModelId) : baseQuery.eq('file_url', selectedModel))
       .maybeSingle().then(({ data }) => {
-        if (!cancelled) setModelBase(modelBaseFromRow(data));
+        if (cancelled) return;
+        setModelBase(modelBaseFromRow(data));
+        if (selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
       });
     return () => { cancelled = true; };
   }, [selectedModel, selectedModelId]);
@@ -227,7 +231,7 @@ function applyDesign(design: {
       }
 
       setModelBase(null);
-      setSelectedModel(design.model_file);
+      setSelectedModel(design.models_3d?.file_url || design.model_file);
       setSelectedModelId(design.model_id || null);
       setModelName(design.model_name);
       setModelCategory(design.models_3d?.category || 'Vase');
@@ -280,9 +284,12 @@ function applyDesign(design: {
           return;
         }
         const snapshot = normalizeDesignRequestSnapshot(request.design_snapshot);
+        const { data: currentModel } = snapshot.model.id
+          ? await supabase.from('models_3d').select('file_url').eq('id', snapshot.model.id).maybeSingle()
+          : { data: null };
         const requestShop = Array.isArray(request.shops) ? request.shops[0] : request.shops;
         setModelBase(null);
-        setSelectedModel(snapshot.model.file);
+        setSelectedModel(currentModel?.file_url || snapshot.model.file);
         setSelectedModelId(snapshot.model.id);
         setModelName(snapshot.model.name);
         setModelCategory(snapshot.model.category || 'Vase');
@@ -326,10 +333,10 @@ function applyDesign(design: {
               shopName = shop?.name || '';
             }
             const modelQuery = data.model_id
-              ? supabase.from('models_3d').select('id,category,thumbnail').eq('id', data.model_id)
-              : supabase.from('models_3d').select('id,category,thumbnail').eq('file_url', data.model_file);
+              ? supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('id', data.model_id)
+              : supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('file_url', data.model_file);
             const { data: savedModel } = await modelQuery.maybeSingle();
-            applyDesign({ ...data, model_id: savedModel?.id || data.model_id, shop_name: shopName });
+            applyDesign({ ...data, model_file: savedModel?.file_url || data.model_file, model_id: savedModel?.id || data.model_id, shop_name: shopName });
             setModelCategory(savedModel?.category || 'Vase');
             setModelThumbnail(savedModel?.thumbnail || data.thumbnail || '');
             setActiveStep('review');
@@ -346,11 +353,11 @@ function applyDesign(design: {
         const { data: navModel } = await modelQuery.maybeSingle();
         const navBase = modelBaseFromRow(navModel);
         selectModel(
-          navState.modelUrl,
+          navModel?.file_url || navState.modelUrl,
           navState.modelName || 'Selected Model',
           navState.modelCategory || 'Vase',
           navState.modelThumbnail || '',
-          navState.modelId || null,
+          navModel?.id || navState.modelId || null,
           true,
           navBase,
         );
@@ -599,7 +606,14 @@ function applyDesign(design: {
   useEffect(() => {
     stepButtonRefs.current[stepIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     if (hasMountedStepEffectRef.current && window.matchMedia('(max-width: 767px)').matches) {
-      window.requestAnimationFrame(() => viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      controlsScrollRef.current?.scrollTo?.({ top: 0, behavior: 'instant' });
+      if (window.matchMedia('(max-height: 620px)').matches && controlsContentRef.current) {
+        const navHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 60;
+        const previewHeight = document.querySelector('.freeform-viewer-wrap')?.getBoundingClientRect().height || 110;
+        const headingTop = controlsContentRef.current.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: Math.max(0, headingTop - navHeight - previewHeight - 12), behavior: 'instant' });
+      }
+      controlsContentRef.current?.focus({ preventScroll: true });
     }
     hasMountedStepEffectRef.current = true;
   }, [stepIndex]);
@@ -663,7 +677,7 @@ function applyDesign(design: {
 
         {/* ── LEFT SIDEBAR ── */}
         <div ref={sidebarRef} className="freeform-sidebar">
-          <div className="freeform-sidebar-inner">
+          <div ref={controlsScrollRef} className="freeform-sidebar-inner">
             <div className="freeform-sidebar-upper">
               <div className="freeform-sidebar-header">
                 <h2 className="freeform-sidebar-title">Customization</h2>
@@ -682,7 +696,7 @@ function applyDesign(design: {
             </div>
 
             <div className="freeform-sidebar-scroll">
-              <div className="freeform-tab-section">
+              <div ref={controlsContentRef} className="freeform-tab-section" tabIndex={-1}>
 {activeStep === 'model' && (selectedShopId ? (
                   <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id, base) => selectModel(f, n, c, t, id, true, base)} />
                 ) : (
@@ -694,7 +708,7 @@ function applyDesign(design: {
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : DEFAULT_SHAPE} onChange={setShapeParams} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={modelBase ? shapeFromModelBase(modelBase) : shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : DEFAULT_SHAPE} onChange={setShapeParams} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (

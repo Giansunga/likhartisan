@@ -143,4 +143,25 @@ describe('FreeformPage send-to-shop flow', () => {
     expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0);
     vi.restoreAllMocks();
   });
+
+  it('keeps one viewer mounted and returns mobile controls to the top on step change', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width: 767px'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    HTMLElement.prototype.scrollTo = vi.fn();
+    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
+      modelUrl: '/models/vase.glb', modelName: 'Test Vase', modelCategory: 'Vase', modelId: 'model-1',
+    } }]}><FreeformPage /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getAllByText('Test Vase').length).toBeGreaterThan(0));
+    const viewer = screen.getByTestId('freeform-viewer');
+    const controls = document.querySelector('.freeform-sidebar-inner') as HTMLElement;
+    fireEvent.click(screen.getByRole('button', { name: /Shape Customize shape/i }));
+
+    expect(screen.getByTestId('freeform-viewer')).toBe(viewer);
+    expect(controls.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' });
+    expect(document.activeElement).toHaveClass('freeform-tab-section');
+  });
 });

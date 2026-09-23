@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ShapeTab from '../ShapeTab';
-import { DEFAULT_SHAPE_PARAMS_IN } from '../../../lib/measurements';
+import { DEFAULT_SHAPE_PARAMS_IN, shapeFromModelBase } from '../../../lib/measurements';
 
 const initialShape = DEFAULT_SHAPE_PARAMS_IN;
 
@@ -77,5 +77,13 @@ describe('ShapeTab', () => {
     expect(screen.getByText('+1.00 in')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
     expect(onChange).toHaveBeenLastCalledWith(shape);
+  });
+
+  it('keeps the model baseline metadata when resetting an edited shape', () => {
+    const base = shapeFromModelBase({ height: 14, bodyWidth: 5, neckWidth: 5, rimSize: 5 });
+    const onChange = vi.fn();
+    render(<ShapeTab shapeParams={{ ...base, height: 15 }} baseShape={base} onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
+    expect(onChange).toHaveBeenCalledWith(base);
   });
 });

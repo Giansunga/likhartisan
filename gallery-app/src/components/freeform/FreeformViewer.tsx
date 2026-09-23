@@ -22,6 +22,7 @@ import type { MaterialParams } from './materials';
 import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 import { getSectionAnchors, sectionScale } from './calibrateModel';
+import { isUneditedShape, restoreSourceGeometry } from './shapeGeometry';
 import { captureException } from '../../lib/sentry';
 
 class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
@@ -50,7 +51,7 @@ function LoadingIndicator() {
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
 
-type GeometrySnapshot = { rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
+type GeometrySnapshot = { localPositions: Float32Array; localNormals: Float32Array | null; rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
 type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -90,7 +91,8 @@ function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnaps
     rootPositions[i * 3 + 2] = vertex.z;
   }
 
-  return { rootPositions, profileCoefficients: new Float32Array(position.count * 4), rootToLocal };
+  const normal = geometry.attributes.normal;
+  return { localPositions, localNormals: normal ? normal.array.slice() as Float32Array : null, rootPositions, profileCoefficients: new Float32Array(position.count * 4), rootToLocal };
 }
 
 function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBounds {
@@ -195,7 +197,7 @@ function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: Gener
       <meshStandardMaterial color={selected ? '#F59E0B' : '#9A4C10'} emissive={selected ? '#7C2D12' : '#311306'} emissiveIntensity={0.35} depthTest={false} />
     </mesh>
     <Html center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-      <span style={{ display: 'block', whiteSpace: 'nowrap', borderRadius: '999px', background: selected ? '#F59E0B' : '#fff', color: selected ? '#fff' : '#4B2E1F', padding: '3px 7px', fontSize: '10px', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>{socket.name}</span>
+      <span className="freeform-attachment-socket-label" style={{ display: 'block', whiteSpace: 'nowrap', borderRadius: '999px', background: selected ? '#F59E0B' : '#fff', color: selected ? '#fff' : '#4B2E1F', padding: '3px 7px', fontSize: '10px', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>{socket.name}</span>
     </Html>
   </group>;
 }
@@ -356,6 +358,7 @@ function Scene({
 
     const relativeBaseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
     const baselineFactor = shapeParams.unit === 'in' ? 2.54 : 1;
+    const isBaseShape = isUneditedShape(shapeParams);
     const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${relativeBaseline ? Object.values(relativeBaseline).join('|') : 'legacy'}`;
     const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
     const shapeChanged = appliedShapeRef.current !== shapeKey;
@@ -384,10 +387,6 @@ function Scene({
       if (!(child instanceof THREE.Mesh)) return;
       const mesh = child as THREE.Mesh;
 
-      if (shapeChanged && mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
-        mesh.morphTargetInfluences.fill(0);
-      }
-
       if (shapeChanged && mesh.geometry) {
         const snapshot = geometrySnapshotsRef.current.get(mesh.geometry);
         if (!snapshot) return;
@@ -395,7 +394,13 @@ function Scene({
         const pos = mesh.geometry.attributes.position;
         const arr = pos.array as Float32Array;
         const count = pos.count;
-        const { rootPositions, profileCoefficients, rootToLocal } = snapshot;
+        const { localPositions, localNormals, rootPositions, profileCoefficients, rootToLocal } = snapshot;
+
+        if (isBaseShape) {
+          // A zero-edit model must retain its uploaded vertices and normals exactly.
+          // Restore from the immutable snapshot only after an actual shape edit.
+          if (appliedShapeRef.current) restoreSourceGeometry(mesh.geometry, localPositions, localNormals);
+        } else {
 
         for (let i = 0; i < count; i++) {
           const ox = rootPositions[i * 3];
@@ -430,6 +435,7 @@ function Scene({
         mesh.geometry.computeVertexNormals();
         mesh.geometry.computeBoundingBox();
         mesh.geometry.computeBoundingSphere();
+        }
       }
 
       if ((appearanceChanged || shapeChanged) && mesh.material) {
