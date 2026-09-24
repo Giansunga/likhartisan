@@ -4,17 +4,15 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "key": "host", "value": "likhartisan.vercel.app" }],
+      "has": [{ "type": "host", "value": { "eq": "likhartisan.vercel.app" } }],
       "destination": "https://likhartisan.com/:path*",
-      "permanent": true,
-      "preserveQueryParams": true
+      "permanent": true
     },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "key": "host", "value": "www.likhartisan.com" }],
+      "has": [{ "type": "host", "value": { "eq": "www.likhartisan.com" } }],
       "destination": "https://likhartisan.com/:path*",
-      "permanent": true,
-      "preserveQueryParams": true
+      "permanent": true
     }
   ],
   "rewrites": [
