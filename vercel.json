@@ -1,6 +1,22 @@
 {
   "buildCommand": "cd gallery-app && npm install && npm run build",
   "outputDirectory": "gallery-app/dist",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "key": "host", "value": "likhartisan.vercel.app" }],
+      "destination": "https://likhartisan.com/:path*",
+      "permanent": true,
+      "preserveQueryParams": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "key": "host", "value": "www.likhartisan.com" }],
+      "destination": "https://likhartisan.com/:path*",
+      "permanent": true,
+      "preserveQueryParams": true
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

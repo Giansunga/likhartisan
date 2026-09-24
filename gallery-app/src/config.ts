@@ -1,1 +1,1 @@
-export const SITE_URL = 'https://likhartisan.vercel.app';
+export const SITE_URL = 'https://likhartisan.com';

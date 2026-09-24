@@ -28,6 +28,7 @@ import { createCustomOrderCheckout } from './services/customOrderCheckoutService
 import { normalizeCatalogMeasurement } from './services/measurements.js';
 import { resolveNotificationRecipient } from './services/notificationService.js';
 import { createActivityRouter } from './routes/activity.js';
+import { isAllowedFrontendOrigin } from './services/frontendOrigin.js';
 
 // ── Env var validation ──────────────────────────────────────────────────────
 const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'PAYMONGO_SECRET_KEY'];
@@ -62,7 +63,7 @@ if (FRONTEND_URL.includes('localhost') || FRONTEND_URL.includes('127.0.0.1')) {
   console.warn(
     '[WARN] FRONTEND_URL is set to a localhost URL. In production this will cause ' +
     'PayMongo to redirect users to localhost (unreachable). Set FRONTEND_URL to your ' +
-    'public frontend URL (e.g. https://likhartisan.vercel.app).'
+    'public frontend URL (e.g. https://likhartisan.com).'
   );
 }
 
@@ -142,12 +143,10 @@ const proxyLimiter = rateLimit({
 });
 
 app.use(helmet());
-// CORS: Allow dev origins (localhost) + production frontend (Vercel) + configured FRONTEND_URL
-const devOrigins = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
-const vercelDomains = [/^https:\/\/likhartisan\.vercel\.app$/, /^https:\/\/likhartisan-[a-z0-9-]+\.vercel\.app$/];
+// CORS: Allow dev origins, the configured production frontend, and Vercel previews.
 app.use(cors({
   origin: (reqOrigin, cb) => {
-    if (!reqOrigin || devOrigins.test(reqOrigin) || reqOrigin === FRONTEND_URL || vercelDomains.some(r => r.test(reqOrigin))) {
+    if (isAllowedFrontendOrigin(reqOrigin, FRONTEND_URL)) {
       cb(null, true);
     } else {
       cb(new Error('Not allowed by CORS'));

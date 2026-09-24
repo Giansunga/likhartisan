@@ -35,4 +35,4 @@ envVars:
   - key: GOOGLE_MAPS_API_KEY
     sync: false
   - key: FRONTEND_URL
-    value: https://likhartisan.vercel.app
+    value: https://likhartisan.com

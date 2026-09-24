@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Box, HandHeart, Palette, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { SITE_URL } from '../config';
 import { supabase } from '../lib/supabase';
 
 interface Artisan {
@@ -100,7 +101,7 @@ export default function AboutPage() {
       ['meta[name="description"]', 'LikhArtisan connects Santo Tomas pottery, participating local shops, artisan profiles, and an interactive 3D design experience.'],
       ['meta[property="og:title"]', 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable'],
       ['meta[property="og:description"]', 'Meet the makers, understand the local craft, and see how LikhArtisan connects pottery with digital discovery and custom design.'],
-      ['meta[property="og:url"]', `${window.location.origin}/about`],
+      ['meta[property="og:url"]', `${SITE_URL}/about`],
       ['meta[name="twitter:title"]', 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable'],
       ['meta[name="twitter:description"]', 'Meet the makers and discover how LikhArtisan connects Santo Tomas pottery with digital discovery and custom design.'],
     ].map(([selector, value]) => {
@@ -113,7 +114,7 @@ export default function AboutPage() {
     const previousCanonical = canonical?.href;
 
     document.title = 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable';
-    if (canonical) canonical.href = `${window.location.origin}/about`;
+    if (canonical) canonical.href = `${SITE_URL}/about`;
 
     return () => {
       document.title = previousTitle;

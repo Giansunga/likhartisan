@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AboutPage from '../AboutPage';
+import { SITE_URL } from '../../config';
 
 vi.mock('framer-motion', () => ({
   useReducedMotion: () => true,
@@ -32,5 +33,22 @@ describe('AboutPage editorial chapters', () => {
     expect(document.getElementById('makers')).toHaveAttribute('aria-labelledby', 'about-makers-title');
     expect(document.getElementById('commitments')).toHaveAttribute('aria-labelledby', 'about-commitments-title');
     expect(screen.getByRole('heading', { name: /A local craft deserves a clearer path online/i })).toBeInTheDocument();
+  });
+
+  it('uses the production domain for About page canonical and social URLs', () => {
+    const canonical = document.createElement('link');
+    canonical.rel = 'canonical';
+    const ogUrl = document.createElement('meta');
+    ogUrl.setAttribute('property', 'og:url');
+    document.head.append(canonical, ogUrl);
+
+    const { unmount } = render(<MemoryRouter><AboutPage /></MemoryRouter>);
+
+    expect(canonical.href).toBe(`${SITE_URL}/about`);
+    expect(ogUrl.content).toBe(`${SITE_URL}/about`);
+
+    unmount();
+    canonical.remove();
+    ogUrl.remove();
   });
 });

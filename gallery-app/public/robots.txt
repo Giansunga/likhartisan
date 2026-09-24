@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://likhartisan.vercel.app/sitemap.xml
+Sitemap: https://likhartisan.com/sitemap.xml

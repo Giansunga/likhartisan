@@ -24,7 +24,7 @@
    GROQ_MODEL=openai/gpt-oss-20b
    GROQ_FALLBACK_MODEL=qwen/qwen3.6-27b
    GOOGLE_MAPS_API_KEY=your_maps_key
-   FRONTEND_URL=your_vercel_url
+   FRONTEND_URL=https://likhartisan.com
    PORT=3001
    ```
 
