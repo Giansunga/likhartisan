@@ -75,7 +75,7 @@ export default function SendDesignRequestModal({
                   <div><dt>Attachments</dt><dd>{snapshot.attachments.length || 'None'}</dd></div>
                   <div><dt>Dimensions</dt><dd>H {formatInches(snapshot.dimensions.heightIn)} · W {formatInches(snapshot.dimensions.widthIn)}</dd></div>
                 </dl>
-                <div className="freeform-request-estimate"><span><small>ESTIMATED PRICE</small><strong>₱{snapshot.estimate.price.toLocaleString()}</strong></span><span><small>EST. PRODUCTION</small><strong>{snapshot.estimate.productionDays} days</strong></span><p>Final price and timing are set by the shop.</p></div>
+                <div className="freeform-request-estimate"><span><small>ESTIMATED PRICE PER PIECE</small><strong>₱{snapshot.estimate.price.toLocaleString()}</strong></span><span><small>EST. PRODUCTION</small><strong>{snapshot.estimate.productionDays} days</strong></span><p>Final price and timing are set by the shop.</p></div>
                 <label className="freeform-request-field"><span>Quantity</span><input type="number" min={MIN_DESIGN_REQUEST_QUANTITY} step={1} value={quantity} aria-describedby="request-quantity-help" aria-invalid={!validQuantity} onChange={event => setQuantity(event.target.value)} /></label>
                 <small id="request-quantity-help">Minimum order: 100 pieces. Enter a whole number.</small>
                 <label className="freeform-request-field"><span>Note <small>(optional)</small></span><textarea rows={3} maxLength={2000} value={note} onChange={event => setNote(event.target.value)} placeholder="Tell the shop anything important about this piece…" /><small>{note.length}/2000</small></label>

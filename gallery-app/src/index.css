@@ -3812,8 +3812,8 @@ body {
   width: fit-content;
   margin-top: 44px;
   display: inline-flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 8px;
   color: #fff8f2;
   font-family: var(--font-sans);
   font-size: 0.92rem;
@@ -3827,6 +3827,7 @@ body {
   width: 21px;
   height: 21px;
   flex: 0 0 auto;
+  margin-bottom: 3px;
   color: #f0a14b;
   stroke-width: 1.8;
 }

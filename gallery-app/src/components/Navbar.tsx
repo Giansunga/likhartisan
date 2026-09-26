@@ -213,7 +213,7 @@ export default function Navbar() {
               {links.map(link => (
                 <li key={link.to}>
                   <Link to={link.to}
-                    className={`text-[1rem] font-semibold relative py-1.5 transition-colors after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-[2px] after:bg-accent after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-accent ${
+                    className={`text-[1.0625rem] font-semibold relative py-1.5 transition-colors after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-[2px] after:bg-accent after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-accent ${
                       location.pathname === link.to ? 'text-accent after:w-full' : 'text-brown-dark'
                     }`}>
                     {link.label}

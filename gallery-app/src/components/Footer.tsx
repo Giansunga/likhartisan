@@ -1,4 +1,4 @@
-import { Phone } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -43,11 +43,11 @@ export default function Footer() {
                 loading="lazy"
               />
             </Link>
-            <a href="tel:+639676711111" className="footer-contact-link">
-              <Phone aria-hidden="true" />
+            <a href="mailto:support@likhartisan.com" className="footer-contact-link">
+              <Mail aria-hidden="true" />
               <span>
                 <small>Contact us</small>
-                +63 967 671 1111
+                support@likhartisan.com
               </span>
             </a>
           </section>

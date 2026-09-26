@@ -39,7 +39,7 @@ describe('Footer', () => {
     const logo = screen.getByRole('img', { name: 'LikhArtisan' });
     expect(logo).toHaveAttribute('src', '/images/likhartisan-brown-wordmark.png');
     expect(screen.getByRole('link', { name: 'LikhArtisan home' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: /\+63 967 671 1111/ })).toHaveAttribute('href', 'tel:+639676711111');
+    expect(screen.getByRole('link', { name: /support@likhartisan\.com/ })).toHaveAttribute('href', 'mailto:support@likhartisan.com');
     expect(screen.getByRole('link', { name: 'Tea Light Vases' })).toHaveAttribute('href', '/gallery?category=Tea%20Light%20Vases');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
