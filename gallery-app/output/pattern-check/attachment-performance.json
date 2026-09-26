@@ -1,0 +1,7 @@
+{
+  "beforeMs": 6646,
+  "prepareMs": 101,
+  "afterMs": 19,
+  "controlMedianMs": 3.307699999999386,
+  "controlP95Ms": 7.543999999999869
+}

@@ -30,10 +30,10 @@ export default function SavedDesignsModal({
   open: boolean;
   currentShopId: string | null;
   onClose: () => void;
-  onLoad: (design: SavedDesign) => void;
+  onLoad: (design: SavedDesign) => void | Promise<void>;
 }) {
   const { user } = useAuth();
-  const { designs, fetchDesigns, renameDesign, deleteDesign } = useSavedDesigns(user?.id);
+  const { designs, loading, fetchDesigns, renameDesign, deleteDesign } = useSavedDesigns(user?.id);
   const [search, setSearch] = useState('');
   const [shopFilter, setShopFilter] = useState(currentShopId || 'all');
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -41,12 +41,8 @@ export default function SavedDesignsModal({
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      fetchDesigns();
-      setShopFilter(currentShopId || 'all');
-      setSearch('');
-    }
-  }, [open, fetchDesigns, currentShopId]);
+    if (open) void fetchDesigns();
+  }, [open, fetchDesigns]);
 
   const shopNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -58,7 +54,7 @@ export default function SavedDesignsModal({
 
   const filtered = useMemo(() => {
     return designs.filter((d) => {
-      if (shopFilter !== 'all' && d.shop_id !== shopFilter) return false;
+      if (shopNames.size > 1 && shopFilter !== 'all' && d.shop_id !== shopFilter) return false;
       if (search) {
         const q = search.toLowerCase();
         return (
@@ -69,7 +65,7 @@ export default function SavedDesignsModal({
       }
       return true;
     });
-  }, [designs, shopFilter, search]);
+  }, [designs, shopFilter, search, shopNames]);
 
   async function handleRename(id: string) {
     const ok = await renameDesign(id, renameValue.trim());
@@ -81,94 +77,89 @@ export default function SavedDesignsModal({
     await deleteDesign(id);
   }
 
-  function handleLoad(d: SavedDesign) {
+  async function handleLoad(d: SavedDesign) {
     setLoadingId(d.id);
-    onLoad(d);
+    try {
+      await onLoad(d);
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  function closeModal() {
+    setSearch('');
+    setShopFilter(currentShopId || 'all');
+    setRenamingId(null);
+    setLoadingId(null);
+    onClose();
   }
 
   if (!open) return null;
 
   return (
-    <div className="freeform-modal-overlay" onClick={onClose}>
-      <div className="freeform-modal saved-designs-modal" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute', top: '16px', right: '16px', zIndex: 10,
-            width: '28px', height: '28px', borderRadius: '50%',
-            border: 'none', background: 'var(--bg-tertiary)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1rem', color: 'var(--text-muted)', transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--bg-tertiary)')}
-          aria-label="Close"
-        >
-          &times;
-        </button>
-        <div style={{ padding: '24px 28px 0' }}>
-          <div style={{ marginBottom: '16px' }}>
-            <h3 className="freeform-modal-title">Load Saved Design</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {designs.length} saved design{designs.length !== 1 ? 's' : ''}
-            </p>
+    <div className="freeform-modal-overlay" onClick={closeModal}>
+      <div className="freeform-modal saved-designs-modal" role="dialog" aria-modal="true" aria-labelledby="saved-designs-title" onClick={(e) => e.stopPropagation()}>
+        <div className="saved-designs-header">
+          <div className="saved-designs-heading">
+            <span className="saved-designs-heading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 3.5h12a1 1 0 0 1 1 1V21l-7-4-7 4V4.5a1 1 0 0 1 1-1Z" />
+                <path d="M9 8h6M9 11h6" />
+              </svg>
+            </span>
+            <div>
+              <span className="saved-designs-eyebrow">YOUR COLLECTION</span>
+              <h3 id="saved-designs-title" className="freeform-modal-title">Load Saved Design</h3>
+              <p>{loading ? 'Loading your designs…' : `${designs.length} saved design${designs.length !== 1 ? 's' : ''}`}</p>
+            </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-            <input
-              type="text"
-              placeholder="Search designs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="freeform-modal-input"
-              style={{ flex: 1 }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setShopFilter('all')}
-              className={`freeform-tab-option${shopFilter === 'all' ? ' selected' : ''}`}
-              style={{ padding: '5px 12px', fontSize: '0.75rem' }}
-            >
-              All Shops
-            </button>
-            {Array.from(shopNames.entries()).map(([id, name]) => (
-              <button
-                key={id}
-                onClick={() => setShopFilter(id)}
-                className={`freeform-tab-option${shopFilter === id ? ' selected' : ''}`}
-                style={{ padding: '5px 12px', fontSize: '0.75rem' }}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
+          <button className="saved-designs-close" onClick={closeModal} aria-label="Close saved designs">&times;</button>
         </div>
 
-        <div style={{ padding: '0 28px 24px', maxHeight: '420px', overflowY: 'auto' }}>
-          {filtered.length === 0 ? (
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '32px 0' }}>
-              {search ? 'No designs match your search.' : 'No saved designs yet.'}
-            </p>
+        {!loading && designs.length > 1 && (
+          <div className="saved-designs-filters">
+            <label className="saved-designs-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m16 16 5 5" /></svg>
+              <input type="search" placeholder="Search saved designs" aria-label="Search saved designs" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </label>
+            {shopNames.size > 1 && (
+              <div className="saved-designs-shop-filters" aria-label="Filter by shop">
+                <button type="button" className={shopFilter === 'all' ? 'active' : ''} onClick={() => setShopFilter('all')}>All shops</button>
+                {Array.from(shopNames.entries()).map(([id, name]) => (
+                  <button type="button" key={id} className={shopFilter === id ? 'active' : ''} onClick={() => setShopFilter(id)}>{name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="saved-designs-content">
+          {loading ? (
+            <div className="saved-designs-empty" role="status"><span className="saved-designs-spinner" aria-hidden="true" /><p>Loading your designs…</p></div>
+          ) : designs.length === 0 ? (
+            <div className="saved-designs-empty">
+              <span className="saved-designs-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M23 13h18l-3 8H26l-3-8Z" /><path d="M26 21c0 6-9 10-9 20 0 10 7 16 15 16s15-6 15-16c0-10-9-14-9-20" /><path d="M22 40c6 4 14 4 20 0" /></svg>
+              </span>
+              <h4>{user ? 'Your first design starts here' : 'Sign in to view your designs'}</h4>
+              <p>{user ? 'Save a design in Freeform and it will be ready to continue here.' : 'Your saved designs will appear here after you sign in.'}</p>
+              <button type="button" className="saved-designs-primary" onClick={user ? closeModal : () => { closeModal(); window.dispatchEvent(new CustomEvent('open-auth', { detail: 'signin' })); }}>
+                {user ? 'Continue designing' : 'Sign in'}
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="saved-designs-empty saved-designs-empty-filtered">
+              <h4>No designs found</h4>
+              <p>Try another search or shop filter.</p>
+              <button type="button" className="saved-designs-clear" onClick={() => { setSearch(''); setShopFilter('all'); }}>Clear filters</button>
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="saved-designs-list">
               {filtered.map((d) => (
-                <div
-                  key={d.id}
-                  className="saved-design-card"
-                  style={{
-                    display: 'flex', gap: '14px', padding: '14px', border: '1px solid var(--bg-tertiary)',
-                    borderRadius: '14px', background: '#fff', alignItems: 'center',
-                  }}
-                >
-                  <div style={{
-                    width: '56px', height: '56px', borderRadius: '12px', overflow: 'hidden',
-                    background: 'var(--bg-secondary)', flexShrink: 0, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}>
+                <div key={d.id} className="saved-design-card">
+                  <div className="saved-design-card-thumb">
                     {d.thumbnail ? (
-                      <img src={d.thumbnail} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={d.thumbnail} alt="" />
                     ) : (
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '28px', height: '28px' }}>
                         <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z" />
@@ -176,70 +167,40 @@ export default function SavedDesignsModal({
                     )}
                   </div>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="saved-design-card-info">
                     {renamingId === d.id ? (
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div className="saved-design-rename">
                         <input
+                          aria-label={`New name for ${d.name}`}
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') handleRename(d.id); }}
-                          style={{ flex: 1, padding: '4px 8px', border: '1px solid var(--primary-color)', borderRadius: '6px', fontSize: '0.8rem', outline: 'none' }}
                           autoFocus
                         />
-                        <button onClick={() => handleRename(d.id)} style={{ border: 0, background: 'var(--primary-color)', color: '#fff', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer' }}>Save</button>
-                        <button onClick={() => setRenamingId(null)} style={{ border: '1px solid var(--bg-tertiary)', background: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}>Cancel</button>
+                        <button type="button" onClick={() => handleRename(d.id)} disabled={!renameValue.trim()}>Save</button>
+                        <button type="button" onClick={() => setRenamingId(null)}>Cancel</button>
                       </div>
                     ) : (
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {d.name}
-                      </div>
+                      <strong className="saved-design-card-name" title={d.name}>{d.name}</strong>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
-                      {d.shops?.name && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: 600 }}>{d.shops.name}</span>
-                      )}
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{d.model_name}</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span className="freeform-summary-row-swatch" style={{ width: 12, height: 12, borderWidth: 1, background: d.material_params?.color }} />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {getFinishLabel(d.material_params?.finish || '')}
-                          {COLOR_NAMES[d.material_params?.color?.toUpperCase()] ? ` · ${COLOR_NAMES[d.material_params.color.toUpperCase()]}` : ` ${d.material_params?.color}`}
-                        </span>
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginTop: '2px' }}>
-                      {new Date(d.updated_at || d.created_at).toLocaleDateString()}
+                    {d.shops?.name && <span className="saved-design-card-shop">{d.shops.name}</span>}
+                    <span className="saved-design-card-model">{d.model_name}</span>
+                    <span className="saved-design-card-finish">
+                      <span className="freeform-summary-row-swatch" style={{ background: d.material_params?.color }} aria-hidden="true" />
+                      {getFinishLabel(d.material_params?.finish || '')}
+                      {COLOR_NAMES[d.material_params?.color?.toUpperCase()] ? ` · ${COLOR_NAMES[d.material_params.color.toUpperCase()]}` : d.material_params?.color ? ` · ${d.material_params.color}` : ''}
+                    </span>
+                    <time className="saved-design-card-date" dateTime={d.updated_at || d.created_at}>{new Date(d.updated_at || d.created_at).toLocaleDateString()}</time>
+                  </div>
+                  <div className="saved-design-card-actions">
+                    <button type="button" className="saved-design-load" onClick={() => handleLoad(d)} disabled={loadingId === d.id}>
+                      {loadingId === d.id ? 'Loading…' : 'Load design'}
+                    </button>
+                    <div className="saved-design-card-secondary">
+                      <button type="button" onClick={() => { setRenamingId(d.id); setRenameValue(d.name); }} aria-label={`Rename ${d.name}`}>Rename</button>
+                      <button type="button" onClick={() => handleDelete(d.id)} aria-label={`Delete ${d.name}`}>Delete</button>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-                    <button
-                      onClick={() => { setRenamingId(d.id); setRenameValue(d.name); }}
-                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
-                      title="Rename"
-                    >
-                      &#9998;
-                    </button>
-                    <button
-                      onClick={() => handleDelete(d.id)}
-                      style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: '2px 6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}
-                      title="Delete"
-                    >
-                      &#128465;
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => handleLoad(d)}
-                    style={{
-                      flexShrink: 0, padding: '8px 18px', borderRadius: '10px', border: '1px solid var(--primary-color)',
-                      background: loadingId === d.id ? 'var(--bg-tertiary)' : '#fff',
-                      color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
-                    }}
-                    disabled={loadingId === d.id}
-                  >
-                    {loadingId === d.id ? '...' : 'Load'}
-                  </button>
                 </div>
               ))}
             </div>

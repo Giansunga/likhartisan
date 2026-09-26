@@ -1,0 +1,114 @@
+[
+  {
+    "name": "Bottle Teracotta Vase",
+    "triangles": 121920,
+    "exterior": 50876,
+    "partial": 0,
+    "ms": 493
+  },
+  {
+    "name": "Scalloped Rim Jar",
+    "triangles": 20000,
+    "exterior": 9751,
+    "partial": 0,
+    "ms": 127
+  },
+  {
+    "name": "Mini Terracotta Bowl",
+    "triangles": 44544,
+    "exterior": 8640,
+    "partial": 0,
+    "ms": 85
+  },
+  {
+    "name": "Wave Pot",
+    "triangles": 99476,
+    "exterior": 35443,
+    "partial": 0,
+    "ms": 498
+  },
+  {
+    "name": "Plain U-Shape Planter",
+    "triangles": 71826,
+    "exterior": 28193,
+    "partial": 0,
+    "ms": 324
+  },
+  {
+    "name": "Tall Cylinder Planter",
+    "triangles": 39064,
+    "exterior": 12855,
+    "partial": 0,
+    "ms": 163
+  },
+  {
+    "name": "Pedestal Base Jar",
+    "triangles": 71616,
+    "exterior": 53952,
+    "partial": 0,
+    "ms": 297
+  },
+  {
+    "name": "Plain Pot",
+    "triangles": 79976,
+    "exterior": 28171,
+    "partial": 0,
+    "ms": 230
+  },
+  {
+    "name": "Cylinder Pot",
+    "triangles": 80934,
+    "exterior": 4260,
+    "partial": 0,
+    "ms": 360
+  },
+  {
+    "name": "Tall Garden Planter",
+    "triangles": 40086,
+    "exterior": 12706,
+    "partial": 0,
+    "ms": 140
+  },
+  {
+    "name": "Rounded Garden Planter",
+    "triangles": 33176,
+    "exterior": 14053,
+    "partial": 0,
+    "ms": 135
+  },
+  {
+    "name": "Large Tapered Square Planter",
+    "triangles": 9856,
+    "exterior": 2854,
+    "partial": 0,
+    "ms": 79
+  },
+  {
+    "name": "Terracotta Cylinder Planter",
+    "triangles": 67748,
+    "exterior": 17325,
+    "partial": 0,
+    "ms": 215
+  },
+  {
+    "name": "Banded Terracotta Vase",
+    "triangles": 228386,
+    "exterior": 67472,
+    "partial": 0,
+    "ms": 909
+  },
+  {
+    "name": "Single Jarlet",
+    "triangles": 8128,
+    "exterior": 2948,
+    "partial": 0,
+    "ms": 51
+  },
+  {
+    "name": "Cylinder Terracotta Vase",
+    "triangles": 107672,
+    "exterior": 36681,
+    "partial": 0,
+    "ms": 334
+  }
+]
