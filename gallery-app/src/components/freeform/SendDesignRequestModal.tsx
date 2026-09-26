@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronLeft, LoaderCircle, Send, Store, X } from 'lucide-
 import { getPattern } from './decor';
 import { getFinishDefinition } from './materials';
 import FreeformViewer from './FreeformViewer';
-import type { DesignRequestSnapshotV1 } from '../../types/designRequest';
+import { MIN_DESIGN_REQUEST_QUANTITY, isValidDesignRequestQuantity, type DesignRequestSnapshotV1 } from '../../types/designRequest';
 import { useOverlayA11y } from '../artisan/useOverlayA11y';
 import { formatInches } from '../../lib/measurements';
 
@@ -11,7 +11,7 @@ export type RequestShop = { id: string; name: string; image?: string; location?:
 
 export default function SendDesignRequestModal({
   open, shops, selectedShopId, snapshot, submitting, successConversationId,
-  revisionMode = false, initialQuantity = 1, initialNote = '',
+  revisionMode = false, initialQuantity = MIN_DESIGN_REQUEST_QUANTITY, initialNote = '',
   onSelectShop, onSubmit, onClose, onOpenMessages,
 }: {
   open: boolean;
@@ -29,7 +29,8 @@ export default function SendDesignRequestModal({
   onOpenMessages: () => void;
 }) {
   const [changingShop, setChangingShop] = useState(false);
-  const [quantity, setQuantity] = useState(initialQuantity);
+  const [quantity, setQuantity] = useState(String(Math.max(MIN_DESIGN_REQUEST_QUANTITY, initialQuantity)));
+  const validQuantity = isValidDesignRequestQuantity(Number(quantity));
   const [note, setNote] = useState(initialNote);
   const panelRef = useOverlayA11y(open, onClose, submitting);
   if (!open || !snapshot) return null;
@@ -75,11 +76,12 @@ export default function SendDesignRequestModal({
                   <div><dt>Dimensions</dt><dd>H {formatInches(snapshot.dimensions.heightIn)} · W {formatInches(snapshot.dimensions.widthIn)}</dd></div>
                 </dl>
                 <div className="freeform-request-estimate"><span><small>ESTIMATED PRICE</small><strong>₱{snapshot.estimate.price.toLocaleString()}</strong></span><span><small>EST. PRODUCTION</small><strong>{snapshot.estimate.productionDays} days</strong></span><p>Final price and timing are set by the shop.</p></div>
-                <label className="freeform-request-field"><span>Quantity</span><input type="number" min={1} max={100} value={quantity} onChange={event => setQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></label>
+                <label className="freeform-request-field"><span>Quantity</span><input type="number" min={MIN_DESIGN_REQUEST_QUANTITY} step={1} value={quantity} aria-describedby="request-quantity-help" aria-invalid={!validQuantity} onChange={event => setQuantity(event.target.value)} /></label>
+                <small id="request-quantity-help">Minimum order: 100 pieces. Enter a whole number.</small>
                 <label className="freeform-request-field"><span>Note <small>(optional)</small></span><textarea rows={3} maxLength={2000} value={note} onChange={event => setNote(event.target.value)} placeholder="Tell the shop anything important about this piece…" /><small>{note.length}/2000</small></label>
               </div>
             </div>
-            <footer className="freeform-request-actions"><button type="button" className="freeform-tab-btn-outline" onClick={onClose} disabled={submitting}>Cancel</button><button type="button" className="freeform-save-btn" disabled={submitting} onClick={() => onSubmit(quantity, note)}>{submitting ? <><LoaderCircle className="seller-spin" size={17} /> Sending…</> : <><Send size={17} /> {revisionMode ? 'Send Revision' : 'Send Request'}</>}</button></footer>
+            <footer className="freeform-request-actions"><button type="button" className="freeform-tab-btn-outline" onClick={onClose} disabled={submitting}>Cancel</button><button type="button" className="freeform-save-btn" disabled={submitting || !validQuantity} onClick={() => { if (validQuantity) onSubmit(Number(quantity), note); }}>{submitting ? <><LoaderCircle className="seller-spin" size={17} /> Sending…</> : <><Send size={17} /> {revisionMode ? 'Send Revision' : 'Send Request'}</>}</button></footer>
           </>
         ) : null}
       </div>

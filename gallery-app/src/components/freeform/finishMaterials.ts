@@ -132,7 +132,7 @@ export function applyFinishToMaterial(material: THREE.MeshPhysicalMaterial, para
   const definition = getFinishDefinition(params.finish);
   const textures = getFinishTextureSet(definition.id);
   const previousFinish = material.userData.finishId;
-  material.color.set(params.color);
+  material.color.set(definition.id === 'raw_clay' ? definition.color : params.color);
   material.map = null;
   material.normalMap = textures.normalMap;
   material.normalScale.setScalar(definition.normalScale);

@@ -19,7 +19,7 @@ import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../compon
 import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
-import { createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
+import { MIN_DESIGN_REQUEST_QUANTITY, isValidDesignRequestQuantity, createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
 import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams, shapeFromModelBase } from '../lib/measurements';
 import { estimateModelDesign, modelBaseFromRow, type ModelBase } from '../components/freeform/modelEstimate';
 import * as THREE from 'three';
@@ -86,6 +86,7 @@ export default function FreeformPage() {
   const [modelCategory, setModelCategory] = useState('Vase');
   const [modelThumbnail, setModelThumbnail] = useState('');
   const [modelBase, setModelBase] = useState<ModelBase | null>(null);
+  const [revisionEstimate, setRevisionEstimate] = useState<{ price: number; productionDays: number; attachmentPrice: number; attachmentDays: number } | null>(null);
 
   /* Design params */
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
@@ -107,7 +108,7 @@ export default function FreeformPage() {
   const [submitting, setSubmitting] = useState(false);
   const [requestToken, setRequestToken] = useState(() => crypto.randomUUID());
   const [requestConversationId, setRequestConversationId] = useState<string | null>(null);
-  const [revisionQuantity, setRevisionQuantity] = useState(1);
+  const [revisionQuantity, setRevisionQuantity] = useState(MIN_DESIGN_REQUEST_QUANTITY);
   const [revisionNote, setRevisionNote] = useState('');
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [designName, setDesignName] = useState('');
@@ -174,11 +175,12 @@ export default function FreeformPage() {
     (selectedModelId ? baseQuery.eq('id', selectedModelId) : baseQuery.eq('file_url', selectedModel))
       .maybeSingle().then(({ data }) => {
         if (cancelled) return;
-        setModelBase(modelBaseFromRow(data));
-        if (selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
+        const base = modelBaseFromRow(data);
+        if (base || !revisionMode) setModelBase(base);
+        if (!revisionMode && selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
       });
     return () => { cancelled = true; };
-  }, [selectedModel, selectedModelId]);
+  }, [selectedModel, selectedModelId, revisionMode]);
 
 function applyDesign(design: {
     model_file: string;
@@ -285,11 +287,12 @@ function applyDesign(design: {
         }
         const snapshot = normalizeDesignRequestSnapshot(request.design_snapshot);
         const { data: currentModel } = snapshot.model.id
-          ? await supabase.from('models_3d').select('file_url').eq('id', snapshot.model.id).maybeSingle()
+          ? await supabase.from('models_3d').select('file_url,base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days').eq('id', snapshot.model.id).maybeSingle()
           : { data: null };
         const requestShop = Array.isArray(request.shops) ? request.shops[0] : request.shops;
-        setModelBase(null);
-        setSelectedModel(currentModel?.file_url || snapshot.model.file);
+        setModelBase(modelBaseFromRow(currentModel));
+        setRevisionEstimate({ ...snapshot.estimate, attachmentPrice: attachmentTotals(snapshot.attachments).price, attachmentDays: attachmentTotals(snapshot.attachments).productionDays });
+        setSelectedModel(snapshot.model.file || currentModel?.file_url || '');
         setSelectedModelId(snapshot.model.id);
         setModelName(snapshot.model.name);
         setModelCategory(snapshot.model.category || 'Vase');
@@ -362,7 +365,7 @@ function applyDesign(design: {
           navBase,
         );
         if (navState.color) {
-          setMaterialParams((prev) => ({ ...prev, color: navState.color! }));
+          setMaterialParams((prev) => normalizeMaterialParams({ ...prev, color: navState.color! }));
         }
         if (!shopModalShownRef.current) {
           shopModalShownRef.current = true;
@@ -553,7 +556,11 @@ function applyDesign(design: {
   async function handleSubmitToShop(quantity: number, buyerNote: string) {
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
-    if (!user || quantity < 1 || quantity > 100) { setSubmitting(false); return; }
+    if (!user || !isValidDesignRequestQuantity(quantity)) {
+      setSubmitting(false);
+      toast.error('Minimum order is 100 pieces. Enter a whole number.');
+      return;
+    }
     try {
       const { data, error } = revisionMode && revisionRequestId
         ? await supabase.rpc('revise_design_request', {
@@ -588,10 +595,13 @@ function applyDesign(design: {
   const estimate = modelBase ? estimateModelDesign({
     base: modelBase, shape: shapeParams, material: materialParams, decoration: decorationParams,
     attachmentPrice: attachmentEstimate.price, attachmentDays: attachmentEstimate.productionDays,
-  }) : null;
+  }) : revisionMode && revisionEstimate ? {
+    price: Math.max(0, revisionEstimate.price + attachmentEstimate.price - revisionEstimate.attachmentPrice),
+    productionDays: Math.max(1, revisionEstimate.productionDays + attachmentEstimate.productionDays - revisionEstimate.attachmentDays),
+  } : null;
   const estimatedPrice = estimate?.price ?? 0;
   const estimatedDays = estimate?.productionDays ?? 0;
-  const isDesignValid = Boolean(modelBase) && hasValidDesign(selectedModel, shapeParams, materialParams);
+  const isDesignValid = Boolean(modelBase || (revisionMode && revisionEstimate)) && hasValidDesign(selectedModel, shapeParams, materialParams);
   const canAdvanceToNext = !isReviewStep && isDesignValid && canGoTo(stepIndex + 1);
   const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
     model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
@@ -1168,6 +1178,7 @@ function applyDesign(design: {
       )}
 
       <SendDesignRequestModal
+        key={`${revisionRequestId ?? "new"}:${revisionQuantity}:${revisionNote}`}
         open={showShopModal}
         shops={shops}
         selectedShopId={selectedShop}

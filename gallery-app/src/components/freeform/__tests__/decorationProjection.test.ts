@@ -32,4 +32,10 @@ describe('decoration projection', () => {
     const full = createPatternSvg('floral', '#123456', 'full');
     expect(full.match(/translate\(0 (6|72|138|204)\)/g)).toHaveLength(4);
   });
+
+  it('rasterizes HD textures without changing motif coordinates or placement', () => {
+    const hd = createPatternSvg('floral', '#123456', 'full', 'transparent', 8);
+    expect(hd).toContain('width="640" height="2048" viewBox="0 0 80 256"');
+    expect(hd.match(/translate\(0 (6|72|138|204)\)/g)).toHaveLength(4);
+  });
 });

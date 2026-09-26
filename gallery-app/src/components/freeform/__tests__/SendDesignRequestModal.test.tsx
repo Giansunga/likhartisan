@@ -34,10 +34,10 @@ describe('SendDesignRequestModal', () => {
     expect(screen.getByTestId('request-viewer')).toBeInTheDocument();
     expect(screen.getByText('Regala Vase')).toBeInTheDocument();
     expect(screen.getByText('Blue botanical')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'Please make three matching pieces.' } });
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '150' } });
+    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'Please make 150 matching pieces.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send Request' }));
-    expect(submit).toHaveBeenCalledWith(3, 'Please make three matching pieces.');
+    expect(submit).toHaveBeenCalledWith(150, 'Please make 150 matching pieces.');
   });
 
   it('shows a completion state without resubmitting', () => {
@@ -51,12 +51,29 @@ describe('SendDesignRequestModal', () => {
     const selectShop = vi.fn();
     render(<SendDesignRequestModal open revisionMode initialQuantity={4} initialNote="Make the rim wider." shops={[{ id: 'shop-1', name: 'Regala Pottery' }, { id: 'shop-2', name: 'Other Shop' }]} selectedShopId="shop-1" snapshot={snapshot} submitting={false} successConversationId={null} onSelectShop={selectShop} onSubmit={submit} onClose={() => {}} onOpenMessages={() => {}} />);
     expect(screen.getByRole('heading', { name: 'Send revised design' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Quantity')).toHaveValue(4);
+    expect(screen.getByLabelText('Quantity')).toHaveValue(100);
     expect(screen.getByLabelText(/Note/)).toHaveValue('Make the rim wider.');
     expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
     expect(screen.queryByText('Other Shop')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Send Revision' }));
-    expect(submit).toHaveBeenCalledWith(4, 'Make the rim wider.');
+    expect(submit).toHaveBeenCalledWith(100, 'Make the rim wider.');
     expect(selectShop).not.toHaveBeenCalled();
   });
+  it('defaults to 100 and blocks empty, fractional, and smaller quantities', () => {
+    const submit = vi.fn();
+    render(<SendDesignRequestModal open shops={[{ id: 'shop-1', name: 'Shop' }]} selectedShopId="shop-1" snapshot={snapshot} submitting={false} successConversationId={null} onSelectShop={() => {}} onSubmit={submit} onClose={() => {}} onOpenMessages={() => {}} />);
+    const input = screen.getByLabelText('Quantity');
+    const button = screen.getByRole('button', { name: 'Send Request' });
+    expect(input).toHaveValue(100);
+    for (const value of ['', '99', '100.5']) {
+      fireEvent.change(input, { target: { value } });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(submit).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: '100' } });
+    fireEvent.click(button);
+    expect(submit).toHaveBeenCalledWith(100, '');
+  });
+
 });

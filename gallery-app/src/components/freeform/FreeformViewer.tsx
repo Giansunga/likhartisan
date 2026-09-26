@@ -1,4 +1,4 @@
-import { Suspense, useRef, useMemo, useEffect, Component, type ReactNode } from 'react';
+import { Suspense, useRef, useMemo, useEffect, Component, type ReactNode, type RefObject } from 'react';
 /* eslint-disable react-hooks/immutability -- R3F animation code intentionally mutates Three.js objects owned by the scene. */
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { Html, OrbitControls, useProgress } from '@react-three/drei';
@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
 import { getDecorationProjection } from './decorationProjection';
+import { clonePatternGeometry, computePatternNormals, updateExteriorPatternMask } from './exteriorPatternMask';
 import { type AttachmentPlacement, type AttachmentSelection, type GeneratedAttachmentSocket } from './attachments';
 import {
   analyzeAttachmentSockets,
@@ -14,6 +15,8 @@ import {
   getLiveAttachmentTransformLimits,
   resolveAttachmentMount,
   resolveAttachmentPoint,
+  prepareAttachmentSurface,
+  getAttachmentSurfaceRevision,
   type AttachmentPlacementLimitMap,
 } from './attachmentPlacement';
 import { applyGeneratedAttachmentThickness, disposeGeneratedAttachment, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
@@ -146,7 +149,7 @@ class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?:
   render() { return this.state.hasError ? null : this.props.children; }
 }
 
-function AttachmentModel({ attachment, placement, currentSocket, baseScene, shapeKey, material }: { attachment: AttachmentSelection; placement: AttachmentPlacement; currentSocket?: GeneratedAttachmentSocket; baseScene: THREE.Group; shapeKey: string; material: MaterialParams }) {
+function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, shapeKey, material }: { attachment: AttachmentSelection; placement: AttachmentPlacement; liveSocketsRef: RefObject<GeneratedAttachmentSocket[]>; baseScene: THREE.Group; shapeKey: string; material: MaterialParams }) {
   const groupRef = useRef<THREE.Group>(null);
   const placementKeyRef = useRef('');
   const recipe = getGeneratedAttachmentRecipe(attachment.recipeKey, attachment.recipeVersion);
@@ -168,6 +171,7 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
   useFrame(() => {
     if (!groupRef.current || !recipe) return;
     const { socket: savedSocket, transform } = placement;
+    const currentSocket = liveSocketsRef.current?.find((candidate) => candidate.id === savedSocket.id);
     const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
     const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${transform.thicknessMultiplier}|${recipe.key}|${recipe.version}`;
     if (placementKeyRef.current === placementKey) return;
@@ -184,12 +188,16 @@ function AttachmentModel({ attachment, placement, currentSocket, baseScene, shap
 
 function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: GeneratedAttachmentSocket; baseScene: THREE.Group; selected: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
+  const resolvedKey = useRef('');
   useFrame(() => {
     if (!groupRef.current) return;
+    const key = `${getAttachmentSurfaceRevision(baseScene)}|${socket.height}|${socket.azimuth}`;
+    if (resolvedKey.current === key) return;
     const resolved = resolveAttachmentPoint(baseScene, socket.height, socket.azimuth);
     if (!resolved) return;
     groupRef.current.position.copy(resolved.position).addScaledVector(resolved.normal, resolved.maxDimension * 0.025);
     groupRef.current.scale.setScalar(Math.max(resolved.maxDimension * 0.025, 0.015));
+    resolvedKey.current = key;
   });
   return <group ref={groupRef}>
     <mesh>
@@ -236,12 +244,13 @@ function Scene({
   previewMode?: boolean;
 }) {
   const gltf = useLoader(GLTFLoader, modelFile);
-  const { camera, controls } = useThree();
+  const { camera, controls, gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const initialized = useRef(false);
   const morphChecked = useRef(false);
   const analyzedShapeRef = useRef('');
   const analyzedPlacementRef = useRef('');
+  const liveSocketsRef = useRef<GeneratedAttachmentSocket[]>([]);
   const appliedShapeRef = useRef('');
   const appliedAppearanceRef = useRef('');
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
@@ -264,7 +273,7 @@ function Scene({
     const clonedScene = gltf.scene.clone(true);
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        child.geometry = child.geometry.clone();
+        child.geometry = clonePatternGeometry(child.geometry);
         if (Array.isArray(child.material)) {
           child.material = child.material.map((mat) => mat.clone());
         } else {
@@ -291,11 +300,16 @@ function Scene({
     const patternColor = decorationParams.effect === 'engraved'
       ? new THREE.Color(decorationParams.color).multiplyScalar(0.55).getStyle()
       : decorationParams.color;
-    const texture = new THREE.TextureLoader().load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(createPatternSvg(decorationParams.patternId, patternColor, decorationParams.placement))}`);
+    const pixelScale = Math.min(8, gl.capabilities.maxTextureSize / 256);
+    const texture = new THREE.TextureLoader().load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(createPatternSvg(decorationParams.patternId, patternColor, decorationParams.placement, 'transparent', pixelScale))}`);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.anisotropy = Math.min(16, gl.capabilities.getMaxAnisotropy());
     return texture;
-  }, [decorationParams.color, decorationParams.effect, decorationParams.patternId, decorationParams.placement]);
+  }, [decorationParams.color, decorationParams.effect, decorationParams.patternId, decorationParams.placement, gl]);
 
   useEffect(() => () => decorTexture?.dispose(), [decorTexture]);
 
@@ -303,11 +317,11 @@ function Scene({
     if (!groupRef.current) return;
 
     if (!initialized.current) {
-      const box = new THREE.Box3().setFromObject(groupRef.current);
+      const box = new THREE.Box3().setFromObject(scene);
       const size = new THREE.Vector3();
       box.getSize(size);
 
-      groupRef.current.traverse((child) => {
+      scene.traverse((child) => {
         if (child instanceof THREE.Mesh && child.geometry) {
           const snapshot = getGeometrySnapshot(child, groupRef.current!);
           if (snapshot) geometrySnapshotsRef.current.set(child.geometry, snapshot);
@@ -347,7 +361,7 @@ function Scene({
 
     if (!morphChecked.current) {
       let hasMorph = false;
-      groupRef.current.traverse((child) => {
+      scene.traverse((child) => {
         if (child instanceof THREE.Mesh && child.morphTargetInfluences && child.morphTargetInfluences.length > 0) {
           hasMorph = true;
         }
@@ -383,7 +397,7 @@ function Scene({
     const rootVertex = new THREE.Vector3();
     const localVertex = new THREE.Vector3();
 
-    if (shapeChanged || appearanceChanged) groupRef.current.traverse((child) => {
+    if (shapeChanged || appearanceChanged) scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const mesh = child as THREE.Mesh;
 
@@ -432,7 +446,7 @@ function Scene({
         }
 
         pos.needsUpdate = true;
-        mesh.geometry.computeVertexNormals();
+        computePatternNormals(mesh.geometry);
         mesh.geometry.computeBoundingBox();
         mesh.geometry.computeBoundingSphere();
         }
@@ -467,19 +481,17 @@ function Scene({
             shader.uniforms.decorMinY = { value: values.minY };
             shader.uniforms.decorHeight = { value: values.height };
             shader.uniforms.decorEngraved = { value: values.engraved };
-            shader.vertexShader = `varying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\n${shader.vertexShader}`.replace(
+            shader.vertexShader = `attribute float decorExterior;\nvarying float decorExteriorMask;\nvarying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\n${shader.vertexShader}`.replace(
               '#include <begin_vertex>',
-              '#include <begin_vertex>\n  decorWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n  decorWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );'
+              '#include <begin_vertex>\n  decorExteriorMask = decorExterior;\n  decorWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;\n  decorWorldNormal = normalize( mat3( modelMatrix ) * objectNormal );'
             );
-            shader.fragmentShader = `varying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\nuniform sampler2D decorMap;\nuniform float decorEnabled;\nuniform float decorRepeat;\nuniform float decorMinY;\nuniform float decorHeight;\nuniform float decorEngraved;\n${shader.fragmentShader}`.replace(
+            shader.fragmentShader = `varying float decorExteriorMask;\nvarying vec3 decorWorldPosition;\nvarying vec3 decorWorldNormal;\nuniform sampler2D decorMap;\nuniform float decorEnabled;\nuniform float decorRepeat;\nuniform float decorMinY;\nuniform float decorHeight;\nuniform float decorEngraved;\n${shader.fragmentShader}`.replace(
               '#include <color_fragment>',
               `#include <color_fragment>
-              vec2 decorRadialDirection = normalize( decorWorldPosition.xz );
-              float decorOutwardness = dot( normalize( decorWorldNormal.xz ), decorRadialDirection );
               float decorV = clamp( 1.0 - ( decorWorldPosition.y - decorMinY ) / max( decorHeight, 0.0001 ), 0.0, 1.0 );
-              if ( decorEnabled > 0.5 && decorOutwardness > 0.12 && decorV >= 0.03 ) {
+              if ( decorEnabled > 0.5 && decorExteriorMask > 0.5 && decorV >= 0.03 && decorV <= 0.97 ) {
                 float decorU = atan( decorWorldPosition.z, decorWorldPosition.x ) / 6.28318530718 + 0.5;
-                vec4 decorSample = texture2D( decorMap, vec2( fract( decorU * decorRepeat ), decorV ) );
+                vec4 decorSample = texture2D( decorMap, vec2( decorU * decorRepeat, decorV ) );
                 vec3 decorColor = decorSample.rgb;
                 if ( decorEngraved > 0.5 ) decorColor = mix( diffuseColor.rgb * 0.42, decorColor, 0.18 );
                 diffuseColor.rgb = mix( diffuseColor.rgb, decorColor, decorSample.a );
@@ -504,16 +516,23 @@ function Scene({
       }
     });
 
-    if (shapeChanged) appliedShapeRef.current = shapeKey;
+    if (shapeChanged) {
+      // Shape controls scale each horizontal section radially by a positive
+      // factor, preserving which surface is first along every horizontal ray.
+      updateExteriorPatternMask(scene, Boolean(appliedShapeRef.current));
+      prepareAttachmentSurface(scene);
+      appliedShapeRef.current = shapeKey;
+    }
     if (appearanceChanged) appliedAppearanceRef.current = appearanceKey;
 
     const analyzedShape = shapeKey;
-    let liveSockets = attachmentSockets;
-    if (!pauseAttachmentAnalysis && (onSocketsChange || onAttachmentLimitsChange) && analyzedShapeRef.current !== analyzedShape) {
+    let liveSockets = liveSocketsRef.current.length ? liveSocketsRef.current : attachmentSockets;
+    if ((attachmentParams.length > 0 || (!pauseAttachmentAnalysis && (onSocketsChange || onAttachmentLimitsChange))) && analyzedShapeRef.current !== analyzedShape) {
       scene.updateMatrixWorld(true);
       analyzedShapeRef.current = analyzedShape;
       liveSockets = analyzeAttachmentSockets(scene);
-      onSocketsChange?.(liveSockets);
+      liveSocketsRef.current = liveSockets;
+      if (!pauseAttachmentAnalysis) onSocketsChange?.(liveSockets);
       analyzedPlacementRef.current = '';
     }
     const placementAnalysisKey = `${analyzedShape}|${attachmentParams.flatMap((selection) => selection.placements.map((placement) => `${selection.id}:${placement.socket.id}:${Object.values(placement.transform).join(',')}`)).join('|')}`;
@@ -549,7 +568,7 @@ function Scene({
       {showAttachmentSockets && attachmentSockets.map((socket) => <AttachmentSocketMarker key={socket.id} socket={socket} baseScene={scene} selected={selectedSocketIds.includes(socket.id)} />)}
       {attachmentParams.flatMap((attachment) => attachment.placements.map((placement) => (
           <AttachmentErrorBoundary key={`${attachment.recipeKey}-${attachment.recipeVersion}-${placement.socket.id}`} onError={() => onAttachmentError?.(attachment)}>
-          <AttachmentModel attachment={attachment} placement={placement} currentSocket={attachmentSockets.find((socket) => socket.id === placement.socket.id)} material={materialParams} baseScene={scene} shapeKey={`${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}`} />
+          <AttachmentModel attachment={attachment} placement={placement} liveSocketsRef={liveSocketsRef} material={materialParams} baseScene={scene} shapeKey={`${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${shapeParams.geometryMode || ''}|${Object.values(shapeParams.baseline || {}).join('|')}`} />
         </AttachmentErrorBoundary>
       )))}
     </group>

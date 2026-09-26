@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshBVH } from 'three-mesh-bvh';
 import type { GeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import {
   DEFAULT_ATTACHMENT_TRANSFORM,
@@ -10,6 +11,54 @@ import {
 
 const HEIGHT_BANDS = 32;
 const AZIMUTH_SAMPLES = 16;
+
+type SurfaceEntry = { mesh: THREE.Mesh; tree: MeshBVH; inverse: THREE.Matrix4 };
+const attachmentSurfaces = new WeakMap<THREE.Object3D, { entries: SurfaceEntry[]; box: THREE.Box3; revision: number }>();
+const geometryTrees = new WeakMap<THREE.BufferGeometry, MeshBVH>();
+
+/** Rebuild/refit only after geometry changes; placement queries reuse this index. */
+export function prepareAttachmentSurface(scene: THREE.Object3D) {
+  scene.updateMatrixWorld(true);
+  const entries: SurfaceEntry[] = [];
+  scene.traverse(child => {
+    if (!(child instanceof THREE.Mesh) || !child.geometry.attributes.position) return;
+    let tree = geometryTrees.get(child.geometry);
+    if (!tree) {
+      // BVH indexing must not reorder the renderer's face masks or shape snapshots.
+      const indexed = new THREE.BufferGeometry();
+      indexed.setAttribute('position', child.geometry.getAttribute('position'));
+      if (child.geometry.index) indexed.setIndex(child.geometry.index.clone());
+      indexed.groups = child.geometry.groups.map((group: { start: number; count: number; materialIndex?: number }) => ({ ...group }));
+      tree = new MeshBVH(indexed, { maxLeafTris: 8 });
+      geometryTrees.set(child.geometry, tree);
+    } else tree.refit();
+    entries.push({ mesh: child, tree, inverse: child.matrixWorld.clone().invert() });
+  });
+  const revision = (attachmentSurfaces.get(scene)?.revision || 0) + 1;
+  attachmentSurfaces.set(scene, { entries, box: new THREE.Box3().setFromObject(scene), revision });
+}
+
+export function getAttachmentSurfaceRevision(scene: THREE.Object3D) {
+  return attachmentSurfaces.get(scene)?.revision || 0;
+}
+
+function indexedSurfaceHit(scene: THREE.Object3D, origin: THREE.Vector3, direction: THREE.Vector3, far: number) {
+  const surface = attachmentSurfaces.get(scene);
+  if (!surface) return new THREE.Raycaster(origin, direction, 0, far).intersectObject(scene, true).find(hit => hit.object.visible);
+  const localRay = new THREE.Ray();
+  let closest: THREE.Intersection | undefined;
+  for (const { mesh, tree, inverse } of surface.entries) {
+    if (!mesh.visible) continue;
+    localRay.set(origin, direction).applyMatrix4(inverse);
+    const hit = tree.raycastFirst(localRay, mesh.material);
+    if (!hit) continue;
+    hit.point.applyMatrix4(mesh.matrixWorld);
+    hit.distance = hit.point.distanceTo(origin);
+    hit.object = mesh;
+    if (hit.distance <= far && (!closest || hit.distance < closest.distance)) closest = hit;
+  }
+  return closest;
+}
 
 export type TransformRange = { min: number; max: number; step: number };
 export type AttachmentTransformLimits = {
@@ -54,8 +103,7 @@ export function getAttachmentRay(box: THREE.Box3, normalizedHeight: number, azim
 
 function resolveFromBox(scene: THREE.Object3D, box: THREE.Box3, normalizedHeight: number, azimuthDegrees: number) {
   const ray = getAttachmentRay(box, normalizedHeight, azimuthDegrees);
-  const raycaster = new THREE.Raycaster(ray.origin, ray.direction, 0, ray.radialSize * 3);
-  const hit = raycaster.intersectObject(scene, true).find((candidate) => candidate.object.visible);
+  const hit = indexedSurfaceHit(scene, ray.origin, ray.direction, ray.radialSize * 3);
   if (!hit) return null;
   let normal = ray.outward.clone();
   if (hit.face) {
@@ -68,8 +116,9 @@ function resolveFromBox(scene: THREE.Object3D, box: THREE.Box3, normalizedHeight
 }
 
 export function resolveAttachmentPoint(scene: THREE.Object3D, normalizedHeight: number, azimuthDegrees: number, knownBox?: THREE.Box3) {
-  if (!knownBox) scene.updateMatrixWorld(true);
-  const box = knownBox || new THREE.Box3().setFromObject(scene);
+  const prepared = attachmentSurfaces.get(scene);
+  if (!knownBox && !prepared) scene.updateMatrixWorld(true);
+  const box = knownBox || prepared?.box || new THREE.Box3().setFromObject(scene);
   return box.isEmpty() ? null : resolveFromBox(scene, box, normalizedHeight, azimuthDegrees);
 }
 
@@ -149,7 +198,7 @@ export function getSocketTransformLimits(recipe: GeneratedAttachmentRecipe, sock
   return {
     horizontalDegrees: { min: -horizontal, max: horizontal, step: 1 },
     verticalRatio: { min: verticalMin, max: verticalMax, step: 0.005 },
-    surfaceOffsetRatio: { min: 0.002, max: 0.08, step: 0.002 },
+    surfaceOffsetRatio: { min: 0.002, max: recipe.family === 'handle' ? 0.04 : 0.08, step: 0.002 },
     twistDegrees: { min: -180, max: 180, step: 1 },
     scaleMultiplier: { min: minimumScale, max: maximumScale, step: 0.05 },
     thicknessMultiplier: recipe.family === 'handle'
@@ -194,6 +243,7 @@ export function resolveAttachmentMount(
     quaternion: baseMount.quaternion,
     scale: baseMount.scale,
     verticalScale: baseMount.scale,
+    seatCorrection: 0,
   };
   if (recipe.family !== 'handle' || !recipe.mountContactY) return fallback;
 
@@ -234,12 +284,35 @@ export function resolveAttachmentMount(
   quaternion.multiply(twist);
 
   const offsetDistance = baseMount.offset.dot(resolved.normal);
+  const position = lower.position.clone().add(upper.position).multiplyScalar(0.5).addScaledVector(outward, offsetDistance);
+  // A saved transform can predate the live limits. Seat its rotated contact
+  // points against the shaped pot instead of letting either lug hover.
+  const contactHalfSpan = recipe.envelope.contactRadius * baseMount.scale * 0.12;
+  const boxCenter = resolved.box.getCenter(new THREE.Vector3());
+  const verticalScale = THREE.MathUtils.clamp(contactDistance / contactSpan, baseMount.scale * 0.85, baseMount.scale * 1.25);
+  let seatCorrection = 0;
+  for (let iteration = 0; iteration < 3; iteration++) {
+    let requiredCorrection = 0;
+    for (const contactY of recipe.mountContactY) {
+      const contact = new THREE.Vector3(0, contactY * verticalScale, 0).applyQuaternion(quaternion).add(position);
+      const contactHeight = (contact.y - resolved.box.min.y) / boxHeight;
+      const contactAzimuth = THREE.MathUtils.radToDeg(Math.atan2(contact.x - boxCenter.x, contact.z - boxCenter.z));
+      const surface = resolveAttachmentPoint(scene, contactHeight, contactAzimuth, resolved.box);
+      if (!surface) continue;
+      const gap = contact.clone().sub(surface.position).dot(surface.normal) - contactHalfSpan;
+      requiredCorrection = Math.max(requiredCorrection, gap / Math.max(0.4, surface.normal.dot(outward)));
+    }
+    if (requiredCorrection <= 0.00001) break;
+    position.addScaledVector(outward, -requiredCorrection);
+    seatCorrection += requiredCorrection;
+  }
   return {
     ...resolved,
-    position: lower.position.clone().add(upper.position).multiplyScalar(0.5).addScaledVector(outward, offsetDistance),
+    position,
     quaternion,
     scale: baseMount.scale,
-    verticalScale: THREE.MathUtils.clamp(contactDistance / contactSpan, baseMount.scale * 0.85, baseMount.scale * 1.25),
+    verticalScale,
+    seatCorrection,
   };
 }
 
@@ -265,9 +338,24 @@ export function isAttachmentPlacementSafe(scene: THREE.Object3D, socket: Generat
     [resolved.height - heightHalfRatio, resolved.azimuth],
     [resolved.height + heightHalfRatio, resolved.azimuth],
   ] as const;
-  return edgeCoordinates.every(([height, azimuth]) => {
+  const edgesSafe = edgeCoordinates.every(([height, azimuth]) => {
     const edge = resolveAttachmentPoint(scene, height, azimuth, resolved.box);
     return edge && Math.abs(edge.normal.y) <= 0.78 && edge.normal.dot(resolved.normal) >= 0.45;
+  });
+  if (!edgesSafe || recipe.family !== 'handle' || !recipe.mountContactY) return edgesSafe;
+  const mount = resolveAttachmentMount(scene, socket, recipe, clamped, resolved.box);
+  if (!mount) return false;
+  if (mount.seatCorrection > recipe.envelope.contactRadius * mount.scale * 0.08) return false;
+  const boxCenter = resolved.box.getCenter(new THREE.Vector3());
+  return recipe.mountContactY.every((contactY) => {
+    const contact = new THREE.Vector3(0, contactY * mount.verticalScale, 0).applyQuaternion(mount.quaternion).add(mount.position);
+    const height = (contact.y - resolved.box.min.y) / boxSize.y;
+    const azimuth = THREE.MathUtils.radToDeg(Math.atan2(contact.x - boxCenter.x, contact.z - boxCenter.z));
+    const surface = resolveAttachmentPoint(scene, height, azimuth, resolved.box);
+    if (!surface) return false;
+    const gap = contact.clone().sub(surface.position).dot(surface.normal);
+    return gap <= recipe.envelope.contactRadius * mount.scale * 0.18
+      && gap >= -recipe.envelope.contactRadius * mount.scale * 1.5;
   });
 }
 
@@ -340,15 +428,18 @@ export function getLiveAttachmentTransformLimits(
     const fallback = fallbackCandidates.find(isSafe);
     if (!fallback) return null;
     current = fallback;
-    return Object.fromEntries((Object.keys(hardLimits) as Array<keyof AttachmentPlacementTransform>).map((key) => [
-      key,
-      { ...hardLimits[key], min: current[key], max: current[key] },
-    ])) as AttachmentTransformLimits;
   }
   // The socket analyzer already derives conservative, deformation-aware ranges.
   // Validate only the value the shopper actually chose here; eagerly probing every
   // unused slider position makes a paired attachment perform hundreds of raycasts.
-  return hardLimits;
+  if (recipe.family !== 'handle') return hardLimits;
+  return {
+    ...hardLimits,
+    surfaceOffsetRatio: probeContinuousSafeRange(current.surfaceOffsetRatio, hardLimits.surfaceOffsetRatio,
+      (value) => isSafe({ ...current, surfaceOffsetRatio: value })),
+    twistDegrees: probeContinuousSafeRange(current.twistDegrees, hardLimits.twistDegrees,
+      (value) => isSafe({ ...current, twistDegrees: value })),
+  };
 }
 
 export function getAttachmentMountTransform(normal: THREE.Vector3, maxDimension: number, recipe: GeneratedAttachmentRecipe, transform: AttachmentPlacementTransform = DEFAULT_ATTACHMENT_TRANSFORM) {

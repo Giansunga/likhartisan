@@ -1,3 +1,6 @@
+export const MIN_DESIGN_REQUEST_QUANTITY = 100;
+export const isValidDesignRequestQuantity = (quantity: number) => Number.isInteger(quantity) && quantity >= MIN_DESIGN_REQUEST_QUANTITY && quantity <= 2147483647;
+
 import { normalizeAttachmentSelections, type AttachmentSelection } from '../components/freeform/attachments';
 import type { DecorationParams } from '../components/freeform/decor';
 import { normalizeMaterialParams, type MaterialParams } from '../components/freeform/materials';

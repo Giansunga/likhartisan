@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { FINISHES, MATERIAL_COLORS, SHOP_FINISHES, isFinishId, type FinishId, type MaterialParams } from './materials';
 
 export default function MaterialTab({
@@ -10,7 +10,7 @@ export default function MaterialTab({
   onChange: (params: MaterialParams) => void;
   shopName?: string;
 }) {
-  const [customColor, setCustomColor] = useState(materialParams.color);
+  const colorLocked = materialParams.finish === 'raw_clay';
 
   const availableFinishIds = shopName ? (SHOP_FINISHES[shopName] || null) : null;
   const availableFinishes = availableFinishIds
@@ -30,13 +30,12 @@ export default function MaterialTab({
     const f = FINISHES.find((x) => x.id === finish);
     if (f) {
       const color = finish === 'raw_clay' ? f.color : materialParams.color;
-      if (finish === 'raw_clay') setCustomColor(color);
       onChange({ ...materialParams, finish, color });
     }
   }
 
   function selectColor(color: string) {
-    setCustomColor(color);
+    if (colorLocked) return;
     onChange({ ...materialParams, color });
   }
 
@@ -60,10 +59,11 @@ export default function MaterialTab({
       </div>
 
       <h4 className="freeform-tab-subheading">Color</h4>
-      <div className="freeform-material-colors" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px', marginBottom: '16px' }}>
+      <div className="freeform-material-colors" aria-disabled={colorLocked} style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px', marginBottom: '16px', opacity: colorLocked ? 0.45 : 1 }}>
         {MATERIAL_COLORS.map((c) => (
           <button
             key={c}
+            disabled={colorLocked}
             onClick={() => selectColor(c)}
             style={{
               width: '100%',
@@ -86,13 +86,15 @@ export default function MaterialTab({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
           <input
             type="color"
-            value={customColor}
+            disabled={colorLocked}
+            value={materialParams.color}
             onChange={(e) => selectColor(e.target.value)}
             style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1.5px solid var(--bg-tertiary)', cursor: 'pointer', padding: 0 }}
           />
           <input
             type="text"
-            value={customColor}
+            disabled={colorLocked}
+            value={materialParams.color}
             onChange={(e) => selectColor(e.target.value)}
             className="freeform-tab-input"
             style={{ flex: 1, padding: '8px 12px', fontSize: '0.78rem', fontFamily: 'monospace' }}
@@ -100,7 +102,7 @@ export default function MaterialTab({
         </div>
       </div>
 
-      <button onClick={() => { onChange({ finish: 'raw_clay', color: '#BE734F' }); setCustomColor('#BE734F'); }} className="freeform-tab-btn-outline">
+      <button onClick={() => onChange({ finish: 'raw_clay', color: '#BE734F' })} className="freeform-tab-btn-outline">
         Reset Material
       </button>
     </div>

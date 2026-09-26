@@ -95,6 +95,7 @@ export function isFinishId(value: unknown): value is FinishId {
 
 export function normalizeMaterialParams(value: Partial<{ finish: unknown; color: unknown }> | null | undefined): MaterialParams {
   const finish = normalizeFinishId(value?.finish);
+  if (finish === 'raw_clay') return { finish, color: FINISH_DEFINITIONS.raw_clay.color };
   const color = typeof value?.color === 'string' && /^#[0-9a-f]{6}$/i.test(value.color)
     ? value.color.toUpperCase()
     : FINISH_DEFINITIONS[finish].color;

@@ -13,6 +13,7 @@ import {
   resolveAttachmentMount,
   resolveAttachmentPlacement,
   resolveAttachmentPoint,
+  prepareAttachmentSurface,
 } from '../attachmentPlacement';
 import { DEFAULT_ATTACHMENT_TRANSFORM } from '../attachments';
 import { GENERATED_ATTACHMENT_RECIPES } from '../generatedAttachmentCatalog';
@@ -38,6 +39,25 @@ function roundedVase() {
 }
 
 describe('automatic attachment socket placement', () => {
+  it('accelerates placement queries without changing hits and refits after deformation', () => {
+    const pot = cylinder();
+    pot.position.set(2, 1, -3);
+    pot.scale.set(1.2, 1.4, 0.9);
+    const expected = [-90, 0, 40, 90].map(angle => resolveAttachmentPoint(pot, 0.55, angle)!);
+    const sourceIndex = Array.from(pot.geometry.index!.array);
+    prepareAttachmentSurface(pot);
+    const raycast = vi.spyOn(pot, 'raycast');
+    [-90, 0, 40, 90].forEach((angle, i) => {
+      const actual = resolveAttachmentPoint(pot, 0.55, angle)!;
+      expect(actual.position.distanceTo(expected[i].position)).toBeLessThan(0.00001);
+      expect(actual.normal.dot(expected[i].normal)).toBeCloseTo(1, 5);
+    });
+    expect(raycast).not.toHaveBeenCalled();
+    expect(Array.from(pot.geometry.index!.array)).toEqual(sourceIndex);
+    pot.geometry.scale(1.3, 1, 1.3);
+    prepareAttachmentSurface(pot);
+    expect(resolveAttachmentPoint(pot, 0.55, 0)!.radialDistance).toBeCloseTo(expected[1].radialDistance * 1.3, 5);
+  });
   it('builds rays from normalized height and azimuth', () => {
     const ray = getAttachmentRay(new THREE.Box3(new THREE.Vector3(-1, -5, -1), new THREE.Vector3(1, 5, 1)), 0.8, 90);
     expect(ray.y).toBeCloseTo(3);
@@ -156,6 +176,25 @@ describe('automatic attachment socket placement', () => {
         .applyQuaternion(mount.quaternion)
         .add(mount.position);
       expect(contact.distanceTo(surface.position)).toBeLessThan(recipe.envelope.contactRadius * mount.scale);
+    }
+  });
+
+  it('limits handle depth and rotation to connected positions and seats old saved offsets', () => {
+    const scene = roundedVase();
+    const socket = analyzeAttachmentSockets(scene).find((candidate) => candidate.family === 'handle')!;
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find((candidate) => candidate.key === 'bamboo-loop')!;
+    const limits = getLiveAttachmentTransformLimits(scene, recipe, socket, DEFAULT_ATTACHMENT_TRANSFORM)!;
+    expect(limits.surfaceOffsetRatio.max).toBeLessThan(0.04);
+    expect(isAttachmentPlacementSafe(scene, socket, recipe, { ...DEFAULT_ATTACHMENT_TRANSFORM, surfaceOffsetRatio: limits.surfaceOffsetRatio.max })).toBe(true);
+    const saved = resolveAttachmentMount(scene, socket, recipe, { ...DEFAULT_ATTACHMENT_TRANSFORM, surfaceOffsetRatio: 0.08, twistDegrees: 40 })!;
+    expect(saved.seatCorrection).toBeGreaterThan(0);
+    const boxCenter = saved.box.getCenter(new THREE.Vector3());
+    for (const contactY of recipe.mountContactY!) {
+      const contact = new THREE.Vector3(0, contactY * saved.verticalScale, 0).applyQuaternion(saved.quaternion).add(saved.position);
+      const surface = resolveAttachmentPoint(scene,
+        (contact.y - saved.box.min.y) / saved.box.getSize(new THREE.Vector3()).y,
+        THREE.MathUtils.radToDeg(Math.atan2(contact.x - boxCenter.x, contact.z - boxCenter.z)), saved.box)!;
+      expect(contact.clone().sub(surface.position).dot(surface.normal)).toBeLessThan(recipe.envelope.contactRadius * saved.scale * 0.2);
     }
   });
 

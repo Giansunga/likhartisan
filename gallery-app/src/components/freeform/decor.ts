@@ -85,7 +85,7 @@ export function getPattern(patternId: string) {
   return PATTERNS.find((pattern) => pattern.id === patternId);
 }
 
-export function createPatternSvg(patternId: string, color: string, placement: DecorPlacement = 'middle', backgroundColor = 'transparent'): string {
+export function createPatternSvg(patternId: string, color: string, placement: DecorPlacement = 'middle', backgroundColor = 'transparent', pixelScale = 1): string {
   const pattern = getPattern(patternId);
   if (!pattern) return '';
   const content = pattern.content.replaceAll('currentColor', color);
@@ -96,5 +96,5 @@ export function createPatternSvg(patternId: string, color: string, placement: De
     // Reserve the upper rim area, then repeat complete pattern rows only.
     ? [6, 72, 138, 204].map((offset) => `<g transform="translate(0 ${offset})">${content}</g>`).join('')
     : `<g transform="translate(0 ${y})">${content}</g>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="256" viewBox="0 0 80 256"><rect width="80" height="256" fill="${backgroundColor}"/>${patternRows}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${80 * pixelScale}" height="${256 * pixelScale}" viewBox="0 0 80 256"><rect width="80" height="256" fill="${backgroundColor}"/>${patternRows}</svg>`;
 }
