@@ -59,8 +59,11 @@ export function useNotifications(userId: string | undefined, context: Notificati
     if (!userId) return;
     const refresh = () => { void load(true); };
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    // A fresh topic prevents React StrictMode's replacement effect from
+    // reusing a channel that Supabase is still removing asynchronously.
+    const channelTopic = `notifications:${context}:${userId}:${limit || 'all'}:${crypto.randomUUID()}`;
     const channel = supabase
-      .channel(`notifications:${context}:${userId}:${limit || 'all'}`)
+      .channel(channelTopic)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, refresh)
       .subscribe();
