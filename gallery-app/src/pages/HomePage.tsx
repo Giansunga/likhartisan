@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HomeReviewRail, { type HomeReview } from '../components/home/HomeReviewRail';
 import HomeShopRail, { type HomeShop } from '../components/home/HomeShopRail';
@@ -9,6 +9,57 @@ import { supabase } from '../lib/supabase';
 import './HomePage.css';
 
 const HERO_VIDEO = '/videos/LikhArtisan.mp4';
+
+const IMPACT_STATS = [
+  { value: 50, label: 'Local Artisans' },
+  { value: 200, label: 'Years of Tradition' },
+  { value: 10_000, label: 'Pottery Creations' },
+];
+
+function AnimatedCounter({ value, delay = 0 }: { value: number; delay?: number }) {
+  const [count, setCount] = useState(0);
+  const counterRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const node = counterRef.current;
+    if (!node) return;
+    let animationFrame = 0;
+    let delayTimer = 0;
+    let startTime: number | null = null;
+    let observer: IntersectionObserver | null = null;
+
+    const startCounting = () => {
+      const tick = (time: number) => {
+        if (startTime === null) startTime = time;
+        const progress = Math.min((time - startTime) / 2600, 1);
+        setCount(Math.round(value * progress));
+        if (progress < 1) animationFrame = requestAnimationFrame(tick);
+      };
+      delayTimer = window.setTimeout(() => {
+        animationFrame = requestAnimationFrame(tick);
+      }, delay);
+    };
+
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting) return;
+        observer?.disconnect();
+        startCounting();
+      }, { threshold: 0.65 });
+      observer.observe(node);
+    } else {
+      startCounting();
+    }
+
+    return () => {
+      observer?.disconnect();
+      window.clearTimeout(delayTimer);
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [delay, value]);
+
+  return <span ref={counterRef}>{count.toLocaleString('en-US')}+</span>;
+}
 
 interface CollectionFeature {
   name: string;
@@ -119,7 +170,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <section className="home-section home-collections" aria-labelledby="home-collections-title"><div className="home-container"><div className="home-section-heading home-section-heading--split"><div><h2 id="home-collections-title">Pottery for <em>everyday rituals</em></h2></div></div><div className="home-collection-grid">{COLLECTIONS.map((collection, index) => <Link key={collection.name} to={`/gallery?category=${encodeURIComponent(collection.name)}`} className={`home-collection-card home-collection-card--${index + 1}`}><img src={collection.image} alt="" loading="lazy" /><b>0{index + 1}</b><span>{collection.name}</span><small>{collection.description}</small><i>View collection <ArrowRight aria-hidden="true" /></i></Link>)}</div><Link to="/gallery" className="home-text-link home-text-link--center">Browse the full gallery <ArrowRight aria-hidden="true" /></Link></div></section>
+    <section className="home-section home-collections" aria-labelledby="home-collections-title"><div className="home-container"><div id="home-impact" className="home-impact" aria-label="LikhArtisan community impact"><p>More than just pottery, it's a destination of <strong>culture, creativity, and community.</strong></p>{IMPACT_STATS.map((stat, index) => <div className="home-impact__stat" key={stat.label}><AnimatedCounter value={stat.value} delay={index * 180} /><small>{stat.label}</small></div>)}</div><div className="home-section-heading home-section-heading--split"><div><h2 id="home-collections-title">Pottery for <em>everyday rituals</em></h2></div></div><div className="home-collection-grid">{COLLECTIONS.map((collection, index) => <Link key={collection.name} to={`/gallery?category=${encodeURIComponent(collection.name)}`} className={`home-collection-card home-collection-card--${index + 1}`}><img src={collection.image} alt="" loading="lazy" /><b>0{index + 1}</b><span>{collection.name}</span><small>{collection.description}</small><i>View collection <ArrowRight aria-hidden="true" /></i></Link>)}</div><Link to="/gallery" className="home-text-link home-text-link--center">Browse the full gallery <ArrowRight aria-hidden="true" /></Link></div></section>
 
     <HomeShopRail shops={shops} loading={shopsLoading} error={shopsError} />
 

@@ -64,7 +64,12 @@ describe('HomePage editorial landing page', () => {
     expect(screen.getByAltText('A potter shaping a large clay vessel')).toHaveAttribute('src', '/images/history_bottom_right.jpg');
     expect(screen.getByAltText('Two pottery workers shaping a large clay vessel in a Santo Tomas workshop')).toHaveAttribute('src', '/images/artisan_1.jpg');
     expect(screen.getAllByRole('link', { name: /Read the full story/i })[0]).toHaveAttribute('href', '/about#origin');
-    expect(screen.queryByText('LOCAL ARTISANS')).not.toBeInTheDocument();
+    const impact = screen.getByLabelText('LikhArtisan community impact');
+    expect(impact).toHaveTextContent("More than just pottery, it's a destination of culture, creativity, and community.");
+    expect(impact).toHaveTextContent('Local Artisans');
+    expect(impact).toHaveTextContent('Years of Tradition');
+    expect(impact).toHaveTextContent('Pottery Creations');
+    expect(impact.compareDocumentPosition(collections) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByRole('link', { name: 'Clay Corner' })).toHaveAttribute('href', '/shop/shop-1');
   });
 
