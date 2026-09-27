@@ -1,3 +1,5 @@
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import './Navbar.css';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -50,7 +52,13 @@ export default function Navbar() {
   const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isCompact = useMediaQuery('(max-width: 1199px)');
+  const isTablet = isCompact && !isMobile;
+  const [showNavigation, setShowNavigation] = useState(false);
+  const navigationRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
   const [cartCount, setCartCount] = useState(getCartCount);
   const [hasShopRole, setHasShopRole] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -60,12 +68,21 @@ export default function Navbar() {
   const notificationData = useNotifications(isArtisanDashboard ? undefined : user?.id, notificationContext, 10);
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 768px)');
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+    setShowNavigation(false);
+    setShowProfileDropdown(false);
+    setShowNotifications(false);
+  }, [location.key, isTablet]);
+
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (showNavigation) { setShowNavigation(false); menuButtonRef.current?.focus(); }
+      else if (showProfileDropdown) { setShowProfileDropdown(false); profileButtonRef.current?.focus(); }
+      else if (showNotifications) { setShowNotifications(false); notificationButtonRef.current?.focus(); }
+    }
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showNavigation, showProfileDropdown, showNotifications]);
 
   useEffect(() => {
     if (!user) return;
@@ -120,7 +137,8 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: PointerEvent) {
+      if (!navigationRef.current?.contains(e.target as Node) && !menuButtonRef.current?.contains(e.target as Node)) setShowNavigation(false);
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
         setShowProfileDropdown(false);
       }
@@ -130,8 +148,8 @@ export default function Navbar() {
         setShowNotifications(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, []);
 
   async function handleAuthChange(user: User) {
@@ -145,6 +163,7 @@ export default function Navbar() {
 
   if (isAdmin) return null;
 
+  const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
   const links = isArtisanDashboard ? [] : [
     { to: '/', label: 'Home' },
     { to: '/gallery', label: 'Gallery' },
@@ -198,23 +217,20 @@ export default function Navbar() {
           </Link>
         </div>
       ) : (
-        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} h-full flex items-center justify-between relative`} style={{ padding: isMobile ? '0 16px' : '0 32px' }}>
-          {/* Mobile: hamburger left, logo center-left. Desktop: logo left */}
-
-
+        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} navbar-layout h-full relative`}>
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
             <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
-            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
+            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : isTablet ? '38px' : '46px', width: 'auto' }} />
           </Link>
 
           {/* Desktop nav links */}
-          {!isMobile && (
-            <ul className="nav-links absolute left-1/2 -translate-x-1/2 items-center list-none flex" style={{ margin: 0, padding: 0, gap: '36px' }}>
+          {!isCompact && (
+            <ul className="nav-links navbar-desktop-links">
               {links.map(link => (
                 <li key={link.to}>
-                  <Link to={link.to}
+                  <Link to={link.to} aria-current={isActive(link.to) ? 'page' : undefined}
                     className={`text-[1.0625rem] font-semibold relative py-1.5 transition-colors after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:w-0 after:h-[2px] after:bg-accent after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-accent ${
-                      location.pathname === link.to ? 'text-accent after:w-full' : 'text-brown-dark'
+                      isActive(link.to) ? 'text-accent after:w-full' : 'text-brown-dark'
                     }`}>
                     {link.label}
                   </Link>
@@ -224,12 +240,12 @@ export default function Navbar() {
           )}
 
           {/* Action icons */}
-          <div className="flex items-center" style={{ gap: isMobile ? '4px' : '20px' }}>
+          <div className="navbar-actions">
             <CartAction count={cartCount} isMobile={isMobile} />
             {loggedIn ? (
               <>
                 <div ref={notifDropdownRef} className="relative">
-                  <button ref={notificationButtonRef} onClick={() => setShowNotifications(current => !current)} aria-label="Notifications" aria-expanded={showNotifications} aria-controls="navbar-notification-panel" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                  <button ref={notificationButtonRef} onClick={() => { setShowNotifications(current => !current); setShowNavigation(false); setShowProfileDropdown(false); }} aria-label="Notifications" aria-expanded={showNotifications} aria-controls="navbar-notification-panel" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                     </svg>
@@ -257,11 +273,11 @@ export default function Navbar() {
                   </Link>
                 )}
 
-                {/* Profile: tap-based on mobile, hover on desktop */}
-                {isMobile ? (
+                {/* Profile disclosure works with touch, mouse, and keyboard. */}
+                {(
                   <div ref={profileDropdownRef} className="relative">
-                    <button onClick={() => setShowProfileDropdown(!showProfileDropdown)} aria-label="User menu" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                      <div className="rounded-full bg-[#D9D9D9] border-2 border-cream-tertiary overflow-hidden" style={{ width: '34px', height: '34px' }}>
+                    <button ref={profileButtonRef} className="navbar-profile-button" aria-expanded={showProfileDropdown} aria-controls="navbar-profile-panel" onClick={() => { setShowProfileDropdown(!showProfileDropdown); setShowNavigation(false); setShowNotifications(false); }} aria-label="User menu" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                      <div className="rounded-full bg-[#D9D9D9] border-2 border-cream-tertiary overflow-hidden" style={{ width: isMobile ? '34px' : '44px', height: isMobile ? '34px' : '44px' }}>
                         {userAvatar ? (
                           <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
@@ -271,8 +287,7 @@ export default function Navbar() {
                         )}
                       </div>
                     </button>
-                    {showProfileDropdown && (
-                      <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 100, padding: '6px 0' }}>
+                      <div id="navbar-profile-panel" className="navbar-profile-panel" hidden={!showProfileDropdown} style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: '#fff', border: '1px solid #E8E0D8', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 100, padding: '6px 0' }}>
                         {(userEmail && (SHOP_EMAILS.includes(userEmail) || hasShopRole)) && (
                           <Link to="/artisan-dashboard" onClick={() => setShowProfileDropdown(false)} className="block w-full text-left px-4 py-2.5 text-[0.9rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Shop Dashboard</Link>
                         )}
@@ -281,41 +296,26 @@ export default function Navbar() {
                         <hr className="border-0 border-t border-cream-secondary my-1.5" />
                         <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-[0.9rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Sign Out</button>
                       </div>
-                    )}
                   </div>
-                ) : (
-                  <div className="user-profile relative cursor-pointer group">
-                    <div className="w-[46px] h-[46px] rounded-full bg-[#D9D9D9] border-2 border-cream-tertiary overflow-hidden transition-all hover:border-accent hover:scale-105">
-                      {userAvatar ? (
-                        <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-primary text-white flex items-center justify-center text-sm font-bold">
-                          {(userEmail || 'U').charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute top-full right-0 mt-2.5 bg-white rounded-[10px] shadow-[var(--shadow-lg)] w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all translate-y-2 group-hover:translate-y-0 border border-black/5 py-2 z-50">
-                      {(userEmail && (SHOP_EMAILS.includes(userEmail) || hasShopRole)) && (
-                        <Link to="/artisan-dashboard" className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Shop Dashboard</Link>
-                      )}
-                      <Link to="/dashboard?tab=account" className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">My Account</Link>
-                      <Link to="/dashboard?tab=purchases" className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">My Purchase</Link>
-                      <hr className="border-0 border-t border-cream-secondary my-1.5" />
-                      <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-[0.95rem] font-medium text-brown-dark hover:bg-cream-secondary hover:text-accent">Sign Out</button>
-                    </div>
-                  </div>
+
                 )}
               </>
             ) : (
-              <button onClick={() => setAuthOpen(true)}
+              <button onClick={() => { setAuthOpen(true); setShowNavigation(false); }}
                 className="bg-primary text-white font-semibold px-4 py-2 rounded-[10px] shadow-[var(--shadow-sm)] hover:bg-accent hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] transition-all"
                 style={{ fontSize: isMobile ? '0.8rem' : '1rem' }}>
                 SIGN IN
               </button>
             )}
+            {isTablet && <button ref={menuButtonRef} type="button" className="navbar-menu-button" aria-label="Navigation menu" aria-expanded={showNavigation} aria-controls="navbar-tablet-panel" onClick={() => { setShowNavigation(current => !current); setShowProfileDropdown(false); setShowNotifications(false); }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={showNavigation ? 'M6 6l12 12M6 18L18 6' : 'M3 6h18M3 12h18M3 18h18'} /></svg>
+            </button>}
           </div>
         </div>
       )}
+      {isTablet && !isArtisanDashboard && <nav ref={navigationRef} id="navbar-tablet-panel" aria-label="Tablet navigation menu" className="navbar-tablet-panel" hidden={!showNavigation}>
+        {links.map(link => <Link key={link.to} to={link.to} aria-current={isActive(link.to) ? 'page' : undefined} onClick={() => setShowNavigation(false)}>{link.label}</Link>)}
+      </nav>}
 
       {authOpen && createPortal(
         <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onAuthChange={handleAuthChange} initialView={authView} />,

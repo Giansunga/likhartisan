@@ -1,0 +1,127 @@
+.navbar-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding-inline: 32px;
+}
+
+.navbar-desktop-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: clamp(20px, calc(10vw - 100px), 36px);
+  white-space: nowrap;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar-profile-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.navbar-profile-panel {
+  max-height: calc(100dvh - var(--nav-height) - 24px);
+  overflow-y: auto;
+}
+
+.navbar-profile-panel a,
+.navbar-profile-panel button {
+  min-height: 44px;
+}
+
+.navbar-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+}
+
+.navbar-tablet-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: calc(100dvh - var(--nav-height));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 24px;
+  background: white;
+  border-top: 1px solid #e8e0d8;
+  box-shadow: var(--shadow-md);
+}
+
+.navbar-tablet-panel a {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding-inline: 16px;
+  color: var(--text-dark);
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.navbar-tablet-panel a[aria-current="page"],
+.navbar-tablet-panel a:hover {
+  color: var(--primary-color);
+  background: var(--bg-secondary);
+}
+
+#main-navbar button:focus-visible,
+#main-navbar a:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+}
+
+@media (min-width: 769px) and (max-width: 1199px) {
+  .navbar-layout {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+    padding-inline: 24px;
+  }
+
+  .navbar-actions {
+    gap: 8px;
+  }
+
+  .navbar-actions > button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-layout {
+    display: flex;
+    justify-content: space-between;
+    gap: 0;
+    padding-inline: 16px;
+  }
+
+  .navbar-actions {
+    gap: 4px;
+  }
+
+  .navbar-profile-button {
+    min-width: 34px;
+    min-height: 34px;
+  }
+}
