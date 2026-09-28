@@ -32,6 +32,7 @@ export default function GalleryPage() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
+  const [variationAvailability, setVariationAvailability] = useState<Record<string, boolean>>({});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
   const [search, setSearch] = useState('');
@@ -129,21 +130,25 @@ export default function GalleryPage() {
 
           const productIds = products.map(p => p.id);
           if (productIds.length > 0) {
-            const { data: varData } = await supabase
+            const { data: varData, error: variationError } = await supabase
               .from('product_variations')
-              .select('product_id, price')
-              .in('product_id', productIds)
-              .not('price', 'is', null);
+              .select('product_id, price, stock')
+              .in('product_id', productIds);
 
-            if (varData) {
+            if (!variationError && varData) {
               const prices: Record<string, number> = {};
+              const availability: Record<string, boolean> = {};
               for (const v of varData) {
+                if (!(v.product_id in availability)) availability[v.product_id] = false;
+                if (!(Number(v.stock) > 0)) continue;
+                availability[v.product_id] = true;
                 const price = Number(v.price);
                 if (price > 0 && (!prices[v.product_id] || price < prices[v.product_id])) {
                   prices[v.product_id] = price;
                 }
               }
               setVariantPrices(prices);
+              setVariationAvailability(availability);
             }
 
             const { data: revData } = await supabase
@@ -540,7 +545,11 @@ export default function GalleryPage() {
                       <span className="product-card-shop">{p.shopName}</span>
                     </div>
                     <div className="product-card-footer">
-                      <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
+                      {(variationAvailability[p.id] ?? (p.stock > 0)) ? (
+                        <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
+                      ) : (
+                        <div className="product-card-out-of-stock">Out of stock</div>
+                      )}
                     </div>
                   </div>
                 </Link>
