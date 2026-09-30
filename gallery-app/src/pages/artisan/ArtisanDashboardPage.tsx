@@ -1430,26 +1430,22 @@ export function OrdersPanel({ shopId, shopName, loadingOrders, setLoadingOrders 
 
   async function updateDeliveryStatus(orderId: string, newStatus: string) {
     setUpdateError('');
-    const updates: Record<string, string> = {};
-    if (newStatus === 'cancelled') {
-      updates.status = 'cancelled';
-      updates.delivery_status = 'cancelled';
-    } else {
-      updates.delivery_status = newStatus;
-      if (newStatus === 'completed') updates.status = 'completed';
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      const token = authData.session?.access_token;
+      if (!token) throw new Error('Please sign in again to update this order.');
+      const response = await fetch(`${API_BASE}/api/orders/${orderId}/seller-delivery-status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Order update failed.');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...result.order } : o));
+      if (!result.notificationSent) toast.error('Order updated but notification failed to send');
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Order update failed.');
     }
-    const { error } = await supabase
-      .from('orders')
-      .update(updates)
-      .eq('id', orderId);
-    if (error) { setUpdateError('Failed: ' + error.message); return; }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...(newStatus === 'cancelled' ? { status: 'cancelled', delivery_status: 'cancelled' } : { delivery_status: newStatus, ...(newStatus === 'completed' ? { status: 'completed' } : {}) }) } : o));
-
-    // Create notification for buyer (non-blocking, toast on failure)
-    createBuyerNotification(orderId, newStatus).catch(err => {
-      console.error('Failed to create notification:', err);
-      toast.error('Order updated but notification failed to send');
-    });
   }
 
   async function advanceDeliveryStatus(order: { id: string; order_type?: string }, newStatus: string) {
@@ -2504,31 +2500,6 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
       </div>
     </div>
   );
-}
-
-async function createBuyerNotification(orderId: string, status: string) {
-  const { data: order } = await supabase.from('orders').select('user_id, items, id').eq('id', orderId).single();
-  if (!order || !order.user_id) return;
-  const firstItem = (order.items || [])[0] || {};
-  const productImage = firstItem.image || '';
-  const notifications: Record<string, { title: string; message: string }> = {
-    preparing: { title: 'Order is Being Prepared', message: `Your order #${orderId.slice(-6)} is being prepared by the seller.` },
-    shipped: { title: 'Shipped Out', message: `Your order #${orderId.slice(-6)} has been shipped out by the seller.` },
-    delivered: { title: 'Received Order?', message: `Your order #${orderId.slice(-6)} has been delivered. Please confirm receipt.` },
-    completed: { title: 'Your Order is Completed', message: `Your order #${orderId.slice(-6)} has been completed. Thank you!` },
-    cancelled: { title: 'Order Cancelled', message: `Your order #${orderId.slice(-6)} has been cancelled by the seller.` },
-  };
-  const notif = notifications[status];
-  if (!notif) return;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const { data: authData } = await supabase.auth.getSession();
-  const token = authData.session?.access_token;
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}/api/notifications`, {
-    method: 'POST', headers, credentials: 'include',
-    body: JSON.stringify({ user_id: order.user_id, type: status, title: notif.title, message: notif.message, order_id: orderId, product_image: productImage }),
-  });
-  if (!res.ok) throw new Error(`Notification failed: ${res.status}`);
 }
 
 export function NotificationsPanel({ userId }: { userId: string }) {

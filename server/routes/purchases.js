@@ -4,6 +4,7 @@ import {
   presignReturnEvidence, receiveBuyerOrder, reorderPlan, reviewReturnRequest,
   submitReturnRequest,
 } from '../services/purchaseService.js';
+import { updateSellerOrderStatus } from '../services/sellerOrderService.js';
 
 function errorResponse(res, error) {
   const status = Number(error?.status) || 500;
@@ -14,6 +15,8 @@ function errorResponse(res, error) {
     RETURN_NOT_ELIGIBLE: 'This order is outside the return window', RETURN_EXISTS: 'This order already has an active return request',
     EVIDENCE_REQUIRED: 'Add at least one supporting image', EVIDENCE_LIMIT: 'A maximum of three images is allowed',
     RETURN_NOT_FOUND: 'Return request not found',
+    INVALID_DELIVERY_STATUS: 'Invalid delivery status', CUSTOM_ORDER_WORKFLOW: 'Use the custom order workflow',
+    ORDER_SHOP_ACCESS_DENIED: 'You cannot update a multi-shop order for another seller',
   };
   if (status >= 500) console.error('Purchases API error:', error);
   res.status(status).json({ error: messages[code] || (status >= 500 ? 'Purchase service is temporarily unavailable' : 'Invalid request'), code });
@@ -44,6 +47,10 @@ export function createPurchasesRouter({ supabase, verifyAuth, requireSuperAdmin 
   });
   router.post('/:orderId/receive', async (req, res) => {
     try { res.json(await receiveBuyerOrder(supabase, req.params.orderId, req.verifiedUserId)); }
+    catch (error) { errorResponse(res, error); }
+  });
+  router.patch('/:orderId/seller-delivery-status', async (req, res) => {
+    try { res.json(await updateSellerOrderStatus(supabase, req.params.orderId, req.verifiedUserId, req.body?.status)); }
     catch (error) { errorResponse(res, error); }
   });
   router.post('/:orderId/reorder-plan', async (req, res) => {
