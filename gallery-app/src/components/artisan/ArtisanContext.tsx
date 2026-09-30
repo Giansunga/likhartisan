@@ -7,6 +7,7 @@ import { normalizeProductCategory } from '../../lib/utils';
 import type { ArtisanProduct, ArtisanShop } from '../../types/artisan';
 import { PortalRealtimeProvider } from '../../realtime/PortalRealtimeProvider';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { listenToBuyerPresence } from '../../realtime/buyerPresence';
 import { ArtisanContext, useArtisanPortal, type ArtisanContextValue } from './artisanContextValue';
 
 function ArtisanRealtimeBridge({ refreshProducts }: { refreshProducts: () => Promise<void> }) {
@@ -129,18 +130,7 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
   }, [shop?.id]);
 
   useEffect(() => {
-    const channel = supabase.channel('buyers-online')
-      .on('presence', { event: 'sync' }, () => {
-        const next: Record<string, boolean> = {};
-        for (const presences of Object.values(channel.presenceState())) {
-          for (const presence of presences as Array<{ user_id?: string }>) {
-            if (presence.user_id) next[presence.user_id] = true;
-          }
-        }
-        setBuyerActiveMap(next);
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return listenToBuyerPresence(setBuyerActiveMap);
   }, []);
 
   const value = useMemo<ArtisanContextValue | null>(() => shop && user ? ({

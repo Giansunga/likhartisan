@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { trackBuyerPresence } from '../realtime/buyerPresence';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
 import { FALLBACK_BUYER_NAME } from '../lib/constants';
@@ -371,15 +372,7 @@ export default function ChatPage() {
   // Track buyer presence (auto-detects join/leave)
   useEffect(() => {
     if (!userId) return;
-    const buyerChannel = supabase.channel('buyers-online', {
-      config: { presence: { key: userId } }
-    });
-    buyerChannel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await buyerChannel.track({ user_id: userId, online_at: new Date().toISOString() });
-      }
-    });
-    return () => { supabase.removeChannel(buyerChannel); };
+    return trackBuyerPresence(userId);
   }, [userId]);
 
   function broadcastTyping() {

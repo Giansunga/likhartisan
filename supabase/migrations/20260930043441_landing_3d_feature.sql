@@ -27,3 +27,5 @@ create policy "Admins can update the landing 3D feature"
   to authenticated
   using ((select public.is_admin()))
   with check ((select public.is_admin()));
+
+notify pgrst, 'reload schema';
