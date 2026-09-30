@@ -1,6 +1,6 @@
 begin;
 
-select plan(19);
+select plan(20);
 
 select has_table('public', 'design_request_revisions', 'revision snapshots table exists');
 select has_table('public', 'design_request_events', 'workflow events table exists');
@@ -10,6 +10,7 @@ select has_index('public', 'design_request_events', 'idx_design_request_events_r
 
 select has_function('public', 'revise_design_request', array['uuid', 'uuid', 'jsonb', 'integer', 'text'], 'buyer revision RPC exists');
 select has_function('public', 'advance_custom_order', array['uuid', 'text'], 'custom production RPC exists');
+select has_column('public', 'orders', 'updated_at', 'custom production RPC can update the order timestamp');
 select function_privs_are(
   'public', 'revise_design_request', array['uuid', 'uuid', 'jsonb', 'integer', 'text'],
   'authenticated', array['EXECUTE'], 'only authenticated buyers can invoke revision RPC'

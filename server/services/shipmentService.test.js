@@ -2,14 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calculateShipment,
+  createShipmentLine,
   createShipmentFingerprint,
   getShipmentConfig,
+  parsePackedDimensionsInches,
   resolveShippingWeightGrams,
   ShipmentDataError,
   SHIPPING_DEFAULTS,
   VEHICLE_GUIDE,
 } from './shipmentService.js';
 import { getPublishedVehiclePricing, LALAMOVE_RATE_CARDS } from './lalamovePricing.js';
+import { loadAuthoritativeItems } from '../controllers/lalamoveController.js';
 
 const vehicles = [
   { serviceType: 'BIKE', label: 'Bike', maxL: 50, maxW: 40, maxH: 50, maxKg: 20 },
@@ -41,6 +44,17 @@ test('uses the existing variation kg weight when shipping grams are not populate
   }]);
 
   assert.equal(shipment.totalWeightG, 13600);
+});
+
+test('honors explicit inch units even when a variation has legacy centimeter metadata', () => {
+  const product = { id: 'p1', name: 'Cylinder vase' };
+  const variation = {
+    id: 'v1', dimensions: '11 in x  7.5 in', height: '11 in',
+    measurement_unit: 'cm', weight_kg: '3.100',
+  };
+  const line = createShipmentLine(product, variation, 1);
+  assert.deepEqual(parsePackedDimensionsInches(line), [11, 7.5, 11]);
+  assert.deepEqual(parsePackedDimensionsInches({ dimensions: '28 x 19', height: '25', measurement_unit: 'cm' }), [28 / 2.54, 19 / 2.54, 25 / 2.54]);
 });
 
 test('accepts rotated packages without hidden packing inflation', () => {
@@ -96,4 +110,43 @@ test('fingerprint changes when quantity or route changes', () => {
   const base = { items: [item()], shipment, pickupCoords: { lat: 15, lng: 120 }, dropoffCoords: { lat: 15.1, lng: 120.1 } };
   assert.notEqual(createShipmentFingerprint(base), createShipmentFingerprint({ ...base, items: [item({ quantity: 3 })] }));
   assert.notEqual(createShipmentFingerprint(base), createShipmentFingerprint({ ...base, dropoffCoords: { lat: 15.2, lng: 120.2 } }));
+  assert.notEqual(createShipmentFingerprint(base), createShipmentFingerprint({ ...base, pickupCoords: { lat: 15.2, lng: 120 } }));
+  assert.notEqual(createShipmentFingerprint(base), createShipmentFingerprint({ ...base, items: [item({ shipping_length_in: 9 })] }));
+});
+
+test('quote and checkout fingerprint the same raw catalog measurements, including a variation', async () => {
+  const product = {
+    id: 'p1', name: 'Vase', shop_id: 'shop1', dimensions: '28 x 19', height: '25',
+    measurement_unit: 'cm', product_weight_g: 3100,
+  };
+  const variation = {
+    id: 'v1', product_id: 'p1', dimensions: '11 in x  7.5 in', height: '11 in',
+    measurement_unit: 'cm', weight_kg: 3.5,
+  };
+  const req = { app: { locals: { supabase: {
+    from(table) {
+      return {
+        select() { return this; },
+        async in() { return { data: table === 'products' ? [product] : [variation], error: null }; },
+      };
+    },
+  } } } };
+  const requested = [
+    { productId: 'p1', quantity: 1 },
+    { productId: 'p1', variationId: 'v1', quantity: 2 },
+  ];
+  const { lines: quoteLines } = await loadAuthoritativeItems(req, requested);
+  const checkoutLines = [createShipmentLine(product, null, 1), createShipmentLine(product, variation, 2)];
+  const route = { pickupCoords: { lat: 15, lng: 120 }, dropoffCoords: { lat: 15.1, lng: 120.1 }, serviceType: 'MOTORCYCLE' };
+  assert.deepEqual(quoteLines, checkoutLines);
+  assert.equal(quoteLines[0].dimensions, '28 x 19');
+  assert.equal(quoteLines[1].dimensions, '11 in x  7.5 in');
+  assert.equal(
+    createShipmentFingerprint({ items: quoteLines, shipment: calculateShipment(quoteLines), ...route }),
+    createShipmentFingerprint({ items: checkoutLines, shipment: calculateShipment(checkoutLines), ...route }),
+  );
+  assert.notEqual(
+    createShipmentFingerprint({ items: quoteLines, shipment: calculateShipment(quoteLines), ...route }),
+    createShipmentFingerprint({ items: [quoteLines[0], createShipmentLine(product, { ...variation, dimensions: '12 in x 7.5 in' }, 2)], shipment: calculateShipment(quoteLines), ...route }),
+  );
 });

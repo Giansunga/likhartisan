@@ -114,7 +114,8 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_verification_source TEXT,
   payment_verified_at TIMESTAMP WITH TIME ZONE,
   lalamove_quote_id TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- Recreate CHECK constraints safely

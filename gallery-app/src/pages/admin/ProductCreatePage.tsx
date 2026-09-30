@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { uploadToR2 } from '../../lib/r2';
@@ -6,6 +6,7 @@ import { recomputeProductStock } from '../../lib/stockSync';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
 import { kgToGrams, positiveInches } from '../../lib/shipping';
+import './product-create.css';
 
 const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Decorative Pieces', 'Plates', 'Others'];
 
@@ -16,6 +17,8 @@ interface Shop {
 }
 
 interface VariationDraft {
+  id: number;
+  shippingOpen: boolean;
   dimensions: string;
   height: string;
   openingDiameter: string;
@@ -26,6 +29,29 @@ interface VariationDraft {
   shippingHeightIn: string;
   price: string;
   stock: string;
+}
+
+function newVariation(id: number): VariationDraft {
+  return { id, shippingOpen: false, dimensions: '', height: '', openingDiameter: '', weightKg: '', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '', stock: '' };
+}
+
+function hasCompletePackedDimensions(variation: VariationDraft): boolean {
+  return positiveInches(variation.shippingLengthIn) !== null
+    && positiveInches(variation.shippingWidthIn) !== null
+    && positiveInches(variation.shippingHeightIn) !== null;
+}
+
+function hasInvalidShippingDetails(variation: VariationDraft): boolean {
+  const packedValues = [variation.shippingLengthIn, variation.shippingWidthIn, variation.shippingHeightIn];
+  return (packedValues.some(value => value.trim() !== '') && !hasCompletePackedDimensions(variation))
+    || (variation.packagingWeightKg.trim() !== '' && kgToGrams(variation.packagingWeightKg) === null);
+}
+
+function hasValidVariation(variation: VariationDraft): boolean {
+  const hasCatalogDimensions = /\d/.test(variation.dimensions) && /\d/.test(variation.height);
+  return (kgToGrams(variation.weightKg) || 0) > 0
+    && (hasCatalogDimensions || hasCompletePackedDimensions(variation))
+    && !hasInvalidShippingDetails(variation);
 }
 
 const inputStyle: React.CSSProperties = {
@@ -66,13 +92,14 @@ const varLabelStyle: React.CSSProperties = {
 
 export default function ProductCreatePage() {
   const navigate = useNavigate();
+  const nextVariationId = useRef(1);
   const [shops, setShops] = useState<Shop[]>([]);
   const [form, setForm] = useState({
     name: '', category: '',
     materials: '', technique: '', shopId: '',
     productWeightKg: '', packagingWeightKg: '', packedLengthIn: '', packedWidthIn: '', packedHeightIn: '',
   });
-  const [variations, setVariations] = useState<VariationDraft[]>([]);
+  const [variations, setVariations] = useState<VariationDraft[]>([newVariation(0)]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [glbFile, setGlbFile] = useState<File | null>(null);
@@ -117,7 +144,7 @@ export default function ProductCreatePage() {
   };
 
   function addVariation() {
-    setVariations(prev => [...prev, { dimensions: '', height: '', openingDiameter: '', weightKg: '', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '', stock: '' }]);
+    setVariations(prev => [...prev, newVariation(nextVariationId.current++)]);
   }
 
   function updateVariation(index: number, field: keyof VariationDraft, value: string) {
@@ -126,6 +153,10 @@ export default function ProductCreatePage() {
 
   function removeVariation(index: number) {
     setVariations(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function toggleShippingDetails(index: number) {
+    setVariations(prev => prev.map((variation, i) => i === index ? { ...variation, shippingOpen: !variation.shippingOpen } : variation));
   }
 
   async function uploadFile(file: File): Promise<string> {
@@ -143,15 +174,11 @@ export default function ProductCreatePage() {
     setSubmitError('');
 
     try {
-      const hasCatalogDimensions = (dimensions: string, height: string) => /\d/.test(dimensions) && /\d/.test(height);
-      const hasExplicitDimensions = (variation: VariationDraft) => positiveInches(variation.shippingLengthIn) !== null
-        && positiveInches(variation.shippingWidthIn) !== null
-        && positiveInches(variation.shippingHeightIn) !== null;
-      const validVariation = (variation: VariationDraft) => (
-        (kgToGrams(variation.weightKg) || 0) > 0
-        && (hasCatalogDimensions(variation.dimensions, variation.height) || hasExplicitDimensions(variation))
-      );
-      if (variations.length > 0 && variations.some((variation) => !validVariation(variation))) {
+      if (variations.some(hasInvalidShippingDetails)) {
+        setVariations(prev => prev.map(variation => hasInvalidShippingDetails(variation) ? { ...variation, shippingOpen: true } : variation));
+        throw new Error('Enter all three packed dimensions with positive values, or leave them all blank.');
+      }
+      if (variations.some((variation) => !hasValidVariation(variation))) {
         throw new Error('Every variation needs product weight plus length, width, and height.');
       }
       const imageUrl = imageFile ? await uploadFile(imageFile) : '/placeholder.svg';
@@ -226,17 +253,10 @@ export default function ProductCreatePage() {
     }
   };
 
-  const hasVariationShipping = variations.length > 0 && variations.every((variation) => (
-    (kgToGrams(variation.weightKg) || 0) > 0
-    && ((/\d/.test(variation.dimensions) && /\d/.test(variation.height))
-      || (positiveInches(variation.shippingLengthIn) !== null
-        && positiveInches(variation.shippingWidthIn) !== null
-        && positiveInches(variation.shippingHeightIn) !== null))
-  ));
-  const isValid = Boolean(form.name && form.category && form.shopId && (variations.length === 0 || hasVariationShipping));
+  const isValid = Boolean(form.name && form.category && form.shopId && variations.every(hasValidVariation));
 
   return (
-    <div>
+    <div className="product-create-page">
 
       {submitted ? (
         <div style={{
@@ -255,7 +275,7 @@ export default function ProductCreatePage() {
           {/* Section: Product Information */}
           <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E8E0D8', padding: '28px 32px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
             <h3 style={sectionHeaderStyle}>Product Information</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="product-create-info-grid">
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Product Name</label>
                 <input name="name" value={form.name} onChange={handleChange} required placeholder="e.g. Ancient Vase"
@@ -300,7 +320,7 @@ export default function ProductCreatePage() {
             {variations.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
                 {variations.map((v, i) => (
-                  <div key={i} style={{
+                  <div key={v.id} style={{
                     border: '1.5px solid #E8E0D8', borderRadius: '12px', padding: '16px',
                     background: '#FAF8F5', position: 'relative',
                   }}>
@@ -319,7 +339,7 @@ export default function ProductCreatePage() {
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#E8E0D8'; e.currentTarget.style.background = 'none'; }}
                       >Remove</button>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                    <div className="product-create-variation-grid">
                       <div>
                         <label style={varLabelStyle}>Dimensions</label>
                         <input value={v.dimensions} onChange={e => updateVariation(i, 'dimensions', e.target.value)} placeholder="e.g. 6 in × 4 in"
@@ -336,25 +356,10 @@ export default function ProductCreatePage() {
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                    <div className="product-create-variation-grid product-create-variation-grid--second">
                       <div>
                         <label style={varLabelStyle}>Product weight (kg)</label>
                         <input type="number" min="0" step="0.001" value={v.weightKg} onChange={e => updateVariation(i, 'weightKg', e.target.value)} placeholder="e.g. 1.5"
-                          style={varInputStyle} {...varInputFocusProps} />
-                      </div>
-                      <div>
-                        <label style={varLabelStyle}>Length (in)</label>
-                        <input type="number" min="0.01" step="0.01" value={v.shippingLengthIn} onChange={e => updateVariation(i, 'shippingLengthIn', e.target.value)} placeholder="Length"
-                          style={varInputStyle} {...varInputFocusProps} />
-                      </div>
-                      <div>
-                        <label style={varLabelStyle}>Width (in)</label>
-                        <input type="number" min="0.01" step="0.01" value={v.shippingWidthIn} onChange={e => updateVariation(i, 'shippingWidthIn', e.target.value)} placeholder="Width"
-                          style={varInputStyle} {...varInputFocusProps} />
-                      </div>
-                      <div>
-                        <label style={varLabelStyle}>Height (in)</label>
-                        <input type="number" min="0.01" step="0.01" value={v.shippingHeightIn} onChange={e => updateVariation(i, 'shippingHeightIn', e.target.value)} placeholder="Height"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                       <div>
@@ -367,6 +372,23 @@ export default function ProductCreatePage() {
                         <input type="number" value={v.stock} onChange={e => updateVariation(i, 'stock', e.target.value)} placeholder="0"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
+                    </div>
+                    <div className="product-create-shipping">
+                      <button type="button" className="product-create-shipping-toggle" aria-expanded={v.shippingOpen || hasInvalidShippingDetails(v)} aria-controls={`product-create-shipping-${v.id}`} onClick={() => toggleShippingDetails(i)}>
+                        Shipping details <span aria-hidden="true">{v.shippingOpen || hasInvalidShippingDetails(v) ? '−' : '+'}</span>
+                      </button>
+                      {(v.shippingOpen || hasInvalidShippingDetails(v)) && (
+                        <div id={`product-create-shipping-${v.id}`}>
+                          <p>Packed dimensions are optional when the dimensions and height above are filled in.</p>
+                          <div className="product-create-shipping-grid">
+                            <div><label style={varLabelStyle}>Packaging weight (kg)</label><input type="number" min="0" step="0.001" value={v.packagingWeightKg} onChange={e => updateVariation(i, 'packagingWeightKg', e.target.value)} placeholder="Optional" style={varInputStyle} {...varInputFocusProps} /></div>
+                            <div><label style={varLabelStyle}>Packed length (in)</label><input type="number" min="0.01" step="0.01" value={v.shippingLengthIn} onChange={e => updateVariation(i, 'shippingLengthIn', e.target.value)} placeholder="Length" style={varInputStyle} {...varInputFocusProps} /></div>
+                            <div><label style={varLabelStyle}>Packed width (in)</label><input type="number" min="0.01" step="0.01" value={v.shippingWidthIn} onChange={e => updateVariation(i, 'shippingWidthIn', e.target.value)} placeholder="Width" style={varInputStyle} {...varInputFocusProps} /></div>
+                            <div><label style={varLabelStyle}>Packed height (in)</label><input type="number" min="0.01" step="0.01" value={v.shippingHeightIn} onChange={e => updateVariation(i, 'shippingHeightIn', e.target.value)} placeholder="Height" style={varInputStyle} {...varInputFocusProps} /></div>
+                          </div>
+                          {hasInvalidShippingDetails(v) && <p className="product-create-shipping-error" role="alert">Enter all three packed dimensions with positive values, or leave them all blank. Packaging weight cannot be negative.</p>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -394,7 +416,7 @@ export default function ProductCreatePage() {
           {/* Section: Media Upload */}
           <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E8E0D8', padding: '28px 32px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
             <h3 style={sectionHeaderStyle}>Media Upload</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div className="product-create-media-grid">
               <div>
                 <label style={labelStyle}>Product Image</label>
                 <label style={{

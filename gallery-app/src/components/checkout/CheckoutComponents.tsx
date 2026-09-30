@@ -290,6 +290,7 @@ interface OrderReviewProps {
   hasCourierQuote: boolean;
   placing: boolean;
   disabledReason: string | null;
+  notice?: string | null;
   onPlaceOrder: () => void;
 }
 
@@ -303,6 +304,7 @@ export function OrderReview({
   hasCourierQuote,
   placing,
   disabledReason,
+  notice,
   onPlaceOrder,
 }: OrderReviewProps) {
   const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
@@ -344,6 +346,7 @@ export function OrderReview({
         </div>
         <div className="checkout-totals__grand"><dt>Total</dt><dd>{fmt(total)}</dd></div>
       </dl>
+      {notice ? <div className="checkout-notice checkout-notice--attention" role="status">{notice}</div> : null}
       <div className="checkout-review__action">
         <button type="button" className="checkout-pay-button" disabled={disabled} onClick={onPlaceOrder}>
           {placing ? <><LoaderCircle className="checkout-spin" size={18} aria-hidden="true" /> Preparing payment…</> : <><CreditCard size={18} aria-hidden="true" /> Continue to secure payment</>}

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
 import { API_BASE } from '../lib/api';
+import { checkoutQuoteKey } from '../lib/checkoutQuote';
 import type { CartCheckoutDraft, CartItem } from '../types';
 import {
   getCartLineKey,
@@ -41,6 +42,7 @@ interface Coordinates {
 }
 
 interface LalamoveQuote {
+  requestKey?: string;
   quotationId?: string;
   serviceType?: string;
   expiresAt?: string;
@@ -116,6 +118,8 @@ export default function CheckoutPage() {
   const [lalamoveQuote, setLalamoveQuote] = useState<LalamoveQuote | null>(null);
   const [lalamoveLoading, setLalamoveLoading] = useState(false);
   const [lalamoveError, setLalamoveError] = useState<string | null>(null);
+  const [checkoutNotice, setCheckoutNotice] = useState<{ key: string; message: string } | null>(null);
+  const [quoteRefreshToken, setQuoteRefreshToken] = useState(0);
   const [pickupReady, setPickupReady] = useState(false);
   const [shopAddress, setShopAddress] = useState(DEFAULT_PICKUP_ADDRESS);
   const [storedPickupCoordinates, setStoredPickupCoordinates] = useState<Coordinates | null>(null);
@@ -131,22 +135,25 @@ export default function CheckoutPage() {
 
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.qty, 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.price * item.qty, 0), [items]);
+  const currentQuoteKey = checkoutQuoteKey(items, shopAddress, userAddress, mapCoords.pickup, mapCoords.dropoff);
   const quoteExpiryMs = lalamoveQuote?.expiresAt ? Date.parse(lalamoveQuote.expiresAt) : Number.NaN;
   const quoteExpired = Boolean(lalamoveQuote?.expiresAt && Number.isFinite(quoteExpiryMs) && quoteExpiryMs <= currentTime);
   const hasValidCourierQuote = deliveryOption === 'courier'
     && Boolean(lalamoveQuote?.quotationId)
+    && lalamoveQuote?.requestKey === currentQuoteKey
     && Number(lalamoveQuote?.priceBreakdown?.total) > 0
     && !quoteExpired;
   const shippingFee = hasValidCourierQuote
     ? Number(lalamoveQuote?.priceBreakdown?.total) || 0
     : 0;
   const total = subtotal + shippingFee;
-  const quoteDistanceKm = lalamoveQuote?.distanceMeters != null
+  const quoteDistanceKm = !hasValidCourierQuote ? null : lalamoveQuote?.distanceMeters != null
     ? (Number(lalamoveQuote.distanceMeters) / 1000).toFixed(1)
     : lalamoveQuote?.distance?.value
       ? (Number(lalamoveQuote.distance.value) / 1000).toFixed(1)
     : null;
-  const quoteShipment = lalamoveQuote?.shipment;
+  const quoteShipment = hasValidCourierQuote ? lalamoveQuote?.shipment : null;
+  const visibleCheckoutNotice = checkoutNotice?.key === currentQuoteKey ? checkoutNotice.message : null;
 
   const fetchLalamoveQuote = useCallback(async (
     pickup: string,
@@ -157,6 +164,7 @@ export default function CheckoutPage() {
     const sequence = ++quoteRequestSequence.current;
     quoteAbortController.current?.abort();
     quoteAbortController.current = null;
+    setLalamoveQuote(null);
 
     const validPickup = validCoordinates(pickupCoordinates);
     const validDropoff = validCoordinates(confirmedDropoffCoordinates);
@@ -211,7 +219,7 @@ export default function CheckoutPage() {
       }
       if (sequence !== quoteRequestSequence.current) return;
 
-      setLalamoveQuote(data as LalamoveQuote);
+      setLalamoveQuote({ ...data, requestKey: checkoutQuoteKey(items, pickup, dropoff, validPickup, dropoffCoordinates) } as LalamoveQuote);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
       if (sequence !== quoteRequestSequence.current) return;
@@ -288,6 +296,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (storedPickupCoordinates) {
       // Prefer stored artisan coordinates when the shop record provides them.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMapCoords(current => ({ ...current, pickup: storedPickupCoordinates }));
       setPickupReady(true);
       return;
@@ -315,26 +324,23 @@ export default function CheckoutPage() {
   }, [isLoaded, shopAddress, storedPickupCoordinates]);
 
   useEffect(() => {
+    quoteAbortController.current?.abort();
+    quoteAbortController.current = null;
+    quoteRequestSequence.current += 1;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLalamoveQuote(null);
     if (deliveryOption !== 'courier') {
-      quoteAbortController.current?.abort();
-      quoteAbortController.current = null;
-      quoteRequestSequence.current += 1;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLalamoveQuote(null);
       setLalamoveError(null);
       setLalamoveLoading(false);
       return;
     }
     if (!isLoaded || !pickupReady || userAddress.trim().length < 5 || !validCoordinates(mapCoords.pickup)) {
-      quoteAbortController.current?.abort();
-      quoteAbortController.current = null;
-      quoteRequestSequence.current += 1;
-      setLalamoveQuote(null);
       setLalamoveError(null);
       setLalamoveLoading(false);
       return;
     }
 
+    setLalamoveLoading(true);
     const timer = window.setTimeout(() => {
       void fetchLalamoveQuote(
         shopAddress,
@@ -344,7 +350,7 @@ export default function CheckoutPage() {
       );
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.dropoff, mapCoords.pickup, pickupReady, shopAddress, userAddress]);
+  }, [currentQuoteKey, deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.dropoff, mapCoords.pickup, pickupReady, quoteRefreshToken, shopAddress, userAddress]);
 
   useEffect(() => {
     if (deliveryOption !== 'courier' || !lalamoveQuote?.expiresAt || !hasValidCourierQuote) return;
@@ -481,6 +487,7 @@ export default function CheckoutPage() {
     }
 
     setPlacing(true);
+    setCheckoutNotice(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before continuing to payment.');
@@ -507,10 +514,23 @@ export default function CheckoutPage() {
           pickupCoords: mapCoords.pickup,
           dropoffCoords: mapCoords.dropoff,
           shipmentFingerprint: lalamoveQuote?.shipment?.fingerprint || null,
+          quotedShippingFeeCentavos: deliveryOption === 'courier' ? Math.round(shippingFee * 100) : null,
           shopAddress,
         }),
       });
       const data = await response.json();
+      if (response.status === 409 && (data.code === 'ERR_STALE_SHIPMENT' || data.code === 'ERR_COURIER_FEE_CHANGED')) {
+        setCheckoutNotice({
+          key: currentQuoteKey,
+          message: data.code === 'ERR_COURIER_FEE_CHANGED'
+            ? 'The courier fee changed. Review the updated delivery fee and total, then continue to payment again.'
+            : 'Your order or delivery route changed. We are refreshing the courier fee; review it before continuing.',
+        });
+        setLalamoveQuote(null);
+        setLalamoveLoading(true);
+        setQuoteRefreshToken(current => current + 1);
+        return;
+      }
       if (!response.ok) throw new Error(data.error?.message || data.error || 'Payment could not be prepared');
 
       if (!data.orderId) throw new Error('Payment order was not created. Please try again.');
@@ -522,6 +542,7 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error(error instanceof Error ? error.message : 'An error occurred. Please try again.');
+    } finally {
       setPlacing(false);
     }
   }
@@ -613,6 +634,7 @@ export default function CheckoutPage() {
               hasCourierQuote={hasValidCourierQuote}
               placing={placing}
               disabledReason={disabledReason}
+              notice={visibleCheckoutNotice}
               onPlaceOrder={() => void handlePlaceOrder()}
             />
           </div>

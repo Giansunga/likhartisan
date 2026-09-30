@@ -1,0 +1,89 @@
+.product-create-page .product-create-info-grid,
+.product-create-page .product-create-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.product-create-page .product-create-media-grid {
+  gap: 20px;
+}
+
+.product-create-page .product-create-variation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.product-create-page .product-create-variation-grid--second {
+  margin-top: 12px;
+}
+
+.product-create-page .product-create-info-grid > *,
+.product-create-page .product-create-media-grid > *,
+.product-create-page .product-create-variation-grid > *,
+.product-create-page .product-create-shipping-grid > * {
+  min-width: 0;
+}
+
+.product-create-shipping {
+  margin-top: 14px;
+  border-top: 1px solid #e8e0d8;
+  padding-top: 12px;
+}
+
+.product-create-shipping-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: #823e0b;
+  font-size: .82rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.product-create-shipping-toggle:focus-visible {
+  outline: 2px solid #823e0b;
+  outline-offset: 3px;
+}
+
+.product-create-shipping-toggle span {
+  font-size: 1.1rem;
+}
+
+.product-create-shipping p {
+  margin: 8px 0 12px;
+  color: #8c7b6e;
+  font-size: .78rem;
+}
+
+.product-create-page .product-create-shipping-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.product-create-shipping .product-create-shipping-error {
+  margin-bottom: 0;
+  color: #b91c1c;
+}
+
+@media (max-width: 1050px) {
+  .product-create-page .product-create-shipping-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .product-create-page .product-create-info-grid,
+  .product-create-page .product-create-media-grid,
+  .product-create-page .product-create-variation-grid,
+  .product-create-page .product-create-shipping-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

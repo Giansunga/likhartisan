@@ -8,6 +8,7 @@ import {
 } from '../services/lalamoveService.js';
 import {
   calculateShipment,
+  createShipmentLine,
   createShipmentFingerprint,
   getShipmentConfig,
   ShipmentDataError,
@@ -34,28 +35,6 @@ function isSchemaColumnError(error) {
       error?.code === '42703' ||
       /column .* (does not exist|not found)|could not find .* column|schema cache/i.test(message),
   );
-}
-
-function shipmentSource(product, variation) {
-  // A selected variation is its own sellable package. It must carry its own
-  // shipping facts; silently borrowing the base product could underquote it.
-  const source = variation || product;
-  return {
-    productId: product.id,
-    variationId: variation?.id || null,
-    productName: product.name,
-    quantity: 0,
-    dimensions: source.dimensions,
-    height: source.height,
-    measurement_unit: source.measurement_unit,
-    weight_kg: source.weight_kg,
-    shipping_weight_g: source.shipping_weight_g,
-    product_weight_g: source.product_weight_g,
-    packaging_weight_g: source.packaging_weight_g,
-    shipping_length_in: source.shipping_length_in,
-    shipping_width_in: source.shipping_width_in,
-    shipping_height_in: source.shipping_height_in,
-  };
 }
 
 async function loadAuthoritativeItems(req, requestedItems) {
@@ -100,7 +79,7 @@ async function loadAuthoritativeItems(req, requestedItems) {
       throw new ShipmentDataError(`The selected variation for ${product.name} is no longer available.`, { code: 'ERR_SHIPPING_DATA_UNAVAILABLE', status: 400, productName: product.name });
     }
     if (product.shop_id) shopIds.add(product.shop_id);
-    return { ...shipmentSource(product, variation), quantity: item.quantity };
+    return createShipmentLine(product, variation, item.quantity);
   });
   if (shopIds.size > 1) {
     throw new ShipmentDataError('Courier checkout currently supports one artisan shop per shipment.', {

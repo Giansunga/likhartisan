@@ -45,6 +45,28 @@ export class ShipmentDataError extends Error {
   }
 }
 
+export function createShipmentLine(product, variation, quantity) {
+  // Keep catalog measurements raw for both quoting and checkout. Formatting
+  // them for the order display rounds centimeter values before fingerprinting.
+  const source = variation || product;
+  return {
+    productId: product.id,
+    variationId: variation?.id || null,
+    productName: product.name,
+    quantity,
+    dimensions: source.dimensions,
+    height: source.height,
+    measurement_unit: source.measurement_unit,
+    weight_kg: source.weight_kg,
+    shipping_weight_g: source.shipping_weight_g,
+    product_weight_g: source.product_weight_g,
+    packaging_weight_g: source.packaging_weight_g,
+    shipping_length_in: source.shipping_length_in,
+    shipping_width_in: source.shipping_width_in,
+    shipping_height_in: source.shipping_height_in,
+  };
+}
+
 function positiveNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
@@ -61,11 +83,12 @@ function measurementNumbers(value) {
 }
 
 function parseInches(value, unit = 'in') {
-  const number = positiveNumber(value);
-  if (number != null) return number;
-  const first = measurementNumbers(value)[0];
-  if (!positiveNumber(first)) return null;
-  return /cm|centimeter/i.test(String(value)) ? first / 2.54 : unit === 'cm' ? first / 2.54 : first;
+  const number = positiveNumber(value) ?? positiveNumber(measurementNumbers(value)[0]);
+  if (number == null) return null;
+  const raw = String(value);
+  const measurementUnit = /cm|centimeter/i.test(raw) ? 'cm'
+    : /\bin(?:ches)?\b|"/i.test(raw) ? 'in' : unit;
+  return measurementUnit === 'cm' ? number / 2.54 : number;
 }
 
 export function parsePackedDimensionsInches(source = {}) {
@@ -73,7 +96,7 @@ export function parsePackedDimensionsInches(source = {}) {
     .map(value => parseInches(value, 'in'));
   if (explicit.every(value => value != null)) return explicit;
 
-  const dimensions = measurementNumbers(source.dimensions);
+  const dimensions = String(source.dimensions ?? '').match(/-?\d+(?:\.\d+)?\s*(?:centimeters?|cm|inches?|in|")?/gi) || [];
   const length = parseInches(dimensions[0], source.measurement_unit);
   const width = parseInches(dimensions[1] ?? dimensions[0], source.measurement_unit);
   const height = parseInches(source.height, source.measurement_unit);

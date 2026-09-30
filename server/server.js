@@ -15,7 +15,7 @@ import { getSupabaseAuthConfigurationState, verifySupabaseAuthConfiguration } fr
 import lalamoveRoutes from './routes/lalamove.js';
 import { createUploadRouter } from './routes/upload.js';
 import { getQuotation, isValidCoordinates, mapLalamoveError } from './services/lalamoveService.js';
-import { calculateShipment, createShipmentFingerprint, getShipmentConfig, ShipmentDataError } from './services/shipmentService.js';
+import { calculateShipment, createShipmentLine, createShipmentFingerprint, getShipmentConfig, ShipmentDataError } from './services/shipmentService.js';
 import { createPurchasesRouter } from './routes/purchases.js';
 import {
   createCheckoutSession,
@@ -216,7 +216,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
   try {
     const authUserId = await verifyAuth(req, res);
     if (!authUserId) return;
-    const { items, userName, userPhone, userAddress, userEmail, deliveryOption, shipmentFingerprint: clientShipmentFingerprint, pickupCoords, dropoffCoords, shopAddress } = req.body;
+    const { items, userName, userPhone, userAddress, userEmail, deliveryOption, shipmentFingerprint: clientShipmentFingerprint, quotedShippingFeeCentavos, pickupCoords, dropoffCoords, shopAddress } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'No items provided' });
@@ -233,6 +233,9 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     }
     if (!['pickup', 'courier'].includes(deliveryOption)) {
       return res.status(400).json({ error: 'deliveryOption must be pickup or courier' });
+    }
+    if (deliveryOption === 'courier' && (!Number.isSafeInteger(quotedShippingFeeCentavos) || quotedShippingFeeCentavos <= 0)) {
+      return res.status(400).json({ error: 'A confirmed courier fee is required.', code: 'ERR_COURIER_FEE_REQUIRED' });
     }
 
     // Server-side price verification: fetch real prices from Supabase
@@ -373,7 +376,12 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         return res.status(400).json({ error: 'Courier orders require geocoded pickup/dropoff coordinates' });
       }
       try {
-        verifiedShipment = calculateShipment(verifiedItems, getShipmentConfig());
+        const shipmentLines = validatedItems.map(({ item, qty }) => createShipmentLine(
+          productMap.get(item.productId),
+          item.variationId ? variationMap.get(item.variationId) : null,
+          qty,
+        ));
+        verifiedShipment = calculateShipment(shipmentLines, getShipmentConfig());
         verifiedQuote = await getQuotation({
           pickupCoords,
           dropoffCoords,
@@ -387,7 +395,7 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         }
         verifiedShippingFee = fee;
         verifiedShipmentFingerprint = createShipmentFingerprint({
-          items: verifiedItems,
+          items: shipmentLines,
           shipment: verifiedShipment,
           pickupCoords,
           dropoffCoords,
@@ -395,6 +403,9 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
         });
         if (clientShipmentFingerprint && clientShipmentFingerprint !== verifiedShipmentFingerprint) {
           return res.status(409).json({ error: 'Your cart or delivery route changed. Please refresh the courier fee and try again.', code: 'ERR_STALE_SHIPMENT' });
+        }
+        if (quotedShippingFeeCentavos !== Math.round(verifiedShippingFee * 100)) {
+          return res.status(409).json({ error: 'The courier fee changed. Review the updated total before continuing to payment.', code: 'ERR_COURIER_FEE_CHANGED' });
         }
       } catch (err) {
         console.error('[create-checkout] shipment or Lalamove re-quote failed:', {
