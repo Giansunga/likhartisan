@@ -10,7 +10,7 @@ const EXPLORE_LINKS = [
   { label: 'About', to: '/about' },
 ];
 
-const SHOP_CATEGORIES = ['Vases', 'Planters', 'Jars', 'Amphoras', 'Tea Light Vases'];
+const SHOP_CATEGORIES = ['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others'];
 
 export default function Footer() {
   const location = useLocation();

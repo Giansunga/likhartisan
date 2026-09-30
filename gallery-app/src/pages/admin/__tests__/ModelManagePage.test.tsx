@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import ModelManagePage from '../ModelManagePage';
 
 const state = vi.hoisted(() => ({
@@ -7,11 +8,15 @@ const state = vi.hoisted(() => ({
   inserted: null as Record<string, unknown> | null,
   updated: null as Record<string, unknown> | null,
   uploaded: [] as File[],
+  featuredModelId: null as string | null,
 }));
 
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
     from(table: string) {
+      if (table === 'landing_3d_feature') return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: state.featuredModelId ? { model_id: state.featuredModelId } : null, error: null }) }) }),
+      };
       return {
         select() {
           return { order: async () => ({ data: table === 'models_3d' ? state.models : [{ id: 'shop-1', name: 'Pottery Shop' }] }) };
@@ -37,11 +42,12 @@ beforeEach(() => {
   state.inserted = null;
   state.updated = null;
   state.uploaded = [];
+  state.featuredModelId = null;
 });
 
 describe('admin model form', () => {
   it('uploads the original GLB while saving entered dimensions as the baseline', async () => {
-    const { container } = render(<ModelManagePage />);
+    const { container } = render(<MemoryRouter><ModelManagePage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Upload Model' }));
     const form = container.querySelector('form')!;
     fireEvent.change(within(form).getByPlaceholderText('e.g. Classic Vase'), { target: { value: 'Wave Pot' } });
@@ -68,7 +74,7 @@ describe('admin model form', () => {
       status: 'active', file_url: 'https://example.com/original.glb', thumbnail: '', created_at: '',
       base_height_in: 13, base_body_width_in: 14, base_neck_width_in: 8, base_rim_size_in: 10,
       base_price_php: 180, base_production_days: 30 }];
-    const { container } = render(<ModelManagePage />);
+    const { container } = render(<MemoryRouter><ModelManagePage /></MemoryRouter>);
     await screen.findByText('Wave Pot');
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     const form = container.querySelector('form')!;
@@ -85,7 +91,7 @@ describe('admin model form', () => {
       status: 'active', file_url: 'https://example.com/original.glb', thumbnail: '', created_at: '',
       base_height_in: 13, base_body_width_in: 14, base_neck_width_in: 8, base_rim_size_in: 10,
       base_price_php: 180, base_production_days: 30 }];
-    const { container } = render(<ModelManagePage />);
+    const { container } = render(<MemoryRouter><ModelManagePage /></MemoryRouter>);
     await screen.findByText('Wave Pot');
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     const form = container.querySelector('form')!;
@@ -95,5 +101,20 @@ describe('admin model form', () => {
     expect(state.updated?.base_height_in).toBe(15);
     expect(state.updated?.file_url).toBeUndefined();
     expect(state.uploaded).toHaveLength(0);
+  });
+
+  it('blocks archiving or deleting the published featured model', async () => {
+    state.models = [{ id: 'model-1', name: 'Wave Pot', category: 'Vase', shop_id: 'shop-1',
+      status: 'active', file_url: 'https://example.com/original.glb', thumbnail: '', created_at: '',
+      base_height_in: 13, base_body_width_in: 14, base_neck_width_in: 8, base_rim_size_in: 10,
+      base_price_php: 180, base_production_days: 30 }];
+    state.featuredModelId = 'model-1';
+    render(<MemoryRouter><ModelManagePage /></MemoryRouter>);
+    await screen.findByText('Wave Pot');
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Publish a different featured model');
+    expect(state.updated).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(state.updated).toBeNull();
   });
 });

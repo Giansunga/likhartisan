@@ -40,7 +40,7 @@ describe('Footer', () => {
     expect(logo).toHaveAttribute('src', '/images/likhartisan-brown-wordmark.png');
     expect(screen.getByRole('link', { name: 'LikhArtisan home' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: /support@likhartisan\.com/ })).toHaveAttribute('href', 'mailto:support@likhartisan.com');
-    expect(screen.getByRole('link', { name: 'Tea Light Vases' })).toHaveAttribute('href', '/gallery?category=Tea%20Light%20Vases');
+    expect(screen.getByRole('link', { name: 'Others' })).toHaveAttribute('href', '/gallery?category=Others');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(authEvent).toHaveBeenCalledTimes(1);

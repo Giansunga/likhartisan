@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { uploadToR2 } from '../../lib/r2';
@@ -32,6 +33,7 @@ export default function ModelManagePage() {
   const [editingModel, setEditingModel] = useState<Model3D | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState('Vase');
   const [formShopId, setFormShopId] = useState('');
@@ -133,7 +135,7 @@ export default function ModelManagePage() {
       if (thumbFile) thumbnailUrl = await uploadFile(thumbFile, 'models');
 
       if (editingModel) {
-        const updateData: Record<string, any> = {
+        const updateData: Record<string, string | number | null> = {
           name: formName.trim(),
           category: formCategory,
           shop_id: formShopId || null,
@@ -159,8 +161,8 @@ export default function ModelManagePage() {
       setShowModal(false);
       setEditingModel(null);
       fetchModels();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save');
+    } catch (err: unknown) {
+      setError(err && typeof err === 'object' && 'message' in err && typeof err.message === 'string' ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -169,6 +171,7 @@ export default function ModelManagePage() {
   async function handleArchive(id: string) {
     const model = models.find(m => m.id === id);
     if (!model) return;
+    if (model.status === 'active' && await isFeatured(id)) return;
     const newStatus = model.status === 'archived' ? 'active' : 'archived';
     const label = newStatus === 'archived' ? 'Archive' : 'Activate';
     if (!confirm(`${label} "${model.name}"?`)) return;
@@ -177,9 +180,26 @@ export default function ModelManagePage() {
   }
 
   async function handleDelete(id: string) {
+    if (await isFeatured(id)) return;
     if (!confirm('Delete this model?')) return;
     await supabase.from('models_3d').delete().eq('id', id);
     fetchModels();
+  }
+
+  async function isFeatured(id: string): Promise<boolean> {
+    setActionError('');
+    try {
+      const { data, error: checkError } = await supabase.from('landing_3d_feature')
+        .select('model_id').eq('id', 'current').maybeSingle();
+      if (checkError?.code === '42P01' || checkError?.code === 'PGRST205') return false;
+      if (checkError) throw checkError;
+      if (data?.model_id !== id) return false;
+      setActionError('Publish a different featured model before archiving or deleting this one.');
+      return true;
+    } catch {
+      setActionError('Could not check whether this model is featured. Try again.');
+      return true;
+    }
   }
 
   if (libraryView === 'attachments') return <AttachmentManagePanel onBack={() => setLibraryView('models')} />;
@@ -187,6 +207,7 @@ export default function ModelManagePage() {
   return (
     <div>
       <div className="portal-action-bar">
+        <Link to="/admin/models/featured" className="px-5 py-2.5 rounded-xl text-sm font-semibold border border-cream-tertiary bg-white text-brown-dark hover:bg-cream-secondary">Edit Featured 3D Preview</Link>
         <button onClick={openCreate}
           className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors flex items-center gap-2">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
@@ -195,6 +216,7 @@ export default function ModelManagePage() {
           Upload Model
         </button>
       </div>
+      {actionError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{actionError}</p>}
 
       <div className="flex gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">

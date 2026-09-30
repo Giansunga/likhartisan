@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { SHOP_EMAILS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
+import { normalizeProductCategory } from '../../lib/utils';
 import type { ArtisanProduct, ArtisanShop } from '../../types/artisan';
 import { PortalRealtimeProvider } from '../../realtime/PortalRealtimeProvider';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
@@ -90,7 +91,7 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
       setLoadingProducts(false);
       throw error;
     }
-    const nextProducts = (data || []) as ArtisanProduct[];
+    const nextProducts = ((data || []) as ArtisanProduct[]).map(product => ({ ...product, category: normalizeProductCategory(product.category) }));
     setProducts(nextProducts);
     const ids = nextProducts.map(product => product.id);
     if (ids.length) {

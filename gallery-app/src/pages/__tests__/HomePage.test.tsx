@@ -83,7 +83,7 @@ describe('HomePage editorial landing page', () => {
   it('uses real category routes, alphabetized shop fields, and the review fallback', async () => {
     renderHome();
     expect(screen.getAllByRole('link').find(link => link.getAttribute('href') === '/gallery?category=Vases')).toBeDefined();
-    expect(screen.getAllByRole('link').find(link => link.getAttribute('href') === '/gallery?category=Tea%20Light%20Vases')).toBeDefined();
+    expect(screen.getAllByRole('link').find(link => link.getAttribute('href') === '/gallery?category=Others')).toBeDefined();
     await waitFor(() => expect(mocks.shopSelect).toHaveBeenCalledWith('id, name, description, banner, image, location'));
     expect(mocks.shopOrder).toHaveBeenCalledWith('name');
     expect(screen.getByTestId('review-rail')).toHaveTextContent('Maria Santos');

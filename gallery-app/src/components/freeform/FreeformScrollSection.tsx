@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { isEligibleLandingModel, landingLookAtProgress, parseLandingFeature, type LandingFeature, type LandingModel } from '../../lib/landing3dFeature';
 import { DEFAULT_ATTACHMENT_TRANSFORM, type AttachmentSelection } from './attachments';
 import type { DecorationParams } from './decor';
 import type { KnownFinishId } from './materials';
@@ -79,7 +80,8 @@ export default function FreeformScrollSection() {
   
   // Freeform preview state
   const [previewModel, setPreviewModel] = useState<string | null>(null);
-  const [previewModelMeta, setPreviewModelMeta] = useState<{ name: string; category: string; thumbnail: string } | null>(null);
+  const [previewModelMeta, setPreviewModelMeta] = useState<{ id: string | null; shopId: string | null; name: string; category: string; thumbnail: string } | null>(null);
+  const [publishedFeature, setPublishedFeature] = useState<LandingFeature | null>(null);
   const freeformSectionRef = useRef<HTMLDivElement>(null);
   const [freeformVisible, setFreeformVisible] = useState(false);
   const [previewColor, setPreviewColor] = useState('#BE734F');
@@ -103,6 +105,15 @@ export default function FreeformScrollSection() {
   });
 
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
+    if (publishedFeature) {
+      const look = landingLookAtProgress(publishedFeature, latest);
+      setScrollShape(look.shape);
+      setScrollFinish(look.material.finish);
+      setPreviewColor(look.material.color);
+      setScrollDecoration(look.decoration);
+      setScrollAttachments(look.attachments);
+      return;
+    }
     if (latest < 0.3) {
       setScrollShape({ height: 25, bodyWidth: 20, neckWidth: 15, rimSize: 12, curvature: 50 });
       setScrollFinish('raw_clay');
@@ -175,24 +186,48 @@ export default function FreeformScrollSection() {
     return () => obs.disconnect();
   }, []);
 
-  // Fetch a default model for the preview
+  // Load the published selection, retaining the original preview when no valid setting exists.
   useEffect(() => {
-    if (!freeformVisible || previewModel) return;
-    supabase.from('models_3d').select('file_url, name, category, thumbnail').eq('status', 'active')
-      .not('base_price_php', 'is', null).not('base_production_days', 'is', null).limit(1).maybeSingle()
-      .then(({ data }) => {
-        if (data?.file_url) {
-          setPreviewModel(data.file_url);
-          setPreviewModelMeta({
-            name: data.name,
-            category: data.category,
-            thumbnail: data.thumbnail || '',
-          });
-        } else {
-          setPreviewModel('');
+    if (!freeformVisible) return;
+    let active = true;
+    async function loadPreview() {
+      const { data: setting } = await supabase.from('landing_3d_feature')
+        .select('model_id,visual_keyframes').eq('id', 'current').maybeSingle();
+      if (!active) return;
+      if (setting?.model_id) {
+        const { data: selected } = await supabase.from('models_3d').select('*').eq('id', setting.model_id).maybeSingle();
+        if (!active) return;
+        const model = selected as LandingModel | null;
+        if (isEligibleLandingModel(model)) {
+          const parsed = parseLandingFeature(setting.visual_keyframes, model);
+          if (parsed) {
+            const initialLook = landingLookAtProgress(parsed, scrollYProgress.get());
+            setScrollShape(initialLook.shape);
+            setScrollFinish(initialLook.material.finish);
+            setPreviewColor(initialLook.material.color);
+            setScrollDecoration(initialLook.decoration);
+            setScrollAttachments(initialLook.attachments);
+            setPublishedFeature(parsed);
+            setPreviewModel(model.file_url);
+            setPreviewModelMeta({ id: model.id, shopId: model.shop_id, name: model.name, category: model.category, thumbnail: model.thumbnail || '' });
+            return;
+          }
         }
-      });
-  }, [freeformVisible, previewModel]);
+      }
+      const { data: fallback } = await supabase.from('models_3d')
+        .select('id,file_url,name,category,thumbnail,shop_id').eq('status', 'active')
+        .not('base_price_php', 'is', null).not('base_production_days', 'is', null).limit(1).maybeSingle();
+      if (!active) return;
+      setPublishedFeature(null);
+      setPreviewModel(fallback?.file_url || '');
+      setPreviewModelMeta(fallback?.file_url ? {
+        id: fallback.id || null, shopId: fallback.shop_id || null, name: fallback.name,
+        category: fallback.category, thumbnail: fallback.thumbnail || '',
+      } : null);
+    }
+    void loadPreview();
+    return () => { active = false; };
+  }, [freeformVisible, scrollYProgress]);
 
   useEffect(() => {
     const section = freeformSectionRef.current;
@@ -228,10 +263,13 @@ export default function FreeformScrollSection() {
     navigate('/freeform', {
       state: {
         modelUrl: previewModel,
+        modelId: previewModelMeta?.id,
+        shopId: previewModelMeta?.shopId,
         modelName: previewModelMeta?.name,
         modelCategory: previewModelMeta?.category,
         modelThumbnail: previewModelMeta?.thumbnail,
         color: previewColor,
+        featuredLook: publishedFeature?.stages.details,
       },
     });
   }
@@ -303,7 +341,7 @@ export default function FreeformScrollSection() {
                 Choose the <span>surface.</span>
               </h2>
               <p className="freeform-landing-caption__body">
-                Compare raw clay, ceramic, and glazed finishes to find the tone and texture that suit your piece.
+                Explore colors and surface finishes to find the tone and texture that suit your piece.
               </p>
             </motion.div>
 
@@ -321,7 +359,7 @@ export default function FreeformScrollSection() {
                 Give it a <span>signature.</span>
               </h2>
               <p className="freeform-landing-caption__body">
-                Place a pattern, tune its scale and color, then choose a painted or engraved treatment.
+                Try a pattern, tune its scale and color, then choose a painted or engraved treatment.
               </p>
             </motion.div>
 
@@ -339,7 +377,9 @@ export default function FreeformScrollSection() {
                 Complete the <span>form.</span>
               </h2>
               <p className="freeform-landing-caption__body">
-                Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.
+                {publishedFeature && publishedFeature.stages.details.attachments.length === 0
+                  ? 'See the completed form from every angle before you continue in Design Studio.'
+                  : 'Add sculpted handles and dimensional accents, previewed from every angle before you continue in Design Studio.'}
               </p>
               <div className="flex gap-4">
                 <button

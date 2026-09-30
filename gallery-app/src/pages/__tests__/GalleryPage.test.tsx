@@ -54,12 +54,12 @@ describe('GalleryPage', () => {
 
     await waitFor(() => expect(container.querySelectorAll('.zoom-card-bg')).toHaveLength(6));
     const christmasImages = [
-      'christmas-all-crafts.webp',
-      'christmas-vases.webp',
-      'christmas-planters.webp',
-      'christmas-jars.webp',
-      'christmas-amphoras.webp',
-      'christmas-tealights.webp',
+      'gallery-thumbnail-all-crafts.jpg',
+      'gallery-thumbnail-vases.jpg',
+      'gallery-thumbnail-planters.jpg',
+      'gallery-thumbnail-jars.jpg',
+      'gallery-thumbnail-decorative-pieces.jpg',
+      'gallery-thumbnail-others.png',
     ];
     Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
       expect(image).toHaveStyle({ backgroundImage: `url(/images/${christmasImages[index]})` });
@@ -75,12 +75,12 @@ describe('GalleryPage', () => {
     });
 
     const valentinesImages = [
-      'valentines-all-crafts.webp',
-      'valentines-vases.webp',
-      'valentines-planters.webp',
-      'valentines-jars.webp',
-      'valentines-amphoras.webp',
-      'valentines-tealights.webp',
+      'gallery-thumbnail-all-crafts.jpg',
+      'gallery-thumbnail-vases.jpg',
+      'gallery-thumbnail-planters.jpg',
+      'gallery-thumbnail-jars.jpg',
+      'gallery-thumbnail-decorative-pieces.jpg',
+      'gallery-thumbnail-others.png',
     ];
     Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
       expect(image).toHaveStyle({ backgroundImage: `url(/images/${valentinesImages[index]})` });
@@ -96,16 +96,28 @@ describe('GalleryPage', () => {
     });
 
     const standardImages = [
-      'gallery-category-all-crafts-v2.webp',
-      'gallery-category-vases-v2.webp',
-      'gallery-category-planters-v2.webp',
-      'gallery-category-jars-v2.webp',
-      'gallery-category-amphoras-v2.webp',
-      'gallery-category-tea-lights-v2.webp',
+      'gallery-thumbnail-all-crafts.jpg',
+      'gallery-thumbnail-vases.jpg',
+      'gallery-thumbnail-planters.jpg',
+      'gallery-thumbnail-jars.jpg',
+      'gallery-thumbnail-decorative-pieces.jpg',
+      'gallery-thumbnail-others.png',
     ];
     Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
       expect(image).toHaveStyle({ backgroundImage: `url(/images/${standardImages[index]})` });
     });
+  });
+
+  it.each(['/gallery?category=Decorative%20Pieces', '/gallery?category=Amphoras'])('keeps existing Amphoras products in Decorative Pieces for %s', async route => {
+    mocks.order.mockResolvedValue({ data: [{ ...product('Legacy amphora', 1), category: 'Amphoras' }], error: null });
+    render(<MemoryRouter initialEntries={[route]}><GalleryPage /></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: /Legacy amphora/ })).toHaveTextContent('Decorative Pieces');
+  });
+
+  it.each(['/gallery?category=Others', '/gallery?category=Tea%20Light%20Vases'])('keeps existing Tea Light Vases products in Others for %s', async route => {
+    mocks.order.mockResolvedValue({ data: [{ ...product('Legacy tea light', 1), category: 'Tea Light Vases' }], error: null });
+    render(<MemoryRouter initialEntries={[route]}><GalleryPage /></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: /Legacy tea light/ })).toHaveTextContent('Others');
   });
 
   it('shows stock status from variations and prices only available variations', async () => {

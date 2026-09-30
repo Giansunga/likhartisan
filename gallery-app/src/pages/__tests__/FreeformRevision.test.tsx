@@ -23,6 +23,7 @@ vi.mock('../../lib/supabase', () => {
   const model = {
     id: 'model-1', file_url: '/models/vase.glb', base_height_in: 10, base_body_width_in: 8,
     base_neck_width_in: 5, base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5,
+    shop_id: 'shop-1', status: 'active', name: 'Test Vase', category: 'Vase', thumbnail: '',
   };
   const request = {
     id: 'request-1', buyer_id: 'buyer-1', shop_id: 'shop-1', quantity: 1,
@@ -43,7 +44,7 @@ vi.mock('../../lib/supabase', () => {
     const data = table === 'models_3d' ? model : table === 'design_requests' ? request : [{ id: 'shop-1', name: 'Test Shop' }];
     const query = {
       select: () => query, eq: () => query, order: () => query,
-      maybeSingle: async () => ({ data, error: null }),
+      maybeSingle: async () => ({ data: table === 'shops' ? { id: 'shop-1', name: 'Test Shop' } : data, error: null }),
       limit: async () => ({ data: [data].flat(), error: null }),
       then: (resolve: (value: { data: unknown; error: null }) => unknown) => Promise.resolve({ data, error: null }).then(resolve),
     };
@@ -51,7 +52,10 @@ vi.mock('../../lib/supabase', () => {
   };
   return { supabase: { from, rpc: mocks.rpc } };
 });
-vi.mock('../../components/freeform/FreeformViewer', () => ({ default: () => <div data-testid="freeform-viewer" /> }));
+vi.mock('../../components/freeform/FreeformViewer', () => ({ default: ({ modelFile, shapeParams, materialParams, decorationParams, attachmentParams }: {
+  modelFile: string; shapeParams: { height: number }; materialParams: { finish: string; color: string };
+  decorationParams: { patternId: string }; attachmentParams: unknown[];
+}) => <div data-testid="freeform-viewer">{JSON.stringify({ modelFile, height: shapeParams.height, material: materialParams, pattern: decorationParams.patternId, attachments: attachmentParams.length })}</div> }));
 vi.mock('../../components/freeform/ModelTab', () => ({ default: () => <div>Model choices</div> }));
 vi.mock('../../components/freeform/ShapeTab', () => ({ default: () => <div>Shape choices</div> }));
 vi.mock('../../components/freeform/MaterialTab', () => ({ default: () => <div>Material choices</div> }));
@@ -93,5 +97,22 @@ describe('buyer revision', () => {
       p_quantity: 100,
       p_design_snapshot: expect.objectContaining({ attachments: [], material: { finish: 'raw_clay', color: '#BE734F' } }),
     })));
+  });
+
+  it('opens a published landing look with its model, shop, and customization', async () => {
+    const featuredLook = {
+      shape: { height: 11, bodyWidth: 8, neckWidth: 5, rimSize: 4, curvature: 60, unit: 'in', geometryMode: 'baseline', baseline: { height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 4 } },
+      material: { finish: 'glazed', color: '#123456' },
+      decoration: { patternId: 'traditional-curl', placement: 'full', scale: 1.1, color: '#315A9F', effect: 'engraved' },
+      attachments: [originalAttachment],
+    };
+    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
+      modelId: 'model-1', modelUrl: '/models/vase.glb', modelName: 'Test Vase', modelCategory: 'Vase', shopId: 'shop-1', featuredLook,
+    } }]}><FreeformPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveTextContent('"height":11'));
+    expect(screen.getByTestId('freeform-viewer')).toHaveTextContent('"color":"#123456"');
+    expect(screen.getByTestId('freeform-viewer')).toHaveTextContent('"pattern":"traditional-curl"');
+    expect(screen.getByTestId('freeform-viewer')).toHaveTextContent('"attachments":1');
+    expect(screen.getAllByText('Test Shop').length).toBeGreaterThan(0);
   });
 });

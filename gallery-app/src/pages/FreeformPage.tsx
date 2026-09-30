@@ -21,6 +21,7 @@ import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, typ
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import { MIN_DESIGN_REQUEST_QUANTITY, isValidDesignRequestQuantity, createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
 import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams, shapeFromModelBase } from '../lib/measurements';
+import { isValidLandingLook, type LandingLook, type LandingModel } from '../lib/landing3dFeature';
 import { estimateModelDesign, modelBaseFromRow, type ModelBase } from '../components/freeform/modelEstimate';
 import * as THREE from 'three';
 import '../styles/freeform.css';
@@ -268,10 +269,12 @@ function applyDesign(design: {
     const navState = location.state as {
       modelId?: string;
       modelUrl?: string;
+      shopId?: string;
       modelName?: string;
       modelCategory?: string;
       modelThumbnail?: string;
       color?: string;
+      featuredLook?: LandingLook;
     } | null;
 
     async function bootstrap() {
@@ -354,6 +357,12 @@ function applyDesign(design: {
           ? supabase.from('models_3d').select('*').eq('id', navState.modelId)
           : supabase.from('models_3d').select('*').eq('file_url', navState.modelUrl);
         const { data: navModel } = await modelQuery.maybeSingle();
+        if (!navModel || navModel.status !== 'active') {
+          toast.error('The featured model is no longer available. Please choose another model.');
+          setShopSelectOpen(true);
+          shopModalShownRef.current = true;
+          return;
+        }
         const navBase = modelBaseFromRow(navModel);
         selectModel(
           navModel?.file_url || navState.modelUrl,
@@ -364,8 +373,21 @@ function applyDesign(design: {
           true,
           navBase,
         );
-        if (navState.color) {
+        if (navState.featuredLook && isValidLandingLook(navState.featuredLook, navModel as LandingModel)) {
+          setShapeParams(navState.featuredLook.shape);
+          setMaterialParams(normalizeMaterialParams(navState.featuredLook.material));
+          setDecorationParams(navState.featuredLook.decoration);
+          setAttachmentParams(normalizeAttachmentSelections(navState.featuredLook.attachments));
+        } else if (navState.color) {
           setMaterialParams((prev) => normalizeMaterialParams({ ...prev, color: navState.color! }));
+        }
+        if (navState.shopId && navModel.shop_id === navState.shopId) {
+          const { data: landingShop } = await supabase.from('shops').select('name').eq('id', navState.shopId).maybeSingle();
+          setSelectedShopId(navState.shopId);
+          setSelectedShop(navState.shopId);
+          setSelectedShopName(landingShop?.name || 'Selected Shop');
+          shopModalShownRef.current = true;
+          return;
         }
         if (!shopModalShownRef.current) {
           shopModalShownRef.current = true;

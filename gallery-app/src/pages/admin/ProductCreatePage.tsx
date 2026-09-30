@@ -7,7 +7,7 @@ import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefres
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
 import { kgToGrams, positiveInches } from '../../lib/shipping';
 
-const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
+const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Decorative Pieces', 'Plates', 'Others'];
 
 interface Shop {
   id: string;

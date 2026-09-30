@@ -34,13 +34,19 @@ export function formatTime(dateStr: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+export function normalizeProductCategory(category: string | null | undefined): string {
+  if (category === 'Amphoras') return 'Decorative Pieces';
+  if (category === 'Tea Light Vases') return 'Others';
+  return category || '';
+}
+
 export function mapSupabaseProduct(row: any) {
   const measurementUnit: MeasurementUnit = row.measurement_unit === 'in' ? 'in' : 'cm';
   return {
     id: row.id,
     name: row.name,
     description: row.description || '',
-    category: row.category || '',
+    category: normalizeProductCategory(row.category),
     price: row.price || 0,
     stock: row.stock || 0,
     inStock: (row.stock || 0) > 0,

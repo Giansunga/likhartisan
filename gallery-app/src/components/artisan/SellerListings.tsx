@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, CircleOff, Package, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { normalizeProductCategory } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
 import type { ArtisanProduct } from '../../types/artisan';
 import { SellerConfirmDialog, SellerOverlay } from './Overlay';
@@ -95,7 +96,7 @@ export default function SellerListings() {
     setFeedback(null);
     const { data, error } = await supabase.from('products').update({ status }).eq('id', product.id).select('*').single();
     if (error) { setFeedback({ tone: 'error', text: error.message }); return; }
-    setProducts(current => current.map(item => item.id === product.id ? data as ArtisanProduct : item));
+    setProducts(current => current.map(item => item.id === product.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : item));
     setFeedback({ tone: 'success', text: `${product.name} is now ${status}.` });
   }
 
@@ -105,7 +106,7 @@ export default function SellerListings() {
     const { data, error } = await supabase.from('products').update({ status: 'archived' }).eq('id', archiveTarget.id).select('*').single();
     if (error) setFeedback({ tone: 'error', text: error.message });
     else {
-      setProducts(current => current.map(product => product.id === archiveTarget.id ? data as ArtisanProduct : product));
+      setProducts(current => current.map(product => product.id === archiveTarget.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : product));
       setFeedback({ tone: 'success', text: `${archiveTarget.name} moved to Design Vault.` });
       setArchiveTarget(null);
     }

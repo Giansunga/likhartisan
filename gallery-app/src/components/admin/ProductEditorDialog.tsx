@@ -6,7 +6,7 @@ import type { ProductEditorErrors, ProductVariationDraft } from '../../types/adm
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
 import { kgToGrams, positiveInches } from '../../lib/shipping';
 
-const CATEGORIES = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Amphoras', 'Plates'];
+const CATEGORIES = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Decorative Pieces', 'Plates', 'Others'];
 
 export interface ProductEditorSave {
   name: string;

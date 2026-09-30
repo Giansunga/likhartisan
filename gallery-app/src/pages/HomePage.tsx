@@ -76,11 +76,11 @@ interface EditorialChapter {
 }
 
 const COLLECTIONS: CollectionFeature[] = [
-  { name: 'Vases', image: '/images/gallery-category-vases-v2.webp', description: 'Sculptural forms for everyday spaces.' },
-  { name: 'Planters', image: '/images/gallery-category-planters-v2.webp', description: 'Made to let growing things thrive.' },
-  { name: 'Jars', image: '/images/gallery-category-jars-v2.webp', description: 'Useful vessels with a handmade soul.' },
-  { name: 'Amphoras', image: '/images/amphoras_collection.png', description: 'Classic silhouettes shaped by tradition.' },
-  { name: 'Tea Light Vases', image: '/images/tealights_collection.png', description: 'Small pieces that hold a warm glow.' },
+  { name: 'Vases', image: '/images/category-vases.jpg', description: 'Sculptural forms for everyday spaces.' },
+  { name: 'Planters', image: '/images/category-planters.jpg', description: 'Made to let growing things thrive.' },
+  { name: 'Jars', image: '/images/category-jars.jpg', description: 'Useful vessels with a handmade soul.' },
+  { name: 'Decorative Pieces', image: '/images/category-decorative-pieces.jpg', description: 'Handmade accents with character.' },
+  { name: 'Others', image: '/images/category-others.png', description: 'More handcrafted pieces to discover.' },
 ];
 
 const EDITORIAL_CHAPTERS: EditorialChapter[] = [
@@ -134,7 +134,7 @@ export default function HomePage() {
       const [shopResult, reviewResult] = await Promise.all([shopRequest, reviewRequest]);
       if (!active) return;
       if (shopResult.error) setShopsError(true);
-      else setShops((shopResult.data ?? []).map((shop: HomeShop) => ({ id: shop.id, name: shop.name, description: shop.description || '', banner: shop.banner || '', image: shop.image || '', location: shop.location || '' })));
+      else setShops((shopResult.data ?? []).filter((shop: HomeShop) => shop.name?.trim()).map((shop: HomeShop) => ({ id: shop.id, name: shop.name, description: shop.description || '', banner: shop.banner || '', image: shop.image || '', location: shop.location || '' })));
       setShopsLoading(false);
       if (reviewResult.error || !reviewResult.data?.length) { setReviews(SAMPLE_REVIEWS); return; }
       const productIds = [...new Set(reviewResult.data.map((review: { product_id: string }) => review.product_id).filter(Boolean))];

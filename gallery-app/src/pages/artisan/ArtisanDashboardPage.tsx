@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, Component, type ReactN
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { fmt, displayVariation } from '../../lib/utils';
+import { fmt, displayVariation, normalizeProductCategory } from '../../lib/utils';
 import { recomputeProductStock } from '../../lib/stockSync';
 import { API_BASE } from '../../lib/api';
 import { getChatMessagePreview, parseChatMessage } from '../../lib/chatMessages';
@@ -224,7 +224,7 @@ export default function ArtisanDashboardPage() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setProducts(data);
+        setProducts(data.map((product: Product) => ({ ...product, category: normalizeProductCategory(product.category) })));
       // Fetch lowest variation price per product
       const pIds = data.map((p: any) => p.id);
       if (pIds.length > 0) {

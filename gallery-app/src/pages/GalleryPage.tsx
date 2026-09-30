@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
-import { loadFavorites, saveFavorites, mapSupabaseProduct } from '../lib/utils';
+import { loadFavorites, saveFavorites, mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
 import Pagination from '../components/Pagination';
 import GalleryHero from '../components/GalleryHero';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,12 +18,12 @@ import {
 const PAGE_SIZE = 24;
 
 const categories = [
-  { name: 'All Crafts', bg: '/images/gallery-category-all-crafts-v2.webp', christmasBg: '/images/christmas-all-crafts.webp', valentinesBg: '/images/valentines-all-crafts.webp' },
-  { name: 'Vases', bg: '/images/gallery-category-vases-v2.webp', christmasBg: '/images/christmas-vases.webp', valentinesBg: '/images/valentines-vases.webp' },
-  { name: 'Planters', bg: '/images/gallery-category-planters-v2.webp', christmasBg: '/images/christmas-planters.webp', valentinesBg: '/images/valentines-planters.webp' },
-  { name: 'Jars', bg: '/images/gallery-category-jars-v2.webp', christmasBg: '/images/christmas-jars.webp', valentinesBg: '/images/valentines-jars.webp' },
-  { name: 'Amphoras', bg: '/images/gallery-category-amphoras-v2.webp', christmasBg: '/images/christmas-amphoras.webp', valentinesBg: '/images/valentines-amphoras.webp' },
-  { name: 'Tea Light Vases', bg: '/images/gallery-category-tea-lights-v2.webp', christmasBg: '/images/christmas-tealights.webp', valentinesBg: '/images/valentines-tealights.webp' },
+  { name: 'All Crafts', bg: '/images/gallery-thumbnail-all-crafts.jpg' },
+  { name: 'Vases', bg: '/images/gallery-thumbnail-vases.jpg' },
+  { name: 'Planters', bg: '/images/gallery-thumbnail-planters.jpg' },
+  { name: 'Jars', bg: '/images/gallery-thumbnail-jars.jpg' },
+  { name: 'Decorative Pieces', bg: '/images/gallery-thumbnail-decorative-pieces.jpg' },
+  { name: 'Others', bg: '/images/gallery-thumbnail-others.png' },
 ];
 
 export default function GalleryPage() {
@@ -34,7 +34,7 @@ export default function GalleryPage() {
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
   const [variationAvailability, setVariationAvailability] = useState<Record<string, boolean>>({});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
-  const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category'));
+  const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recommended');
   const [showFavorites, setShowFavorites] = useState(false);
@@ -59,12 +59,10 @@ export default function GalleryPage() {
   }, []);
   const { user, loading: authLoading } = useAuth();
   const loggedIn = !!user;
-  const isChristmasTheme = currentTheme === 'christmas';
-  const isValentinesTheme = currentTheme === 'valentines';
 
   useEffect(() => {
     const cat = searchParams.get('category');
-    setActiveCategory(cat);
+    setActiveCategory(cat ? normalizeProductCategory(cat) : null);
   }, [searchParams]);
 
   useEffect(() => { saveFavorites(favorites); }, [favorites]);
@@ -363,7 +361,7 @@ export default function GalleryPage() {
                   className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
                   <div
                     className="zoom-card-bg"
-                    style={{ backgroundImage: `url(${isChristmasTheme ? cat.christmasBg : isValentinesTheme ? cat.valentinesBg : cat.bg})` }}
+                    style={{ backgroundImage: `url(${cat.bg})` }}
                   />
                   <div className="zoom-card-overlay" />
                   <div className="zoom-card-content">

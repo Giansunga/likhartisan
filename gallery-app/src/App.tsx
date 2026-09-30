@@ -50,6 +50,7 @@ const RoleAssignationPage = lazy(() => import('./pages/admin/RoleAssignationPage
 const ThemeCustomizer = lazy(() => import('./pages/admin/ThemeCustomizer'));
 const ArtisanManagePage = lazy(() => import('./pages/admin/ArtisanManagePage'));
 const ModelManagePage = lazy(() => import('./pages/admin/ModelManagePage'));
+const Featured3DPage = lazy(() => import('./pages/admin/Featured3DPage'));
 const ActivityLogPage = lazy(() => import('./pages/admin/ActivityLogPage'));
 const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
 
@@ -150,6 +151,7 @@ function AppShell() {
             <Route path="theme" element={<ThemeCustomizer />} />
             <Route path="artisans" element={<ArtisanManagePage />} />
             <Route path="models" element={<ModelManagePage />} />
+            <Route path="models/featured" element={<Featured3DPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
           </Route>

@@ -70,6 +70,14 @@ describe('fmtRating', () => {
 });
 
 describe('mapSupabaseProduct', () => {
+  it('shows the new category for an existing Amphoras product', () => {
+    expect(mapSupabaseProduct({ id: 'legacy', name: 'Amphora', category: 'Amphoras' }).category).toBe('Decorative Pieces');
+  });
+
+  it('shows Others for an existing Tea Light Vases product', () => {
+    expect(mapSupabaseProduct({ id: 'legacy-tealight', name: 'Tea Light Vase', category: 'Tea Light Vases' }).category).toBe('Others');
+  });
+
   it('maps a full row', () => {
     const row = {
       id: '1', name: 'Vase', description: 'A vase', category: 'Vases',

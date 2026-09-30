@@ -21,7 +21,7 @@ export default function ShopsPage() {
   useEffect(() => {
     async function fetchShops() {
       const { data } = await supabase.from('shops').select('id, name, owner_name, email, description, banner, image, location').order('name');
-      if (data) setShops(data);
+      if (data) setShops(data.filter(shop => shop.name?.trim()));
     }
     fetchShops();
   }, []);

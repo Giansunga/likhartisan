@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { normalizeProductCategory } from '../../lib/utils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import StatCard from '../../components/admin/dashboard/StatCard';
 import RevenueChart from '../../components/admin/dashboard/RevenueChart';
@@ -219,7 +220,7 @@ export default function DashboardPage() {
         image: p.image,
         price: productPrices[p.id] || 0,
         shop_name: p.shop_name,
-        category: p.category,
+        category: normalizeProductCategory(p.category),
         status: p.status,
         created_at: p.created_at,
       })));

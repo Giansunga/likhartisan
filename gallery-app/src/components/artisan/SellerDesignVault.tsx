@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Archive, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { normalizeProductCategory } from '../../lib/utils';
 import type { ArtisanProduct } from '../../types/artisan';
 import { SellerConfirmDialog } from './Overlay';
 import SellerListingCard from './SellerListingCard';
@@ -27,7 +28,7 @@ export default function SellerDesignVault() {
     const { data, error } = await supabase.from('products').update({ status: 'active' }).eq('id', restoreTarget.id).select('*').single();
     if (error) setFeedback({ tone: 'error', text: error.message });
     else {
-      setProducts(current => current.map(product => product.id === restoreTarget.id ? data as ArtisanProduct : product));
+      setProducts(current => current.map(product => product.id === restoreTarget.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : product));
       setFeedback({ tone: 'success', text: `${restoreTarget.name} is active and visible in My Listings.` });
       setRestoreTarget(null);
     }
