@@ -120,6 +120,12 @@ describe('GalleryPage', () => {
     expect(await screen.findByRole('link', { name: /Legacy tea light/ })).toHaveTextContent('Others');
   });
 
+  it.each(['Bowls', 'Teapots', 'Plates'])('shows a legacy %s product in Others', async category => {
+    mocks.order.mockResolvedValue({ data: [{ ...product('Legacy piece', 1), category }], error: null });
+    render(<MemoryRouter initialEntries={['/gallery?category=Others']}><GalleryPage /></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: /Legacy piece/ })).toHaveTextContent('Others');
+  });
+
   it('shows stock status from variations and prices only available variations', async () => {
     mocks.order.mockResolvedValue({ data: [
       product('No stock', 0),

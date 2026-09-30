@@ -17,6 +17,7 @@ import TermsPage from './pages/TermsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import LikhAIDock from './components/LikhAIDock';
@@ -123,6 +124,7 @@ function AppShell() {
             <Route path="terms" element={<TermsPage />} />
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<SignUpPage />} />
+            <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="likhai" element={<ChatbotPage />} />

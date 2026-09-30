@@ -36,8 +36,20 @@ export function formatTime(dateStr: string) {
 
 export function normalizeProductCategory(category: string | null | undefined): string {
   if (category === 'Amphoras') return 'Decorative Pieces';
-  if (category === 'Tea Light Vases') return 'Others';
+  if (category === 'Tea Light Vases' || category === 'Bowls' || category === 'Teapots' || category === 'Plates') return 'Others';
   return category || '';
+}
+
+export const PRODUCT_CATEGORIES = ['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others'] as const;
+
+export function storedProductCategories(categories: string[]): string[] {
+  const normalized = new Set(categories.map(normalizeProductCategory));
+  const stored = new Set(normalized);
+  if (normalized.has('Decorative Pieces')) stored.add('Amphoras');
+  if (normalized.has('Others')) {
+    for (const category of ['Tea Light Vases', 'Bowls', 'Teapots', 'Plates']) stored.add(category);
+  }
+  return [...stored];
 }
 
 export function mapSupabaseProduct(row: any) {

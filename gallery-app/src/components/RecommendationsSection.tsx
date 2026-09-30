@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { mapSupabaseProduct, fmt } from '../lib/utils';
+import { mapSupabaseProduct, fmt, storedProductCategories } from '../lib/utils';
 import type { Product } from '../types';
 
 interface RecommendationsSectionProps {
@@ -39,7 +39,7 @@ export default function RecommendationsSection({
       const { data } = await supabase
         .from('products')
       .select('id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
-        .in('category', preferredCategories)
+        .in('category', storedProductCategories(preferredCategories))
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(limit + excludeProductIds.length);

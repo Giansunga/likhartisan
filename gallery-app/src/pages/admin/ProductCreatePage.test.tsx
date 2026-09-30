@@ -44,6 +44,8 @@ describe('admin product upload form', () => {
 
   it('starts with one variation and expands incomplete shipping details', () => {
     renderPage();
+    expect(screen.getAllByRole('option').slice(1, 6).map(option => option.textContent)).toEqual(['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others']);
+    expect(screen.queryByRole('option', { name: /Bowls|Teapots|Plates/ })).not.toBeInTheDocument();
     expect(screen.getByText('Variation 1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Shipping details/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: 'Upload Product' })).toBeDisabled();

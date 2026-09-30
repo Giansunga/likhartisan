@@ -26,6 +26,8 @@ export interface ProductVariationDraft {
   price: string;
   stock: string;
   measurementUnit?: 'cm' | 'in';
+  shippingEdited?: boolean;
+  requiresWeight?: boolean;
 }
 
 export interface ProductEditorErrors {

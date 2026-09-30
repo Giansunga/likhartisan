@@ -6,9 +6,8 @@ import { recomputeProductStock } from '../../lib/stockSync';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
 import { kgToGrams, positiveInches } from '../../lib/shipping';
+import { PRODUCT_CATEGORIES } from '../../lib/utils';
 import './product-create.css';
-
-const categories = ['Vases', 'Bowls', 'Jars', 'Teapots', 'Planters', 'Decorative Pieces', 'Plates', 'Others'];
 
 interface Shop {
   id: string;
@@ -286,7 +285,7 @@ export default function ProductCreatePage() {
                 <select name="category" value={form.category} onChange={handleChange} required
                   style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }}>
                   <option value="">Select category</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  {PRODUCT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>

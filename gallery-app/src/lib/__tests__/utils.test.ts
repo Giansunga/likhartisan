@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmt, formatVariation, displayVariation, fmtRating, mapSupabaseProduct } from '../utils';
+import { fmt, formatVariation, displayVariation, fmtRating, mapSupabaseProduct, PRODUCT_CATEGORIES, storedProductCategories } from '../utils';
 
 describe('fmt', () => {
   it('formats zero', () => {
@@ -70,6 +70,21 @@ describe('fmtRating', () => {
 });
 
 describe('mapSupabaseProduct', () => {
+  it('uses only storefront categories for new product choices', () => {
+    expect(PRODUCT_CATEGORIES).toEqual(['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others']);
+  });
+
+  it.each(['Bowls', 'Teapots', 'Plates'])('shows Others for an existing %s product', category => {
+    expect(mapSupabaseProduct({ id: 'legacy', name: 'Legacy product', category }).category).toBe('Others');
+  });
+
+  it('includes stored legacy categories in same-category queries', () => {
+    expect(storedProductCategories(['Others'])).toEqual(['Others', 'Tea Light Vases', 'Bowls', 'Teapots', 'Plates']);
+    expect(storedProductCategories(['Decorative Pieces'])).toEqual(['Decorative Pieces', 'Amphoras']);
+    expect(storedProductCategories(['Vases'])).toEqual(['Vases']);
+    expect(storedProductCategories(['Bowls'])).toEqual(['Others', 'Tea Light Vases', 'Bowls', 'Teapots', 'Plates']);
+  });
+
   it('shows the new category for an existing Amphoras product', () => {
     expect(mapSupabaseProduct({ id: 'legacy', name: 'Amphora', category: 'Amphoras' }).category).toBe('Decorative Pieces');
   });

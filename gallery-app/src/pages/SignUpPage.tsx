@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getAuthDestination } from '../lib/authDestination';
+import { savePendingSignupEmail } from '../lib/pendingSignupEmail';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
@@ -13,7 +14,6 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [confirmationSent, setConfirmationSent] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,7 +37,8 @@ export default function SignUpPage() {
       if (data.session?.user) {
         navigate(await getAuthDestination(data.session.user), { replace: true });
       } else {
-        setConfirmationSent(true);
+        savePendingSignupEmail(email);
+        navigate('/verify-email', { replace: true });
       }
     } catch {
       setError('Account creation could not be completed. Please try again.');
@@ -53,14 +54,6 @@ export default function SignUpPage() {
         <h1 className="font-serif text-3xl font-bold text-brown-dark text-center mb-2">Create Account</h1>
         <p className="text-brown-medium text-center mb-8">Join the LikhArtisan community</p>
 
-        {confirmationSent ? (
-          <div role="status" className="text-center text-brown-dark">
-            <h2 className="font-serif text-xl font-bold mb-2">Check your email</h2>
-            <p>Check {email.trim()} for a confirmation link before signing in.</p>
-            <Link to="/signin" className="mt-5 inline-block text-primary hover:underline font-medium">Sign In</Link>
-          </div>
-        ) : (
-        <>
         {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -101,8 +94,6 @@ export default function SignUpPage() {
           Already have an account?{' '}
           <Link to="/signin" className="text-primary hover:underline font-medium">Sign In</Link>
         </p>
-        </>
-        )}
       </motion.div>
     </div>
   );
