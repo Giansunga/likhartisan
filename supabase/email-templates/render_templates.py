@@ -12,7 +12,7 @@ from string import Template
 ROOT = Path(__file__).resolve().parent
 WORDMARK = "https://likhartisan.com/images/likhartisan-brown-wordmark.png"
 CONFIRMATION_URL = "{{ .ConfirmationURL }}"
-VERIFY_EMAIL_URL = "https://likhartisan.com/verify-email"
+VERIFY_EMAIL_URL = "https://likhartisan.com/?auth=verify"
 TOKEN = "{{ .Token }}"
 NEW_EMAIL = "{{ .NewEmail }}"
 

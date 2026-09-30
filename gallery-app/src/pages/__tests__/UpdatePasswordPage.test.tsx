@@ -53,7 +53,7 @@ describe('reset password page', () => {
     const confirmation = screen.getByLabelText('Confirm new password', { selector: 'input' });
 
     expect(screen.getByRole('img', { name: 'LikhArtisan' })).toBeInTheDocument();
-    expect(screen.getByText('At least 6 characters')).toBeInTheDocument();
+    expect(screen.getByText('At least 8 characters, 1 uppercase letter, 1 number, and 1 symbol.')).toBeInTheDocument();
     expect(newPassword).toHaveAttribute('autocomplete', 'new-password');
     expect(confirmation).toHaveAttribute('autocomplete', 'new-password');
     newPassword.focus();
@@ -69,7 +69,7 @@ describe('reset password page', () => {
   it('shows a mismatch error without sending a password update', async () => {
     renderPage();
     await screen.findByLabelText('New password', { selector: 'input' });
-    fillPasswords('new-password', 'other-password');
+    fillPasswords('New-password1!', 'Other-password1!');
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Passwords do not match');
@@ -81,7 +81,7 @@ describe('reset password page', () => {
     mocks.updateUser.mockImplementation(() => new Promise(resolve => { finishUpdate = resolve; }));
     renderPage();
     await screen.findByLabelText('New password', { selector: 'input' });
-    fillPasswords('new-password');
+    fillPasswords('New-password1!');
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
 
     expect(screen.getByRole('button', { name: /Updating password/ })).toBeDisabled();
@@ -122,11 +122,11 @@ describe('reset password page', () => {
   it('shows success after updating and signing out', async () => {
     renderPage();
     await screen.findByLabelText('New password', { selector: 'input' });
-    fillPasswords('new-password');
+    fillPasswords('New-password1!');
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'You’re all set' })).toBeInTheDocument());
-    expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'new-password' });
+    expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'New-password1!' });
     expect(mocks.recordSecurityActivity).toHaveBeenCalledWith('auth.password_reset');
     expect(mocks.signOutWithActivity).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Go to login' }));

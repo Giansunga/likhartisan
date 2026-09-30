@@ -142,6 +142,18 @@ describe('Navbar notification routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'User menu' }));
     expect(screen.getByRole('link', { name: 'Shop Dashboard' })).toBeInTheDocument();
   });
+  it.each([
+    ['/?auth=signup', 'Create Account'],
+    ['/?auth=verify', 'Verify your email'],
+  ])('opens the account popup from %s', async (path, heading) => {
+    userForTest = null;
+    sessionStorage.clear();
+    renderNavbar(path);
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/');
+    expect(screen.queryByRole('heading', { name: heading })).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     requestedContext = undefined;

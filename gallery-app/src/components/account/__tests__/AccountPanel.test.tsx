@@ -123,11 +123,17 @@ describe('AccountPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Complete all password fields.');
 
     fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'old-password' } });
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'new-password' } });
-    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'new-password' } });
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'weakpass1!' } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'weakpass1!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('1 uppercase letter');
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'New-password1!' } });
+    fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'New-password1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Update password' }));
 
     await waitFor(() => expect(mocks.signInWithPassword).toHaveBeenCalledWith({ email: 'maria@example.com', password: 'old-password' }));
-    expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'new-password' });
+    expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'New-password1!' });
   });
 });

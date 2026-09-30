@@ -105,6 +105,7 @@ describe('orders management UI', () => {
     );
 
     expect(screen.getByRole('dialog', { name: '#12345678' })).toBeInTheDocument();
+    expect(document.querySelector('.orders-drawer-statuses')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Summary' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Ship order' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Fulfillment' }));

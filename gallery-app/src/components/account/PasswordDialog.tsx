@@ -3,6 +3,7 @@ import { Eye, EyeOff, KeyRound, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 import { recordSecurityActivity } from '../../lib/activityApi';
+import { meetsPasswordRequirements, PASSWORD_REQUIREMENTS } from '../../lib/passwordPolicy';
 
 interface PasswordDialogProps {
   email: string;
@@ -74,8 +75,8 @@ export default function PasswordDialog({ email, onClose }: PasswordDialogProps) 
       setError('Complete all password fields.');
       return;
     }
-    if (newPassword.length < 8) {
-      setError('Your new password must be at least 8 characters.');
+    if (!meetsPasswordRequirements(newPassword)) {
+      setError(PASSWORD_REQUIREMENTS);
       return;
     }
     if (newPassword === currentPassword) {
@@ -127,8 +128,10 @@ export default function PasswordDialog({ email, onClose }: PasswordDialogProps) 
               <div>
                 <input
                   id={field.id}
+                  aria-label={field.label}
                   type={visible[field.field] ? 'text' : 'password'}
                   autoComplete={field.autoComplete}
+                  aria-describedby={field.field === 'next' ? 'account-password-requirements' : undefined}
                   value={field.value}
                   onChange={event => field.setValue(event.target.value)}
                 />
@@ -136,6 +139,7 @@ export default function PasswordDialog({ email, onClose }: PasswordDialogProps) 
                   {visible[field.field] ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
+              {field.field === 'next' && <small id="account-password-requirements" style={{ color: '#7A6558', fontSize: '0.8rem' }}>{PASSWORD_REQUIREMENTS}</small>}
             </label>
           ))}
         </div>

@@ -301,7 +301,6 @@ export function OrderDetailDrawer({
                 <button type="button" className={order.flagged_for_investigation ? 'is-flagged' : ''} onClick={onToggleInvestigation} aria-label={order.flagged_for_investigation ? 'Remove investigation flag' : 'Flag for investigation'} title={order.flagged_for_investigation ? 'Remove investigation flag' : 'Flag for investigation'}>!</button>
                 <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Close order details">×</button>
               </div>
-              <div className="orders-drawer-statuses"><StatusBadge kind="order" status={order.status} /><StatusBadge kind="payment" status={order.payment_status} /><StatusBadge kind="delivery" status={order.delivery_status} /></div>
             </header>
             <div className="orders-drawer-tabs" role="tablist" aria-label="Order detail sections">{DETAIL_TABS.map((tab) => <button type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? 'is-active' : ''} key={tab.key} onClick={() => onTabChange(tab.key)}>{tab.label}</button>)}</div>
             <div className="orders-drawer-body" role="tabpanel">{children}</div>

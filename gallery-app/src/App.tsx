@@ -16,8 +16,6 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
-import SignUpPage from './pages/SignUpPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
 import LikhAIDock from './components/LikhAIDock';
@@ -101,7 +99,7 @@ function AppShell() {
   const isLikhAIPage = location.pathname === '/likhai';
   const isDashboardPage = location.pathname === '/dashboard';
   const isArtisanPage = location.pathname.startsWith('/artisan-dashboard');
-  const shouldHideDock = isLikhAIPage || isArtisanPage || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
+  const shouldHideDock = isLikhAIPage || isArtisanPage || location.pathname.startsWith('/admin') || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
 
   return (
     <>
@@ -123,8 +121,8 @@ function AppShell() {
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="signin" element={<SignInPage />} />
-            <Route path="signup" element={<SignUpPage />} />
-            <Route path="verify-email" element={<VerifyEmailPage />} />
+            <Route path="signup" element={<Navigate to="/?auth=signup" replace />} />
+            <Route path="verify-email" element={<Navigate to="/?auth=verify" replace />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="likhai" element={<ChatbotPage />} />

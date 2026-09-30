@@ -1,6 +1,6 @@
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './Navbar.css';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { getCartCount, onCartUpdate } from '../data/store';
@@ -41,15 +41,21 @@ export default function Navbar() {
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisanDashboard = location.pathname.startsWith('/artisan-dashboard');
   const isFreeform = location.pathname.startsWith('/freeform');
+  const requestedAuth = new URLSearchParams(location.search).get('auth');
+  const routeAuthView = requestedAuth === 'signup' || requestedAuth === 'verify' ? requestedAuth : null;
 
   const [authOpen, setAuthOpen] = useState(false);
+  const closeAuthModal = useCallback(() => {
+    setAuthOpen(false);
+    if (routeAuthView) navigate('/', { replace: true });
+  }, [navigate, routeAuthView]);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const notifPanelRef = useRef<HTMLDivElement>(null);
   const notificationButtonRef = useRef<HTMLButtonElement>(null);
-  const [authView, setAuthView] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [authView, setAuthView] = useState<'signin' | 'signup' | 'verify' | 'forgot'>('signin');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState('');
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -301,7 +307,7 @@ export default function Navbar() {
                 )}
               </>
             ) : (
-              <button onClick={() => { setAuthOpen(true); setShowNavigation(false); }}
+              <button onClick={() => { setAuthView('signin'); setAuthOpen(true); setShowNavigation(false); }}
                 className="bg-primary text-white font-semibold px-4 py-2 rounded-[10px] shadow-[var(--shadow-sm)] hover:bg-accent hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] transition-all"
                 style={{ fontSize: isMobile ? '0.8rem' : '1rem' }}>
                 SIGN IN
@@ -317,8 +323,8 @@ export default function Navbar() {
         {links.map(link => <Link key={link.to} to={link.to} aria-current={isActive(link.to) ? 'page' : undefined} onClick={() => setShowNavigation(false)}>{link.label}</Link>)}
       </nav>}
 
-      {authOpen && createPortal(
-        <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} onAuthChange={handleAuthChange} initialView={authView} />,
+      {(authOpen || routeAuthView) && createPortal(
+        <AuthModal open onClose={closeAuthModal} onAuthChange={handleAuthChange} initialView={routeAuthView || authView} />,
         document.body
       )}
 

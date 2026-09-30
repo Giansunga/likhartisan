@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { recordSecurityActivity, signOutWithActivity } from '../lib/activityApi';
 import './UpdatePasswordPage.css';
+import { meetsPasswordRequirements, PASSWORD_REQUIREMENTS } from '../lib/passwordPolicy';
 
 export default function UpdatePasswordPage() {
   const navigate = useNavigate();
@@ -60,8 +61,8 @@ export default function UpdatePasswordPage() {
     event.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!meetsPasswordRequirements(password)) {
+      setError(PASSWORD_REQUIREMENTS);
       return;
     }
     if (password !== confirmPassword) {
@@ -119,7 +120,7 @@ export default function UpdatePasswordPage() {
                         type={showPassword ? 'text' : 'password'}
                         autoComplete="new-password"
                         required
-                        minLength={6}
+                        minLength={8}
                         aria-describedby="reset-password-hint"
                         value={password}
                         onChange={event => setPassword(event.target.value)}
@@ -133,7 +134,7 @@ export default function UpdatePasswordPage() {
                         {showPassword ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
                       </button>
                     </div>
-                    <p className="reset-form__hint" id="reset-password-hint">At least 6 characters</p>
+                    <p className="reset-form__hint" id="reset-password-hint">{PASSWORD_REQUIREMENTS}</p>
                   </div>
 
                   <div className="reset-form__field">
@@ -144,7 +145,7 @@ export default function UpdatePasswordPage() {
                         type={showConfirmation ? 'text' : 'password'}
                         autoComplete="new-password"
                         required
-                        minLength={6}
+                        minLength={8}
                         value={confirmPassword}
                         onChange={event => setConfirmPassword(event.target.value)}
                       />

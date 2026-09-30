@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
-import { savePendingSignupEmail } from '../lib/pendingSignupEmail';
+import { clearPendingSignupEmail, getPendingSignupEmail, savePendingSignupEmail } from '../lib/pendingSignupEmail';
+import { meetsPasswordRequirements, PASSWORD_REQUIREMENTS } from '../lib/passwordPolicy';
 
-type View = 'signin' | 'signup' | 'forgot';
+type View = 'signin' | 'signup' | 'verify' | 'forgot';
 
 interface Props {
   open: boolean;
@@ -51,7 +51,6 @@ const S = {
 };
 
 export default function AuthModal({ open, onClose, onAuthChange, initialView }: Props) {
-  const navigate = useNavigate();
   const [view, setView]           = useState<View>('signin');
   const [error, setError]         = useState('');
   const [showPw, setShowPw]       = useState(false);
@@ -59,6 +58,10 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successEmail, setSuccessEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState(getPendingSignupEmail);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [passwordInvalid, setPasswordInvalid] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -72,13 +75,17 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
   useEffect(() => {
     if (open) {
-      setView(initialView || 'signin');
+      setView(initialView === 'signup' && getPendingSignupEmail() ? 'verify' : initialView || 'signin');
       setError('');
       setShowPw(false);
       setShowPw2(false);
       setShowSuccess(false);
       setSuccessEmail('');
       setSubmitting(false);
+      setVerificationEmail(getPendingSignupEmail());
+      setVerificationCode('');
+      setVerificationMessage('');
+      setPasswordInvalid(false);
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
 
@@ -157,20 +164,77 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
     const name     = (form.elements.namedItem('name')     as HTMLInputElement).value;
     const email    = (form.elements.namedItem('email')    as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+    if (!meetsPasswordRequirements(password)) {
+      setPasswordInvalid(true);
+      return;
+    }
+    setPasswordInvalid(false);
     setSubmitting(true);
     try {
       const { data, error: err } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
       if (err) { setError(err.message); return; }
       if (!data.session) {
         savePendingSignupEmail(email);
-        onClose();
-        navigate('/verify-email');
+        setVerificationEmail(email.trim());
+        setVerificationCode('');
+        setVerificationMessage('');
+        setView('verify');
         return;
       }
       onAuthChange(data.session.user);
       onClose();
     } catch {
       setError('Account creation could not be completed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function openSignup() {
+    setError('');
+    setVerificationMessage('');
+    setView(getPendingSignupEmail() ? 'verify' : 'signup');
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (submitting) return;
+    setError('');
+    setVerificationMessage('');
+    const email = verificationEmail.trim();
+    if (!/^\d{8}$/.test(verificationCode)) {
+      setError('Enter the eight-digit code from your email.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { data, error: err } = await supabase.auth.verifyOtp({ email, token: verificationCode, type: 'email' });
+      if (err) { setError(err.message); return; }
+      if (!data.session?.user) { setError('Email verification could not be completed. Please try again.'); return; }
+      clearPendingSignupEmail();
+      onAuthChange(data.session.user);
+      onClose();
+    } catch {
+      setError('Email verification could not be completed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResend() {
+    if (submitting) return;
+    setError('');
+    setVerificationMessage('');
+    const email = verificationEmail.trim();
+    if (!email) { setError('Enter the email address you used to create your account.'); return; }
+    setSubmitting(true);
+    try {
+      const { error: err } = await supabase.auth.resend({ type: 'signup', email });
+      if (err) { setError(err.message); return; }
+      savePendingSignupEmail(email);
+      setVerificationMessage(`If this address has an unverified account, a new code was sent to ${email}.`);
+    } catch {
+      setError('A new code could not be sent. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -340,7 +404,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
 
                 <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '20px' }}>
                   Don't have an account yet?{' '}
-                  <button type="button" onClick={() => setView('signup')} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
+                  <button type="button" onClick={openSignup} style={{ background: 'none', border: 'none', color: '#823E0B', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>
                     Sign up
                   </button>
                 </p>
@@ -399,6 +463,8 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showPw2 ? 'text' : 'password'} name="password" required
+                        autoComplete="new-password" aria-describedby="signup-password-requirements" aria-invalid={passwordInvalid}
+                        onChange={e => { if (meetsPasswordRequirements(e.target.value)) setPasswordInvalid(false); }}
                         style={{ ...S.input, paddingRight: '44px' }}
                         onFocus={e => (e.currentTarget.style.borderColor = '#823E0B')}
                         onBlur={e  => (e.currentTarget.style.borderColor = '#DDD5CC')}
@@ -410,6 +476,7 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                         <EyeIcon show={showPw2} />
                       </button>
                     </div>
+                    <p id="signup-password-requirements" role={passwordInvalid ? 'alert' : undefined} style={{ fontSize: '0.75rem', color: passwordInvalid ? '#B91C1C' : '#7A6558', marginTop: '7px' }}>{PASSWORD_REQUIREMENTS}</p>
                   </div>
 
                   <button
@@ -441,6 +508,40 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   <GoogleIcon />
                   Continue with Google
                 </button>
+              </motion.div>
+            )}
+
+            {/* ════ VERIFY EMAIL ════ */}
+            {view === 'verify' && (
+              <motion.div key="verify" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
+                <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '12px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
+                  Verify your email
+                </h1>
+                <p style={{ color: '#7A6558', fontSize: '0.875rem', marginBottom: '24px' }}>
+                  Enter the eight-digit code sent to your email to finish creating your account.
+                </p>
+                {verificationMessage && <p role="status" style={{ color: '#166534', fontSize: '0.82rem', marginBottom: '16px' }}>{verificationMessage}</p>}
+                <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div>
+                    <label htmlFor="verification-email" style={S.label}>Email address</label>
+                    <input id="verification-email" type="email" required autoComplete="email" value={verificationEmail}
+                      onChange={e => { setVerificationEmail(e.target.value); savePendingSignupEmail(e.target.value); }} style={S.input} />
+                  </div>
+                  <div>
+                    <label htmlFor="verification-code" style={S.label}>Verification code</label>
+                    <input id="verification-code" type="text" required inputMode="numeric" autoComplete="one-time-code" maxLength={8}
+                      value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      style={{ ...S.input, letterSpacing: '0.16em', textAlign: 'center', fontSize: '1.15rem' }} />
+                  </div>
+                  <button type="submit" disabled={submitting} style={S.btn}>{submitting ? 'Verifying...' : 'Verify Email'}</button>
+                </form>
+                <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#7A6558', marginTop: '22px' }}>
+                  Didn't get the code? Check your spam folder or{' '}
+                  <button type="button" disabled={submitting} onClick={handleResend} style={{ background: 'none', border: 'none', color: '#823E0B', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>resend code</button>.
+                </p>
+                <p style={{ textAlign: 'center', fontSize: '0.82rem', marginTop: '16px' }}>
+                  <button type="button" onClick={() => { setError(''); setVerificationMessage(''); setView('signup'); }} style={{ background: 'none', border: 'none', color: '#823E0B', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline', padding: 0 }}>Back</button>
+                </p>
               </motion.div>
             )}
 
