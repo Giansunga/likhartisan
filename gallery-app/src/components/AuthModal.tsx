@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import { savePendingSignupEmail } from '../lib/pendingSignupEmail';
 
 type View = 'signin' | 'signup' | 'forgot';
 
@@ -49,13 +51,13 @@ const S = {
 };
 
 export default function AuthModal({ open, onClose, onAuthChange, initialView }: Props) {
+  const navigate = useNavigate();
   const [view, setView]           = useState<View>('signin');
   const [error, setError]         = useState('');
   const [showPw, setShowPw]       = useState(false);
   const [showPw2, setShowPw2]     = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successEmail, setSuccessEmail] = useState('');
-  const [signupNeedsConfirmation, setSignupNeedsConfirmation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -76,7 +78,6 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       setShowPw2(false);
       setShowSuccess(false);
       setSuccessEmail('');
-      setSignupNeedsConfirmation(false);
       setSubmitting(false);
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
@@ -161,8 +162,9 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
       const { data, error: err } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
       if (err) { setError(err.message); return; }
       if (!data.session) {
-        setSuccessEmail(email);
-        setSignupNeedsConfirmation(true);
+        savePendingSignupEmail(email);
+        onClose();
+        navigate('/verify-email');
         return;
       }
       onAuthChange(data.session.user);
@@ -369,14 +371,6 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
             {/* ════ SIGN UP ════ */}
             {view === 'signup' && (
               <motion.div key="signup" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.18 }}>
-                {signupNeedsConfirmation ? (
-                  <div role="status" style={{ textAlign: 'center', padding: '32px 0', color: '#3D2B1F' }}>
-                    <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '12px' }}>Check your email</h1>
-                    <p>Check {successEmail} for a confirmation link before signing in.</p>
-                    <button type="button" onClick={onClose} style={{ ...S.btn, marginTop: '24px' }}>Got it</button>
-                  </div>
-                ) : (
-                <>
                 <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#2A1A0E', marginBottom: '24px', letterSpacing: '-0.02em', fontFamily: 'var(--font-serif, Georgia, serif)' }}>
                   Create Account
                 </h1>
@@ -447,8 +441,6 @@ export default function AuthModal({ open, onClose, onAuthChange, initialView }: 
                   <GoogleIcon />
                   Continue with Google
                 </button>
-                </>
-                )}
               </motion.div>
             )}
 

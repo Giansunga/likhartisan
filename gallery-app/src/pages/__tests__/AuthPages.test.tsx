@@ -19,6 +19,7 @@ function renderPage(path: '/signin' | '/signup') {
   render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/signin" element={<SignInPage />} />
     <Route path="/signup" element={<SignUpPage />} />
+    <Route path="/verify-email" element={<p>Verification destination</p>} />
     <Route path="/" element={<p>Home destination</p>} />
     <Route path="/artisan-dashboard" element={<p>Shop destination</p>} />
   </Routes></MemoryRouter>);
@@ -83,7 +84,8 @@ describe('direct authentication pages', () => {
     renderPage('/signup');
     fillSignUp();
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Check your email');
+    expect(await screen.findByText('Verification destination')).toBeInTheDocument();
+    expect(sessionStorage.getItem('likhartisan:pending-signup-email')).toBe('maria@example.com');
     expect(mocks.signUp).toHaveBeenCalledWith({
       email: 'maria@example.com', password: 'password123', options: { data: { name: 'Maria Santos' } },
     });
