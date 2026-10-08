@@ -357,8 +357,8 @@ export default function ProductCreatePage() {
                     </div>
                     <div className="product-create-variation-grid product-create-variation-grid--second">
                       <div>
-                        <label style={varLabelStyle}>Product weight (kg)</label>
-                        <input type="number" min="0" step="0.001" value={v.weightKg} onChange={e => updateVariation(i, 'weightKg', e.target.value)} placeholder="e.g. 1.5"
+                        <label htmlFor={`product-weight-${v.id}`} style={varLabelStyle}>Product weight (kg) *</label>
+                        <input id={`product-weight-${v.id}`} type="number" min="0.001" step="0.001" required value={v.weightKg} onChange={e => updateVariation(i, 'weightKg', e.target.value)} placeholder="e.g. 1.5"
                           style={varInputStyle} {...varInputFocusProps} />
                       </div>
                       <div>

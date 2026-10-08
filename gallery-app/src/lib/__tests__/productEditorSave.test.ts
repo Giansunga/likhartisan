@@ -26,4 +26,9 @@ describe('productVariationUpdateData', () => {
     const update = productVariationUpdateData({ ...variation, shippingEdited: true });
     expect(update).toEqual(expect.objectContaining({ product_weight_g: 400, shipping_weight_g: 500, shipping_length_in: 10, shipping_width_in: 8, shipping_height_in: 12 }));
   });
+
+  it('updates edited weight and retains saved package data', () => {
+    const update = productVariationUpdateData({ ...variation, weightKg: '1.2', shippingEdited: true });
+    expect(update).toEqual(expect.objectContaining({ weight_kg: 1.2, product_weight_g: 1200, packaging_weight_g: 100, shipping_weight_g: 1300, shipping_length_in: 10, shipping_width_in: 8, shipping_height_in: 12 }));
+  });
 });

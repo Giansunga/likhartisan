@@ -47,11 +47,14 @@ describe('admin product upload form', () => {
     expect(screen.getAllByRole('option').slice(1, 6).map(option => option.textContent)).toEqual(['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others']);
     expect(screen.queryByRole('option', { name: /Bowls|Teapots|Plates/ })).not.toBeInTheDocument();
     expect(screen.getByText('Variation 1')).toBeInTheDocument();
+    expect(within(variationCard(1)).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toBeRequired();
+    expect(within(variationCard(1)).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toHaveValue(null);
     expect(screen.getByRole('button', { name: /Shipping details/ })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: 'Upload Product' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add New Variation' }));
     expect(screen.getByText('Variation 2')).toBeInTheDocument();
+    expect(within(variationCard(2)).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toBeRequired();
     fireEvent.click(within(variationCard(2)).getByRole('button', { name: 'Remove' }));
     expect(screen.queryByText('Variation 2')).not.toBeInTheDocument();
 

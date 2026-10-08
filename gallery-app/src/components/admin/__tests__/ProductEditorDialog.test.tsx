@@ -29,7 +29,7 @@ describe('ProductEditorDialog', () => {
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   });
 
-  it('restores the earlier sections and product category choices while retaining hidden shipping values', async () => {
+  it('shows saved editable weight while retaining untouched shipping values', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const { container } = render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
     expect(screen.getByRole('heading', { name: 'Product Specifications' })).toBeInTheDocument();
@@ -37,7 +37,9 @@ describe('ProductEditorDialog', () => {
     expect(screen.getByRole('heading', { name: 'Variations' })).toBeInTheDocument();
     expect(within(screen.getByRole('combobox', { name: 'Category' })).getAllByRole('option').slice(1).map(option => option.textContent)).toEqual(['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others']);
     const card = await screen.findByText('Variation 1').then(() => variationCard(1));
-    expect(within(card).queryByRole('spinbutton', { name: /Product weight/ })).not.toBeInTheDocument();
+    expect(within(card).getByRole('spinbutton', { name: /Product weight/ })).toHaveValue(0.4);
+    expect(within(card).getByRole('spinbutton', { name: /Product weight/ })).toBeRequired();
+    expect(within(card).queryByText('Optional packed details')).not.toBeInTheDocument();
     expect(within(card).getAllByRole('textbox')).toHaveLength(3);
     fireEvent.change(within(card).getByRole('spinbutton', { name: 'Price' }), { target: { value: '500' } });
     fireEvent.change(container.querySelector('input[accept="image/jpeg,image/png"]')!, { target: { files: [new File(['image'], 'bowl.png', { type: 'image/png' })] } });
@@ -83,6 +85,33 @@ describe('ProductEditorDialog', () => {
     mocks.variations[0] = { ...mocks.variations[0], product_weight_g: null };
     render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={vi.fn()} />);
     await screen.findByText('Variation 1');
-    expect(within(variationCard(1)).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toBeInTheDocument();
+    expect(within(variationCard(1)).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toHaveValue(null);
+  });
+
+  it('loads legacy kilogram weight when gram weight is missing', async () => {
+    mocks.variations[0] = { ...mocks.variations[0], product_weight_g: null, weight_kg: 2.5 };
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={vi.fn()} />);
+    await screen.findByText('Variation 1');
+    expect(within(variationCard(1)).getByRole('spinbutton', { name: /Product weight/ })).toHaveValue(2.5);
+  });
+
+  it('edits saved weight while preserving packaging and packed dimensions', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.change(within(variationCard(1)).getByRole('spinbutton', { name: /Product weight/ }), { target: { value: '1.2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onSave.mock.calls[0][1].variations[0]).toEqual(expect.objectContaining({ weightKg: '1.2', shippingEdited: true, packagingWeightKg: '0.1', shippingLengthIn: '10', shippingWidthIn: '8', shippingHeightIn: '12' }));
+  });
+
+  it.each(['', '0', '-1'])('blocks saving invalid weight %j', async (value) => {
+    const onSave = vi.fn();
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.change(within(variationCard(1)).getByRole('spinbutton', { name: /Product weight/ }), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('needs product weight');
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
