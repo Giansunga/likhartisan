@@ -1,4 +1,4 @@
-import { Component, useState, useEffect, useMemo, Suspense, lazy, type ReactNode } from 'react';
+import { Component, useState, useEffect, useMemo, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart, getCart, onCartUpdate } from '../data/store';
 import { toast } from 'sonner';
@@ -11,6 +11,8 @@ import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/util
 import { normalizeCatalogMeasurement } from '../lib/measurements';
 import RecommendationsSection from '../components/RecommendationsSection';
 import { animateProductToCart } from '../lib/cartAnimation';
+import { ChevronDown, FileText, MessageCircle, ShoppingCart, Store } from 'lucide-react';
+import './ProductDetailPage.css';
 
 function renderStars(rating: number, size = 14): ReactElement[] {
   const stars: ReactElement[] = [];
@@ -72,18 +74,19 @@ export default function ProductDetailPage() {
   const [askSuccess, setAskSuccess] = useState(false);
   const [askMessage, setAskMessage] = useState('');
   const [askSending, setAskSending] = useState(false);
-  const [cartRevision, setCartRevision] = useState(0);
+  const [cart, setCart] = useState(getCart);
+  const productSectionRef = useRef<HTMLDivElement>(null);
+  const [stickyProductId, setStickyProductId] = useState<string | null>(null);
   const productRating = useMemo(() => {
     if (allReviews.length === 0) return { avg: 0, count: 0 };
     const total = allReviews.reduce((s, r) => s + r.rating, 0);
     return { avg: total / allReviews.length, count: allReviews.length };
   }, [allReviews]);
 
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -92,14 +95,22 @@ export default function ProductDetailPage() {
   const displayPrice = selectedVariation?.price ?? product?.price ?? 0;
   const cartProductId = product?.id ?? '';
   const cartVariationId = selectedVariation?.id ?? '';
-  const cartQuantity = useMemo(() => {
-    if (!cartProductId) return 0;
-    return getCart().find(item => (
-      item.productId === cartProductId && (item.variationId ?? '') === cartVariationId
-    ))?.qty ?? 0;
-  }, [cartProductId, cartRevision, cartVariationId]);
+  const cartQuantity = cart.find(item => (
+    item.productId === cartProductId && (item.variationId ?? '') === cartVariationId
+  ))?.qty ?? 0;
 
-  useEffect(() => onCartUpdate(() => setCartRevision(current => current + 1)), []);
+  useEffect(() => onCartUpdate(() => setCart(getCart())), []);
+
+  useEffect(() => {
+    const section = productSectionRef.current;
+    if (loading || !cartProductId || !section || typeof IntersectionObserver === 'undefined') return;
+    const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-height')) || 80;
+    const observer = new IntersectionObserver(([entry]) => {
+      setStickyProductId(!entry.isIntersecting && entry.boundingClientRect.bottom <= headerHeight && entry.boundingClientRect.top < 0 ? cartProductId : null);
+    }, { rootMargin: `-${headerHeight}px 0px 0px 0px`, threshold: 0 });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [loading, cartProductId]);
 
   useEffect(() => {
     if (!product?.image) return;
@@ -169,8 +180,20 @@ export default function ProductDetailPage() {
   }
 
   useEffect(() => {
+    let active = true;
     async function fetchProduct() {
       setLoading(true);
+      setProduct(null);
+      setVariations([]);
+      setSelectedVariation(null);
+      setAllReviews([]);
+      setShopImage('');
+      setShopProductCount(0);
+      setShopRating({ avg: 0, count: 0 });
+      setSoldCount(0);
+      setAskModal(false);
+      setAskSuccess(false);
+      setAskMessage('');
       try {
         const { data, error } = await supabase
           .from('products')
@@ -178,6 +201,7 @@ export default function ProductDetailPage() {
           .eq('id', id)
           .single();
 
+        if (!active) return;
         if (error) {
           console.error('Product fetch error:', error);
           return;
@@ -196,6 +220,7 @@ export default function ProductDetailPage() {
                 .eq('shop_id', shopId).eq('status', 'active'),
               supabase.from('products').select('id').eq('shop_id', shopId).eq('status', 'active'),
             ]);
+            if (!active) return;
             if (shopData.data?.image) setShopImage(shopData.data.image);
             setShopProductCount(countRes.count || 0);
             if (shopProducts.data && shopProducts.data.length > 0) {
@@ -204,18 +229,21 @@ export default function ProductDetailPage() {
                 .from('product_reviews')
                 .select('rating')
                 .in('product_id', productIds);
+              if (!active) return;
               if (shopReviews && shopReviews.length > 0) {
-                const avg = shopReviews.reduce((s: number, r: any) => s + r.rating, 0) / shopReviews.length;
+                const avg = shopReviews.reduce((s: number, r) => s + r.rating, 0) / shopReviews.length;
                 setShopRating({ avg, count: shopReviews.length });
               }
             }
           }
 
+          if (!active) return;
           // Atomic view increment (avoids read-modify-write race)
           supabase.rpc('increment_views', { p_id: id });
 
           // Safe server-side sold count (no full-order download / privacy leak)
           const { data: soldRes } = await supabase.rpc('get_product_sold_count', { p_product_id: id });
+          if (!active) return;
           setSoldCount(soldRes || 0);
 
           const { data: varData, error: varErr } = await supabase
@@ -223,21 +251,16 @@ export default function ProductDetailPage() {
             .select('id, product_id, dimensions, height, opening_diameter, weight_kg, price, stock, sort_order, measurement_unit')
             .eq('product_id', id)
             .order('sort_order');
+          if (!active) return;
           if (varErr) console.error('Variations fetch error:', varErr);
           if (varData) {
-            const mappedVars = varData.map((v: any) => ({
+            const mappedVars = varData.map((v) => ({
               id: v.id, productId: v.product_id,
               dimensions: normalizeCatalogMeasurement(v.dimensions, v.measurement_unit === 'in' ? 'in' : 'cm'),
               height: normalizeCatalogMeasurement(v.height, v.measurement_unit === 'in' ? 'in' : 'cm'),
               openingDiameter: normalizeCatalogMeasurement(v.opening_diameter, v.measurement_unit === 'in' ? 'in' : 'cm'),
               measurementUnit: 'in' as const,
               weightKg: v.weight_kg == null ? undefined : Number(v.weight_kg),
-              productWeightG: v.product_weight_g == null ? undefined : Number(v.product_weight_g),
-              packagingWeightG: v.packaging_weight_g == null ? undefined : Number(v.packaging_weight_g),
-              shippingWeightG: v.shipping_weight_g == null ? undefined : Number(v.shipping_weight_g),
-              shippingLengthIn: v.shipping_length_in == null ? undefined : Number(v.shipping_length_in),
-              shippingWidthIn: v.shipping_width_in == null ? undefined : Number(v.shipping_width_in),
-              shippingHeightIn: v.shipping_height_in == null ? undefined : Number(v.shipping_height_in),
               price: v.price, stock: v.stock, sortOrder: v.sort_order,
             }));
             setVariations(mappedVars);
@@ -249,8 +272,9 @@ export default function ProductDetailPage() {
             .select('id, product_id, user_id, user_name, rating, title, body, images, seller_service_rating, delivery_service_rating, created_at')
             .eq('product_id', id)
             .order('created_at', { ascending: false });
+          if (!active) return;
           if (revData) {
-            const mappedRevs = revData.map((r: any) => ({
+            const mappedRevs = revData.map((r) => ({
               id: r.id, productId: r.product_id, userId: r.user_id,
               userName: r.user_name, rating: r.rating, title: r.title,
               body: r.body, images: r.images || [],
@@ -264,16 +288,17 @@ export default function ProductDetailPage() {
       } catch (error) {
         console.error('Product detail load error:', error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     void fetchProduct();
+    return () => { active = false; };
   }, [id]);
 
-  if (loading && !product) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center" style={{ paddingTop: '80px' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid #E8E0D8', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div role="status" aria-label="Loading product" style={{ width: '40px', height: '40px', border: '3px solid #E8E0D8', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -292,6 +317,21 @@ export default function ProductDetailPage() {
 
   const availableStock = Math.max(0, Math.floor(Number(selectedVariation?.stock ?? product.stock) || 0));
   const cartAtStockLimit = availableStock > 0 && cartQuantity >= availableStock;
+  const buyDisabled = availableStock === 0 || (variations.length > 0 && !selectedVariation);
+  const addDisabled = buyDisabled || cartAtStockLimit;
+  const hasValue = (value: string | undefined) => Boolean(value?.trim() && value.trim().toLowerCase() !== 'n/a');
+  const dimensions = selectedVariation ? selectedVariation.dimensions : product.dimensions;
+  const height = selectedVariation ? selectedVariation.height : product.height;
+  const openingDiameter = selectedVariation ? selectedVariation.openingDiameter : product.openingDiameter;
+  const weightKg = selectedVariation?.weightKg;
+  const sizeLabel = formatVariation(selectedVariation ?? product);
+  const specs = [
+    { label: 'Dimensions', value: hasValue(dimensions) ? dimensions : [height, openingDiameter].filter(hasValue).join(' × ') },
+    { label: 'Weight', value: weightKg != null && Number.isFinite(weightKg) && weightKg > 0 ? `${weightKg} kg` : '' },
+    { label: 'Material', value: hasValue(product.materials) ? product.materials : '' },
+  ].filter(spec => spec.value);
+  const stickyVisible = !isMobile && stickyProductId === product.id;
+  const hasCraftDetails = specs.length > 0 || hasValue(height) || hasValue(openingDiameter) || hasValue(product.technique) || hasValue(product.description);
 
   const handleAddToCart = () => {
     const result = addToCart({
@@ -351,7 +391,7 @@ export default function ProductDetailPage() {
 
 
   return (
-    <div>
+    <div className={`product-detail-page${stickyVisible ? ' product-detail-page--sticky' : ''}`}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'Product',
@@ -363,7 +403,7 @@ export default function ProductDetailPage() {
           '@type': 'Offer',
           priceCurrency: 'PHP',
           price: displayPrice,
-          availability: product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          availability: availableStock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
           url: `${SITE_URL}/product/${product.id}`,
         },
         aggregateRating: productRating.count > 0 ? {
@@ -372,307 +412,134 @@ export default function ProductDetailPage() {
           reviewCount: productRating.count,
         } : undefined,
       }) }} />
-      <main className="product-viewer-section" style={{ marginTop: 'var(--nav-height)' }}>
-        <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="breadcrumbs viewer-breadcrumbs">
-            <Link to="/">Home</Link>
-            <span className="separator" style={{ color: 'var(--text-light)' }}>/</span>
+      <div className="pdp-main">
+        <div className="pdp-container">
+          <nav className="pdp-breadcrumbs" aria-label="Breadcrumb">
+            <Link to="/">Home</Link><span aria-hidden="true">/</span>
             <Link to="/gallery">Gallery</Link>
-            <span className="separator" style={{ color: 'var(--text-light)' }}>/</span>
-            <Link to="/gallery">{product.category}</Link>
-            <span className="separator" style={{ color: 'var(--text-light)' }}>/</span>
-            <span className="text-primary font-medium">{product.name}</span>
-          </div>
+            {product.category && <><span aria-hidden="true">/</span><Link to={`/gallery?category=${encodeURIComponent(product.category)}`}>{product.category}</Link></>}
+            <span aria-hidden="true">/</span><span aria-current="page">{product.name}</span>
+          </nav>
 
-          <div className="product-viewer-layout">
-            <div className="product-image-container">
-              <div className="product-viewer-img-frame" data-product-cart-source>
+          {product.shopId && (
+            <section className="pdp-shop" aria-label="Product shop">
+              <div className="pdp-shop-identity">
+                <div className="pdp-shop-avatar">
+                  {shopImage ? <img src={shopImage} alt="" /> : <Store aria-hidden="true" />}
+                </div>
+                <div className="pdp-shop-details">
+                  <h2>{product.shopName || 'Shop'}</h2>
+                  <div className="pdp-shop-actions">
+                    <button type="button" onClick={handleChatNow}><MessageCircle aria-hidden="true" />Chat Now</button>
+                    <Link to={`/shop/${product.shopId}`}><Store aria-hidden="true" />View Shop</Link>
+                  </div>
+                </div>
+              </div>
+              <dl className="pdp-shop-stats">
+                <div><dt>Products</dt><dd>{shopProductCount}</dd></div>
+                <div><dt>Ratings</dt><dd className="pdp-shop-rating">
+                  {shopRating.count > 0 ? <><span className="pdp-stars" role="img" aria-label={`${fmtRating(shopRating.avg)} out of 5 stars`}>{renderStars(shopRating.avg, 16)}</span><small>{fmtRating(shopRating.avg)} ({shopRating.count})</small></> : <small>No reviews yet</small>}
+                </dd></div>
+              </dl>
+            </section>
+          )}
+
+          <div className="pdp-hero" ref={productSectionRef}>
+            <div className="pdp-media">
+              <div className="pdp-media-frame" data-product-cart-source>
                 {product.model3d ? (
-                  <ProductMediaErrorBoundary
-                    key={product.model3d}
-                    fallback={<img src={product.image} alt={product.name} id="viewer-main-img" />}
-                  >
-                    <div className="w-full h-full">
-                      <Suspense fallback={
-                        <div className="w-full h-full flex items-center justify-center bg-cream-secondary">
-                          <div className="text-brown-medium text-center">
-                            <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
-                            <p className="text-sm">Loading 3D model...</p>
-                          </div>
-                        </div>
-                      }>
-                        <ModelViewer url={product.model3d} />
-                      </Suspense>
-                    </div>
+                  <ProductMediaErrorBoundary key={product.model3d} fallback={<img src={product.image} alt={product.name} id="viewer-main-img" />}>
+                    <Suspense fallback={<div className="pdp-media-loading" role="status"><span className="pdp-spinner" />Loading 3D model…</div>}>
+                      <ModelViewer url={product.model3d} />
+                    </Suspense>
                   </ProductMediaErrorBoundary>
-                ) : (
-                  <img src={product.image} alt={product.name} id="viewer-main-img" />
-                )}
+                ) : <img src={product.image} alt={product.name} id="viewer-main-img" />}
               </div>
             </div>
 
-            <div className="product-info-panel">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '16px' }}>
-                <h1 className="product-viewer-title" style={{ margin: 0 }}>{product.name}</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  {productRating.count > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <div style={{ display: 'flex', gap: '2px' }}>{renderStars(productRating.avg, 16)}</div>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>({fmtRating(productRating.avg)})</span>
-                    </div>
-                  )}
-                  {soldCount > 0 && (
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-light)' }}>{soldCount} sold</span>
-                  )}
+            <div className="pdp-info">
+              <div className="pdp-heading">
+                <h1>{product.name}</h1>
+                <div className="pdp-product-rating">
+                  {productRating.count > 0 ? <><span className="pdp-stars" role="img" aria-label={`${fmtRating(productRating.avg)} out of 5 stars`}>{renderStars(productRating.avg, 16)}</span><a href="#product-reviews" aria-label={`Read ${productRating.count} product reviews`}>({fmtRating(productRating.avg)})</a></> : <a href="#product-reviews">No reviews yet</a>}
+                  {soldCount > 0 && <span>{soldCount} sold</span>}
                 </div>
               </div>
 
-              {variations.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '8px' }}>Select Variation</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {variations.map(v => (
-                      <button key={v.id} onClick={() => setSelectedVariation(v)}
-                        style={{
-                          padding: '8px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
-                          border: selectedVariation?.id === v.id ? '2px solid var(--primary-color)' : '1.5px solid #E8E0D8',
-                          background: selectedVariation?.id === v.id ? 'var(--primary-color)' : '#fff',
-                          color: selectedVariation?.id === v.id ? '#fff' : 'var(--text-dark)',
-                          transition: 'all 0.15s ease',
-                        }}>
-                        {v.dimensions || `${v.height} × ${v.openingDiameter}`}
+              <div className="pdp-selection">
+                <div className="pdp-price-row">
+                  <div className="pdp-size-caption"><span>{variations.length > 0 ? 'Select size' : product.category}</span>{sizeLabel && <span className="pdp-selected-size">{sizeLabel}</span>}</div>
+                  <div className="pdp-price" aria-live="polite" aria-atomic="true">{variations.length > 0 && !selectedVariation ? 'Select a variation' : fmt(displayPrice)}</div>
+                </div>
+                {variations.length > 0 && (
+                  <div className="pdp-variations" role="group" aria-label="Select size">
+                    {variations.map((variation, index) => (
+                      <button type="button" key={variation.id} onClick={() => setSelectedVariation(variation)} aria-pressed={selectedVariation?.id === variation.id}>
+                        <span>{formatVariation(variation) || `Size ${index + 1}`}</span>
+                        {variation.stock <= 0 && <small>Out of stock</small>}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-
-              <div className="product-viewer-price" style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-color)', marginBottom: '16px' }}>
-                {variations.length > 0 ? (
-                  selectedVariation ? fmt(displayPrice) : 'Select a variation'
-                ) : (
-                  fmt(displayPrice)
                 )}
               </div>
 
-              <div className="product-viewer-attributes">
-                {selectedVariation && selectedVariation.height && selectedVariation.height !== 'N/A' && (
-                  <div className="attr-item"><span className="attr-label">Height:</span> <span className="attr-val">{selectedVariation.height}</span></div>
-                )}
-                {selectedVariation && selectedVariation.openingDiameter && selectedVariation.openingDiameter !== 'N/A' && (
-                  <div className="attr-item"><span className="attr-label">Opening Diameter:</span> <span className="attr-val">{selectedVariation.openingDiameter}</span></div>
-                )}
-                {selectedVariation && selectedVariation.dimensions && selectedVariation.dimensions !== 'N/A' && (
-                  <div className="attr-item"><span className="attr-label">Dimensions:</span> <span className="attr-val">{selectedVariation.dimensions}</span></div>
-                )}
-                {selectedVariation && selectedVariation.weightKg != null && (
-                  <div className="attr-item"><span className="attr-label">Weight:</span> <span className="attr-val">{selectedVariation.weightKg} kg</span></div>
-                )}
-                <div className="attr-item"><span className="attr-label">Material:</span> <span className="attr-val">{product.materials || 'Terracotta Clay'}</span></div>
-                <div className="attr-item"><span className="attr-label">Technique:</span> <span className="attr-val">{product.technique || 'Handcrafted & Kiln-Fired'}</span></div>
-              </div>
-
-              {(() => {
-                const stock = availableStock;
-                const isOutOfStock = stock === 0;
-                const isLowStock = stock > 0 && stock <= 3;
-                return (
-                  <>
-                    {isOutOfStock && (
-                      <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', fontSize: '0.88rem', fontWeight: 600, marginBottom: '16px' }}>
-                        This item is currently out of stock.
-                      </div>
-                    )}
-                    {isLowStock && (
-                      <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FFF7ED', border: '1px solid #FED7AA', color: '#9A3412', fontSize: '0.88rem', fontWeight: 600, marginBottom: '16px' }}>
-                        Only {stock} left in stock.
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-
-              {!isMobile && (
-                <div className="product-viewer-actions">
-                  {(() => {
-                    const stock = availableStock;
-                    const isOutOfStock = stock === 0;
-                    const needsVariation = variations.length > 0 && !selectedVariation;
-                    const addDisabled = isOutOfStock || needsVariation || cartAtStockLimit;
-                    return (
-                      <>
-                        <button className="btn-product-buy" onClick={handleBuy} disabled={isOutOfStock || needsVariation} style={{ opacity: isOutOfStock || needsVariation ? 0.5 : 1, cursor: isOutOfStock || needsVariation ? 'not-allowed' : 'pointer' }}>Buy Now</button>
-                        <button className="btn-product-ask" onClick={handleAskClick}>Ask a Question</button>
-                        <button className="btn-product-design" onClick={handleAddToCart} disabled={addDisabled} style={{ opacity: addDisabled ? 0.5 : 1, cursor: addDisabled ? 'not-allowed' : 'pointer' }}>{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
-                      </>
-                    );
-                  })()}
+              {specs.length > 0 && <dl className="pdp-spec-tiles">{specs.map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}</dl>}
+              {hasCraftDetails && <details className="pdp-craft" key={product.id}>
+                <summary><FileText aria-hidden="true" /><span>Full Specifications &amp; Craft Details</span><ChevronDown aria-hidden="true" /></summary>
+                <div className="pdp-craft-content">
+                  {hasValue(product.description) && <p>{product.description}</p>}
+                  <dl>{[
+                    ...specs,
+                    { label: 'Height', value: hasValue(height) ? height : '' },
+                    { label: 'Opening diameter', value: hasValue(openingDiameter) ? openingDiameter : '' },
+                    { label: 'Technique', value: hasValue(product.technique) ? product.technique : '' },
+                  ].filter(spec => spec.value).map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}</dl>
                 </div>
-              )}
+              </details>}
+
+              <div className="pdp-purchase">
+                {availableStock === 0 && <p className="pdp-stock pdp-stock--empty" role="status">This item is currently out of stock.</p>}
+                {availableStock > 0 && availableStock <= 3 && <p className="pdp-stock" role="status">Only {availableStock} left in stock.</p>}
+                {cartAtStockLimit && <p className="pdp-stock" role="status">Your cart already contains all {availableStock} available.</p>}
+                <div className="pdp-actions">
+                  <button type="button" className="pdp-buy" onClick={handleBuy} disabled={buyDisabled}>Buy Now</button>
+                  <button type="button" className="pdp-add" onClick={handleAddToCart} disabled={addDisabled}><ShoppingCart aria-hidden="true" />{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
+                  <button type="button" className="pdp-ask" onClick={handleAskClick}><MessageCircle aria-hidden="true" />Ask a Question</button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Shop Section */}
-          <div className="product-shop-section" style={{
-            marginTop: '40px', marginBottom: '40px', padding: isMobile ? '18px 16px' : '18px 28px',
-            background: '#fff', borderRadius: '16px', border: '1px solid #eee',
-            display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? '16px' : '0',
-          }}>
-            {/* Avatar + Name + Desktop Buttons */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '16px',
-              justifyContent: isMobile ? 'space-between' : 'flex-start',
-              flex: isMobile ? 1 : undefined,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: isMobile ? '56px' : '64px', height: isMobile ? '56px' : '64px', borderRadius: '50%', overflow: 'hidden',
-                  flexShrink: 0, border: '3px solid var(--primary-color)',
-                }}>
-                  {shopImage ? (
-                    <img src={shopImage} alt={product.shopName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: isMobile ? '1.2rem' : '1.4rem' }}>
-                      {(product.shopName || 'S').charAt(0)}
-                    </div>
-                  )}
+          <section className="pdp-reviews" id="product-reviews" aria-labelledby="product-reviews-title">
+            <h2 id="product-reviews-title" className="pdp-section-title">Product Reviews</h2>
+            {allReviews.length === 0 ? <p className="pdp-empty-reviews">No reviews yet. Reviews from completed purchases will appear here.</p> : <div className="pdp-review-list">
+              {allReviews.map(review => <article key={review.id} className="pdp-review">
+                <div className="pdp-review-heading">
+                  <div className="pdp-review-person"><span className="pdp-review-avatar" aria-hidden="true">{(review.userName || 'Buyer').charAt(0).toUpperCase()}</span><div><h3>{review.userName || 'Buyer'}</h3><span className="pdp-stars" role="img" aria-label={`${review.rating} out of 5 stars`}>{renderStars(review.rating, 14)}</span></div></div>
+                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>
                 </div>
-              </div>
+                {review.title && <h4>{review.title}</h4>}
+                <p>{review.body}</p>
+                <div className="pdp-service-ratings">
+                  {(review.sellerServiceRating || 0) > 0 && <span>Seller Service: <span className="pdp-stars" role="img" aria-label={`${review.sellerServiceRating} out of 5 stars`}>{renderStars(review.sellerServiceRating || 0, 12)}</span></span>}
+                  {(review.deliveryServiceRating || 0) > 0 && <span>Delivery Service: <span className="pdp-stars" role="img" aria-label={`${review.deliveryServiceRating} out of 5 stars`}>{renderStars(review.deliveryServiceRating || 0, 12)}</span></span>}
+                </div>
+                {review.images?.length > 0 && <div className="pdp-review-images">{review.images.map((image, index) => <a key={index} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`Review photo ${index + 1}`} loading="lazy" /></a>)}</div>}
+              </article>)}
+            </div>}
+          </section>
 
-              <div className="product-shop-name" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: isMobile ? 1 : undefined }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0 }}>{product.shopName}</h3>
-                  {isMobile && (
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-dark)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span>{shopProductCount}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 500 }}>Products</span>
-                      </div>
-                      <div style={{ width: '1px', height: '24px', background: '#E8E0D8' }} />
-                      <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flexDirection: 'column' }}>
-                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 500 }}>Ratings</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="product-shop-buttons" style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={handleChatNow}
-                    style={{
-                      padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                      border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)',
-                      display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
-                    }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
-                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                    </svg>
-                    Chat Now
-                  </button>
-                  <Link to={`/shop/${product.shopId}`} style={{
-                    padding: '6px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                    border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)',
-                    display: 'flex', alignItems: 'center', gap: '5px', textDecoration: 'none', whiteSpace: 'nowrap',
-                  }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 13, height: 13 }}>
-                      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                    View Shop
-                  </Link>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Desktop: Stats column — pushed to far right */}
-            {!isMobile && (
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Products</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)' }}>{shopProductCount}</div>
-                </div>
-                <div style={{ width: '1px', height: '32px', background: '#E8E0D8' }} />
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-light)', marginBottom: '2px' }}>Ratings</div>
-                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>{renderStars(shopRating.avg, 14)}</div>
-                </div>
-              </div>
-            )}
-
+          <div className="pdp-recommendations" key={product.id}>
+            {product.shopId && <RecommendationsSection excludeProductIds={[product.id]} preferredShopIds={[product.shopId]} sameShopOnly title="More from the Same Shop" subtitle={`Handcrafted pieces by ${product.shopName || 'this shop'}`} viewAllHref={`/shop/${product.shopId}`} />}
+            <RecommendationsSection excludeProductIds={[product.id]} preferredCategories={product.category ? [product.category] : []} preferredShopIds={product.shopId ? [product.shopId] : []} />
           </div>
-
-          {/* Product Reviews Section */}
-          <div style={{ marginTop: '48px', paddingBottom: '40px' }}>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '24px' }}>Product Reviews</h2>
-
-            {allReviews.length === 0 ? (
-              <p style={{ color: 'var(--text-light)', padding: '30px 0', textAlign: 'center' }}>No reviews yet. Be the first to review this product!</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {allReviews.map(rev => (
-                  <div key={rev.id} style={{ padding: '18px', background: '#fff', borderRadius: '12px', border: '1px solid #eee' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
-                          {rev.userName.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{rev.userName}</div>
-                          <div style={{ display: 'flex', gap: '2px' }}>{renderStars(rev.rating, 12)}</div>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>
-                        {new Date(rev.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </span>
-                    </div>
-                    {rev.title && <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>{rev.title}</div>}
-                    <p style={{ fontSize: '0.88rem', color: 'var(--text-light)', lineHeight: 1.6, margin: 0 }}>{rev.body}</p>
-                    {((rev.sellerServiceRating || 0) > 0 || (rev.deliveryServiceRating || 0) > 0) && (
-                      <div style={{ display: 'flex', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
-                        {(rev.sellerServiceRating || 0) > 0 && (
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>
-                            Seller Service: <span style={{ display: 'inline-flex', gap: '1px', verticalAlign: 'middle' }}>{renderStars(rev.sellerServiceRating || 0, 10)}</span>
-                          </div>
-                        )}
-                        {(rev.deliveryServiceRating || 0) > 0 && (
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>
-                            Delivery Service: <span style={{ display: 'inline-flex', gap: '1px', verticalAlign: 'middle' }}>{renderStars(rev.deliveryServiceRating || 0, 10)}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {rev.images && rev.images.length > 0 && (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
-                        {rev.images.map((img, i) => (
-                          <a key={i} href={img} target="_blank" rel="noopener noreferrer">
-                            <img src={img} alt="Review photo" style={{ width: '72px', height: '72px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E8E0D8', cursor: 'pointer' }} />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {product && (
-            <>
-              <hr className="viewer-section-divider" />
-              <RecommendationsSection
-                excludeProductIds={[product.id]}
-                preferredCategories={product.category ? [product.category] : []}
-                preferredShopIds={product.shopId ? [product.shopId] : []}
-              />
-            </>
-          )}
-          </div>
-        </main>
+        </div>
+      </div>
 
         {/* Ask a Question Modal */}
       <div className={`modal-overlay ${askModal ? 'active' : ''}`}>
         <div className="modal-box">
-          <button className="modal-close" onClick={() => { setAskModal(false); setAskSuccess(false); setAskMessage(''); }}>×</button>
+          <button type="button" aria-label="Close question dialog" className="modal-close" onClick={() => { setAskModal(false); setAskSuccess(false); setAskMessage(''); }}>×</button>
           {!askSuccess ? (
             <>
               <h3 className="modal-title">Ask the Potter</h3>
@@ -681,8 +548,8 @@ export default function ProductDetailPage() {
               </p>
               <form onSubmit={handleAskSubmit}>
                 <div className="form-group">
-                  <label>Your Message</label>
-                  <textarea rows={4} placeholder="Type your question here..." required
+                  <label htmlFor="product-question">Your Message</label>
+                  <textarea id="product-question" rows={4} placeholder="Type your question here..." required
                     value={askMessage} onChange={e => setAskMessage(e.target.value)} />
                 </div>
                 <button type="submit" className="btn-form-submit" disabled={askSending}>
@@ -706,6 +573,28 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {stickyVisible && (
+        <section className="pdp-desktop-dock" aria-label="Sticky purchase controls">
+          <div className="pdp-dock-container">
+            <div className="pdp-dock-identity">
+              {product.image && <img src={product.image} alt="" />}
+              <div className="pdp-dock-copy">
+                <h2>{product.name}</h2>
+                <div className="pdp-dock-meta">{sizeLabel && <span title={sizeLabel}>{sizeLabel}</span>}<small>{product.shopName}</small></div>
+              </div>
+            </div>
+            <div className="pdp-dock-purchase">
+              <div className="pdp-dock-price"><span>{availableStock === 0 ? 'Out of stock' : 'Price'}</span><strong>{fmt(displayPrice)}</strong></div>
+              <div className="pdp-dock-actions">
+                <button type="button" className="pdp-dock-ask" onClick={handleAskClick} aria-label="Ask a Question"><MessageCircle aria-hidden="true" />Ask</button>
+                <button type="button" className="pdp-dock-add" onClick={handleAddToCart} disabled={addDisabled}><ShoppingCart aria-hidden="true" />{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
+                <button type="button" className="pdp-dock-buy" onClick={handleBuy} disabled={buyDisabled}>Buy Now</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {isMobile && (
         <div className="mobile-action-bar" style={{
           position: 'fixed', bottom: 'var(--mobile-nav-reserved-height)', left: 0, right: 0,
@@ -721,7 +610,7 @@ export default function ProductDetailPage() {
             const addDisabled = buyDisabled || cartAtStockLimit;
             return (
               <>
-                <button onClick={handleAskClick} className="btn-chat" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button type="button" aria-label="Ask a Question" onClick={handleAskClick} className="btn-chat" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                 </button>
                 <button onClick={handleAddToCart} disabled={addDisabled} className="btn-cart" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: addDisabled ? 0.5 : 1 }}>{cartAtStockLimit ? 'Stock Limit' : 'Add to Cart'}</button>
