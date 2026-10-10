@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Layout from '../Layout';
 
@@ -13,8 +13,19 @@ function AboutFixture() {
   return <><Link to="/about#heritage">Open heritage</Link><section id="origin">Origin</section><section id="heritage">Heritage</section></>;
 }
 
+function HomeFixture() {
+  const navigate = useNavigate();
+  return <>
+    <Link to="/#home-reviews">Open reviews</Link>
+    <button onClick={() => navigate(-1)}>Back</button>
+    <button onClick={() => navigate(1)}>Forward</button>
+    <section id="home-story" data-home-section tabIndex={-1}>Story</section>
+    <section id="home-reviews" data-home-section tabIndex={-1}>Reviews</section>
+  </>;
+}
+
 function renderAt(entry: string) {
-  return render(<MemoryRouter initialEntries={[entry]}><Routes><Route element={<Layout />}><Route path="about" element={<AboutFixture />} /></Route></Routes></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[entry]}><Routes><Route element={<Layout />}><Route index element={<HomeFixture />} /><Route path="about" element={<AboutFixture />} /></Route></Routes></MemoryRouter>);
 }
 
 describe('Layout hash navigation', () => {
@@ -41,5 +52,18 @@ describe('Layout hash navigation', () => {
   it('falls back to the page top for missing or absent hashes', () => {
     renderAt('/about#missing');
     expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
+  it('scrolls and focuses homepage direct links and history destinations', () => {
+    renderAt('/#home-story');
+    expect(scrolledIds).toContain('home-story');
+    expect(document.getElementById('home-story')).toHaveFocus();
+    fireEvent.click(screen.getByRole('link', { name: 'Open reviews' }));
+    expect(document.getElementById('home-reviews')).toHaveFocus();
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'start', behavior: 'instant' });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(document.getElementById('home-story')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
+    expect(document.getElementById('home-reviews')).toHaveFocus();
   });
 });

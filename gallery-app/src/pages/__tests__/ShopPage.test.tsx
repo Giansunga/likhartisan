@@ -105,7 +105,7 @@ describe('ShopPage', () => {
     expect(await screen.findByRole('heading', { name: 'Clay House' })).toBeInTheDocument();
     expect(screen.getByText('14')).toBeInTheDocument();
     expect(screen.getByText('2022')).toBeInTheDocument();
-    expect(screen.getByText('Price unavailable')).toBeInTheDocument();
+    expect(screen.getByText('₱0.00')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View all 14 pieces/i })).toHaveAttribute('href', '/gallery?shop=shop-1');
     expect(screen.queryByText('Verified Shop')).not.toBeInTheDocument();
     expect(screen.queryByText('100%')).not.toBeInTheDocument();

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 interface ArtisanRow {
   id: string;
-  shop_id: string;
+  shop_id: string | null;
   name: string;
   specialty: string;
   experience: string;
@@ -109,6 +109,9 @@ export default function ArtisansPage() {
                   </div>
                   <div className="p-5 flex flex-col flex-grow">
                     <h4 className="text-[1.25rem] font-bold text-brown-dark mb-1">{a.name}</h4>
+                    <p className="artisan-shop-name">
+                      {a.shop_id && a.shop_name ? <Link to={`/shop/${a.shop_id}`}>{a.shop_name}</Link> : a.shop_id ? 'Shop unavailable' : 'No shop assigned'}
+                    </p>
                     {a.specialty && <p className="text-[0.95rem] font-semibold text-primary mb-3">{a.specialty}</p>}
                     <div className="w-[36px] h-[3px] bg-primary mb-3.5" />
                     <p className="text-[0.85rem] text-brown-medium leading-[1.6] mb-5 flex-grow">{a.description}</p>

@@ -4,6 +4,7 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
 import { captureException } from '../lib/sentry';
+import { scrollToHomeSection } from '../lib/homeSections';
 
 class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -44,7 +45,8 @@ export default function Layout() {
       if (hash) {
         const target = document.getElementById(hash);
         if (target) {
-          target.scrollIntoView({ block: 'start' });
+          if (location.pathname === '/' && target.hasAttribute('data-home-section')) scrollToHomeSection(target);
+          else target.scrollIntoView({ block: 'start' });
           return;
         }
       }

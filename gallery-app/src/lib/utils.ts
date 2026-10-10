@@ -1,10 +1,11 @@
-const FAVORITES_KEY = 'likhartisan_favorites';
+export const FAVORITES_KEY = 'likhartisan_favorites';
 import { normalizeCatalogMeasurement, type MeasurementUnit } from './measurements';
 
 export function loadFavorites(): string[] {
   try {
     const stored = localStorage.getItem(FAVORITES_KEY);
-    return stored ? JSON.parse(stored) : [];
+    const parsed: unknown = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? [...new Set(parsed.filter((id): id is string => typeof id === 'string'))] : [];
   } catch {
     return [];
   }
@@ -60,6 +61,7 @@ export function mapSupabaseProduct(row: any) {
     description: row.description || '',
     category: normalizeProductCategory(row.category),
     price: row.price || 0,
+    catalogPrice: row.price == null || row.price === '' ? null : Number(row.price),
     stock: row.stock || 0,
     inStock: (row.stock || 0) > 0,
     image: row.image || '',

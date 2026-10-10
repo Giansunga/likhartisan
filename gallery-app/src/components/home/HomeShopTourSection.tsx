@@ -2,7 +2,7 @@ const SHOP_TOUR_VIDEO = 'https://www.youtube-nocookie.com/embed/yrfUUl-jhAQ';
 
 export default function HomeShopTourSection() {
   return (
-    <section className="home-section home-shop-tour" aria-labelledby="home-shop-tour-title">
+    <section id="home-shop-tour" data-home-section tabIndex={-1} className="home-section home-shop-tour" aria-labelledby="home-shop-tour-title">
       <div className="home-container">
         <div className="home-shop-tour__intro">
           <div className="home-section-heading home-shop-tour__heading">

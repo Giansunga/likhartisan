@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomePage from '../HomePage';
+import { HOME_SECTIONS } from '../../lib/homeSections';
 
 const mocks = vi.hoisted(() => ({
   shops: { data: [] as any[], error: null as null | { message: string } },
@@ -12,10 +13,11 @@ const mocks = vi.hoisted(() => ({
   shopOrder: vi.fn(),
 }));
 
+vi.mock('../../hooks/useLandingCounts', () => ({ useLandingCounts: () => ({ artisanCount: 19, potteryCount: 104 }) }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user, loading: false }) }));
-vi.mock('../../components/freeform/FreeformScrollSection', () => ({ default: () => <div data-testid="freeform-scroller" /> }));
-vi.mock('../../components/home/HomeShopRail', () => ({ default: ({ shops, loading, error }: any) => <div data-testid="shop-rail">{loading ? 'Loading shops' : error ? 'Shop error' : shops.map((shop: any) => <a key={shop.id} href={`/shop/${shop.id}`}>{shop.name}</a>)}</div> }));
-vi.mock('../../components/home/HomeReviewRail', () => ({ default: ({ reviews }: any) => <div data-testid="review-rail">{reviews.map((review: any) => review.userName).join(', ')}</div> }));
+vi.mock('../../components/freeform/FreeformScrollSection', () => ({ default: () => <div id="home-design-studio" data-home-section data-testid="freeform-scroller" /> }));
+vi.mock('../../components/home/HomeShopRail', () => ({ default: ({ shops, loading, error }: any) => <div id="home-shops" data-home-section data-testid="shop-rail">{loading ? 'Loading shops' : error ? 'Shop error' : shops.map((shop: any) => <a key={shop.id} href={`/shop/${shop.id}`}>{shop.name}</a>)}</div> }));
+vi.mock('../../components/home/HomeReviewRail', () => ({ default: ({ reviews }: any) => <div id="home-reviews" data-home-section data-testid="review-rail">{reviews.map((review: any) => review.userName).join(', ')}</div> }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...args: unknown[]) => mocks.from(...args) } }));
 
 function configureQueries() {
@@ -34,11 +36,13 @@ function renderHome() { return render(<MemoryRouter><HomePage /></MemoryRouter>)
 
 describe('HomePage editorial landing page', () => {
   beforeEach(() => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     mocks.user = null;
     mocks.shops = { data: [{ id: 'shop-1', name: 'Clay Corner', description: '', banner: '', image: '', location: '' }], error: null };
     mocks.reviews = { data: [], error: null };
     mocks.from.mockReset(); mocks.shopSelect.mockReset(); mocks.shopOrder.mockReset(); configureQueries();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it('keeps the hero first and renders the connected editorial path in order', async () => {
     renderHome();
@@ -86,6 +90,21 @@ describe('HomePage editorial landing page', () => {
     expect(screen.getAllByRole('link').find(link => link.getAttribute('href') === '/gallery?category=Others')).toBeDefined();
     await waitFor(() => expect(mocks.shopSelect).toHaveBeenCalledWith('id, name, description, banner, image, location'));
     expect(mocks.shopOrder).toHaveBeenCalledWith('name');
+    expect(screen.getByTestId('review-rail')).toHaveTextContent('Maria Santos');
+  });
+
+  it('keeps every section destination mounted while shop data loads', async () => {
+    renderHome();
+    expect(screen.getByTestId('shop-rail')).toHaveTextContent('Loading shops');
+    HOME_SECTIONS.forEach(section => expect(document.getElementById(section.id)).toHaveAttribute('data-home-section'));
+    await screen.findByRole('link', { name: 'Clay Corner' });
+  });
+
+  it.each(['empty', 'error'])('keeps navigation destinations with %s shop data', async state => {
+    mocks.shops = { data: [], error: state === 'error' ? { message: 'Unavailable' } : null };
+    renderHome();
+    await waitFor(() => expect(screen.getByTestId('shop-rail')).not.toHaveTextContent('Loading shops'));
+    HOME_SECTIONS.forEach(section => expect(document.getElementById(section.id)).toHaveAttribute('data-home-section'));
     expect(screen.getByTestId('review-rail')).toHaveTextContent('Maria Santos');
   });
 

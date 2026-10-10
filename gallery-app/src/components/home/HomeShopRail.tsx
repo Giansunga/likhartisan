@@ -45,7 +45,7 @@ export default function HomeShopRail({ shops, loading, error }: HomeShopRailProp
   };
 
   return (
-    <section className="home-section home-shops" aria-labelledby="home-shops-title">
+    <section id="home-shops" data-home-section tabIndex={-1} className="home-section home-shops" aria-labelledby="home-shops-title">
       <div className="home-container">
         <div className="home-section-heading home-section-heading--split">
           <div><h2 id="home-shops-title">Shops keeping the <em>craft in motion</em></h2></div>

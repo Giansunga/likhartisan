@@ -8,7 +8,6 @@ import ShopProductsSection from '../components/shop/ShopProductsSection';
 import ShopStorySection from '../components/shop/ShopStorySection';
 import {
   EMPTY_STOREFRONT_DATA,
-  getLowestProductPrices,
   getMembershipYear,
   getProductRatingSummaries,
   type ShopArtisan,
@@ -17,6 +16,7 @@ import {
 } from '../components/shop/shopStorefront';
 import { useAuth } from '../contexts/AuthContext';
 import { mapSupabaseProduct } from '../lib/utils';
+import { summarizeCatalogVariations } from '../lib/catalogPresentation';
 import { supabase } from '../lib/supabase';
 import '../styles/shop-profile.css';
 
@@ -87,15 +87,20 @@ export default function ShopPage() {
       const products = (productResult.data ?? []).map(row => mapSupabaseProduct(row));
       const productIds = products.map(product => product.id);
       let productPrices: Record<string, number> = {};
+      let productAvailability: Record<string, boolean> = {};
       let productRatings = {};
 
       if (productIds.length) {
         const [variationResult, reviewResult] = await Promise.all([
-          supabase.from('product_variations').select('product_id, price').in('product_id', productIds).not('price', 'is', null),
+          supabase.from('product_variations').select('product_id, price, stock').in('product_id', productIds),
           supabase.from('product_reviews').select('product_id, rating').in('product_id', productIds),
         ]);
         if (currentRequest !== requestId.current) return;
-        if (!variationResult.error) productPrices = getLowestProductPrices(variationResult.data ?? []);
+        if (!variationResult.error) {
+          const summary = summarizeCatalogVariations(variationResult.data ?? []);
+          productPrices = summary.prices;
+          productAvailability = summary.availability;
+        }
         if (!reviewResult.error) productRatings = getProductRatingSummaries(reviewResult.data ?? []);
       }
 
@@ -106,6 +111,7 @@ export default function ShopPage() {
         artisanCount: artisanResult.error ? 0 : artisanResult.count ?? artisanResult.data?.length ?? 0,
         artisans: artisanResult.error ? [] : (artisanResult.data ?? []) as ShopArtisan[],
         productPrices,
+        productAvailability,
         productRatings,
       });
     } catch (error) {
@@ -277,7 +283,7 @@ export default function ShopPage() {
       <nav className="shop-section-nav" aria-label="Shop sections">
         <div className="shop-container"><a href="#shop-products">Pieces</a><a href="#shop-story">Our story</a><a href="#shop-makers">Artisans</a></div>
       </nav>
-      <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} ratings={storefront.productRatings} />
+      <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} availability={storefront.productAvailability} ratings={storefront.productRatings} />
       <ShopStorySection shop={shop} membershipYear={membershipYear} />
       <ShopMakersSection artisans={storefront.artisans} artisanCount={storefront.artisanCount} />
       <ShopClosingSection shopName={shop.name} messagePending={messagePending} onMessage={() => void handleMessageShop()} />

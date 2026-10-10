@@ -2,7 +2,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
-import { loadFavorites, saveFavorites, mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
+import { mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
+import { useFavorites } from '../hooks/useFavorites';
+import { catalogDisplayPrice, summarizeCatalogVariations } from '../lib/catalogPresentation';
 import Pagination from '../components/Pagination';
 import GalleryHero from '../components/GalleryHero';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,7 +40,7 @@ export default function GalleryPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recommended');
   const [showFavorites, setShowFavorites] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(() => loadFavorites());
+  const { favorites, toggleFavorite: toggleSavedFavorite } = useFavorites();
   const [signals, setSignals] = useState<UserProductSignal[]>([]);
   const [loadingSignals, setLoadingSignals] = useState(true);
   const [resettingRecommendations, setResettingRecommendations] = useState(false);
@@ -65,15 +67,13 @@ export default function GalleryPage() {
     setActiveCategory(cat ? normalizeProductCategory(cat) : null);
   }, [searchParams]);
 
-  useEffect(() => { saveFavorites(favorites); }, [favorites]);
-
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed, shopFilter]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
     e.stopPropagation();
-    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+    toggleSavedFavorite(id);
   }
 
   useEffect(() => {
@@ -134,17 +134,7 @@ export default function GalleryPage() {
               .in('product_id', productIds);
 
             if (!variationError && varData) {
-              const prices: Record<string, number> = {};
-              const availability: Record<string, boolean> = {};
-              for (const v of varData) {
-                if (!(v.product_id in availability)) availability[v.product_id] = false;
-                if (!(Number(v.stock) > 0)) continue;
-                availability[v.product_id] = true;
-                const price = Number(v.price);
-                if (price > 0 && (!prices[v.product_id] || price < prices[v.product_id])) {
-                  prices[v.product_id] = price;
-                }
-              }
+              const { prices, availability } = summarizeCatalogVariations(varData);
               setVariantPrices(prices);
               setVariationAvailability(availability);
             }
@@ -284,11 +274,14 @@ export default function GalleryPage() {
         return list.sort((a, b) =>
           (productRatings[b.id]?.count ?? 0) - (productRatings[a.id]?.count ?? 0) || a.id.localeCompare(b.id));
       case 'price-asc':
-        return list.sort((a, b) =>
-          (variantPrices[a.id] ?? a.price) - (variantPrices[b.id] ?? b.price) || a.id.localeCompare(b.id));
       case 'price-desc':
-        return list.sort((a, b) =>
-          (variantPrices[b.id] ?? b.price) - (variantPrices[a.id] ?? a.price) || a.id.localeCompare(b.id));
+        return list.sort((a, b) => {
+          const first = catalogDisplayPrice(a, variantPrices[a.id]);
+          const second = catalogDisplayPrice(b, variantPrices[b.id]);
+          return Number(first === null) - Number(second === null)
+            || (sort === 'price-asc' ? 1 : -1) * ((first ?? 0) - (second ?? 0))
+            || a.id.localeCompare(b.id);
+        });
       case 'name-asc':
         return list.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
       default:
@@ -501,14 +494,14 @@ export default function GalleryPage() {
                 <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
                     <img src={p.image} alt={p.name} />
-                    {loggedIn && (
                     <button
                       className={`gallery-favorite-icon-button ${favorites.includes(p.id) ? 'active' : ''}`}
+                      aria-pressed={favorites.includes(p.id)}
                       aria-label={favorites.includes(p.id) ? `Remove ${p.name} from favorites` : `Add ${p.name} to favorites`}
                       onClick={(e) => toggleFavorite(e, p.id)}
                       style={{
                         position: 'absolute', top: '10px', right: '10px', zIndex: 5,
-                        width: '34px', height: '34px', borderRadius: '50%',
+                        width: '44px', height: '44px', borderRadius: '50%',
                         background: 'rgba(255,255,255,0.9)', border: 'none',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
@@ -522,7 +515,6 @@ export default function GalleryPage() {
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                       </svg>
                     </button>
-                    )}
                   </div>
                   <div className="product-details">
                     <div className="product-card-header">
@@ -543,11 +535,8 @@ export default function GalleryPage() {
                       <span className="product-card-shop">{p.shopName}</span>
                     </div>
                     <div className="product-card-footer">
-                      {(variationAvailability[p.id] ?? (p.stock > 0)) ? (
-                        <div className="product-card-price">₱{(variantPrices[p.id] ?? p.price).toLocaleString()}</div>
-                      ) : (
-                        <div className="product-card-out-of-stock">Out of stock</div>
-                      )}
+                      <div className="product-card-price">{catalogDisplayPrice(p, variantPrices[p.id]) === null ? 'Price unavailable' : `₱${catalogDisplayPrice(p, variantPrices[p.id])!.toLocaleString()}`}</div>
+                      {!(variationAvailability[p.id] ?? (p.stock > 0)) && <div className="product-card-out-of-stock">Out of stock</div>}
                     </div>
                   </div>
                 </Link>

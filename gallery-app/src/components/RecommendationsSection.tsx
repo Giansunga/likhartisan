@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { mapSupabaseProduct, fmt, storedProductCategories } from '../lib/utils';
 import type { Product } from '../types';
+import { catalogDisplayPrice, summarizeCatalogVariations } from '../lib/catalogPresentation';
 
 interface RecommendationsSectionProps {
   excludeProductIds?: string[];
@@ -79,13 +80,10 @@ export default function RecommendationsSection({
         if (results.length > 0) {
           const ids = results.map(product => product.id);
           const [{ data: varRows }, { data: reviewRows }] = await Promise.all([
-            supabase.from('product_variations').select('product_id, price').in('product_id', ids),
+            supabase.from('product_variations').select('product_id, price, stock').in('product_id', ids),
             supabase.from('product_reviews').select('product_id, rating').in('product_id', ids),
           ]);
-          const prices: Record<string, number> = {};
-          for (const variation of varRows || []) {
-            if (variation.price && (prices[variation.product_id] == null || variation.price < prices[variation.product_id])) prices[variation.product_id] = variation.price;
-          }
+          const { prices, availability } = summarizeCatalogVariations(varRows || []);
           const ratings: Record<string, { total: number; count: number }> = {};
           for (const review of reviewRows || []) {
             ratings[review.product_id] ??= { total: 0, count: 0 };
@@ -94,7 +92,8 @@ export default function RecommendationsSection({
           }
           results = results.map(product => ({
             ...product,
-            price: prices[product.id] ?? product.price,
+            catalogPrice: catalogDisplayPrice(product, prices[product.id]),
+            inStock: availability[product.id] ?? (product.stock > 0),
             ratingAvg: ratings[product.id] ? ratings[product.id].total / ratings[product.id].count : product.ratingAvg,
             ratingCount: ratings[product.id]?.count ?? product.ratingCount,
           }));
@@ -156,7 +155,8 @@ export default function RecommendationsSection({
               <div className="pdp-card-info">
                 <h3 title={product.name}>{product.name}</h3>
                 <p>{product.shopName}</p>
-                <div className="pdp-card-price"><strong>{fmt(product.price)}</strong>{product.ratingCount > 0 && <span aria-label={`${product.ratingAvg.toFixed(1)} out of 5 stars, ${product.ratingCount} reviews`}><Star aria-hidden="true" />{product.ratingAvg.toFixed(1)}</span>}</div>
+                <div className="pdp-card-price"><strong>{catalogDisplayPrice(product) === null ? 'Price unavailable' : fmt(catalogDisplayPrice(product)!)}</strong>{!product.inStock && <span className="product-card-out-of-stock">Out of stock</span>}</div>
+                {product.ratingCount > 0 && <div className="pdp-card-rating" aria-label={`${product.ratingAvg.toFixed(1)} out of 5 stars, ${product.ratingCount} reviews`}><Star aria-hidden="true" />{product.ratingAvg.toFixed(1)}</div>}
               </div>
             </Link>)}
           </div>

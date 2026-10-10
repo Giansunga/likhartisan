@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GalleryPage from '../GalleryPage';
@@ -144,8 +144,10 @@ describe('GalleryPage', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: /Mixed variations/ })).toHaveTextContent('₱120'));
     expect(screen.getByRole('link', { name: /No stock/ })).toHaveTextContent('Out of stock');
+    expect(screen.getByRole('link', { name: /No stock/ })).toHaveTextContent('₱100');
     expect(screen.getByRole('link', { name: /In stock/ })).toHaveTextContent('₱140');
     expect(screen.getByRole('link', { name: /All variations sold out/ })).toHaveTextContent('Out of stock');
+    expect(screen.getByRole('link', { name: /All variations sold out/ })).toHaveTextContent('₱50');
     expect(screen.getByRole('link', { name: /Mixed variations/ })).not.toHaveTextContent('₱40');
     expect(screen.getByRole('link', { name: /All variations sold out/ })).toHaveAttribute('href', '/product/All variations sold out');
   });
@@ -158,5 +160,18 @@ describe('GalleryPage', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: /Available/ })).toHaveTextContent('₱250'));
     expect(screen.getByRole('link', { name: /Unavailable/ })).toHaveTextContent('Out of stock');
+  });
+
+  it('sorts by the visible sold-out price and exposes persistent guest favorites', async () => {
+    localStorage.clear();
+    mocks.order.mockResolvedValue({ data: [product('Sold vase', 0, 300), product('Available vase', 2, 100)], error: null });
+    mocks.variations.mockResolvedValue({ data: [{ product_id: 'Sold vase', price: 50, stock: 0 }], error: null });
+    const { container } = render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('link', { name: /Sold vase/ })).toHaveTextContent('₱50'));
+    fireEvent.change(screen.getAllByRole('combobox', { name: 'Sort products' })[0], { target: { value: 'price-asc' } });
+    expect(container.querySelector('.product-card-item')).toHaveAttribute('href', '/product/Sold vase');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Sold vase to favorites' }));
+    expect(screen.getByRole('button', { name: 'Remove Sold vase from favorites' })).toHaveAttribute('aria-pressed', 'true');
+    expect(JSON.parse(localStorage.getItem('likhartisan_favorites')!)).toEqual(['Sold vase']);
   });
 });

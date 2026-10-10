@@ -22,10 +22,12 @@ const DEFAULT_FIT = createViewerFit(new THREE.Box3());
 function ProductModel({
   url,
   rotate,
+  shadowsEnabled,
   onFit,
 }: {
   url: string;
   rotate: boolean;
+  shadowsEnabled: boolean;
   onFit: (fit: ViewerFit) => void;
 }) {
   const { scene } = useGLTF(url);
@@ -34,14 +36,17 @@ function ProductModel({
   const productScene = useMemo(() => {
     const clone = scene.clone(true);
     clone.updateMatrixWorld(true);
-    clone.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
     return clone;
   }, [scene]);
+
+  useEffect(() => {
+    productScene.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = shadowsEnabled;
+        child.receiveShadow = shadowsEnabled;
+      }
+    });
+  }, [productScene, shadowsEnabled]);
 
   const fit = useMemo(() => {
     productScene.updateMatrixWorld(true);
@@ -91,65 +96,14 @@ function StudioCyclorama({ scale }: { scale: number }) {
 
   return (
     <group name="product-studio-cyclorama">
-      <mesh rotation-x={-Math.PI / 2} position-y={layout.floorY} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} position-y={layout.floorY} receiveShadow={false}>
         <circleGeometry args={[layout.floorRadius, 128]} />
         <meshStandardMaterial color="#ededed" roughness={1} metalness={0} side={THREE.FrontSide} />
       </mesh>
-      <mesh geometry={geometry} receiveShadow>
+      <mesh geometry={geometry} receiveShadow={false}>
         <meshStandardMaterial color="#ededed" roughness={1} metalness={0} side={THREE.BackSide} />
       </mesh>
     </group>
-  );
-}
-
-function createSoftShadowTexture(size = 96): THREE.DataTexture {
-  const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const normalizedX = (x / (size - 1) - 0.5) * 2;
-      const normalizedY = (y / (size - 1) - 0.5) * 2;
-      const distance = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
-      const alpha = Math.round(255 * Math.pow(Math.max(0, 1 - distance), 2.15));
-      const offset = (y * size + x) * 4;
-      data[offset] = 255;
-      data[offset + 1] = 255;
-      data[offset + 2] = 255;
-      data[offset + 3] = alpha;
-    }
-  }
-
-  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function SoftGroundShadow({ fit }: { fit: ViewerFit }) {
-  const texture = useMemo(() => createSoftShadowTexture(), []);
-  const floorY = createStudioLayout(fit.scale).floorY;
-  const width = Math.max(fit.footprint[0] * 1.65, fit.scale * 0.55);
-  const depth = Math.max(fit.footprint[1] * 1.2, fit.scale * 0.32);
-
-  useEffect(() => () => texture.dispose(), [texture]);
-
-  return (
-    <mesh
-      name="product-soft-shadow"
-      position={[fit.footprint[0] * 0.24, floorY + fit.scale * 0.0015, 0]}
-      rotation={[-Math.PI / 2, 0, -0.1]}
-      scale={[width, depth, 1]}
-      renderOrder={1}
-    >
-      <planeGeometry args={[1, 1]} />
-      <meshBasicMaterial
-        map={texture}
-        color="#3b3430"
-        opacity={0.44}
-        transparent
-        depthWrite={false}
-        side={THREE.FrontSide}
-        toneMapped={false}
-      />
-    </mesh>
   );
 }
 
@@ -184,7 +138,7 @@ function StudioLighting({ fit, enabled, mobile }: { fit: ViewerFit; enabled: boo
         distance={rig.pointDistance}
         decay={2}
         color="#ffffff"
-        castShadow
+        castShadow={!enabled}
         shadow-mapSize-width={shadowMapSize}
         shadow-mapSize-height={shadowMapSize}
         shadow-camera-near={scale * 0.1}
@@ -233,7 +187,7 @@ export default function ModelViewer({ url }: { url: string }) {
         key={url}
         camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}
         gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08 }}
-        shadows="percentage"
+        shadows={studioEnabled ? false : 'percentage'}
         dpr={mobile ? [1, 1.5] : [1, 2]}
         style={{ width: '100%', height: '100%' }}
       >
@@ -244,7 +198,6 @@ export default function ModelViewer({ url }: { url: string }) {
         {studioEnabled ? (
           <>
             <StudioCyclorama scale={fit.scale} />
-            <SoftGroundShadow fit={fit} />
           </>
         ) : null}
 
@@ -252,6 +205,7 @@ export default function ModelViewer({ url }: { url: string }) {
           <ProductModel
             url={url}
             rotate={!reduceMotion && !interacting}
+            shadowsEnabled={!studioEnabled}
             onFit={handleFit}
           />
         </Suspense>

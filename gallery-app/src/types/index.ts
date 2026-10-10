@@ -61,6 +61,7 @@ export interface Product {
   description: string;
   category: string;
   price: number;
+  catalogPrice?: number | null;
   stock: number;
   inStock: boolean;
   image: string;

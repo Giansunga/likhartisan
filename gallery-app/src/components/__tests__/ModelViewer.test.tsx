@@ -6,6 +6,8 @@ import { MODEL_VIEWER_STUDIO_STORAGE_KEY, MODEL_ROTATION_SPEED } from '../modelV
 const orbitControlsSpy = vi.fn();
 const frameCallbacks: Array<(state: unknown, delta: number) => void> = [];
 let reducedMotion = false;
+const canvasSpy = vi.fn();
+const modelMeshes: Array<{ castShadow: boolean; receiveShadow: boolean }> = [];
 
 Object.defineProperty(window, 'matchMedia', {
   configurable: true,
@@ -22,7 +24,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 vi.mock('@react-three/fiber', () => ({
-  Canvas: ({ children }: { children: ReactNode }) => <div data-testid="canvas">{children}</div>,
+  Canvas: ({ children, ...props }: { children: ReactNode; shadows: unknown }) => { canvasSpy(props); return <div data-testid="canvas">{children}</div>; },
   useFrame: (callback: (state: unknown, delta: number) => void) => {
     frameCallbacks.push(callback);
   },
@@ -40,6 +42,12 @@ vi.mock('@react-three/drei', async () => {
   const THREE = await import('three');
   const scene = new THREE.Group();
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial()));
+  const clone = scene.clone.bind(scene);
+  vi.spyOn(scene, 'clone').mockImplementation(recursive => {
+    const result = clone(recursive);
+    result.traverse(child => { if (child instanceof THREE.Mesh) modelMeshes.push(child); });
+    return result;
+  });
 
   return {
     OrbitControls: (props: Record<string, unknown>) => {
@@ -60,6 +68,8 @@ describe('ModelViewer', () => {
   beforeEach(() => {
     localStorage.clear();
     orbitControlsSpy.mockClear();
+    canvasSpy.mockClear();
+    modelMeshes.length = 0;
     frameCallbacks.length = 0;
     reducedMotion = false;
   });
@@ -70,7 +80,10 @@ describe('ModelViewer', () => {
 
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(container.querySelector('[name="product-studio-cyclorama"]')).toBeInTheDocument();
-    expect(container.querySelector('[name="product-soft-shadow"]')).toBeInTheDocument();
+    expect(container.querySelector('[name="product-soft-shadow"]')).not.toBeInTheDocument();
+    expect(canvasSpy).toHaveBeenLastCalledWith(expect.objectContaining({ shadows: false }));
+    expect(modelMeshes.length).toBeGreaterThan(0);
+    expect(modelMeshes.every(mesh => !mesh.castShadow && !mesh.receiveShadow)).toBe(true);
 
     fireEvent.click(toggle);
 
@@ -78,6 +91,8 @@ describe('ModelViewer', () => {
     expect(container.querySelector('[name="product-studio-cyclorama"]')).not.toBeInTheDocument();
     expect(container.querySelector('[name="product-soft-shadow"]')).not.toBeInTheDocument();
     expect(localStorage.getItem(MODEL_VIEWER_STUDIO_STORAGE_KEY)).toBe('off');
+    expect(canvasSpy).toHaveBeenLastCalledWith(expect.objectContaining({ shadows: 'percentage' }));
+    expect(modelMeshes.every(mesh => mesh.castShadow && mesh.receiveShadow)).toBe(true);
   });
 
   it('restores a stored flat-background preference', () => {

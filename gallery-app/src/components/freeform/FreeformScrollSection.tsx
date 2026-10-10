@@ -280,6 +280,10 @@ export default function FreeformScrollSection() {
 
   return (
     <motion.section 
+      id="home-design-studio"
+      data-home-section
+      tabIndex={-1}
+      aria-label="Design Studio"
       ref={freeformSectionRef} 
       style={{ backgroundColor: bgTransform, color: colorTransform }}
       className="relative"

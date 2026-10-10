@@ -10,10 +10,11 @@ interface ShopProductsSectionProps {
   products: Product[];
   productCount: number;
   prices: Record<string, number>;
+  availability: Record<string, boolean>;
   ratings: Record<string, RatingSummary>;
 }
 
-export default function ShopProductsSection({ shopId, shopName, products, productCount, prices, ratings }: ShopProductsSectionProps) {
+export default function ShopProductsSection({ shopId, shopName, products, productCount, prices, availability, ratings }: ShopProductsSectionProps) {
   return (
     <section className="shop-section shop-products" id="shop-products" aria-labelledby="shop-products-title">
       <div className="shop-container">
@@ -45,8 +46,9 @@ export default function ShopProductsSection({ shopId, shopName, products, produc
                     <h3>{product.name}</h3>
                     <div className="shop-product-card__meta">
                       <strong>{displayPrice === null ? 'Price unavailable' : fmt(displayPrice)}</strong>
-                      {rating ? <span aria-label={`${rating.avg.toFixed(1)} out of 5 from ${rating.count} reviews`}><Star fill="currentColor" aria-hidden="true" /> {rating.avg.toFixed(1)} <small>({rating.count})</small></span> : null}
+                      {!(availability[product.id] ?? (product.stock > 0)) && <span className="product-card-out-of-stock">Out of stock</span>}
                     </div>
+                    {rating ? <div className="shop-product-card__rating" aria-label={`${rating.avg.toFixed(1)} out of 5 from ${rating.count} reviews`}><Star fill="currentColor" aria-hidden="true" /> {rating.avg.toFixed(1)} <small>({rating.count})</small></div> : null}
                   </div>
                 </Link>
               );

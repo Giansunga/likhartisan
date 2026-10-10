@@ -11,13 +11,13 @@ import {
 const product = { id: 'product-1', price: 0 } as Product;
 
 describe('shop storefront helpers', () => {
-  it('keeps only the lowest positive variation price', () => {
+  it('keeps the lowest valid variation price including zero', () => {
     expect(getLowestProductPrices([
       { product_id: 'product-1', price: 250 },
       { product_id: 'product-1', price: '180' },
       { product_id: 'product-1', price: 0 },
       { product_id: 'product-2', price: null },
-    ])).toEqual({ 'product-1': 180 });
+    ])).toEqual({ 'product-1': 0 });
   });
 
   it('summarizes genuine review rows', () => {
@@ -27,8 +27,9 @@ describe('shop storefront helpers', () => {
     ])).toEqual({ 'product-1': { avg: 4, count: 2 } });
   });
 
-  it('does not present a zero price as a purchasable amount', () => {
-    expect(getProductDisplayPrice(product)).toBeNull();
+  it('preserves stored zero prices and distinguishes missing prices', () => {
+    expect(getProductDisplayPrice(product)).toBe(0);
+    expect(getProductDisplayPrice({ ...product, catalogPrice: null })).toBeNull();
     expect(getProductDisplayPrice(product, 125)).toBe(125);
   });
 

@@ -17,10 +17,8 @@ interface HomeReviewRailProps {
 export default function HomeReviewRail({ reviews }: HomeReviewRailProps) {
   const [isPaused, setIsPaused] = useState(false);
 
-  if (!reviews.length) return null;
-
   // Duplicate items to ensure a seamless, gapless infinite scrolling track
-  const baseItems = reviews.length < 6
+  const baseItems = reviews.length > 0 && reviews.length < 6
     ? Array.from({ length: Math.ceil(6 / reviews.length) }, () => reviews).flat()
     : reviews;
   const displayItems = [...baseItems, ...baseItems];
@@ -32,13 +30,14 @@ export default function HomeReviewRail({ reviews }: HomeReviewRailProps) {
   };
 
   return (
-    <section className="home-section home-reviews" aria-labelledby="home-reviews-title">
+    <section id="home-reviews" data-home-section tabIndex={-1} className="home-section home-reviews" aria-labelledby="home-reviews-title" aria-busy={!reviews.length}>
       <div className="home-container">
         <div className="home-section-heading home-section-heading--split">
           <div>
             <h2 id="home-reviews-title">Reviews from the <em>community</em></h2>
           </div>
         </div>
+        {!reviews.length && <p role="status">Loading reviews…</p>}
         <div
           className="home-review-viewport"
           aria-label="Customer reviews carousel"

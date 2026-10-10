@@ -48,9 +48,10 @@ describe('HomeReviewRail', () => {
     expect(track).toHaveAttribute('data-paused', 'false');
   });
 
-  it('renders nothing when review list is empty', () => {
-    const { container } = render(<HomeReviewRail reviews={[]} />);
-    expect(container).toBeEmptyDOMElement();
+  it('keeps the section destination available while reviews load', () => {
+    render(<HomeReviewRail reviews={[]} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading reviews');
+    expect(document.getElementById('home-reviews')).toHaveAttribute('aria-busy', 'true');
   });
 });
 

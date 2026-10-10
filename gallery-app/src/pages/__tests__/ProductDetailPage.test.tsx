@@ -9,10 +9,11 @@ const mocks = vi.hoisted(() => ({
   user: null as null | { id: string },
   products: [] as Row[], variations: [] as Row[], reviews: [] as Row[],
   failProducts: false,
+  failModel: false,
   calls: [] as { table: string; filters: [string, unknown][]; order?: string }[],
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user }) }));
-vi.mock('../../components/ModelViewer', () => ({ default: () => <div>3D viewer</div> }));
+vi.mock('../../components/ModelViewer', () => ({ default: () => { if (mocks.failModel) throw new Error('Model unavailable'); return <div>3D viewer</div>; } }));
 vi.mock('../../lib/cartAnimation', () => ({ animateProductToCart: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -53,6 +54,7 @@ beforeEach(() => {
   localStorage.clear();
   mocks.user = null;
   mocks.failProducts = false;
+  mocks.failModel = false;
   mocks.calls = [];
   mocks.products = [
     { id: 'jar', name: 'Bigasan Terracotta', category: 'Jars', price: 100, stock: 20, image: '/jar.jpg', shop_id: 'shop', shop_name: 'Maria’s Pottery', status: 'active', materials: 'Terracotta Clay', description: 'Made by hand.', technique: 'Wheel-thrown', measurement_unit: 'in' },
@@ -70,6 +72,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it.each([false, true])('keeps guest favorites usable with the model fallback: %s', async fail => {
+    mocks.products[0].model3d = '/model.glb'; mocks.failModel = fail;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    localStorage.setItem('likhartisan_favorites', '["existing"]');
+    renderProduct();
+    const favorite = await screen.findByRole('button', { name: 'Add Bigasan Terracotta to favorites' });
+    fireEvent.click(favorite);
+    expect(screen.getByRole('button', { name: 'Remove Bigasan Terracotta from favorites' })).toHaveAttribute('aria-pressed', 'true');
+    expect(JSON.parse(localStorage.getItem('likhartisan_favorites')!)).toEqual(['existing', 'jar']);
+    if (fail) expect(await screen.findByAltText('Bigasan Terracotta')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open plain product' }));
+    expect(await screen.findByRole('button', { name: /Add Plain piece.*to favorites/ })).toHaveAttribute('aria-pressed', 'false');
+    consoleError.mockRestore();
+  });
   it('places the shop first and keeps real measurements, price, stock and cart selection in sync', async () => {
     const { container } = renderProduct();
     await screen.findByRole('heading', { name: 'Bigasan Terracotta' });

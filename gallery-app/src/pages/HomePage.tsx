@@ -1,65 +1,18 @@
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import HomeReviewRail, { type HomeReview } from '../components/home/HomeReviewRail';
 import HomeShopRail, { type HomeShop } from '../components/home/HomeShopRail';
 import HomeShopTourSection from '../components/home/HomeShopTourSection';
+import HomeSectionNavigation from '../components/home/HomeSectionNavigation';
+import AnimatedCounter from '../components/home/AnimatedCounter';
+import { useLandingCounts } from '../hooks/useLandingCounts';
+import { HOME_SECTIONS } from '../lib/homeSections';
 import FreeformScrollSection from '../components/freeform/FreeformScrollSection';
 import { supabase } from '../lib/supabase';
 import './HomePage.css';
 
 const HERO_VIDEO = '/videos/LikhArtisan.mp4';
-
-const IMPACT_STATS = [
-  { value: 50, label: 'Local Artisans' },
-  { value: 200, label: 'Years of Tradition' },
-  { value: 10_000, label: 'Pottery Creations' },
-];
-
-function AnimatedCounter({ value, delay = 0 }: { value: number; delay?: number }) {
-  const [count, setCount] = useState(0);
-  const counterRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const node = counterRef.current;
-    if (!node) return;
-    let animationFrame = 0;
-    let delayTimer = 0;
-    let startTime: number | null = null;
-    let observer: IntersectionObserver | null = null;
-
-    const startCounting = () => {
-      const tick = (time: number) => {
-        if (startTime === null) startTime = time;
-        const progress = Math.min((time - startTime) / 2600, 1);
-        setCount(Math.round(value * progress));
-        if (progress < 1) animationFrame = requestAnimationFrame(tick);
-      };
-      delayTimer = window.setTimeout(() => {
-        animationFrame = requestAnimationFrame(tick);
-      }, delay);
-    };
-
-    if ('IntersectionObserver' in window) {
-      observer = new IntersectionObserver(([entry]) => {
-        if (!entry.isIntersecting) return;
-        observer?.disconnect();
-        startCounting();
-      }, { threshold: 0.65 });
-      observer.observe(node);
-    } else {
-      startCounting();
-    }
-
-    return () => {
-      observer?.disconnect();
-      window.clearTimeout(delayTimer);
-      cancelAnimationFrame(animationFrame);
-    };
-  }, [delay, value]);
-
-  return <span ref={counterRef}>{count.toLocaleString('en-US')}+</span>;
-}
 
 interface CollectionFeature {
   name: string;
@@ -121,6 +74,12 @@ const SAMPLE_REVIEWS: HomeReview[] = [
 ];
 
 export default function HomePage() {
+  const { artisanCount, potteryCount } = useLandingCounts();
+  const impactStats = [
+    { value: artisanCount, label: 'Local Artisans', suffix: '' },
+    { value: 200, label: 'Years of Tradition', suffix: '+' },
+    { value: potteryCount, label: 'Pottery Creations', suffix: '' },
+  ];
   const [shops, setShops] = useState<HomeShop[]>([]);
   const [shopsLoading, setShopsLoading] = useState(true);
   const [shopsError, setShopsError] = useState(false);
@@ -148,10 +107,11 @@ export default function HomePage() {
   }, []);
 
   return <div className="home-page">
+    <HomeSectionNavigation sections={HOME_SECTIONS} />
     {/* Hero video: intentionally unchanged. */}
-    <header className="hero-video-section"><video className="hero-video" autoPlay muted loop playsInline preload="auto"><source src={HERO_VIDEO} type="video/mp4" /></video><div className="hero-video-overlay"></div><div className="hero-video-content"><h1 className="hero-video-title system-hero-title system-hero-title--display hero-fade-up" style={{ animationDelay: '0.3s' }}>Explore the Local Pottery<br />Industry in Santo Tomas</h1><Link to="/gallery" className="hero-video-btn hero-fade-up" style={{ animationDelay: '0.6s' }}>Explore</Link></div></header>
+    <header id="home-top" data-home-section tabIndex={-1} className="hero-video-section"><video className="hero-video" autoPlay muted loop playsInline preload="auto"><source src={HERO_VIDEO} type="video/mp4" /></video><div className="hero-video-overlay"></div><div className="hero-video-content"><h1 className="hero-video-title system-hero-title system-hero-title--display hero-fade-up" style={{ animationDelay: '0.3s' }}>Explore the Local Pottery<br />Industry in Santo Tomas</h1><Link to="/gallery" className="hero-video-btn hero-fade-up" style={{ animationDelay: '0.6s' }}>Explore</Link></div></header>
 
-    <section className="home-section home-editorial-intro" aria-labelledby="home-editorial-title">
+    <section id="home-story" data-home-section tabIndex={-1} className="home-section home-editorial-intro" aria-labelledby="home-editorial-title">
       <div className="home-container">
         <div className="home-editorial-intro__grid">
           <div className="home-editorial-intro__copy">
@@ -170,7 +130,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <section className="home-section home-collections" aria-labelledby="home-collections-title"><div className="home-container"><div id="home-impact" className="home-impact" aria-label="LikhArtisan community impact"><p>More than just pottery, it's a destination of <strong>culture, creativity, and community.</strong></p>{IMPACT_STATS.map((stat, index) => <div className="home-impact__stat" key={stat.label}><AnimatedCounter value={stat.value} delay={index * 180} /><small>{stat.label}</small></div>)}</div><div className="home-section-heading home-section-heading--split"><div><h2 id="home-collections-title">Pottery for <em>everyday rituals</em></h2></div></div><div className="home-collection-grid">{COLLECTIONS.map((collection, index) => <Link key={collection.name} to={`/gallery?category=${encodeURIComponent(collection.name)}`} className={`home-collection-card home-collection-card--${index + 1}`}><img src={collection.image} alt="" loading="lazy" /><b>0{index + 1}</b><span>{collection.name}</span><small>{collection.description}</small><i>View collection <ArrowRight aria-hidden="true" /></i></Link>)}</div><Link to="/gallery" className="home-text-link home-text-link--center">Browse the full gallery <ArrowRight aria-hidden="true" /></Link></div></section>
+    <section id="home-collections" data-home-section tabIndex={-1} className="home-section home-collections" aria-labelledby="home-collections-title"><div className="home-container"><div id="home-impact" className="home-impact" aria-label="LikhArtisan community impact"><p>More than just pottery, it's a destination of <strong>culture, creativity, and community.</strong></p>{impactStats.map((stat, index) => <div className="home-impact__stat" key={stat.label}><AnimatedCounter value={stat.value} suffix={stat.suffix} delay={index * 180} /><small>{stat.label}</small></div>)}</div><div className="home-section-heading home-section-heading--split"><div><h2 id="home-collections-title">Pottery for <em>everyday rituals</em></h2></div></div><div className="home-collection-grid">{COLLECTIONS.map((collection, index) => <Link key={collection.name} to={`/gallery?category=${encodeURIComponent(collection.name)}`} className={`home-collection-card home-collection-card--${index + 1}`}><img src={collection.image} alt="" loading="lazy" /><b>0{index + 1}</b><span>{collection.name}</span><small>{collection.description}</small><i>View collection <ArrowRight aria-hidden="true" /></i></Link>)}</div><Link to="/gallery" className="home-text-link home-text-link--center">Browse the full gallery <ArrowRight aria-hidden="true" /></Link></div></section>
 
     <HomeShopRail shops={shops} loading={shopsLoading} error={shopsError} />
 
@@ -181,7 +141,7 @@ export default function HomePage() {
 
     <HomeReviewRail reviews={reviews} />
 
-    <section className="home-section home-chapters" aria-labelledby="home-chapters-title"><div className="home-container"><div className="home-section-heading home-section-heading--split"><div><span>Inside the story</span><h2 id="home-chapters-title">Continue reading in <em>About</em></h2></div><p>Three short chapters connect the place, its practice, and the digital tools built around it.</p></div><ol className="home-chapter-grid">{EDITORIAL_CHAPTERS.map(chapter => <li key={chapter.number}><Link to={chapter.href}><span className="home-chapter__number">{chapter.number}</span><small>{chapter.kicker}</small><h3>{chapter.title}</h3><p>{chapter.excerpt}</p><i>Read chapter <ArrowRight aria-hidden="true" /></i></Link></li>)}</ol></div></section>
+    <section id="home-about" data-home-section tabIndex={-1} className="home-section home-chapters" aria-labelledby="home-chapters-title"><div className="home-container"><div className="home-section-heading home-section-heading--split"><div><span>Inside the story</span><h2 id="home-chapters-title">Continue reading in <em>About</em></h2></div><p>Three short chapters connect the place, its practice, and the digital tools built around it.</p></div><ol className="home-chapter-grid">{EDITORIAL_CHAPTERS.map(chapter => <li key={chapter.number}><Link to={chapter.href}><span className="home-chapter__number">{chapter.number}</span><small>{chapter.kicker}</small><h3>{chapter.title}</h3><p>{chapter.excerpt}</p><i>Read chapter <ArrowRight aria-hidden="true" /></i></Link></li>)}</ol></div></section>
 
   </div>;
 }

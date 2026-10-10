@@ -1,8 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import Layout from './components/Layout';
-import { useMediaQuery } from './hooks/useMediaQuery';
 import HomePage from './pages/HomePage';
 import GalleryPage from './pages/GalleryPage';
 import ProductDetailPage from './pages/ProductDetailPage';
@@ -18,7 +17,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import SignInPage from './pages/SignInPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import UpdatePasswordPage from './pages/UpdatePasswordPage';
-import LikhAIDock from './components/LikhAIDock';
+import LikhAIRouteDock from './components/LikhAIRouteDock';
 import { QuoteReviewProvider } from './components/chat/QuoteReviewContext';
 import AdminLayout from './components/admin/AdminLayout';
 import ArtisanLayout from './components/artisan/ArtisanLayout';
@@ -86,24 +85,9 @@ function PageLoader() {
 }
 
 function AppShell() {
-  const location = useLocation();
-  const isUpdatePassword = location.pathname === '/update-password';
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  
-  // Hide dock on mobile for product, checkout, and cart pages
-  const isProductPage = location.pathname.startsWith('/product/');
-  const isShopPage = location.pathname.startsWith('/shop/');
-  const isCheckoutPage = location.pathname === '/checkout';
-  const isCartPage = location.pathname === '/cart';
-  const isChatPage = location.pathname === '/chat';
-  const isLikhAIPage = location.pathname === '/likhai';
-  const isDashboardPage = location.pathname === '/dashboard';
-  const isArtisanPage = location.pathname.startsWith('/artisan-dashboard');
-  const shouldHideDock = isLikhAIPage || isArtisanPage || location.pathname.startsWith('/admin') || (isMobile && (isProductPage || isShopPage || isCheckoutPage || isCartPage || isChatPage || isDashboardPage));
-
   return (
     <>
-      {!isUpdatePassword && !shouldHideDock && <LikhAIDock />}
+      <LikhAIRouteDock />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route element={<Layout />}>

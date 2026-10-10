@@ -11,7 +11,8 @@ import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/util
 import { normalizeCatalogMeasurement } from '../lib/measurements';
 import RecommendationsSection from '../components/RecommendationsSection';
 import { animateProductToCart } from '../lib/cartAnimation';
-import { ChevronDown, FileText, MessageCircle, ShoppingCart, Store } from 'lucide-react';
+import { useFavorites } from '../hooks/useFavorites';
+import { ChevronDown, FileText, Heart, MessageCircle, ShoppingCart, Store } from 'lucide-react';
 import './ProductDetailPage.css';
 
 function renderStars(rating: number, size = 14): ReactElement[] {
@@ -61,6 +62,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { favorites, toggleFavorite } = useFavorites();
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
@@ -447,6 +449,11 @@ export default function ProductDetailPage() {
           <div className="pdp-hero" ref={productSectionRef}>
             <div className="pdp-media">
               <div className="pdp-media-frame" data-product-cart-source>
+                <button type="button" className="pdp-favorite" aria-pressed={favorites.includes(product.id)}
+                  aria-label={`${favorites.includes(product.id) ? 'Remove' : 'Add'} ${product.name} ${favorites.includes(product.id) ? 'from' : 'to'} favorites`}
+                  onClick={() => toggleFavorite(product.id)}>
+                  <Heart aria-hidden="true" fill={favorites.includes(product.id) ? 'currentColor' : 'none'} />
+                </button>
                 {product.model3d ? (
                   <ProductMediaErrorBoundary key={product.model3d} fallback={<img src={product.image} alt={product.name} id="viewer-main-img" />}>
                     <Suspense fallback={<div className="pdp-media-loading" role="status"><span className="pdp-spinner" />Loading 3D model…</div>}>
