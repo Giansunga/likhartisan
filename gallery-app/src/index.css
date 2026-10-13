@@ -1470,18 +1470,18 @@ body {
   left: 0;
   width: var(--cart-flight-size);
   height: var(--cart-flight-size);
-  border: 2px solid rgba(255, 255, 255, 0.92);
+  border: 3px solid #a35118;
   border-radius: 22%;
   background: #fff;
-  box-shadow: 0 14px 32px rgba(67, 40, 22, 0.28);
+  box-shadow: 0 16px 38px rgba(67, 40, 22, 0.42), 0 0 0 4px rgba(255,255,255,.85);
   object-fit: cover;
   pointer-events: none;
   will-change: transform, opacity;
-  animation: product-to-cart-flight 1050ms cubic-bezier(0.22, 0.72, 0.28, 1) forwards;
+  animation: product-to-cart-flight 1200ms cubic-bezier(0.22, 0.72, 0.28, 1) forwards;
 }
 
 .cart-target-arrival {
-  animation: cart-target-arrival 520ms cubic-bezier(0.2, 0.85, 0.3, 1);
+  animation: cart-target-arrival 800ms cubic-bezier(0.2, 0.85, 0.3, 1);
 }
 
 .cart-flight-item--reduced {
@@ -1495,12 +1495,12 @@ body {
 @keyframes product-to-cart-flight {
   0% {
     opacity: 0;
-    transform: translate3d(calc(var(--cart-flight-start-x) - 50%), calc(var(--cart-flight-start-y) - 50%), 0) scale(0.82) rotate(-3deg);
+    transform: translate3d(calc(var(--cart-flight-start-x) - 50%), calc(var(--cart-flight-start-y) - 50%), 0) scale(1) rotate(-3deg);
   }
   12% { opacity: 1; }
   58% {
     opacity: 1;
-    transform: translate3d(calc(var(--cart-flight-mid-x) - 50%), calc(var(--cart-flight-mid-y) - 50%), 0) scale(0.66) rotate(7deg);
+    transform: translate3d(calc(var(--cart-flight-mid-x) - 50%), calc(var(--cart-flight-mid-y) - 50%), 0) scale(0.92) rotate(7deg);
   }
   100% {
     opacity: 0.15;
@@ -4297,3 +4297,6 @@ body {
 .artisan-shop-name { margin: 0 0 10px; color: var(--text-muted); font-size: .875rem; overflow-wrap: anywhere; }
 .artisan-shop-name a { color: var(--primary-color); text-decoration: underline; text-underline-offset: 3px; }
 .artisan-shop-name a:focus-visible { outline: 3px solid var(--accent-color); outline-offset: 3px; }
+
+.cart-added-badge { position: fixed; z-index: 10001; padding: 4px 9px; border-radius: 999px; background: var(--accent-color); color: white; font-size: 0.9rem; font-weight: 700; box-shadow: 0 3px 12px rgba(0,0,0,.2); pointer-events: none; }
+.cart-target-arrival--reduced { animation: none; background: #f7e6dc; color: var(--accent-color); box-shadow: 0 0 0 4px rgba(193,87,13,.18); }

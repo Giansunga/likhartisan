@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
@@ -17,6 +17,8 @@ import {
   type UserProductSignal,
 } from '../lib/recommendations';
 
+import { readGallerySnapshot, saveGallerySnapshot, type GallerySnapshot } from '../lib/gallerySnapshot';
+
 const PAGE_SIZE = 24;
 
 const categories = [
@@ -29,32 +31,45 @@ const categories = [
 ];
 
 export default function GalleryPage() {
+  const { user, loading } = useAuth();
+  if (loading) return <div role="status" aria-label="Loading gallery">Loading gallery…</div>;
+  return <GalleryView key={user?.id || 'guest'} owner={user?.id || 'guest'} />;
+}
+
+function GalleryView({ owner }: { owner: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentTheme } = useTheme();
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [variantPrices, setVariantPrices] = useState<Record<string, number>>({});
-  const [variationAvailability, setVariationAvailability] = useState<Record<string, boolean>>({});
-  const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>({});
-  const [activeCategory, setActiveCategory] = useState<string | null>(() => searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('recommended');
-  const [showFavorites, setShowFavorites] = useState(false);
+  const navigationType = useNavigationType();
+  const [restored] = useState(() => readGallerySnapshot(owner, searchParams.toString()));
+  const snapshotRef = useRef<GallerySnapshot | null>(restored);
+  const [preserveOrder, setPreserveOrder] = useState(Boolean(restored));
+  const restoringScroll = useRef(Boolean(restored));
+  const urlContext = useRef(restored?.urlSearch ?? searchParams.toString());
+  const normalizeReturnUrl = useRef(true);
+  const [catalogReady, setCatalogReady] = useState(Boolean(restored));
+  const [allProducts, setAllProducts] = useState<Product[]>(restored?.allProducts ?? []);
+  const [loadingProducts, setLoadingProducts] = useState(!restored);
+  const [variantPrices, setVariantPrices] = useState<Record<string, number>>(restored?.variantPrices ?? {});
+  const [variationAvailability, setVariationAvailability] = useState<Record<string, boolean>>(restored?.variationAvailability ?? {});
+  const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>(restored?.productRatings ?? {});
+  const [activeCategory, setActiveCategory] = useState<string | null>(() => restored ? restored.activeCategory : searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
+  const [search, setSearch] = useState(restored?.search ?? '');
+  const [sort, setSort] = useState(restored?.sort ?? 'recommended');
+  const [showFavorites, setShowFavorites] = useState(restored?.showFavorites ?? false);
   const { favorites, toggleFavorite: toggleSavedFavorite } = useFavorites();
-  const [signals, setSignals] = useState<UserProductSignal[]>([]);
-  const [loadingSignals, setLoadingSignals] = useState(true);
+  const [signals, setSignals] = useState<UserProductSignal[]>(restored?.signals ?? []);
+  const [loadingSignals, setLoadingSignals] = useState(!restored);
   const [resettingRecommendations, setResettingRecommendations] = useState(false);
-  const [visitSeed] = useState(createVisitSeed);
-  const recordedSearches = useRef(new Set<string>());
+  const [visitSeed] = useState(() => restored?.visitSeed ?? createVisitSeed());
+  const recordedSearches = useRef(new Set<string>(restored?.recordedSearches));
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [isMobile, setIsMobile] = useState(false);
-  const shopFilter = searchParams.get('shop');
+  const [page, setPage] = useState(restored?.page ?? 1);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+  const [shopFilter, setShopFilter] = useState(() => new URLSearchParams(restored?.urlSearch ?? searchParams.toString()).get('shop'));
   
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -63,12 +78,28 @@ export default function GalleryPage() {
   const loggedIn = !!user;
 
   useEffect(() => {
+    const current = searchParams.toString();
+    const firstVisit = normalizeReturnUrl.current;
+    normalizeReturnUrl.current = false;
+    if (firstVisit && restored && !current && restored.urlSearch) {
+      setSearchParams(new URLSearchParams(restored.urlSearch), { replace: true });
+      return;
+    }
+    if (urlContext.current === current) return;
+    urlContext.current = current;
+    setShopFilter(searchParams.get('shop'));
     const cat = searchParams.get('category');
     setActiveCategory(cat ? normalizeProductCategory(cat) : null);
-  }, [searchParams]);
+  }, [searchParams, setSearchParams, restored]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [activeCategory, search, sort, showFavorites, visitSeed, shopFilter]);
+  const filterKey = JSON.stringify([activeCategory, search, sort, showFavorites, shopFilter]);
+  const previousFilters = useRef(filterKey);
+  useEffect(() => {
+    if (previousFilters.current === filterKey) return;
+    previousFilters.current = filterKey;
+    setPreserveOrder(false);
+    setPage(1);
+  }, [filterKey]);
 
   function toggleFavorite(e: React.MouseEvent, id: string) {
     e.preventDefault();
@@ -77,7 +108,7 @@ export default function GalleryPage() {
   }
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || restored) return;
     let active = true;
 
     if (!user) {
@@ -90,7 +121,6 @@ export default function GalleryPage() {
       return () => { active = false; };
     }
 
-    setLoadingSignals(true);
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     supabase
       .from('user_product_signals')
@@ -107,9 +137,11 @@ export default function GalleryPage() {
       });
 
     return () => { active = false; };
-  }, [authLoading, user]);
+  }, [authLoading, user, restored]);
 
   useEffect(() => {
+    if (restored) return;
+    let active = true;
     async function fetchProducts() {
       try {
         const { data, error } = await supabase
@@ -117,14 +149,16 @@ export default function GalleryPage() {
       .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
           .order('created_at', { ascending: false });
 
+        if (!active) return;
         if (error) {
           console.error('Gallery fetch error:', error);
           return;
         }
 
         if (data) {
-          const products = data.map((p: any) => mapSupabaseProduct(p));
+          const products = data.map(mapSupabaseProduct);
           setAllProducts(products);
+          setCatalogReady(true);
 
           const productIds = products.map(p => p.id);
           if (productIds.length > 0) {
@@ -133,6 +167,7 @@ export default function GalleryPage() {
               .select('product_id, price, stock')
               .in('product_id', productIds);
 
+            if (!active) return;
             if (!variationError && varData) {
               const { prices, availability } = summarizeCatalogVariations(varData);
               setVariantPrices(prices);
@@ -144,6 +179,7 @@ export default function GalleryPage() {
               .select('product_id, rating')
               .in('product_id', productIds);
 
+            if (!active) return;
             if (revData) {
               const ratings: Record<string, { total: number; count: number }> = {};
               for (const r of revData) {
@@ -162,11 +198,12 @@ export default function GalleryPage() {
       } catch (e) {
         console.error('Gallery fetch error:', e);
       } finally {
-        setLoadingProducts(false);
+        if (active) setLoadingProducts(false);
       }
     }
-    fetchProducts();
-  }, []);
+    void fetchProducts();
+    return () => { active = false; };
+  }, [restored]);
 
   const eligibleProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
@@ -233,6 +270,10 @@ export default function GalleryPage() {
   }, [search, searchFilteredProducts.length, user]);
 
   function trackProductClick(productId: string) {
+    if (snapshotRef.current) {
+      snapshotRef.current = { ...snapshotRef.current, openedProduct: productId, scrollY: window.scrollY };
+      saveGallerySnapshot(snapshotRef.current);
+    }
     if (!user) return;
     const queryText = normalizeSearchQuery(search) || null;
     void supabase
@@ -261,6 +302,7 @@ export default function GalleryPage() {
       console.error('Recommendation reset error:', error);
     } else {
       setSignals([]);
+      setPreserveOrder(false);
       recordedSearches.current.clear();
       setPage(1);
     }
@@ -285,6 +327,10 @@ export default function GalleryPage() {
       case 'name-asc':
         return list.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
       default:
+        if (restored && preserveOrder) {
+          const positions = new Map(restored.orderedIds.map((id, index) => [id, index]));
+          return list.sort((a, b) => (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity));
+        }
         return orderRecommendedProducts(list, {
           signals: loggedIn ? signals : [],
           catalog: allProducts,
@@ -292,13 +338,51 @@ export default function GalleryPage() {
           query: search,
         });
     }
-  }, [searchFilteredProducts, sort, productRatings, variantPrices, loggedIn, signals, allProducts, visitSeed, search]);
+  }, [searchFilteredProducts, sort, productRatings, variantPrices, loggedIn, signals, allProducts, visitSeed, search, restored, preserveOrder]);
 
   const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE);
   const products = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
     return filteredProducts.slice(start, start + PAGE_SIZE);
   }, [filteredProducts, page]);
+
+  useEffect(() => {
+    if (loadingProducts || loadingSignals || !catalogReady) return;
+    const next: GallerySnapshot = {
+      owner, urlSearch: searchParams.toString(),
+      allProducts, variantPrices, variationAvailability, productRatings, signals, visitSeed,
+      activeCategory, search, sort, showFavorites, page,
+      scrollY: restoringScroll.current ? restored?.scrollY ?? 0 : window.scrollY,
+      openedProduct: snapshotRef.current?.openedProduct,
+      orderedIds: filteredProducts.map(product => product.id),
+      recordedSearches: [...recordedSearches.current],
+    };
+    snapshotRef.current = next;
+    saveGallerySnapshot(next);
+  }, [owner, searchParams, restored, allProducts, variantPrices, variationAvailability, productRatings, signals, visitSeed, activeCategory, search, sort, showFavorites, page, filteredProducts, loadingProducts, loadingSignals, catalogReady]);
+
+  useEffect(() => {
+    const rememberScroll = () => {
+      if (!snapshotRef.current || restoringScroll.current) return;
+      snapshotRef.current = { ...snapshotRef.current, scrollY: window.scrollY };
+      saveGallerySnapshot(snapshotRef.current);
+    };
+    window.addEventListener('scroll', rememberScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', rememberScroll); };
+  }, []);
+
+  useEffect(() => {
+    if (!restored || loadingProducts || loadingSignals || !restoringScroll.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (navigationType === 'POP' && restored.openedProduct) {
+        const card = [...document.querySelectorAll<HTMLElement>('[data-gallery-product]')].find(element => element.dataset.galleryProduct === restored.openedProduct);
+        card?.focus({ preventScroll: true });
+      }
+      window.scrollTo(0, restored.scrollY);
+      restoringScroll.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [restored, navigationType, loadingProducts, loadingSignals]);
 
   return (
     <div className="gallery-page">
@@ -491,7 +575,7 @@ export default function GalleryPage() {
           ) : (
             <div className="product-grid">
               {products.map(p => (
-                <Link key={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
+                <Link key={p.id} data-gallery-product={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
                     <img src={p.image} alt={p.name} />
                     <button

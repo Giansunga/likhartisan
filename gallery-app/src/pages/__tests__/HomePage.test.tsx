@@ -5,8 +5,8 @@ import HomePage from '../HomePage';
 import { HOME_SECTIONS } from '../../lib/homeSections';
 
 const mocks = vi.hoisted(() => ({
-  shops: { data: [] as any[], error: null as null | { message: string } },
-  reviews: { data: [] as any[], error: null },
+  shops: { data: [] as Array<{ id: string; name: string; description: string; banner: string; image: string; location: string }>, error: null as null | { message: string } },
+  reviews: { data: [] as Array<{ id: string; user_name: string | null; rating: number; body: string | null; created_at: string; product_id: string }>, error: null },
   user: null as null | { id: string },
   from: vi.fn(),
   shopSelect: vi.fn(),
@@ -16,17 +16,21 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../hooks/useLandingCounts', () => ({ useLandingCounts: () => ({ artisanCount: 19, potteryCount: 104 }) }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user, loading: false }) }));
 vi.mock('../../components/freeform/FreeformScrollSection', () => ({ default: () => <div id="home-design-studio" data-home-section data-testid="freeform-scroller" /> }));
-vi.mock('../../components/home/HomeShopRail', () => ({ default: ({ shops, loading, error }: any) => <div id="home-shops" data-home-section data-testid="shop-rail">{loading ? 'Loading shops' : error ? 'Shop error' : shops.map((shop: any) => <a key={shop.id} href={`/shop/${shop.id}`}>{shop.name}</a>)}</div> }));
-vi.mock('../../components/home/HomeReviewRail', () => ({ default: ({ reviews }: any) => <div id="home-reviews" data-home-section data-testid="review-rail">{reviews.map((review: any) => review.userName).join(', ')}</div> }));
+vi.mock('../../components/home/HomeShopRail', () => ({ default: ({ shops, loading, error }: { shops: Array<{ id: string; name: string }>; loading: boolean; error: boolean }) => <div id="home-shops" data-home-section data-testid="shop-rail">{loading ? 'Loading shops' : error ? 'Shop error' : shops.map(shop => <a key={shop.id} href={`/shop/${shop.id}`}>{shop.name}</a>)}</div> }));
+vi.mock('../../components/home/HomeReviewRail', () => ({ default: ({ reviews }: { reviews: Array<{ userName: string }> }) => <div id="home-reviews" data-home-section data-testid="review-rail">{reviews.map(review => review.userName).join(', ')}</div> }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: (...args: unknown[]) => mocks.from(...args) } }));
 
 function configureQueries() {
   mocks.from.mockImplementation((table: string) => {
     const response = table === 'shops' ? mocks.shops : mocks.reviews;
-    const query: any = {
-      select: vi.fn(() => query), order: vi.fn(() => query), limit: vi.fn(() => query), in: vi.fn(() => query),
+    const query = {
+      select: vi.fn(), order: vi.fn(), limit: vi.fn(), in: vi.fn(),
       then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(response).then(resolve, reject),
     };
+    query.select.mockImplementation(() => query);
+    query.order.mockImplementation(() => query);
+    query.limit.mockImplementation(() => query);
+    query.in.mockImplementation(() => query);
     if (table === 'shops') { query.select = mocks.shopSelect.mockImplementation(() => query); query.order = mocks.shopOrder.mockImplementation(() => query); }
     return query;
   });
@@ -60,8 +64,11 @@ describe('HomePage editorial landing page', () => {
     }, hero);
     expect(shopTour).not.toBeNull();
     expect(shopTour?.nextElementSibling).toBe(reviews);
-    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/yrfUUl-jhAQ');
-    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops').querySelector('source')).toHaveAttribute('src', 'https://pub-0cc6e7109e7e48a183d54d0426453a6a.r2.dev/Landing%20Page%20Video/LikhArtisan%203min.mp4');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('preload', 'metadata');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('controls');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('playsinline');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).not.toHaveAttribute('autoplay');
     expect(screen.queryByText('From sculptural vessels to small moments of light, find a piece that feels at home with you.')).not.toBeInTheDocument();
     expect(screen.queryByText('Watch the craft unfold', { exact: false })).not.toBeInTheDocument();
     expect(screen.getByAltText('Rows of finished clay pots in a Santo Tomas workshop')).toHaveAttribute('src', '/images/hero_1.jpg');

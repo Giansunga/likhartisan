@@ -91,8 +91,8 @@ describe('ModelViewer', () => {
     expect(container.querySelector('[name="product-studio-cyclorama"]')).not.toBeInTheDocument();
     expect(container.querySelector('[name="product-soft-shadow"]')).not.toBeInTheDocument();
     expect(localStorage.getItem(MODEL_VIEWER_STUDIO_STORAGE_KEY)).toBe('off');
-    expect(canvasSpy).toHaveBeenLastCalledWith(expect.objectContaining({ shadows: 'percentage' }));
-    expect(modelMeshes.every(mesh => mesh.castShadow && mesh.receiveShadow)).toBe(true);
+    expect(canvasSpy).toHaveBeenLastCalledWith(expect.objectContaining({ shadows: false }));
+    expect(modelMeshes.every(mesh => !mesh.castShadow && !mesh.receiveShadow)).toBe(true);
   });
 
   it('restores a stored flat-background preference', () => {

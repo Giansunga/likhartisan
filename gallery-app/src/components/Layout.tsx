@@ -4,6 +4,8 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
 import { captureException } from '../lib/sentry';
+import { useAuth } from '../contexts/AuthContext';
+import { readGallerySnapshot, clearGalleryForOtherAccount } from '../lib/gallerySnapshot';
 import { scrollToHomeSection } from '../lib/homeSections';
 
 class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -31,6 +33,9 @@ class LayoutErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 
 export default function Layout() {
   const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
+  const galleryOwner = user?.id || 'guest';
+  useEffect(() => { if (!authLoading) clearGalleryForOtherAccount(galleryOwner); }, [authLoading, galleryOwner]);
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisan = location.pathname.startsWith('/artisan-dashboard');
   const isFreeform = location.pathname === '/freeform';
@@ -50,11 +55,12 @@ export default function Layout() {
           return;
         }
       }
+      if (location.pathname === '/gallery' && readGallerySnapshot(galleryOwner, location.search)) return;
       window.scrollTo(0, 0);
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [location.hash, location.pathname]);
+  }, [location.hash, location.pathname, location.search, galleryOwner]);
 
   return (
     <LayoutErrorBoundary>

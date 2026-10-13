@@ -226,6 +226,11 @@
 .product-detail-page .pdp-favorite:hover { background: #fff; }
 .product-detail-page .pdp-card-price .product-card-out-of-stock { font-size: .75rem; }
 
-.pdp-featured-artisan { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 12px; font-size: 0.85rem; color: #8c7b6e; overflow-wrap: anywhere; }
+.pdp-featured-artisan { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 12px; font-size: 0.95rem; color: #8c7b6e; overflow-wrap: anywhere; }
 .pdp-featured-artisan strong { color: #823e0b; font-weight: 500; }
-.pdp-featured-artisan em { font-size: 0.8rem; }
+.pdp-featured-artisan em { font-size: 0.9rem; }
+
+.pdp-stock-detail dd { display: flex; align-items: center; gap: 7px; }
+.pdp-stock-detail--available { color: #087f5b; }
+.pdp-stock-detail--empty { color: #c92a3d; }
+.pdp-stock-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }

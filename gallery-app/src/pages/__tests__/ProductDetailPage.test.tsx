@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock('../../components/ModelViewer', () => ({ default: () => { if (mocks.failModel) throw new Error('Model unavailable'); return <div>3D viewer</div>; } }));
-vi.mock('../../lib/cartAnimation', () => ({ animateProductToCart: vi.fn() }));
+vi.mock('../../lib/cartAnimation', () => ({ animateProductToCart: vi.fn(), cancelCartAnimation: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     rpc: vi.fn(async () => ({ data: 4 })),
@@ -72,6 +72,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it('shows selected-size inventory in craft details without subtracting cart quantity', async () => {
+    const { container } = renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (1)');
+    const sizes = screen.getByRole('group', { name: 'Select size' });
+    fireEvent.click(within(sizes).getByRole('button', { name: /32.*18/ }));
+    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (8)');
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (8)');
+    fireEvent.click(within(sizes).getByRole('button', { name: /40.*20/ }));
+    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('Out of stock');
+    expect(container.querySelector('.pdp-stock-detail--empty')).toBeInTheDocument();
+  });
+
   it.each([false, true])('keeps guest favorites usable with the model fallback: %s', async fail => {
     mocks.products[0].model3d = '/model.glb'; mocks.failModel = fail;
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -173,7 +187,7 @@ describe('product detail presentation and shopping controls', () => {
     expect(container.querySelector('.pdp-price')).toHaveTextContent('₱75.00');
     expect(screen.queryByRole('group', { name: 'Select size' })).not.toBeInTheDocument();
     expect(container.querySelector('.pdp-spec-tiles')).not.toBeInTheDocument();
-    expect(container.querySelector('.pdp-craft')).not.toBeInTheDocument();
+    expect(container.querySelector('.pdp-craft')).toHaveTextContent('Out of stock');
     expect(screen.queryByRole('heading', { name: 'A***t' })).not.toBeInTheDocument();
     expect(container.querySelector('.pdp-reviews')).toHaveTextContent('No reviews yet.');
     expect(screen.getByRole('button', { name: 'Buy Now' })).toBeDisabled();

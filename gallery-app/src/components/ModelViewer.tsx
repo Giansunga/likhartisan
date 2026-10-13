@@ -107,9 +107,8 @@ function StudioCyclorama({ scale }: { scale: number }) {
   );
 }
 
-function StudioLighting({ fit, enabled, mobile }: { fit: ViewerFit; enabled: boolean; mobile: boolean }) {
+function StudioLighting({ fit, enabled }: { fit: ViewerFit; enabled: boolean }) {
   const scale = fit.scale;
-  const shadowMapSize = mobile ? 512 : 1024;
   const rig = useMemo(() => createStudioLightRig(scale), [scale]);
   const areaLightRef = useRef<THREE.RectAreaLight>(null);
 
@@ -122,8 +121,8 @@ function StudioLighting({ fit, enabled, mobile }: { fit: ViewerFit; enabled: boo
 
   return (
     <>
-      <NeutralStudioEnvironment intensity={enabled ? 0.3 : 0.4} />
-      <ambientLight intensity={enabled ? 0.16 : 0.28} color="#ffffff" />
+      <NeutralStudioEnvironment intensity={enabled ? 0.32 : 0.36} />
+      <ambientLight intensity={enabled ? 0.2 : 0.24} color="#ffffff" />
       <rectAreaLight
         ref={areaLightRef}
         position={rig.areaPosition}
@@ -138,14 +137,6 @@ function StudioLighting({ fit, enabled, mobile }: { fit: ViewerFit; enabled: boo
         distance={rig.pointDistance}
         decay={2}
         color="#ffffff"
-        castShadow={!enabled}
-        shadow-mapSize-width={shadowMapSize}
-        shadow-mapSize-height={shadowMapSize}
-        shadow-camera-near={scale * 0.1}
-        shadow-camera-far={scale * 12}
-        shadow-radius={4}
-        shadow-bias={-0.00015}
-        shadow-normalBias={scale * 0.001}
       />
     </>
   );
@@ -187,13 +178,13 @@ export default function ModelViewer({ url }: { url: string }) {
         key={url}
         camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}
         gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08 }}
-        shadows={studioEnabled ? false : 'percentage'}
+        shadows={false}
         dpr={mobile ? [1, 1.5] : [1, 2]}
         style={{ width: '100%', height: '100%' }}
       >
         <color attach="background" args={[studioEnabled ? '#ededed' : '#f5f0eb']} />
         <CameraRig fit={fit} />
-        <StudioLighting fit={fit} enabled={studioEnabled} mobile={mobile} />
+        <StudioLighting fit={fit} enabled={studioEnabled} />
 
         {studioEnabled ? (
           <>
@@ -205,7 +196,7 @@ export default function ModelViewer({ url }: { url: string }) {
           <ProductModel
             url={url}
             rotate={!reduceMotion && !interacting}
-            shadowsEnabled={!studioEnabled}
+            shadowsEnabled={false}
             onFit={handleFit}
           />
         </Suspense>

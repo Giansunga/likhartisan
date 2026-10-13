@@ -1,17 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GalleryPage from '../GalleryPage';
+import { clearGallerySnapshot } from '../../lib/gallerySnapshot';
 
 const mocks = vi.hoisted(() => ({
   currentTheme: 'christmas' as 'default' | 'christmas' | 'valentines',
   order: vi.fn(),
   variations: vi.fn(),
   reviews: vi.fn(),
+  user: null as null | { id: string },
+  signalFetch: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, loading: false }),
+  useAuth: () => ({ user: mocks.user, loading: false }),
 }));
 
 vi.mock('../../contexts/ThemeContext', () => ({
@@ -20,7 +23,7 @@ vi.mock('../../contexts/ThemeContext', () => ({
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn((table: string) => ({
+    from: vi.fn((table: string) => table === 'user_product_signals' ? { select: () => ({ eq: () => ({ gte: () => ({ order: () => ({ limit: mocks.signalFetch }) }) }) }), insert: async () => ({ data: null, error: null }) } : ({
       select: vi.fn(() => table === 'products'
         ? { order: mocks.order }
         : { in: table === 'product_variations' ? mocks.variations : mocks.reviews }),
@@ -33,8 +36,42 @@ function product(id: string, stock: number, price = 100) {
 }
 
 describe('GalleryPage', () => {
+  function ReturnControls() {
+    const navigate = useNavigate();
+    return <><button onClick={() => navigate(-1)}>Return with Back</button><Link to="/gallery">Gallery breadcrumb</Link></>;
+  }
+  it.each(['Return with Back', 'Gallery breadcrumb'])('restores page, search, sorting, order and cached results through %s', async action => {
+    const rows = Array.from({ length: 30 }, (_, index) => product(`Vase ${String(index).padStart(2, '0')}`, 5, index + 100));
+    mocks.order.mockResolvedValue({ data: rows, error: null });
+    const { container } = render(<MemoryRouter initialEntries={['/gallery?category=Vases']}><Routes>
+      <Route path="/gallery" element={<GalleryPage />} />
+      <Route path="/product/:id" element={<ReturnControls />} />
+    </Routes></MemoryRouter>);
+    await waitFor(() => expect(container.querySelectorAll('[data-gallery-product]')).toHaveLength(24));
+    fireEvent.change(screen.getAllByRole('combobox', { name: 'Sort products' })[0], { target: { value: 'price-asc' } });
+    fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'Vase' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    const cards = [...container.querySelectorAll<HTMLElement>('[data-gallery-product]')].map(card => card.dataset.galleryProduct);
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 640 });
+    fireEvent.click(container.querySelector('[data-gallery-product]')!);
+    if (action === 'Return with Back') fireEvent.click(screen.getByRole('button', { name: action }));
+    else fireEvent.click(screen.getByRole('link', { name: action }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page'));
+    expect(screen.getByPlaceholderText(/Search/)).toHaveValue('Vase');
+    expect(screen.getAllByRole('combobox', { name: 'Sort products' })[0]).toHaveValue('price-asc');
+    expect([...container.querySelectorAll<HTMLElement>('[data-gallery-product]')].map(card => card.dataset.galleryProduct)).toEqual(cards);
+    expect(mocks.order).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith(0, 640));
+    if (action === 'Return with Back') expect(container.querySelector('[data-gallery-product]')).toHaveFocus();
+  }, 15000);
+
   beforeEach(() => {
+    clearGallerySnapshot();
+    vi.clearAllMocks();
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     mocks.currentTheme = 'christmas';
+    mocks.user = null;
+    mocks.signalFetch.mockResolvedValue({ data: [], error: null });
     mocks.order.mockResolvedValue({ data: [], error: null });
     mocks.variations.mockResolvedValue({ data: [], error: null });
     mocks.reviews.mockResolvedValue({ data: [], error: null });
@@ -43,6 +80,23 @@ describe('GalleryPage', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     });
+  });
+
+  it('starts a fresh gallery when the account changes', async () => {
+    mocks.order.mockResolvedValue({ data: [product('Guest piece', 2)], error: null });
+    const { rerender } = render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Guest piece/ });
+    mocks.user = { id: 'user-one' };
+    mocks.order.mockResolvedValue({ data: [product('Account piece', 3)], error: null });
+    rerender(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Account piece/ });
+    expect(screen.queryByRole('link', { name: /Guest piece/ })).not.toBeInTheDocument();
+    expect(mocks.order).toHaveBeenCalledTimes(2);
+    mocks.user = null;
+    mocks.order.mockResolvedValue({ data: [product('New guest piece', 1)], error: null });
+    rerender(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /New guest piece/ });
+    expect(mocks.order).toHaveBeenCalledTimes(3);
   });
 
   it('uses the category image set for the active seasonal theme', async () => {

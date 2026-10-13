@@ -2196,3 +2196,6 @@ body:has(.freeform-page) .likhai-dock {
   line-height: 1.35;
   margin: 0.25rem 0 0;
 }
+
+.freeform-summary-field-text { min-width: 0; }
+.freeform-summary-field-label { white-space: normal; overflow-wrap: anywhere; }

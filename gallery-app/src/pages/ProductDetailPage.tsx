@@ -10,7 +10,7 @@ import type { ReactElement } from 'react';
 import { mapSupabaseProduct, fmt, fmtRating, formatVariation } from '../lib/utils';
 import { normalizeCatalogMeasurement } from '../lib/measurements';
 import RecommendationsSection from '../components/RecommendationsSection';
-import { animateProductToCart } from '../lib/cartAnimation';
+import { animateProductToCart, cancelCartAnimation } from '../lib/cartAnimation';
 import { useFavorites } from '../hooks/useFavorites';
 import { ChevronDown, FileText, Heart, MessageCircle, ShoppingCart, Store } from 'lucide-react';
 import ProductFeaturedArtisan from '../components/ProductFeaturedArtisan';
@@ -101,6 +101,8 @@ export default function ProductDetailPage() {
   const cartQuantity = cart.find(item => (
     item.productId === cartProductId && (item.variationId ?? '') === cartVariationId
   ))?.qty ?? 0;
+
+  useEffect(() => () => cancelCartAnimation(), [id]);
 
   useEffect(() => onCartUpdate(() => setCart(getCart())), []);
 
@@ -334,9 +336,10 @@ export default function ProductDetailPage() {
     { label: 'Material', value: hasValue(product.materials) ? product.materials : '' },
   ].filter(spec => spec.value);
   const stickyVisible = !isMobile && stickyProductId === product.id;
-  const hasCraftDetails = specs.length > 0 || hasValue(height) || hasValue(openingDiameter) || hasValue(product.technique) || hasValue(product.description);
+  const stockNeedsSize = variations.length > 0 && !selectedVariation;
+  const stockDescription = stockNeedsSize ? 'Select a size to view stock' : availableStock > 0 ? `In Stock (${availableStock})` : 'Out of stock';
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (event: React.MouseEvent<HTMLButtonElement>) => {
     const result = addToCart({
       productId: product.id,
       productName: product.name,
@@ -353,7 +356,7 @@ export default function ProductDetailPage() {
       toast.info(`Only ${availableStock} available. Your cart already contains the maximum quantity.`);
       return;
     }
-    animateProductToCart(product.image);
+    animateProductToCart(product.image, document, event.currentTarget);
   };
 
   const handleBuy = async (e: React.FormEvent) => {
@@ -493,7 +496,7 @@ export default function ProductDetailPage() {
               </div>
 
               {specs.length > 0 && <dl className="pdp-spec-tiles">{specs.map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}</dl>}
-              {hasCraftDetails && <details className="pdp-craft" key={product.id}>
+              {<details className="pdp-craft" key={product.id}>
                 <summary><FileText aria-hidden="true" /><span>Full Specifications &amp; Craft Details</span><ChevronDown aria-hidden="true" /></summary>
                 <div className="pdp-craft-content">
                   {hasValue(product.description) && <p>{product.description}</p>}
@@ -502,7 +505,9 @@ export default function ProductDetailPage() {
                     { label: 'Height', value: hasValue(height) ? height : '' },
                     { label: 'Opening diameter', value: hasValue(openingDiameter) ? openingDiameter : '' },
                     { label: 'Technique', value: hasValue(product.technique) ? product.technique : '' },
-                  ].filter(spec => spec.value).map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}</dl>
+                  ].filter(spec => spec.value).map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}
+                    <div className="pdp-stock-detail"><dt>Stock</dt><dd className={stockNeedsSize ? undefined : availableStock > 0 ? 'pdp-stock-detail--available' : 'pdp-stock-detail--empty'}>{!stockNeedsSize && <span className="pdp-stock-dot" aria-hidden="true" />}{stockDescription}</dd></div>
+                  </dl>
                 </div>
               </details>}
 

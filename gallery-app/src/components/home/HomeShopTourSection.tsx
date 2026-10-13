@@ -1,4 +1,4 @@
-const SHOP_TOUR_VIDEO = 'https://www.youtube-nocookie.com/embed/yrfUUl-jhAQ';
+const SHOP_TOUR_VIDEO = 'https://pub-0cc6e7109e7e48a183d54d0426453a6a.r2.dev/Landing%20Page%20Video/LikhArtisan%203min.mp4';
 
 export default function HomeShopTourSection() {
   return (
@@ -11,13 +11,16 @@ export default function HomeShopTourSection() {
         </div>
         <div className="home-shop-tour__video-wrap">
           <div className="home-shop-tour__frame">
-            <iframe
-              src={SHOP_TOUR_VIDEO}
+            <video
               title="A Tour of Santo Tomas: Inside the Shops"
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+              aria-label="A Tour of Santo Tomas: Inside the Shops"
+              controls
+              playsInline
+              preload="metadata"
+            >
+              <source src={SHOP_TOUR_VIDEO} type="video/mp4" />
+              Your browser cannot play this video. <a href={SHOP_TOUR_VIDEO}>Open the shop tour video</a>.
+            </video>
           </div>
           <p className="home-shop-tour__caption">A short film from the pottery capital of the Philippines</p>
         </div>
