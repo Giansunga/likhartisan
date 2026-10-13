@@ -73,6 +73,7 @@ export function mapSupabaseProduct(row: any) {
     measurementUnit: 'in' as const,
     technique: row.technique || '',
     shopId: row.shop_id || '',
+    featuredArtisanId: row.featured_artisan_id || undefined,
     shopName: row.shop_name || '',
     status: row.status || 'active',
     views: row.views || 0,

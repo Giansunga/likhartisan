@@ -7,14 +7,14 @@ const mocks = vi.hoisted(() => ({ variations: [] as Record<string, unknown>[] })
 
 vi.mock('../../../lib/supabase', () => ({
   supabase: {
-    from: () => ({ select: () => ({ eq: () => ({ order: async () => ({ data: mocks.variations, error: null }) }) }) }),
+    from: (table: string) => ({ select: () => ({ eq: () => ({ order: async () => ({ data: table === 'artisans' ? [{ id: 'artisan-1', shop_id: 'shop-1', name: 'Juan Dela Cruz', specialty: 'Master Potter' }] : mocks.variations, error: null }) }) }) }),
   },
 }));
 
 const product: Product = {
   id: 'product-1', name: 'Pet Bowl', description: '', category: 'Others', price: 450, stock: 2, inStock: true,
   image: '/product.png', materials: 'Clay', dimensions: '', height: '', openingDiameter: '', technique: 'Handmade',
-  shopId: 'shop-1', shopName: 'Test Shop', status: 'active', views: 8, ratingAvg: 0, ratingCount: 0,
+  featuredArtisanId: 'artisan-1', shopId: 'shop-1', shopName: 'Test Shop', status: 'active', views: 8, ratingAvg: 0, ratingCount: 0,
   createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z',
 };
 
@@ -23,6 +23,17 @@ function variationCard(number: number) {
 }
 
 describe('ProductEditorDialog', () => {
+  it('requires an artisan for legacy products and preselects saved assignments', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<ProductEditorDialog product={{ ...product, featuredArtisanId: undefined }} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByRole('option', { name: 'Juan Dela Cruz' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByText('Select a Featured Artisan for this shop.')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    rerender(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Featured Artisan *' })).toHaveValue('artisan-1'));
+  });
+
   beforeEach(() => {
     mocks.variations = [{ id: 'variation-1', dimensions: '6 in x 4 in', height: '8 in', opening_diameter: '3 in', measurement_unit: 'in', product_weight_g: 400, packaging_weight_g: 100, shipping_length_in: 10, shipping_width_in: 8, shipping_height_in: 12, price: 450, stock: 2 }];
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:preview') });

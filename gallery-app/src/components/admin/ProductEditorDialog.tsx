@@ -1,3 +1,5 @@
+import FeaturedArtisanSelect from './FeaturedArtisanSelect';
+import { useShopArtisans } from '../../hooks/useShopArtisans';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { AlertCircle, FileBox, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +10,7 @@ import { kgToGrams, positiveInches } from '../../lib/shipping';
 import { PRODUCT_CATEGORIES } from '../../lib/utils';
 
 export interface ProductEditorSave {
+  featuredArtisanId: string;
   name: string;
   category: string;
   materials: string;
@@ -37,7 +40,8 @@ function trapFocus(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
 }
 
 export default function ProductEditorDialog({ product, onClose, onSave }: ProductEditorDialogProps) {
-  const [form, setForm] = useState({ name: '', category: '', materials: '', technique: '' });
+  const [form, setForm] = useState({ name: '', category: '', materials: '', technique: '', featuredArtisanId: '' });
+  const artisanOptions = useShopArtisans(product?.shopId || '');
   const [variations, setVariations] = useState<ProductVariationDraft[]>([]);
   const [variationLoading, setVariationLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -53,7 +57,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
   useEffect(() => {
     if (!product) return;
     const request = ++sequence.current;
-    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '' });
+    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', featuredArtisanId: product.featuredArtisanId || '' });
     setVariations([]); setImageFile(null); setImagePreview(product.image || ''); setModelFile(null); setErrors({}); setDirty(false); setConfirmDiscard(false); setVariationLoading(true);
     void supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order').then(({ data, error }) => {
       if (request !== sequence.current) return;
@@ -97,6 +101,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
     const nextErrors: ProductEditorErrors = {};
     if (!form.name.trim()) nextErrors.name = 'Product name is required.';
     if (!form.category) nextErrors.category = 'Select a category.';
+    if (artisanOptions.loading || artisanOptions.error || !artisanOptions.artisans.some(artisan => artisan.id === form.featuredArtisanId)) nextErrors.featuredArtisanId = 'Select a Featured Artisan for this shop.';
     const meaningful = variations.filter((item) => item.id || item.requiresWeight || item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg || item.packagingWeightKg || item.shippingLengthIn || item.shippingWidthIn || item.shippingHeightIn || item.price || item.stock);
     const validShippingData = (item: ProductVariationDraft) => {
       const hasWeight = (kgToGrams(item.weightKg) || 0) > 0;
@@ -134,6 +139,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
             <label><span>Category</span><select value={form.category} onChange={(event) => change('category', event.target.value)} aria-invalid={Boolean(errors.category)}><option value="">Select category</option>{PRODUCT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select>{errors.category && <em>{errors.category}</em>}</label>
             <label><span>Material</span><input value={form.materials} placeholder="e.g. Terracotta clay" onChange={(event) => change('materials', event.target.value)} /></label>
             <label><span>Technique</span><input value={form.technique} placeholder="e.g. Handcrafted & kiln-fired" onChange={(event) => change('technique', event.target.value)} /></label>
+            <div className="product-editor__wide"><p>Assigned shop: {product.shopName}</p><FeaturedArtisanSelect shopId={product.shopId} value={form.featuredArtisanId} onChange={value => change('featuredArtisanId', value)} {...artisanOptions} validationError={errors.featuredArtisanId} disabled={saving} /></div>
           </div>
         </section>
         <section className="product-editor__section product-editor__media">

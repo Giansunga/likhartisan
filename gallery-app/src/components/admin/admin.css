@@ -10,3 +10,13 @@
 @media (max-width: 768px) {
   .admin-main { height: calc(100dvh - 64px) !important; padding: 0 !important; }
 }
+
+.featured-artisan-field { min-width: 0; }
+.featured-artisan-field > label { display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: #5c4033; }
+.featured-artisan-field select { width: 100%; min-width: 0; padding: 11px 14px; border: 1px solid #ded3c8; border-radius: 8px; background: #fff; color: #5c4033; font: inherit; }
+.featured-artisan-field select:focus-visible { outline: 2px solid #823e0b; outline-offset: 2px; }
+.featured-artisan-field select:disabled { background: #f6f3ef; color: #8c7b6e; }
+.featured-artisan-field p { margin: 6px 0 0; font-size: 0.82rem; overflow-wrap: anywhere; }
+.featured-artisan-field [role="alert"] { color: #b42318; }
+.featured-artisan-field a { text-decoration: underline; }
+.featured-artisan-field button { margin-top: 6px; border: 1px solid #823e0b; border-radius: 6px; padding: 5px 12px; color: #823e0b; background: white; cursor: pointer; }

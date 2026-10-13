@@ -13,6 +13,7 @@ import RecommendationsSection from '../components/RecommendationsSection';
 import { animateProductToCart } from '../lib/cartAnimation';
 import { useFavorites } from '../hooks/useFavorites';
 import { ChevronDown, FileText, Heart, MessageCircle, ShoppingCart, Store } from 'lucide-react';
+import ProductFeaturedArtisan from '../components/ProductFeaturedArtisan';
 import './ProductDetailPage.css';
 
 function renderStars(rating: number, size = 14): ReactElement[] {
@@ -199,7 +200,7 @@ export default function ProductDetailPage() {
       try {
         const { data, error } = await supabase
           .from('products')
-            .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+            .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, featured_artisan_id, status, views, created_at, updated_at')
           .eq('id', id)
           .single();
 
@@ -462,6 +463,7 @@ export default function ProductDetailPage() {
                   </ProductMediaErrorBoundary>
                 ) : <img src={product.image} alt={product.name} id="viewer-main-img" />}
               </div>
+              <ProductFeaturedArtisan key={product.id} artisanId={product.featuredArtisanId} shopId={product.shopId} />
             </div>
 
             <div className="pdp-info">

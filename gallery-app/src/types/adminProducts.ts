@@ -31,6 +31,7 @@ export interface ProductVariationDraft {
 }
 
 export interface ProductEditorErrors {
+  featuredArtisanId?: string;
   name?: string;
   category?: string;
   image?: string;

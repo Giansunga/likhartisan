@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
+      if (table === 'artisans') return { select: () => ({ eq: () => ({ eq: () => ({ single: async () => ({ data: { id: 'artisan-1' }, error: null }) }) }) }) };
       if (table === 'products') return {
         select: () => ({ order: async () => ({ data: [{ id: 'product-1', name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' }], error: null }) }),
         update: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }),
@@ -38,7 +39,7 @@ vi.mock('../../components/admin/ProductTable', () => ({
 vi.mock('../../components/admin/ProductEditorDialog', () => ({
   default: ({ product, onSave }: { product: { id: string } | null; onSave: (product: { id: string }, data: unknown) => Promise<void> }) =>
     product && <button onClick={() => void onSave(product, {
-      name: 'Pet Bowl', category: 'Others', materials: 'Clay', technique: 'Handmade', imageFile: null, modelFile: null,
+      featuredArtisanId: 'artisan-1', name: 'Pet Bowl', category: 'Others', materials: 'Clay', technique: 'Handmade', imageFile: null, modelFile: null,
       variations: [{ dimensions: '4 in', height: '2 in', openingDiameter: '3 in', weightKg: '0.4', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '400', stock: '2' }],
     }).catch((error: Error) => mocks.saveError(error.message))}>Save changes</button>,
 }));

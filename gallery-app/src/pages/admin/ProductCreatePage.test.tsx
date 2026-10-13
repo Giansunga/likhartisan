@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => table === 'shops'
-      ? { select: () => ({ order: async () => ({ data: [{ id: 'shop-1', name: 'Clay Studio', email: 'shop@example.com' }] }) }) }
+      ? { select: () => ({ order: async () => ({ data: [{ id: 'shop-1', name: 'Clay Studio', email: 'shop@example.com' }, { id: 'shop-2', name: 'Second Studio', email: 'second@example.com' }] }) }) }
+      : table === 'artisans'
+        ? { select: () => ({ eq: (_key: string, shopId: string) => ({ order: async () => ({ data: shopId === 'shop-1' ? [{ id: 'artisan-1', shop_id: 'shop-1', name: 'Juan Dela Cruz', specialty: 'Master Potter' }] : [{ id: 'artisan-2', shop_id: 'shop-2', name: 'Ana', specialty: 'Potter' }], error: null }), eq: () => ({ single: async () => ({ data: { id: 'artisan-1' }, error: null }) }) }) }) }
       : table === 'products'
         ? { insert: (row: unknown) => { mocks.insertProduct(row); return { select: () => ({ single: async () => ({ data: { id: 'product-1' }, error: null }) }) }; } }
         : { insert: async (rows: unknown) => { mocks.insertVariations(rows); return { error: null }; } },
@@ -35,6 +37,24 @@ function variationCard(number: number) {
 }
 
 describe('admin product upload form', () => {
+  it('clears the artisan when switching shops and blocks upload without an artisan', async () => {
+    const { container } = renderPage();
+    await screen.findByRole('option', { name: 'Clay Studio' });
+    const shop = container.querySelector('select[name="shopId"]')!;
+    fireEvent.change(shop, { target: { value: 'shop-1' } });
+    await screen.findByRole('option', { name: 'Juan Dela Cruz' });
+    const artisan = screen.getByRole('combobox', { name: 'Featured Artisan *' });
+    fireEvent.change(artisan, { target: { value: 'artisan-1' } });
+    fireEvent.change(shop, { target: { value: 'shop-2' } });
+    await screen.findByRole('option', { name: 'Ana' });
+    expect(artisan).toHaveValue('');
+    expect(screen.queryByRole('option', { name: 'Juan Dela Cruz' })).not.toBeInTheDocument();
+    fireEvent.submit(container.querySelector('form')!);
+    expect(await screen.findByText('Select a Featured Artisan for this shop.')).toBeInTheDocument();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.insertProduct).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.uploadToR2.mockImplementation(async (_file: File, folder: string) => `https://files.example/${folder}/uploaded`);
@@ -77,6 +97,8 @@ describe('admin product upload form', () => {
     fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: 'Ancient Vase' } });
     fireEvent.change(container.querySelector('select[name="category"]')!, { target: { value: 'Vases' } });
     fireEvent.change(container.querySelector('select[name="shopId"]')!, { target: { value: 'shop-1' } });
+    await screen.findByRole('option', { name: 'Juan Dela Cruz' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Featured Artisan *' }), { target: { value: 'artisan-1' } });
 
     fireEvent.change(screen.getByPlaceholderText('e.g. 6 in × 4 in'), { target: { value: '6 in x 4 in' } });
     fireEvent.change(screen.getByPlaceholderText('e.g. 8 in'), { target: { value: '8 in' } });
@@ -108,6 +130,7 @@ describe('admin product upload form', () => {
       expect.objectContaining({ product_id: 'product-1', price: 350, stock: 2, product_weight_g: 1500, shipping_length_in: null, shipping_width_in: null, shipping_height_in: null }),
       expect.objectContaining({ product_id: 'product-1', price: 500, stock: 3, product_weight_g: 2000, shipping_length_in: 12, shipping_width_in: 10, shipping_height_in: 14 }),
     ]);
+    expect(mocks.insertProduct).toHaveBeenCalledWith(expect.objectContaining({ featured_artisan_id: 'artisan-1' }));
     expect(mocks.recomputeProductStock).toHaveBeenCalledWith('product-1');
   });
 });

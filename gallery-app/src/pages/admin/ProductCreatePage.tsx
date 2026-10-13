@@ -1,3 +1,6 @@
+import FeaturedArtisanSelect from '../../components/admin/FeaturedArtisanSelect';
+import { useShopArtisans } from '../../hooks/useShopArtisans';
+import { validateFeaturedArtisan } from '../../lib/featuredArtisan';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -95,9 +98,11 @@ export default function ProductCreatePage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [form, setForm] = useState({
     name: '', category: '',
-    materials: '', technique: '', shopId: '',
+    materials: '', technique: '', shopId: '', featuredArtisanId: '',
     productWeightKg: '', packagingWeightKg: '', packedLengthIn: '', packedWidthIn: '', packedHeightIn: '',
   });
+  const artisanOptions = useShopArtisans(form.shopId);
+  const artisanValid = !artisanOptions.loading && !artisanOptions.error && artisanOptions.artisans.some(artisan => artisan.id === form.featuredArtisanId);
   const [variations, setVariations] = useState<VariationDraft[]>([newVariation(0)]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
@@ -124,7 +129,7 @@ export default function ProductCreatePage() {
   usePortalRealtimeRefresh(['shops'], refreshShops);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value, ...(e.target.name === 'shopId' ? { featuredArtisanId: '' } : {}) }));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,6 +178,8 @@ export default function ProductCreatePage() {
     setSubmitError('');
 
     try {
+      if (!artisanValid) throw new Error('Select a Featured Artisan for this shop.');
+      await validateFeaturedArtisan(form.shopId, form.featuredArtisanId);
       if (variations.some(hasInvalidShippingDetails)) {
         setVariations(prev => prev.map(variation => hasInvalidShippingDetails(variation) ? { ...variation, shippingOpen: true } : variation));
         throw new Error('Enter all three packed dimensions with positive values, or leave them all blank.');
@@ -201,6 +208,7 @@ export default function ProductCreatePage() {
            measurement_unit: 'in',
           technique: form.technique || 'Handcrafted & Kiln-Fired',
           shop_id: form.shopId,
+          featured_artisan_id: form.featuredArtisanId,
           shop_name: shop.name,
            status: 'active',
            product_weight_g: kgToGrams(form.productWeightKg),
@@ -252,7 +260,7 @@ export default function ProductCreatePage() {
     }
   };
 
-  const isValid = Boolean(form.name && form.category && form.shopId && variations.every(hasValidVariation));
+  const isValid = Boolean(form.name && form.category && form.shopId && artisanValid && variations.every(hasValidVariation));
 
   return (
     <div className="product-create-page">
@@ -309,6 +317,7 @@ export default function ProductCreatePage() {
                   <p style={{ fontSize: '0.78rem', color: '#823E0B', marginTop: '6px' }}>No shops registered yet. Create a shop first.</p>
                 )}
               </div>
+              <div style={{ gridColumn: '1 / -1' }}><FeaturedArtisanSelect shopId={form.shopId} value={form.featuredArtisanId} onChange={value => setForm(prev => ({ ...prev, featuredArtisanId: value }))} {...artisanOptions} disabled={loading} /></div>
             </div>
           </div>
 

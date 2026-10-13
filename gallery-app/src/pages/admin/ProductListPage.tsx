@@ -10,6 +10,7 @@ import { productVariationUpdateData } from '../../lib/productEditorSave';
 import { DEFAULT_PRODUCT_FILTERS, filterAndSortProducts, getProductInventoryCounts, mergeProductFilters, paginateProducts, productFiltersFromSearch } from '../../lib/adminProducts';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import ProductTable from '../../components/admin/ProductTable';
+import { validateFeaturedArtisan } from '../../lib/featuredArtisan';
 import ProductEditorDialog, { type ProductEditorSave } from '../../components/admin/ProductEditorDialog';
 import type { Product } from '../../types';
 import type { ProductAdminFilters, ProductSort } from '../../types/adminProducts';
@@ -115,7 +116,9 @@ export default function ProductListPage() {
   };
 
   const saveProduct = async (product: Product, data: ProductEditorSave) => {
+    await validateFeaturedArtisan(product.shopId, data.featuredArtisanId);
     const updateData: Record<string, unknown> = {
+      featured_artisan_id: data.featuredArtisanId,
       name: data.name, category: data.category, materials: data.materials, technique: data.technique,
     };
     if (data.imageFile) {
