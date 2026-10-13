@@ -963,7 +963,7 @@ function applyDesign(design: {
                   </svg>
                 </div>
                 <div className="freeform-summary-row-info">
-                  <span className="freeform-summary-row-label">EST. PRICE</span>
+                  <span className="freeform-summary-row-label">Estimated Tentative Price</span>
                   <span className="freeform-price-total">{estimate ? `₱${estimatedPrice.toLocaleString()}.00` : '—'}</span>
                 </div>
               </div>
@@ -975,7 +975,7 @@ function applyDesign(design: {
                   </svg>
                 </div>
                 <div className="freeform-summary-row-info">
-                  <span className="freeform-summary-row-label">EST. PRODUCTION</span>
+                  <span className="freeform-summary-row-label">Estimated Production Days</span>
                   <span className="freeform-summary-row-value">{estimate ? `${estimatedDays} Days` : '—'}</span>
                 </div>
               </div>
