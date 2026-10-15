@@ -35,9 +35,10 @@ export default function DecorTab({ decoration, onChange }: { decoration: Decorat
             {visiblePatterns.map((pattern) => {
               const selected = decoration.patternId === pattern.id;
               return (
-                <button key={pattern.id} type="button" className={`decor-pattern-card ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={() => choosePattern(pattern.id, pattern.defaultColor, pattern.recommendedPlacement)}>
+                <button key={pattern.id} type="button" className={`decor-pattern-card ${selected ? 'selected' : ''}`} aria-pressed={selected} aria-describedby={pattern.name === 'Sampaguita' ? `${pattern.id}-description` : undefined} onClick={() => choosePattern(pattern.id, pattern.defaultColor, pattern.recommendedPlacement)}>
                   <span className="decor-pattern-preview" style={{ backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(createPatternSvg(pattern.id, selected ? decoration.color : '#8E623B'))}")` }} />
                   <span>{pattern.name}</span>
+                  {pattern.name === 'Sampaguita' && <small id={`${pattern.id}-description`} className="decor-pattern-description">{pattern.description}</small>}
                 </button>
               );
             })}

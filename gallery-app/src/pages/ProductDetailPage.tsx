@@ -543,10 +543,10 @@ export default function ProductDetailPage() {
             </div>}
           </section>
 
-          <div className="pdp-recommendations" key={product.id}>
-            {product.shopId && <RecommendationsSection excludeProductIds={[product.id]} preferredShopIds={[product.shopId]} sameShopOnly title="More from the Same Shop" subtitle={`Handcrafted pieces by ${product.shopName || 'this shop'}`} viewAllHref={`/shop/${product.shopId}`} />}
-            <RecommendationsSection excludeProductIds={[product.id]} preferredCategories={product.category ? [product.category] : []} preferredShopIds={product.shopId ? [product.shopId] : []} />
-          </div>
+          {product.shopId && product.category && <div className="pdp-recommendations" key={product.id}>
+            <RecommendationsSection productId={product.id} shopScope="same" title="Similar products from the same shop" subtitle={`Handcrafted pieces by ${product.shopName || 'this shop'}`} viewAllHref={`/shop/${product.shopId}`} />
+            <RecommendationsSection productId={product.id} shopScope="different" title="Similar products from different shops" />
+          </div>}
         </div>
       </div>
 

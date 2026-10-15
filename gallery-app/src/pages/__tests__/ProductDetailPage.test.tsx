@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   products: [] as Row[], variations: [] as Row[], reviews: [] as Row[],
   failProducts: false,
   failModel: false,
+  suggestions: {} as Record<string, Row[]>,
+  suggestionCalls: [] as { p_product_id: string; p_shop_scope: string; p_limit: number }[],
+  suggestionRequest: null as null | ((args: { p_product_id: string; p_shop_scope: string; p_limit: number }) => Promise<{ data: Row[] | null; error: Error | null }>),
   calls: [] as { table: string; filters: [string, unknown][]; order?: string }[],
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: mocks.user }) }));
@@ -17,7 +20,13 @@ vi.mock('../../components/ModelViewer', () => ({ default: () => { if (mocks.fail
 vi.mock('../../lib/cartAnimation', () => ({ animateProductToCart: vi.fn(), cancelCartAnimation: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    rpc: vi.fn(async () => ({ data: 4 })),
+    rpc: vi.fn(async (name: string, args: { p_product_id: string; p_shop_scope: string; p_limit: number }) => {
+      if (name !== 'get_product_suggestions') return { data: 4 };
+      mocks.suggestionCalls.push(args);
+      if (mocks.suggestionRequest) return mocks.suggestionRequest(args);
+      return mocks.failProducts ? { data: null, error: new Error('Unavailable') }
+        : { data: mocks.suggestions[`${args.p_product_id}:${args.p_shop_scope}`] || [], error: null };
+    }),
     from: (table: string) => {
       const request: { table: string; filters: [string, unknown][]; order?: string } = { table, filters: [] };
       mocks.calls.push(request);
@@ -56,6 +65,9 @@ beforeEach(() => {
   mocks.failProducts = false;
   mocks.failModel = false;
   mocks.calls = [];
+  mocks.suggestions = {};
+  mocks.suggestionCalls = [];
+  mocks.suggestionRequest = null;
   mocks.products = [
     { id: 'jar', name: 'Bigasan Terracotta', category: 'Jars', price: 100, stock: 20, image: '/jar.jpg', shop_id: 'shop', shop_name: 'Maria’s Pottery', status: 'active', materials: 'Terracotta Clay', description: 'Made by hand.', technique: 'Wheel-thrown', measurement_unit: 'in' },
     { id: 'plain', name: 'Plain piece with a very long product name that must wrap', category: 'Jars', price: 75, stock: 0, image: '/plain.jpg', status: 'active', measurement_unit: 'in' },
@@ -195,32 +207,58 @@ describe('product detail presentation and shopping controls', () => {
 });
 
 describe('product recommendation rows', () => {
-  it('keeps same-shop results strict, excludes the current product and hides an empty row', async () => {
-    mocks.products.push({ id: 'same', name: 'Same shop piece', shop_id: 'shop', category: 'Vases', price: 80, status: 'active' });
-    const { rerender } = render(<MemoryRouter><RecommendationsSection sameShopOnly preferredShopIds={['shop']} excludeProductIds={['jar']} title="More from the Same Shop" /></MemoryRouter>);
-    const row = await screen.findByRole('region', { name: 'More from the Same Shop products' });
-    expect(within(row).getByRole('link', { name: /Same shop piece/ })).toBeInTheDocument();
-    expect(within(row).queryByRole('link', { name: /Another shop/ })).not.toBeInTheDocument();
-    expect(mocks.calls.filter(call => call.table === 'products').every(call => call.filters.some(([key]) => key === 'shop_id'))).toBe(true);
-    rerender(<MemoryRouter><RecommendationsSection sameShopOnly preferredShopIds={['empty-shop']} title="More from the Same Shop" /></MemoryRouter>);
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'More from the Same Shop' })).not.toBeInTheDocument());
+  it('requests distinct shop scopes in order and preserves variation prices, stock and ratings', async () => {
+    mocks.suggestions['jar:same'] = [{ id: 'same', name: 'Similar jar', shop_id: 'shop', category: 'Jars', price: 80, stock: 0 }];
+    mocks.suggestions['jar:different'] = [mocks.products[2]];
+    mocks.variations.push({ product_id: 'same', price: 125, stock: 2 });
+    mocks.reviews.push({ product_id: 'same', rating: 4 });
+    renderProduct();
+    const row = await screen.findByRole('region', { name: 'Similar products from the same shop products' });
+    expect(within(row).getByRole('link', { name: /Similar jar/ })).toHaveTextContent('₱125.00');
+    expect(within(row).queryByText('Out of stock')).not.toBeInTheDocument();
+    expect(within(row).getByLabelText('4.0 out of 5 stars, 1 reviews')).toBeInTheDocument();
+    const different = await screen.findByRole('region', { name: 'Similar products from different shops products' });
+    expect(within(different).getByRole('link', { name: /Another shop piece/ })).toBeInTheDocument();
+    expect(mocks.suggestionCalls).toEqual([
+      { p_product_id: 'jar', p_shop_scope: 'same', p_limit: 8 },
+      { p_product_id: 'jar', p_shop_scope: 'different', p_limit: 8 },
+    ]);
+    expect(row.compareDocumentPosition(different) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('retains category preference and popular fallback for general recommendations', async () => {
-    render(<MemoryRouter><RecommendationsSection preferredCategories={['Jars']} preferredShopIds={['shop']} excludeProductIds={['jar']} /></MemoryRouter>);
-    const row = await screen.findByRole('region', { name: 'You Might Also Like products' });
-    expect(within(row).getByRole('link', { name: /Another shop piece/ })).toBeInTheDocument();
-    const calls = mocks.calls.filter(call => call.table === 'products');
-    expect(calls[0].filters).toContainEqual(['category', ['Jars']]);
-    expect(calls.at(-1)?.order).toBe('views');
+  it('hides empty rows without querying popular products', async () => {
+    render(<MemoryRouter><RecommendationsSection productId="jar" shopScope="same" /></MemoryRouter>);
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+    expect(mocks.calls).toEqual([]);
   });
 
   it('settles failed recommendations instead of leaving loading placeholders indefinitely', async () => {
     mocks.failProducts = true;
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<MemoryRouter><RecommendationsSection sameShopOnly preferredShopIds={['shop']} /></MemoryRouter>);
+    render(<MemoryRouter><RecommendationsSection productId="jar" shopScope="same" /></MemoryRouter>);
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'You Might Also Like' })).not.toBeInTheDocument());
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     error.mockRestore();
+  });
+
+  it.each(['category', 'shop_id'])('omits both rows when the viewed product lacks %s', async field => {
+    mocks.products[0][field] = '';
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    expect(mocks.suggestionCalls).toEqual([]);
+  });
+
+  it('discards an old response when a different product opens', async () => {
+    let finishOld!: (value: { data: Row[]; error: null }) => void;
+    mocks.suggestionRequest = args => args.p_product_id === 'jar'
+      ? new Promise(resolve => { finishOld = resolve; })
+      : Promise.resolve({ data: [{ id: 'new', name: 'New match', price: 50, stock: 1 }], error: null });
+    const { rerender } = render(<MemoryRouter><RecommendationsSection productId="jar" shopScope="same" /></MemoryRouter>);
+    rerender(<MemoryRouter><RecommendationsSection productId="next" shopScope="same" /></MemoryRouter>);
+    await screen.findByRole('link', { name: /New match/ });
+    await act(async () => { finishOld({ data: [{ id: 'old', name: 'Old match' }], error: null }); });
+    expect(screen.queryByRole('link', { name: /Old match/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /New match/ })).toBeInTheDocument();
   });
 });

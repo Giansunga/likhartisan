@@ -23,6 +23,34 @@ function variationCard(number: number) {
 }
 
 describe('ProductEditorDialog', () => {
+  it('loads tags, saves pending changes, restores persisted tags and allows clearing', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(<ProductEditorDialog product={{ ...product, tags: ['Clay', 'rustic'] }} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag rustic' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tags (optional)' }), { target: { value: ' Floral ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onSave.mock.calls[0][1].tags).toEqual(['clay', 'floral']);
+    rerender(<ProductEditorDialog product={{ ...product, tags: onSave.mock.calls[0][1].tags }} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    expect(screen.getByRole('button', { name: 'Remove tag floral' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag clay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag floral' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(onSave.mock.calls[1][1].tags).toEqual([]);
+  });
+
+  it('blocks saving overlong tags before calling the save handler', async () => {
+    const onSave = vi.fn();
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tags (optional)' }), { target: { value: 'a'.repeat(41) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('40 characters');
+    expect(onSave).not.toHaveBeenCalled();
+  });
   it('requires an artisan for legacy products and preselects saved assignments', async () => {
     const onSave = vi.fn();
     const { rerender } = render(<ProductEditorDialog product={{ ...product, featuredArtisanId: undefined }} onClose={vi.fn()} onSave={onSave} />);

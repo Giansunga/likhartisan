@@ -1,4 +1,6 @@
 import FeaturedArtisanSelect from '../../components/admin/FeaturedArtisanSelect';
+import ProductTagsInput from '../../components/admin/ProductTagsInput';
+import { resolveProductTags, type ProductTagsDraft } from '../../lib/productTags';
 import { useShopArtisans } from '../../hooks/useShopArtisans';
 import { validateFeaturedArtisan } from '../../lib/featuredArtisan';
 import { useState, useEffect, useRef } from 'react';
@@ -108,6 +110,7 @@ export default function ProductCreatePage() {
   const [imagePreview, setImagePreview] = useState('');
   const [glbFile, setGlbFile] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [tagDraft, setTagDraft] = useState<ProductTagsDraft>({ tags: [], input: '' });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -178,6 +181,8 @@ export default function ProductCreatePage() {
     setSubmitError('');
 
     try {
+      const resolvedTags = resolveProductTags(tagDraft);
+      if (resolvedTags.error) throw new Error(resolvedTags.error);
       if (!artisanValid) throw new Error('Select a Featured Artisan for this shop.');
       await validateFeaturedArtisan(form.shopId, form.featuredArtisanId);
       if (variations.some(hasInvalidShippingDetails)) {
@@ -197,6 +202,7 @@ export default function ProductCreatePage() {
           name: form.name,
           description: '',
           category: form.category,
+          tags: resolvedTags.tags,
           price: 0,
           stock: totalStock,
           image: imageUrl,
@@ -260,7 +266,7 @@ export default function ProductCreatePage() {
     }
   };
 
-  const isValid = Boolean(form.name && form.category && form.shopId && artisanValid && variations.every(hasValidVariation));
+  const isValid = Boolean(form.name && form.category && form.shopId && artisanValid && !resolveProductTags(tagDraft).error && variations.every(hasValidVariation));
 
   return (
     <div className="product-create-page">
@@ -317,6 +323,7 @@ export default function ProductCreatePage() {
                   <p style={{ fontSize: '0.78rem', color: '#823E0B', marginTop: '6px' }}>No shops registered yet. Create a shop first.</p>
                 )}
               </div>
+              <div style={{ gridColumn: '1 / -1' }}><ProductTagsInput value={tagDraft} onChange={setTagDraft} disabled={loading} /></div>
               <div style={{ gridColumn: '1 / -1' }}><FeaturedArtisanSelect shopId={form.shopId} value={form.featuredArtisanId} onChange={value => setForm(prev => ({ ...prev, featuredArtisanId: value }))} {...artisanOptions} disabled={loading} /></div>
             </div>
           </div>

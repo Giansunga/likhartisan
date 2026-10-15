@@ -95,6 +95,8 @@ describe('admin product upload form', () => {
     const { container } = renderPage();
     await screen.findByRole('option', { name: 'Clay Studio' });
     fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: 'Ancient Vase' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tags (optional)' }), { target: { value: ' Rustic, CLAY, clay ' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tags (optional)' }), { target: { value: ' Hand   made ' } });
     fireEvent.change(container.querySelector('select[name="category"]')!, { target: { value: 'Vases' } });
     fireEvent.change(container.querySelector('select[name="shopId"]')!, { target: { value: 'shop-1' } });
     await screen.findByRole('option', { name: 'Juan Dela Cruz' });
@@ -130,7 +132,7 @@ describe('admin product upload form', () => {
       expect.objectContaining({ product_id: 'product-1', price: 350, stock: 2, product_weight_g: 1500, shipping_length_in: null, shipping_width_in: null, shipping_height_in: null }),
       expect.objectContaining({ product_id: 'product-1', price: 500, stock: 3, product_weight_g: 2000, shipping_length_in: 12, shipping_width_in: 10, shipping_height_in: 14 }),
     ]);
-    expect(mocks.insertProduct).toHaveBeenCalledWith(expect.objectContaining({ featured_artisan_id: 'artisan-1' }));
+    expect(mocks.insertProduct).toHaveBeenCalledWith(expect.objectContaining({ featured_artisan_id: 'artisan-1', tags: ['rustic', 'clay', 'hand made'] }));
     expect(mocks.recomputeProductStock).toHaveBeenCalledWith('product-1');
   });
 });

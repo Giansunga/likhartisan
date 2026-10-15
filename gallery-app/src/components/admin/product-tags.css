@@ -1,0 +1,13 @@
+.product-tags { min-width: 0; }
+.product-tags > label, .product-editor .product-tags > label { display: block; font-size: .82rem; font-weight: 600; color: #5a4a3e; margin-bottom: 6px; }
+.product-tags > label small { font-weight: 400; }
+.product-tags__field { border: 1.5px solid #e8e0d8; border-radius: 10px; padding: 8px 10px; background: #faf8f5; }
+.product-tags__field:focus-within { border-color: #823e0b; }
+.product-tags__field ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0 0 6px; padding: 0; }
+.product-tags__field li { display: flex; align-items: center; gap: 6px; max-width: 100%; border-radius: 8px; background: #f0e5d9; padding: 3px 7px; font-size: .82rem; color: #5a4a3e; }
+.product-tags__field li span { overflow-wrap: anywhere; min-width: 0; }
+.product-tags__field button { flex-shrink: 0; border: 0; background: transparent; cursor: pointer; min-width: 28px; min-height: 28px; font-size: 1.1rem; color: inherit; }
+.product-tags__field button:focus-visible { outline: 2px solid #823e0b; outline-offset: 2px; }
+.product-tags .product-tags__field input { width: 100%; min-width: 0; border: 0; background: transparent; box-sizing: border-box; padding: 5px 3px; font: inherit; font-size: .88rem; color: #2c1810; outline: none; }
+.product-tags > p { font-size: .78rem; color: #8c7b6e; margin: 6px 0 0; }
+.product-tags > .product-tags__error { color: #b42318; }

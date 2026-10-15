@@ -120,6 +120,7 @@ export default function ProductListPage() {
     const updateData: Record<string, unknown> = {
       featured_artisan_id: data.featuredArtisanId,
       name: data.name, category: data.category, materials: data.materials, technique: data.technique,
+      tags: data.tags,
     };
     if (data.imageFile) {
       const url = await uploadToR2(data.imageFile, 'products');

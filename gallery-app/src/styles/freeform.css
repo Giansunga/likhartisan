@@ -296,6 +296,7 @@ body:has(.freeform-page) .likhai-dock {
 .decor-pattern-card { border: 1.5px solid var(--bg-tertiary); border-radius: 10px; background: #fff; color: var(--text-dark); font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; padding: 7px; text-align: left; transition: border-color .2s, box-shadow .2s; }
 .decor-pattern-card:hover, .decor-pattern-card.selected { border-color: var(--primary-color); box-shadow: 0 2px 8px rgba(130, 62, 11, .12); }
 .decor-pattern-preview { display: block; height: 36px; margin-bottom: 5px; background-position: center; background-repeat: repeat-x; background-size: auto 116px; }
+.decor-pattern-description { display: block; margin-top: 3px; color: var(--text-muted); font-weight: 400; font-size: .68rem; }
 .decor-field-label { display: flex; justify-content: space-between; align-items: center; color: var(--text-dark); font-size: 0.76rem; font-weight: 600; margin: 14px 0 7px; }
 .decor-field-label span { color: var(--primary-color); font-variant-numeric: tabular-nums; }
 .decor-segmented { display: flex; border: 1px solid var(--bg-tertiary); border-radius: 9px; overflow: hidden; }

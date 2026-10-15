@@ -56,6 +56,7 @@ export interface ProductReview {
 }
 
 export interface Product {
+  tags?: string[];
   featuredArtisanId?: string;
   id: string;
   name: string;

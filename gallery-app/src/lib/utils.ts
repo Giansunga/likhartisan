@@ -1,5 +1,6 @@
 export const FAVORITES_KEY = 'likhartisan_favorites';
 import { normalizeCatalogMeasurement, type MeasurementUnit } from './measurements';
+import { normalizeProductTags } from './productTags';
 
 export function loadFavorites(): string[] {
   try {
@@ -60,6 +61,7 @@ export function mapSupabaseProduct(row: any) {
     name: row.name,
     description: row.description || '',
     category: normalizeProductCategory(row.category),
+    tags: normalizeProductTags(row.tags),
     price: row.price || 0,
     catalogPrice: row.price == null || row.price === '' ? null : Number(row.price),
     stock: row.stock || 0,

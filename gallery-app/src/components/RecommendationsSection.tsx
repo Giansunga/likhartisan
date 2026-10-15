@@ -2,32 +2,25 @@ import { useState, useEffect, useRef, useId, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { mapSupabaseProduct, fmt, storedProductCategories } from '../lib/utils';
+import { mapSupabaseProduct, fmt } from '../lib/utils';
 import type { Product } from '../types';
 import { catalogDisplayPrice, summarizeCatalogVariations } from '../lib/catalogPresentation';
 
 interface RecommendationsSectionProps {
-  excludeProductIds?: string[];
-  preferredCategories?: string[];
-  preferredShopIds?: string[];
+  productId: string;
+  shopScope: 'same' | 'different';
   title?: string;
   subtitle?: string;
   limit?: number;
-  sameShopOnly?: boolean;
   viewAllHref?: string;
 }
 
 const EMPTY_PRODUCTS: Product[] = [];
-const PRODUCT_COLUMNS = 'id, name, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at';
-
 export default function RecommendationsSection({
-  excludeProductIds = [], preferredCategories = [], preferredShopIds = [],
-  title = 'You Might Also Like', subtitle, limit = 8, sameShopOnly = false, viewAllHref,
+  productId, shopScope,
+  title = 'You Might Also Like', subtitle, limit = 8, viewAllHref,
 }: RecommendationsSectionProps) {
-  const excludeKey = JSON.stringify(excludeProductIds);
-  const categoriesKey = JSON.stringify(preferredCategories);
-  const shopsKey = JSON.stringify(preferredShopIds);
-  const requestKey = JSON.stringify([excludeKey, categoriesKey, shopsKey, limit, sameShopOnly]);
+  const requestKey = JSON.stringify([productId, shopScope, limit]);
   const [result, setResult] = useState<{ key: string; products: Product[] } | null>(null);
   const loading = result?.key !== requestKey;
   const products = loading ? EMPTY_PRODUCTS : result.products;
@@ -38,45 +31,13 @@ export default function RecommendationsSection({
   useEffect(() => {
     let active = true;
     async function fetchRecommendations() {
-      const excluded: string[] = JSON.parse(excludeKey);
-      const categories: string[] = JSON.parse(categoriesKey);
-      const shops: string[] = JSON.parse(shopsKey);
-      const excludeSet = new Set(excluded);
-      let results: Product[] = [];
-      const append = (rows: Parameters<typeof mapSupabaseProduct>[0][]) => {
-        const existing = new Set(results.map(product => product.id));
-        results = [...results, ...rows.map(mapSupabaseProduct).filter(product => !excludeSet.has(product.id) && !existing.has(product.id))];
-      };
+      let results: Product[];
       try {
-        if (sameShopOnly) {
-          if (shops.length > 0) {
-            const { data, error } = await supabase.from('products').select(PRODUCT_COLUMNS)
-              .in('shop_id', shops).eq('status', 'active').order('created_at', { ascending: false })
-              .limit(limit + excluded.length);
-            if (error) throw error;
-            if (data) append(data);
-          }
-        } else {
-          // Preserve the existing category → shop → popular recommendation order.
-          if (categories.length > 0) {
-            const { data } = await supabase.from('products').select(PRODUCT_COLUMNS)
-              .in('category', storedProductCategories(categories)).eq('status', 'active')
-              .order('created_at', { ascending: false }).limit(limit + excluded.length);
-            if (data) append(data);
-          }
-          if (results.length < limit && shops.length > 0) {
-            const { data } = await supabase.from('products').select(PRODUCT_COLUMNS)
-              .in('shop_id', shops).eq('status', 'active').order('created_at', { ascending: false })
-              .limit(limit + excluded.length + 10);
-            if (data) append(data);
-          }
-          if (results.length < limit) {
-            const { data } = await supabase.from('products').select(PRODUCT_COLUMNS)
-              .eq('status', 'active').order('views', { ascending: false }).limit(limit + excluded.length + 10);
-            if (data) append(data);
-          }
-        }
-        results = results.slice(0, limit);
+        const { data, error } = await supabase.rpc('get_product_suggestions', {
+          p_product_id: productId, p_shop_scope: shopScope, p_limit: limit,
+        });
+        if (error) throw error;
+        results = (data || []).map(mapSupabaseProduct);
         if (results.length > 0) {
           const ids = results.map(product => product.id);
           const [{ data: varRows }, { data: reviewRows }] = await Promise.all([
@@ -106,7 +67,7 @@ export default function RecommendationsSection({
     }
     void fetchRecommendations();
     return () => { active = false; };
-  }, [excludeKey, categoriesKey, shopsKey, limit, sameShopOnly, requestKey]);
+  }, [productId, shopScope, limit, requestKey]);
 
   useEffect(() => {
     const viewport = scrollRef.current;

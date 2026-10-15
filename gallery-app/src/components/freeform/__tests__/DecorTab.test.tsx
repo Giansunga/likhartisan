@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import DecorTab from '../DecorTab';
-import { DEFAULT_DECORATION, type DecorationParams } from '../decor';
+import { DEFAULT_DECORATION, getPattern, type DecorationParams } from '../decor';
 
 function Harness({ initial = DEFAULT_DECORATION }: { initial?: DecorationParams }) {
   const [decoration, setDecoration] = useState(initial);
@@ -10,6 +10,19 @@ function Harness({ initial = DEFAULT_DECORATION }: { initial?: DecorationParams 
 }
 
 describe('DecorTab guided workflow', () => {
+  it('selects the renamed Sampaguita and restores the original saved pattern ID', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<DecorTab decoration={DEFAULT_DECORATION} onChange={onChange} />);
+    const paired = screen.getAllByRole('button', { name: /Sampaguita/ }).find(button => button.textContent?.includes('Paired sampaguita blossoms'))!;
+    expect(paired).toHaveAccessibleDescription('Paired sampaguita blossoms');
+    fireEvent.click(paired);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ patternId: 'floral-orchid' }));
+    rerender(<DecorTab decoration={{ ...DEFAULT_DECORATION, patternId: 'floral-orchid' }} onChange={onChange} />);
+    expect(screen.getByRole('button', { name: /Choose Pattern.*Sampaguita/ })).toBeInTheDocument();
+    expect(getPattern('floral-orchid')?.name).toBe('Sampaguita');
+    expect(getPattern('floral-sampaguita')?.description).toBe('Star-like blossoms');
+    expect(screen.queryByRole('button', { name: /Orchid/ })).not.toBeInTheDocument();
+  });
   it('gates customization and advances after choosing a motif', () => {
     render(<Harness />);
     expect(screen.getByRole('heading', { name: 'Pattern Controls' })).toBeInTheDocument();

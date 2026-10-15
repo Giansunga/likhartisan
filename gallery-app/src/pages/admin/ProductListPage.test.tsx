@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   updateResult: { data: null as { id: string } | null, error: null as { message: string } | null },
   variationInsertResult: { data: { id: 'variation-1' }, error: null as { code: string; message: string } | null },
   insertVariation: vi.fn(),
+  updateProduct: vi.fn(),
+  tags: ['clay'] as string[],
   saveError: vi.fn(),
   recomputeProductStock: vi.fn(),
 }));
@@ -17,7 +19,7 @@ vi.mock('../../lib/supabase', () => ({
       if (table === 'artisans') return { select: () => ({ eq: () => ({ eq: () => ({ single: async () => ({ data: { id: 'artisan-1' }, error: null }) }) }) }) };
       if (table === 'products') return {
         select: () => ({ order: async () => ({ data: [{ id: 'product-1', name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' }], error: null }) }),
-        update: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }),
+        update: (row: unknown) => { mocks.updateProduct(row); return { eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }; },
       };
       return {
         select: () => ({ in: async () => ({ data: [], error: null }) }),
@@ -40,6 +42,7 @@ vi.mock('../../components/admin/ProductEditorDialog', () => ({
   default: ({ product, onSave }: { product: { id: string } | null; onSave: (product: { id: string }, data: unknown) => Promise<void> }) =>
     product && <button onClick={() => void onSave(product, {
       featuredArtisanId: 'artisan-1', name: 'Pet Bowl', category: 'Others', materials: 'Clay', technique: 'Handmade', imageFile: null, modelFile: null,
+      tags: mocks.tags,
       variations: [{ dimensions: '4 in', height: '2 in', openingDiameter: '3 in', weightKg: '0.4', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '400', stock: '2' }],
     }).catch((error: Error) => mocks.saveError(error.message))}>Save changes</button>,
 }));
@@ -49,6 +52,7 @@ describe('admin product editor save', () => {
     vi.clearAllMocks();
     mocks.updateResult = { data: null, error: null };
     mocks.variationInsertResult = { data: { id: 'variation-1' }, error: null };
+    mocks.tags = ['clay'];
   });
 
   async function save() {
@@ -81,5 +85,17 @@ describe('admin product editor save', () => {
     await waitFor(() => expect(mocks.recomputeProductStock).toHaveBeenCalledWith('product-1'));
     expect(mocks.insertVariation).toHaveBeenCalledWith(expect.objectContaining({ product_id: 'product-1' }));
     expect(mocks.saveError).not.toHaveBeenCalled();
+    expect(mocks.updateProduct).toHaveBeenCalledWith(expect.objectContaining({ tags: ['clay'] }));
+  });
+
+  it('writes an empty tags array when all tags are removed', async () => {
+    mocks.tags = [];
+    mocks.updateResult = { data: { id: 'product-1' }, error: null };
+    mocks.recomputeProductStock.mockResolvedValue(2);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit first product' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mocks.recomputeProductStock).toHaveBeenCalledWith('product-1'));
+    expect(mocks.updateProduct).toHaveBeenCalledWith(expect.objectContaining({ tags: [] }));
   });
 });

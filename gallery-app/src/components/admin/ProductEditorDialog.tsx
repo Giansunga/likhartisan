@@ -1,4 +1,6 @@
 import FeaturedArtisanSelect from './FeaturedArtisanSelect';
+import ProductTagsInput from './ProductTagsInput';
+import { normalizeProductTags, resolveProductTags, type ProductTagsDraft } from '../../lib/productTags';
 import { useShopArtisans } from '../../hooks/useShopArtisans';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { AlertCircle, FileBox, ImagePlus, Plus, Trash2, X } from 'lucide-react';
@@ -10,6 +12,7 @@ import { kgToGrams, positiveInches } from '../../lib/shipping';
 import { PRODUCT_CATEGORIES } from '../../lib/utils';
 
 export interface ProductEditorSave {
+  tags: string[];
   featuredArtisanId: string;
   name: string;
   category: string;
@@ -50,6 +53,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
   const [errors, setErrors] = useState<ProductEditorErrors>({});
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [tagDraft, setTagDraft] = useState<ProductTagsDraft>({ tags: [], input: '' });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const sequence = useRef(0);
@@ -57,6 +61,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
   useEffect(() => {
     if (!product) return;
     const request = ++sequence.current;
+    setTagDraft({ tags: normalizeProductTags(product.tags), input: '' });
     setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', featuredArtisanId: product.featuredArtisanId || '' });
     setVariations([]); setImageFile(null); setImagePreview(product.image || ''); setModelFile(null); setErrors({}); setDirty(false); setConfirmDiscard(false); setVariationLoading(true);
     void supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order').then(({ data, error }) => {
@@ -99,6 +104,8 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
 
   const submit = async () => {
     const nextErrors: ProductEditorErrors = {};
+    const resolvedTags = resolveProductTags(tagDraft);
+    if (resolvedTags.error) nextErrors.tags = resolvedTags.error;
     if (!form.name.trim()) nextErrors.name = 'Product name is required.';
     if (!form.category) nextErrors.category = 'Select a category.';
     if (artisanOptions.loading || artisanOptions.error || !artisanOptions.artisans.some(artisan => artisan.id === form.featuredArtisanId)) nextErrors.featuredArtisanId = 'Select a Featured Artisan for this shop.';
@@ -121,7 +128,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
     setSaving(true); setErrors({});
     try {
-      await onSave(product, { ...form, name: form.name.trim(), materials: form.materials.trim(), technique: form.technique.trim(), variations: meaningful, imageFile, modelFile });
+      await onSave(product, { ...form, tags: resolvedTags.tags, name: form.name.trim(), materials: form.materials.trim(), technique: form.technique.trim(), variations: meaningful, imageFile, modelFile });
       onClose();
     } catch (cause) {
       setErrors({ save: cause instanceof Error ? cause.message : 'Could not save product changes.' });
@@ -139,7 +146,8 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
             <label><span>Category</span><select value={form.category} onChange={(event) => change('category', event.target.value)} aria-invalid={Boolean(errors.category)}><option value="">Select category</option>{PRODUCT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select>{errors.category && <em>{errors.category}</em>}</label>
             <label><span>Material</span><input value={form.materials} placeholder="e.g. Terracotta clay" onChange={(event) => change('materials', event.target.value)} /></label>
             <label><span>Technique</span><input value={form.technique} placeholder="e.g. Handcrafted & kiln-fired" onChange={(event) => change('technique', event.target.value)} /></label>
-            <div className="product-editor__wide"><p>Assigned shop: {product.shopName}</p><FeaturedArtisanSelect shopId={product.shopId} value={form.featuredArtisanId} onChange={value => change('featuredArtisanId', value)} {...artisanOptions} validationError={errors.featuredArtisanId} disabled={saving} /></div>
+            <div className="product-editor__wide"><ProductTagsInput value={tagDraft} onChange={value => { setDirty(true); setTagDraft(value); }} disabled={saving} /></div>
+            <div className="product-editor__wide"><FeaturedArtisanSelect shopId={product.shopId} value={form.featuredArtisanId} onChange={value => change('featuredArtisanId', value)} {...artisanOptions} validationError={errors.featuredArtisanId} disabled={saving} /></div>
           </div>
         </section>
         <section className="product-editor__section product-editor__media">
