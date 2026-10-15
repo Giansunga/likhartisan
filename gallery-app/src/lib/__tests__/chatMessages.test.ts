@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getChatMessagePreview, parseChatMessage } from '../chatMessages';
+import { getChatMessagePreview, latestDesignMessageIds, parseChatMessage } from '../chatMessages';
 
 const productInquiry = {
   type: 'product_inquiry',
@@ -11,6 +11,17 @@ const productInquiry = {
 };
 
 describe('chat message formatting', () => {
+  it('finds the newest design message per request without treating ordinary, product or legacy messages as updates', () => {
+    const event = (request: string) => JSON.stringify({ type: 'design_request_update', version: 1, request_id: request });
+    expect([...latestDesignMessageIds([
+      { id: 'a', text: event('request-1') },
+      { id: 'b', text: event('request-2') },
+      { id: 'c', text: `\`\`\`json\n${event('request-1')}\n\`\`\`` },
+      { id: 'd', text: 'Ordinary message' },
+      { id: 'e', text: JSON.stringify(productInquiry) },
+      { id: 'f', text: JSON.stringify({ type: 'design_submission', design: { model: 'Legacy design' } }) },
+    ])]).toEqual([['request-1', 'c'], ['request-2', 'b']]);
+  });
   it('leaves ordinary messages unchanged', () => {
     expect(parseChatMessage('Hello there')).toEqual({ text: 'Hello there' });
     expect(parseChatMessage('{not valid JSON')).toEqual({ text: '{not valid JSON' });

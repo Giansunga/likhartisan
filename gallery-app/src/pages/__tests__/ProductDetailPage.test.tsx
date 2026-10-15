@@ -55,9 +55,8 @@ vi.mock('../../lib/supabase', () => ({
 
 function Location() { const location = useLocation(); return <output data-testid="location">{JSON.stringify({ path: location.pathname, state: location.state })}</output>; }
 function SwitchProduct() { const navigate = useNavigate(); return <button onClick={() => navigate('/product/plain')}>Open plain product</button>; }
-function renderProduct() {
-  return render(<MemoryRouter initialEntries={['/product/jar']}><Routes><Route path="/product/:id" element={<><ProductDetailPage /><SwitchProduct /></>} /><Route path="/checkout" element={<Location />} /><Route path="/chat" element={<Location />} /></Routes></MemoryRouter>);
-}
+const productTree = () => <MemoryRouter initialEntries={['/product/jar']}><Routes><Route path="/product/:id" element={<><ProductDetailPage /><SwitchProduct /></>} /><Route path="/checkout" element={<Location />} /><Route path="/chat" element={<Location />} /></Routes></MemoryRouter>;
+function renderProduct() { return render(productTree()); }
 
 beforeEach(() => {
   localStorage.clear();
@@ -84,6 +83,94 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it('bounds quantity by selected-size stock, retains it after adding, and resets on size/product changes', async () => {
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    const stepper = within(screen.getByRole('group', { name: 'Purchase quantity' }));
+    expect(stepper.getByRole('button', { name: 'Decrease quantity' })).toBeDisabled();
+    expect(stepper.getByRole('button', { name: 'Increase quantity' })).toBeDisabled();
+    const sizes = within(screen.getByRole('group', { name: 'Select size' }));
+    fireEvent.click(sizes.getByRole('button', { name: /32.*18/ }));
+    for (let i = 1; i < 8; i++) fireEvent.click(stepper.getByRole('button', { name: 'Increase quantity' }));
+    expect(stepper.getByText('8')).toBeInTheDocument();
+    expect(stepper.getByRole('button', { name: 'Increase quantity' })).toBeDisabled();
+    fireEvent.click(stepper.getByRole('button', { name: 'Decrease quantity' }));
+    const { getCart } = await import('../../data/store');
+    expect(getCart()).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    expect(getCart()[0]).toMatchObject({ variationId: 'large', qty: 7, price: 2600 });
+    expect(stepper.getByText('7')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
+    expect(screen.getByText('You can add 1 more.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy Now' })).toBeEnabled();
+    fireEvent.click(sizes.getByRole('button', { name: /14.*7.5/ }));
+    expect(stepper.getByText('1')).toBeInTheDocument();
+    fireEvent.click(sizes.getByRole('button', { name: /40.*20/ }));
+    expect(stepper.getByRole('button', { name: 'Decrease quantity' })).toBeDisabled();
+    expect(stepper.getByRole('button', { name: 'Increase quantity' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Open plain product' }));
+    await screen.findByRole('heading', { name: /Plain piece/ });
+    expect(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByText('1')).toBeInTheDocument();
+  });
+
+  it('merges repeated multi-unit additions and prevents exceeding remaining cart stock', async () => {
+    const { toast } = await import('sonner');
+    const success = vi.spyOn(toast, 'success');
+    const { animateProductToCart } = await import('../../lib/cartAnimation');
+    const { getCart } = await import('../../data/store');
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
+    const stepper = within(screen.getByRole('group', { name: 'Purchase quantity' }));
+    fireEvent.click(stepper.getByRole('button', { name: 'Increase quantity' }));
+    fireEvent.click(stepper.getByRole('button', { name: 'Increase quantity' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    expect(getCart()).toHaveLength(1);
+    expect(getCart()[0].qty).toBe(6);
+    expect(success).toHaveBeenLastCalledWith('Added 3 items to your cart.');
+    expect(animateProductToCart).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
+    expect(screen.getByText('You can add 2 more.')).toBeInTheDocument();
+    fireEvent.click(stepper.getByRole('button', { name: 'Decrease quantity' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    expect(getCart()[0].qty).toBe(8);
+    expect(screen.getByRole('button', { name: 'Stock Limit Reached' })).toBeDisabled();
+    success.mockRestore();
+  });
+
+  it('preserves the selected quantity through a guest sign-in prompt and passes it to checkout', async () => {
+    const signIn = vi.fn();
+    window.addEventListener('open-auth', signIn);
+    const view = renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByRole('button', { name: 'Increase quantity' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Buy Now' }));
+    expect(signIn).toHaveBeenCalledTimes(1);
+    mocks.user = { id: 'buyer' };
+    view.rerender(productTree());
+    fireEvent.click(screen.getByRole('button', { name: 'Buy Now' }));
+    expect(JSON.parse(screen.getByTestId('location').textContent!)).toMatchObject({ path: '/checkout', state: { buyNowItem: { variationId: 'large', qty: 2, price: 2600 } } });
+    window.removeEventListener('open-auth', signIn);
+  });
+
+  it('synchronizes main and mobile quantity controls and applies the same cart limits', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
+    const mobile = within(screen.getByRole('region', { name: 'Mobile purchase controls' }));
+    fireEvent.click(mobile.getByRole('button', { name: 'Increase quantity' }));
+    expect(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByText('2')).toBeInTheDocument();
+    fireEvent.click(mobile.getByRole('button', { name: 'Add to Cart' }));
+    const { getCart } = await import('../../data/store');
+    expect(getCart()[0].qty).toBe(2);
+    for (let i = 2; i < 7; i++) fireEvent.click(mobile.getByRole('button', { name: 'Increase quantity' }));
+    expect(mobile.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
+    expect(mobile.getByRole('button', { name: 'Buy Now' })).toBeEnabled();
+  });
+
   it('shows selected-size inventory in craft details without subtracting cart quantity', async () => {
     const { container } = renderProduct();
     await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
@@ -174,15 +261,18 @@ describe('product detail presentation and shopping controls', () => {
     await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
     expect(screen.queryByRole('region', { name: 'Sticky purchase controls' })).not.toBeInTheDocument();
     const notify = (isIntersecting: boolean) => act(() => onIntersection([{ isIntersecting, boundingClientRect: { top: -900, bottom: isIntersecting ? 100 : -20 } } as IntersectionObserverEntry], {} as IntersectionObserver));
+    await waitFor(() => expect(onIntersection).toBeTypeOf('function'));
     notify(false);
     const dock = screen.getByRole('region', { name: 'Sticky purchase controls' });
     const sizes = screen.getByRole('group', { name: 'Select size' });
     fireEvent.click(within(sizes).getByRole('button', { name: /32.*18/ }));
     expect(dock).toHaveTextContent('₱2,600.00');
     expect(dock).toHaveTextContent('32.00 in × 18.00 in');
+    fireEvent.click(within(dock).getByRole('button', { name: 'Increase quantity' }));
+    expect(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByText('2')).toBeInTheDocument();
     fireEvent.click(within(dock).getByRole('button', { name: 'Add to Cart' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()[0]).toMatchObject({ variationId: 'large', price: 2600 });
+    expect(getCart()[0]).toMatchObject({ variationId: 'large', price: 2600, qty: 2 });
     fireEvent.click(within(sizes).getByRole('button', { name: /40.*20/ }));
     expect(within(dock).getByRole('button', { name: 'Buy Now' })).toBeDisabled();
     expect(within(dock).getByRole('button', { name: 'Add to Cart' })).toBeDisabled();

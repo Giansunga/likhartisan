@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PortalRealtimeProvider } from '../../../realtime/PortalRealtimeProvider';
 import SellerMessages from '../SellerMessages';
 
+vi.mock('../../chat/DesignMessageCard', () => ({ default: ({ data, isLatestForRequest }: { data: Record<string, unknown>; isLatestForRequest?: boolean }) => <div data-testid={String(data.message)} data-latest={String(isLatestForRequest)}>{String(data.message)}</div> }));
+
 const mocks = vi.hoisted(() => ({
   conversations: [] as Array<Record<string, unknown>>,
   messages: [] as Array<Record<string, unknown>>,
@@ -131,5 +133,26 @@ describe('SellerMessages buyer identity', () => {
 
     await waitFor(() => expect(screen.getAllByText('Maria Cruz').length).toBeGreaterThanOrEqual(3));
     expect(screen.getByRole('button', { name: 'Delete this conversation' })).toBeInTheDocument();
+  });
+
+  it('marks only the latest design event per request and preserves that selection after a plain-message refresh', async () => {
+    mocks.conversations = [conversation('Maria Santos')];
+    const message = (id: string, requestId: string, text: string) => ({ id, conversation_id: 'conversation-1', sender_id: 'seller-1', created_at: '2026-10-01T01:00:00Z', text: JSON.stringify({ type: 'design_request_update', version: 1, request_id: requestId, message: text }) });
+    mocks.messages = [message('m1', 'request-1', 'First quote'), message('m2', 'request-1', 'Second quote'), message('m3', 'request-2', 'Other design')];
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    expect(await screen.findByTestId('First quote')).toHaveAttribute('data-latest', 'false');
+    expect(screen.getByTestId('Second quote')).toHaveAttribute('data-latest', 'true');
+    expect(screen.getByTestId('Other design')).toHaveAttribute('data-latest', 'true');
+    mocks.messages = [...mocks.messages, { ...mocks.messages[2], id: 'm4', text: 'A new ordinary message' }];
+    act(() => mocks.broadcast?.({ payload: { table: 'messages', operation: 'INSERT', record_id: 'm4' } }));
+    await screen.findByText('A new ordinary message');
+    expect(screen.getByTestId('First quote')).toHaveAttribute('data-latest', 'false');
+    expect(screen.getByTestId('Second quote')).toHaveAttribute('data-latest', 'true');
+    mocks.messages = [...mocks.messages, message('m5', 'request-1', 'Approved design')];
+    act(() => mocks.broadcast?.({ payload: { table: 'messages', operation: 'INSERT', record_id: 'm5' } }));
+    expect(await screen.findByTestId('Approved design')).toHaveAttribute('data-latest', 'true');
+    expect(screen.getByTestId('Second quote')).toHaveAttribute('data-latest', 'false');
+    expect(screen.getByTestId('Other design')).toHaveAttribute('data-latest', 'true');
   });
 });

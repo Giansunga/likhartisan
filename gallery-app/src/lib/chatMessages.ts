@@ -1,3 +1,5 @@
+import { isDesignRequestMessage } from '../types/designRequest';
+
 export interface ProductInquiryContent {
   productId?: string;
   productName?: string;
@@ -88,4 +90,13 @@ export function getChatMessagePreview(rawText: string | null | undefined): strin
     return 'Custom design request';
   }
   return '';
+}
+// Messages arrive in conversation order. Plain text must not supersede a design event.
+export function latestDesignMessageIds(messages: ReadonlyArray<{ id: string; text?: string | null }>): Map<string, string> {
+  const latest = new Map<string, string>();
+  for (const message of messages) {
+    const { design } = parseChatMessage(message.text);
+    if (isDesignRequestMessage(design)) latest.set(design.request_id, message.id);
+  }
+  return latest;
 }

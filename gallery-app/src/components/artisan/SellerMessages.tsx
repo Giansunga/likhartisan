@@ -13,7 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import DesignMessageCard from '../chat/DesignMessageCard';
-import { getChatMessagePreview } from '../../lib/chatMessages';
+import { getChatMessagePreview, latestDesignMessageIds } from '../../lib/chatMessages';
 import { FALLBACK_BUYER_NAME } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { fmt, formatTime } from '../../lib/utils';
@@ -62,6 +62,7 @@ export default function SellerMessages() {
   const selected = conversations.find(conversation => conversation.id === selectedId) || null;
   const visibleConversations = useMemo(() => filterConversations(conversations, search, filter), [conversations, filter, search]);
   const groupedMessages = useMemo(() => groupMessages(messages), [messages]);
+  const latestDesignMessages = useMemo(() => latestDesignMessageIds(messages), [messages]);
   const unreadTotal = conversations.reduce((sum, conversation) => sum + (conversation.artisan_unread || 0), 0);
 
   useEffect(() => {
@@ -272,7 +273,7 @@ export default function SellerMessages() {
                       return <div className="seller-chat-row" key={message.id}>
                         {!outgoing ? isLast ? <BuyerAvatar conversation={selected} size="small" /> : <span className="seller-chat-avatar-space" /> : null}
                         <div className="seller-chat-bubble-wrap">
-                          {content.design ? <DesignMessageCard data={content.design as Record<string, unknown>} audience="artisan" /> : null}
+                          {content.design ? <DesignMessageCard data={content.design as Record<string, unknown>} audience="artisan" isLatestForRequest={latestDesignMessages.get(String(content.design.request_id)) === message.id} /> : null}
                           {content.product?.productId ? <a className="seller-message-product" href={`/product/${content.product.productId}`} target="_blank" rel="noreferrer">{content.product.productImage ? <img src={content.product.productImage} alt="" /> : <ImageIcon />}<span><strong>{content.product.productName || 'Product inquiry'}</strong>{content.product.variantDimensions ? <small>{content.product.variantDimensions}</small> : null}<b>{fmt(content.product.productPrice || 0)}</b></span></a> : null}
                           <div className="seller-chat-bubble">{message.image_url ? <a className="seller-chat-image" href={message.image_url} target="_blank" rel="noreferrer"><img src={message.image_url} alt="Customer attachment" /></a> : null}{content.text ? <span>{content.text}</span> : null}</div>
                         </div>

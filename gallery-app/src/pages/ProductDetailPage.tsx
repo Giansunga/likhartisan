@@ -67,6 +67,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<ProductVariation | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [allReviews, setAllReviews] = useState<ProductReview[]>([]);
   const [shopImage, setShopImage] = useState('');
   const [shopProductCount, setShopProductCount] = useState(0);
@@ -191,6 +192,7 @@ export default function ProductDetailPage() {
       setProduct(null);
       setVariations([]);
       setSelectedVariation(null);
+      setSelectedQuantity(1);
       setAllReviews([]);
       setShopImage('');
       setShopProductCount(0);
@@ -321,9 +323,11 @@ export default function ProductDetailPage() {
   }
 
   const availableStock = Math.max(0, Math.floor(Number(selectedVariation?.stock ?? product.stock) || 0));
+  const quantity = Math.min(selectedQuantity, Math.max(1, availableStock));
+  const remainingCartStock = Math.max(0, availableStock - cartQuantity);
   const cartAtStockLimit = availableStock > 0 && cartQuantity >= availableStock;
   const buyDisabled = availableStock === 0 || (variations.length > 0 && !selectedVariation);
-  const addDisabled = buyDisabled || cartAtStockLimit;
+  const addDisabled = buyDisabled || quantity > remainingCartStock;
   const hasValue = (value: string | undefined) => Boolean(value?.trim() && value.trim().toLowerCase() !== 'n/a');
   const dimensions = selectedVariation ? selectedVariation.dimensions : product.dimensions;
   const height = selectedVariation ? selectedVariation.height : product.height;
@@ -340,6 +344,14 @@ export default function ProductDetailPage() {
   const stockDescription = stockNeedsSize ? 'Select a size to view stock' : availableStock > 0 ? `In Stock (${availableStock})` : 'Out of stock';
 
   const handleAddToCart = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (buyDisabled) return;
+    // Recheck the current cart in case another control changed it before rendering.
+    const currentQuantity = getCart().find(item => item.productId === product.id && (item.variationId ?? '') === cartVariationId)?.qty ?? 0;
+    if (quantity > Math.max(0, availableStock - currentQuantity)) {
+      setCart(getCart());
+      toast.info(`You can add ${Math.max(0, availableStock - currentQuantity)} more.`);
+      return;
+    }
     const result = addToCart({
       productId: product.id,
       productName: product.name,
@@ -347,7 +359,7 @@ export default function ProductDetailPage() {
       image: product.image,
       shopId: product.shopId,
       shopName: product.shopName,
-      qty: 1,
+      qty: quantity,
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
     }, availableStock);
@@ -356,11 +368,13 @@ export default function ProductDetailPage() {
       toast.info(`Only ${availableStock} available. Your cart already contains the maximum quantity.`);
       return;
     }
+    toast.success(`Added ${result.addedQty} ${result.addedQty === 1 ? 'item' : 'items'} to your cart.`);
     animateProductToCart(product.image, document, event.currentTarget);
   };
 
   const handleBuy = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (buyDisabled) return;
     if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
@@ -372,7 +386,7 @@ export default function ProductDetailPage() {
       image: product.image,
       shopId: product.shopId,
       shopName: product.shopName,
-      qty: 1,
+      qty: quantity,
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
     };
@@ -395,6 +409,16 @@ export default function ProductDetailPage() {
     setAskModal(true);
   };
 
+  const renderQuantityControl = (label: string) => (
+    <div className="pdp-quantity-field">
+      <div className="pdp-quantity-stepper" role="group" aria-label={label}>
+        <button type="button" aria-label="Decrease quantity" disabled={buyDisabled || quantity <= 1} onClick={() => setSelectedQuantity(Math.max(1, quantity - 1))}>−</button>
+        <span className="pdp-quantity-value" aria-live="polite" aria-atomic="true">{quantity}</span>
+        <button type="button" aria-label="Increase quantity" disabled={buyDisabled || quantity >= availableStock} onClick={() => setSelectedQuantity(Math.min(availableStock, quantity + 1))}>+</button>
+      </div>
+      {!buyDisabled && quantity > remainingCartStock && <small className="pdp-quantity-hint" role="status">You can add {remainingCartStock} more.</small>}
+    </div>
+  );
 
   return (
     <div className={`product-detail-page${stickyVisible ? ' product-detail-page--sticky' : ''}`}>
@@ -486,7 +510,7 @@ export default function ProductDetailPage() {
                 {variations.length > 0 && (
                   <div className="pdp-variations" role="group" aria-label="Select size">
                     {variations.map((variation, index) => (
-                      <button type="button" key={variation.id} onClick={() => setSelectedVariation(variation)} aria-pressed={selectedVariation?.id === variation.id}>
+                      <button type="button" key={variation.id} onClick={() => { if (selectedVariation?.id !== variation.id) setSelectedQuantity(1); setSelectedVariation(variation); }} aria-pressed={selectedVariation?.id === variation.id}>
                         <span>{formatVariation(variation) || `Size ${index + 1}`}</span>
                         {variation.stock <= 0 && <small>Out of stock</small>}
                       </button>
@@ -517,8 +541,9 @@ export default function ProductDetailPage() {
                 {cartAtStockLimit && <p className="pdp-stock" role="status">Your cart already contains all {availableStock} available.</p>}
                 <div className="pdp-actions">
                   <button type="button" className="pdp-buy" onClick={handleBuy} disabled={buyDisabled}>Buy Now</button>
+                  {renderQuantityControl('Purchase quantity')}
                   <button type="button" className="pdp-add" onClick={handleAddToCart} disabled={addDisabled}><ShoppingCart aria-hidden="true" />{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
-                  <button type="button" className="pdp-ask" onClick={handleAskClick}><MessageCircle aria-hidden="true" />Ask a Question</button>
+                  <button type="button" className="pdp-ask" onClick={handleAskClick} aria-label="Ask a Question" title="Ask a Question"><MessageCircle aria-hidden="true" /></button>
                 </div>
               </div>
             </div>
@@ -601,6 +626,7 @@ export default function ProductDetailPage() {
               <div className="pdp-dock-price"><span>{availableStock === 0 ? 'Out of stock' : 'Price'}</span><strong>{fmt(displayPrice)}</strong></div>
               <div className="pdp-dock-actions">
                 <button type="button" className="pdp-dock-ask" onClick={handleAskClick} aria-label="Ask a Question"><MessageCircle aria-hidden="true" />Ask</button>
+                {renderQuantityControl('Sticky purchase quantity')}
                 <button type="button" className="pdp-dock-add" onClick={handleAddToCart} disabled={addDisabled}><ShoppingCart aria-hidden="true" />{cartAtStockLimit ? 'Stock Limit Reached' : 'Add to Cart'}</button>
                 <button type="button" className="pdp-dock-buy" onClick={handleBuy} disabled={buyDisabled}>Buy Now</button>
               </div>
@@ -610,28 +636,20 @@ export default function ProductDetailPage() {
       )}
 
       {isMobile && (
-        <div className="mobile-action-bar" style={{
+        <div className="mobile-action-bar pdp-mobile-action-bar" role="region" aria-label="Mobile purchase controls" style={{
           position: 'fixed', bottom: 'var(--mobile-nav-reserved-height)', left: 0, right: 0,
           background: '#fff', borderTop: '1px solid #E8E0D8', padding: '12px 16px',
-          display: 'flex', alignItems: 'center', gap: '10px', zIndex: 40,
+          display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '10px', zIndex: 40,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.05)'
         }}>
-          {(() => {
-            const stock = availableStock;
-            const isOutOfStock = stock === 0;
-            const needsVariation = variations.length > 0 && !selectedVariation;
-            const buyDisabled = isOutOfStock || needsVariation;
-            const addDisabled = buyDisabled || cartAtStockLimit;
-            return (
-              <>
+          {renderQuantityControl('Mobile purchase quantity')}
+          <div className="pdp-mobile-buttons">
                 <button type="button" aria-label="Ask a Question" onClick={handleAskClick} className="btn-chat" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 20, height: 20 }}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
                 </button>
                 <button onClick={handleAddToCart} disabled={addDisabled} className="btn-cart" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: '1.5px solid var(--primary-color)', background: '#fff', color: 'var(--primary-color)', fontWeight: 600, fontSize: '0.9rem', opacity: addDisabled ? 0.5 : 1 }}>{cartAtStockLimit ? 'Stock Limit' : 'Add to Cart'}</button>
                 <button onClick={handleBuy} disabled={buyDisabled} className="btn-buy" style={{ flex: 1, padding: '12px 0', borderRadius: '10px', border: 'none', background: 'var(--accent-color)', color: '#fff', fontWeight: 600, fontSize: '0.9rem', opacity: buyDisabled ? 0.5 : 1 }}>Buy Now</button>
-              </>
-            );
-          })()}
+          </div>
         </div>
       )}
     </div>

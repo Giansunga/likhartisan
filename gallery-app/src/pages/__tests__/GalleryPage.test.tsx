@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   reviews: vi.fn(),
   user: null as null | { id: string },
   signalFetch: vi.fn(),
+  soldCounts: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -23,6 +24,7 @@ vi.mock('../../contexts/ThemeContext', () => ({
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
+    rpc: mocks.soldCounts,
     from: vi.fn((table: string) => table === 'user_product_signals' ? { select: () => ({ eq: () => ({ gte: () => ({ order: () => ({ limit: mocks.signalFetch }) }) }) }), insert: async () => ({ data: null, error: null }) } : ({
       select: vi.fn(() => table === 'products'
         ? { order: mocks.order }
@@ -43,11 +45,13 @@ describe('GalleryPage', () => {
   it.each(['Return with Back', 'Gallery breadcrumb'])('restores page, search, sorting, order and cached results through %s', async action => {
     const rows = Array.from({ length: 30 }, (_, index) => product(`Vase ${String(index).padStart(2, '0')}`, 5, index + 100));
     mocks.order.mockResolvedValue({ data: rows, error: null });
+    mocks.soldCounts.mockResolvedValue({ data: rows.map(row => ({ product_id: row.id, sold_count: 12 })), error: null });
     const { container } = render(<MemoryRouter initialEntries={['/gallery?category=Vases']}><Routes>
       <Route path="/gallery" element={<GalleryPage />} />
       <Route path="/product/:id" element={<ReturnControls />} />
     </Routes></MemoryRouter>);
     await waitFor(() => expect(container.querySelectorAll('[data-gallery-product]')).toHaveLength(24));
+    await screen.findAllByText('12 sold');
     fireEvent.change(screen.getAllByRole('combobox', { name: 'Sort products' })[0], { target: { value: 'price-asc' } });
     fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'Vase' } });
     fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
@@ -61,6 +65,8 @@ describe('GalleryPage', () => {
     expect(screen.getAllByRole('combobox', { name: 'Sort products' })[0]).toHaveValue('price-asc');
     expect([...container.querySelectorAll<HTMLElement>('[data-gallery-product]')].map(card => card.dataset.galleryProduct)).toEqual(cards);
     expect(mocks.order).toHaveBeenCalledTimes(1);
+    expect(mocks.soldCounts).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText('12 sold')).toHaveLength(6);
     await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith(0, 640));
     if (action === 'Return with Back') expect(container.querySelector('[data-gallery-product]')).toHaveFocus();
   }, 15000);
@@ -75,11 +81,46 @@ describe('GalleryPage', () => {
     mocks.order.mockResolvedValue({ data: [], error: null });
     mocks.variations.mockResolvedValue({ data: [], error: null });
     mocks.reviews.mockResolvedValue({ data: [], error: null });
+    mocks.soldCounts.mockResolvedValue({ data: [], error: null });
     window.matchMedia = vi.fn().mockReturnValue({
       matches: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     });
+  });
+
+  it('loads sold counts in one batch and displays zero and comma-formatted counts beside categories', async () => {
+    mocks.order.mockResolvedValue({ data: [product('New vase', 3), product('Popular vase', 5)], error: null });
+    mocks.soldCounts.mockResolvedValue({ data: [{ product_id: 'New vase', sold_count: 0 }, { product_id: 'Popular vase', sold_count: '12345' }], error: null });
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    const zero = await screen.findByText('0 sold');
+    expect(zero.parentElement).toHaveClass('product-card-header');
+    expect(zero.parentElement).toHaveTextContent('Vases0 sold');
+    expect(await screen.findByText('12,345 sold')).toBeInTheDocument();
+    expect(mocks.soldCounts).toHaveBeenCalledExactlyOnceWith('get_product_sold_counts', { p_product_ids: ['New vase', 'Popular vase'] });
+  });
+
+  it('renders cards while sold counts are pending, then fills their labels', async () => {
+    let finish!: (result: { data: { product_id: string; sold_count: number }[]; error: null }) => void;
+    mocks.order.mockResolvedValue({ data: [product('Slow count', 3)], error: null });
+    mocks.soldCounts.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Slow count/ });
+    expect(screen.queryByText(/\d sold/)).not.toBeInTheDocument();
+    await act(async () => finish({ data: [{ product_id: 'Slow count', sold_count: 0 }], error: null }));
+    expect(await screen.findByText('0 sold')).toBeInTheDocument();
+  });
+
+  it.each(['response', 'rejection'])('keeps cards usable and hides labels on sold-count %s failure', async failure => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.order.mockResolvedValue({ data: [product('Available vase', 3)], error: null });
+    if (failure === 'response') mocks.soldCounts.mockResolvedValue({ data: null, error: new Error('Unavailable') });
+    else mocks.soldCounts.mockRejectedValue(new Error('Network failure'));
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Available vase/ });
+    await waitFor(() => expect(error).toHaveBeenCalled());
+    expect(screen.queryByText(/\d sold/)).not.toBeInTheDocument();
+    error.mockRestore();
   });
 
   it('starts a fresh gallery when the account changes', async () => {

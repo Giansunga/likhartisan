@@ -8,6 +8,7 @@ export interface GallerySnapshot {
   variantPrices: Record<string, number>;
   variationAvailability: Record<string, boolean>;
   productRatings: Record<string, { avg: number; count: number }>;
+  productSoldCounts: Record<string, number>;
   signals: UserProductSignal[];
   visitSeed: number;
   activeCategory: string | null;

@@ -52,6 +52,7 @@ function GalleryView({ owner }: { owner: string }) {
   const [variantPrices, setVariantPrices] = useState<Record<string, number>>(restored?.variantPrices ?? {});
   const [variationAvailability, setVariationAvailability] = useState<Record<string, boolean>>(restored?.variationAvailability ?? {});
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>(restored?.productRatings ?? {});
+  const [productSoldCounts, setProductSoldCounts] = useState<Record<string, number>>(restored?.productSoldCounts ?? {});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => restored ? restored.activeCategory : searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
   const [search, setSearch] = useState(restored?.search ?? '');
   const [sort, setSort] = useState(restored?.sort ?? 'recommended');
@@ -205,6 +206,32 @@ function GalleryView({ owner }: { owner: string }) {
     return () => { active = false; };
   }, [restored]);
 
+  // Counts are supplementary: a slow or failed request must not hold up the grid.
+  useEffect(() => {
+    if (!catalogReady || (restored && Object.keys(restored.productSoldCounts ?? {}).length > 0)) return;
+    const productIds = allProducts.filter(product => product.status === 'active').map(product => product.id);
+    if (productIds.length === 0) return;
+    let active = true;
+    async function fetchSoldCounts() {
+      try {
+        const { data, error } = await supabase.rpc('get_product_sold_counts', { p_product_ids: productIds });
+        if (!active) return;
+        if (error) throw error;
+        if (!Array.isArray(data)) return;
+        const counts: Record<string, number> = {};
+        for (const row of data) {
+          const count = Number(row.sold_count);
+          if (productIds.includes(row.product_id) && Number.isSafeInteger(count) && count >= 0) counts[row.product_id] = count;
+        }
+        setProductSoldCounts(counts);
+      } catch (error) {
+        if (active) console.error('Gallery sold counts fetch error:', error);
+      }
+    }
+    void fetchSoldCounts();
+    return () => { active = false; };
+  }, [allProducts, catalogReady, restored]);
+
   const eligibleProducts = useMemo(() => {
     let list: Product[] = allProducts.filter(p => p.status === 'active');
     if (shopFilter) {
@@ -350,7 +377,7 @@ function GalleryView({ owner }: { owner: string }) {
     if (loadingProducts || loadingSignals || !catalogReady) return;
     const next: GallerySnapshot = {
       owner, urlSearch: searchParams.toString(),
-      allProducts, variantPrices, variationAvailability, productRatings, signals, visitSeed,
+      allProducts, variantPrices, variationAvailability, productRatings, productSoldCounts, signals, visitSeed,
       activeCategory, search, sort, showFavorites, page,
       scrollY: restoringScroll.current ? restored?.scrollY ?? 0 : window.scrollY,
       openedProduct: snapshotRef.current?.openedProduct,
@@ -359,7 +386,7 @@ function GalleryView({ owner }: { owner: string }) {
     };
     snapshotRef.current = next;
     saveGallerySnapshot(next);
-  }, [owner, searchParams, restored, allProducts, variantPrices, variationAvailability, productRatings, signals, visitSeed, activeCategory, search, sort, showFavorites, page, filteredProducts, loadingProducts, loadingSignals, catalogReady]);
+  }, [owner, searchParams, restored, allProducts, variantPrices, variationAvailability, productRatings, productSoldCounts, signals, visitSeed, activeCategory, search, sort, showFavorites, page, filteredProducts, loadingProducts, loadingSignals, catalogReady]);
 
   useEffect(() => {
     const rememberScroll = () => {
@@ -603,6 +630,7 @@ function GalleryView({ owner }: { owner: string }) {
                   <div className="product-details">
                     <div className="product-card-header">
                       <span className="product-tag">{p.category}</span>
+                      {productSoldCounts[p.id] !== undefined && <span className="product-card-sold-count">{productSoldCounts[p.id].toLocaleString('en-US')} sold</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                       <h3 className="product-card-title" style={{ margin: 0 }}>{p.name}</h3>

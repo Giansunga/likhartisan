@@ -1,5 +1,5 @@
 import { useMemo, type RefObject } from 'react';
-import { parseChatMessage } from '../../lib/chatMessages';
+import { latestDesignMessageIds, parseChatMessage } from '../../lib/chatMessages';
 import { fmt } from '../../lib/utils';
 import DesignMessageCard from './DesignMessageCard';
 import { BuyerShopAvatar, type BuyerMessage } from './BuyerChatUI';
@@ -19,6 +19,7 @@ interface BuyerMessageListProps {
 }
 
 export default function BuyerMessageList({ messages, userId, shopName, shopImage, remoteTyping, endRef }: BuyerMessageListProps) {
+  const latestDesignMessages = useMemo(() => latestDesignMessageIds(messages), [messages]);
   const groups = useMemo(() => messages.reduce<MessageGroup[]>((result, message) => {
     const previous = result[result.length - 1];
     if (previous?.senderId === message.sender_id) previous.messages.push(message);
@@ -35,7 +36,7 @@ export default function BuyerMessageList({ messages, userId, shopName, shopImage
         const timestamp = new Date(lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         return (
-          <div key={`${group.senderId}-${lastMessage.id}`} className={`msg-group msg-group--${direction}`}>
+          <div key={`${group.senderId}-${group.messages[0].id}`} className={`msg-group msg-group--${direction}`}>
             {group.messages.map((message, index) => {
               const { text, design: designData, product: productData } = parseChatMessage(message.text);
               const isLast = index === group.messages.length - 1;
@@ -45,7 +46,7 @@ export default function BuyerMessageList({ messages, userId, shopName, shopImage
                     isLast ? <div className="msg-avatar"><BuyerShopAvatar image={shopImage} name={shopName} size="sm" decorative /></div> : <div className="msg-avatar-spacer" />
                   ) : null}
                   <div className={`msg-bubble-wrap msg-bubble-wrap--${direction}`}>
-                    {designData ? <DesignMessageCard data={designData} /> : productData?.productId ? (
+                    {designData ? <DesignMessageCard data={designData} isLatestForRequest={latestDesignMessages.get(String(designData.request_id)) === message.id} /> : productData?.productId ? (
                       <a href={`/product/${productData.productId}`} target="_blank" rel="noopener noreferrer" className="chat-product-card">
                         {productData.productImage ? <img src={productData.productImage} alt={productData.productName || 'Product'} className="chat-product-img" /> : null}
                         <div className="chat-product-info">
