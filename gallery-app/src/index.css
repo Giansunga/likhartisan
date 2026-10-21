@@ -1800,6 +1800,28 @@ body {
 
 .modal-overlay.active .modal-box { transform: translateY(0); }
 
+.gallery-filter-overlay {
+  z-index: 10001;
+}
+
+.gallery-filter-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 12px);
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.gallery-filter-sheet__content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gallery-filter-sheet__apply {
+  flex-shrink: 0;
+  margin-top: 16px;
+}
+
 .modal-close {
   position: absolute;
   top: 20px;
@@ -4003,7 +4025,7 @@ body {
 @media (max-width: 768px) {
   .bottom-nav {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
     bottom: 0;
     left: 0;

@@ -1,5 +1,6 @@
 import { confirmAction } from '../lib/popups';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
@@ -722,13 +723,13 @@ function GalleryView({ owner }: { owner: string }) {
         </div>
       </div>
       {/* Filter Bottom Sheet (Mobile) */}
-      <div className={`modal-overlay ${filterModalOpen && isMobile ? 'active' : ''}`} onClick={() => setFilterModalOpen(false)}>
-        <div className="modal-box" style={{ 
+      {createPortal(<div className={`modal-overlay gallery-filter-overlay ${filterModalOpen && isMobile ? 'active' : ''}`} onClick={() => setFilterModalOpen(false)}>
+        <div className="modal-box gallery-filter-sheet" style={{
           position: 'absolute', bottom: 0, top: 'auto', left: 0, right: 0, margin: 0, maxWidth: '100%', width: '100%',
-          padding: '24px 16px',
           borderRadius: '24px 24px 0 0', transform: filterModalOpen ? 'translateY(0)' : 'translateY(100%)', 
           transition: 'transform 0.3s ease-out' 
         }} onClick={e => e.stopPropagation()}>
+          <div className="gallery-filter-sheet__content">
           <div style={{ width: '40px', height: '4px', background: '#E8E0D8', borderRadius: '2px', margin: '0 auto 20px' }} />
           <h3 className="modal-title" style={{ textAlign: 'left', marginBottom: '20px', fontSize: '1.4rem' }}>Sort & Filter</h3>
           
@@ -782,12 +783,13 @@ function GalleryView({ owner }: { owner: string }) {
             </div>
           )}
           
-          <button onClick={() => setFilterModalOpen(false)} style={{
+          </div>
+          <button className="gallery-filter-sheet__apply" onClick={() => setFilterModalOpen(false)} style={{
             width: '100%', background: 'var(--primary-color)', color: '#fff', 
             padding: '16px', borderRadius: '12px', fontWeight: 600, fontSize: '1rem', border: 'none'
           }}>View {filteredProducts.length} Results</button>
         </div>
-      </div>
+      </div>, document.body)}
     </div>
   );
 }

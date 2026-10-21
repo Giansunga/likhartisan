@@ -159,31 +159,6 @@
   margin-top: 16px;
 }
 
-.product-variation__shipping {
-  margin-top: 16px;
-  border-top: 1px solid #e8e0d8;
-  padding-top: 12px;
-}
-
-.product-variation__shipping summary {
-  color: #823e0b;
-  cursor: pointer;
-  font-size: .78rem;
-  font-weight: 700;
-}
-
-.product-variation__shipping p {
-  margin: 10px 0;
-  color: #8c7b6e;
-  font-size: .75rem;
-}
-
-.product-variation__shipping-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
 .product-editor__footer {
   padding: 16px 32px;
   background: #fff;
@@ -205,8 +180,7 @@
   }
 
   .product-editor__fields,
-  .product-editor__media-grid,
-  .product-variation__shipping-fields {
+  .product-editor__media-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import BottomNav from '../BottomNav';
@@ -15,7 +15,16 @@ describe('BottomNav', () => {
     expect(navigation.parentElement).toBe(document.body);
     expect(screen.getByRole('link', { name: 'Gallery' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
-    expect(screen.getAllByRole('link')).toHaveLength(4);
+    expect(screen.getAllByRole('link').map(link => link.textContent)).toEqual(['Home', 'Gallery', 'Design', 'Artisans', 'Shops']);
+  });
+
+  it('opens Artisans from the bottom bar and updates the active destination', () => {
+    renderBottomNav('/shops');
+    const artisans = screen.getByRole('link', { name: 'Artisans' });
+    expect(artisans).toHaveAttribute('href', '/artisans');
+    fireEvent.click(artisans);
+    expect(artisans).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Shops' })).not.toHaveAttribute('aria-current');
   });
 
   it('does not render inside the artisan dashboard', () => {

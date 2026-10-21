@@ -17,3 +17,5 @@
 @media (prefers-reduced-motion: reduce) { .system-popup { animation: none; } }
 
 .system-popup__fields { border: 0; padding: 0; margin: 16px 0 0; min-width: 0; }
+
+.system-popup__close { margin-left: auto; align-self: flex-start; border: 0; border-radius: 50%; width: 28px; height: 28px; flex-shrink: 0; background: #f3ede5; color: #796c62; font-size: 20px; line-height: 1; cursor: pointer; }

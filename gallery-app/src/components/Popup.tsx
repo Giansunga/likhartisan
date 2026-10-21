@@ -2,9 +2,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CheckCircle2, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import { dismissPopup, nextPopupId, registerPopupSlot, usePopupRequests, usePopupSlot, type PopupKind } from '../lib/popups';
 import './popup.css';
-interface Props { open?: boolean; title: string; message?: ReactNode; children?: ReactNode; confirmLabel?: string; cancelLabel?: string; danger?: boolean; busy?: boolean; confirmDisabled?: boolean; kind?: PopupKind; onConfirm: () => void | Promise<void>; onCancel?: () => void }
+interface Props { icon?: ReactNode; showClose?: boolean; className?: string; open?: boolean; title: string; message?: ReactNode; children?: ReactNode; confirmLabel?: string; cancelLabel?: string; danger?: boolean; busy?: boolean; confirmDisabled?: boolean; kind?: PopupKind; onConfirm: () => void | Promise<void>; onCancel?: () => void }
 export function Popup({ open = true, ...props }: Props) { return open ? <OpenPopup {...props} /> : null; }
-function OpenPopup({ title, message, children, confirmLabel = 'Continue', cancelLabel = 'Cancel', danger = false, busy = false, confirmDisabled = false, kind = 'confirm', onConfirm, onCancel }: Omit<Props, 'open'>) {
+function OpenPopup({ icon, showClose = false, className = '', title, message, children, confirmLabel = 'Continue', cancelLabel = 'Cancel', danger = false, busy = false, confirmDisabled = false, kind = 'confirm', onConfirm, onCancel }: Omit<Props, 'open'>) {
   const [id] = useState(nextPopupId);
   const active = usePopupSlot() === id;
   const titleId = useId(); const descriptionId = useId();
@@ -24,7 +24,7 @@ function OpenPopup({ title, message, children, confirmLabel = 'Continue', cancel
     return () => { dialog.close(); document.body.style.overflow = overflow; if (previous?.isConnected) previous.focus(); };
   }, [active]);
   const Icon = kind === 'success' ? CheckCircle2 : kind === 'error' ? CircleAlert : kind === 'info' ? Info : TriangleAlert;
-  return <dialog ref={ref} className={`system-popup system-popup--${danger ? 'danger' : kind}`} aria-labelledby={titleId} aria-describedby={message ? descriptionId : undefined} aria-busy={blocked} onCancel={event => { event.preventDefault(); if (!blocked) (onCancel ?? onConfirm)(); }} onKeyDown={event => {
+  return <dialog ref={ref} className={`system-popup system-popup--${danger ? 'danger' : kind} ${className}`} aria-labelledby={titleId} aria-describedby={message ? descriptionId : undefined} aria-busy={blocked} onCancel={event => { event.preventDefault(); if (!blocked) (onCancel ?? onConfirm)(); }} onKeyDown={event => {
     event.stopPropagation();
     if (event.key !== 'Tab') return;
     const buttons = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [href], [tabindex="0"]')];
@@ -34,8 +34,9 @@ function OpenPopup({ title, message, children, confirmLabel = 'Continue', cancel
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }}>
     <header className="system-popup__heading">
-      <div className="system-popup__icon"><Icon size={27} aria-hidden="true" /></div>
+      <div className="system-popup__icon" aria-hidden="true">{icon ?? <Icon size={27} aria-hidden="true" />}</div>
       <h2 id={titleId}>{title}</h2>
+      {showClose && onCancel && <button type="button" className="system-popup__close" aria-label="Close popup" disabled={blocked} onClick={onCancel}>×</button>}
     </header>
     {message && <div id={descriptionId} className="system-popup__message">{message}</div>}
     {children && <fieldset className="system-popup__fields" disabled={blocked}>{children}</fieldset>}

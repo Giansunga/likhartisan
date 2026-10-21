@@ -1,12 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Home, Grid3X3, Store, Palette } from 'lucide-react';
+import { Home, Grid3X3, Store, UsersRound, Palette } from 'lucide-react';
 
 const navItems = [
   { name: 'Home', path: '/', icon: Home },
   { name: 'Gallery', path: '/gallery', icon: Grid3X3 },
-  { name: 'Shops', path: '/shops', icon: Store },
   { name: 'Design', path: '/freeform', icon: Palette },
+  { name: 'Artisans', path: '/artisans', icon: UsersRound },
+  { name: 'Shops', path: '/shops', icon: Store },
 ] as const;
 
 export default function BottomNav() {

@@ -103,7 +103,9 @@ describe('ProductEditorDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Variation' }));
     const card = variationCard(2);
     expect(within(card).getByRole('spinbutton', { name: 'Product weight (kg) *' })).toBeInTheDocument();
-    expect(within(card).getByText('Optional packed details')).toBeInTheDocument();
+    expect(within(card).queryByText('Optional packed details')).not.toBeInTheDocument();
+    expect(within(card).queryByText('Packaging weight (kg)')).not.toBeInTheDocument();
+    expect(within(card).queryByText('Packed length (in)')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByRole('alert')).toHaveTextContent('needs product weight');
     expect(onSave).not.toHaveBeenCalled();
@@ -153,4 +155,25 @@ describe('ProductEditorDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('needs product weight');
     expect(onSave).not.toHaveBeenCalled();
   });
+  it('does not validate hidden partial package metadata when editing product weight', async () => {
+    mocks.variations[0] = { ...mocks.variations[0], shipping_width_in: null, packaging_weight_g: -100 };
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.change(within(variationCard(1)).getByRole('spinbutton', { name: /Product weight/ }), { target: { value: '1.2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(onSave.mock.calls[0][1].variations[0]).toEqual(expect.objectContaining({ shippingWidthIn: '', packagingWeightKg: '-0.1' }));
+  });
+
+  it('retains existing saved packed dimensions as a fallback for legacy products', async () => {
+    mocks.variations[0] = { ...mocks.variations[0], dimensions: '', height: '' };
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+    await screen.findByText('Variation 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(screen.queryByText('Optional packed details')).not.toBeInTheDocument();
+  });
+
 });

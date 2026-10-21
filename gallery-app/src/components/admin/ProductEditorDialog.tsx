@@ -87,7 +87,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
     setDirty(true);
     setVariations((current) => current.map((item, itemIndex) => itemIndex === index ? {
       ...item, [key]: value,
-      shippingEdited: item.shippingEdited || ['weightKg', 'packagingWeightKg', 'shippingLengthIn', 'shippingWidthIn', 'shippingHeightIn'].includes(key),
+      shippingEdited: item.shippingEdited || key === 'weightKg',
     } : item));
   };
 
@@ -110,22 +110,17 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
     if (!form.name.trim()) nextErrors.name = 'Product name is required.';
     if (!form.category) nextErrors.category = 'Select a category.';
     if (artisanOptions.loading || artisanOptions.error || !artisanOptions.artisans.some(artisan => artisan.id === form.featuredArtisanId)) nextErrors.featuredArtisanId = 'Select a Featured Artisan for this shop.';
-    const meaningful = variations.filter((item) => item.id || item.requiresWeight || item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg || item.packagingWeightKg || item.shippingLengthIn || item.shippingWidthIn || item.shippingHeightIn || item.price || item.stock);
-    const validShippingData = (item: ProductVariationDraft) => {
+    const meaningful = variations.filter((item) => item.id || item.requiresWeight || item.dimensions.trim() || item.height.trim() || item.openingDiameter.trim() || item.weightKg || item.price || item.stock);
+    const validVariationMeasurements = (item: ProductVariationDraft) => {
       const hasWeight = (kgToGrams(item.weightKg) || 0) > 0;
-      const hasExplicitDimensions = positiveInches(item.shippingLengthIn) !== null
-        && positiveInches(item.shippingWidthIn) !== null
-        && positiveInches(item.shippingHeightIn) !== null;
       const hasCatalogDimensions = /\d/.test(item.dimensions) && /\d/.test(item.height);
-      const packedValues = [item.shippingLengthIn, item.shippingWidthIn, item.shippingHeightIn];
-      const incompletePackedDimensions = packedValues.some((value) => value.trim() !== '') && !hasExplicitDimensions;
-      const invalidPackagingWeight = item.packagingWeightKg.trim() !== '' && kgToGrams(item.packagingWeightKg) === null;
-      const validateOptionalShipping = !item.id || item.shippingEdited;
-      return hasWeight && (hasExplicitDimensions || hasCatalogDimensions)
-        && (!validateOptionalShipping || (!incompletePackedDimensions && !invalidPackagingWeight));
+      // Existing catalog rows can still use their saved package dimensions.
+      const hasSavedDimensions = Boolean(item.id) && [item.shippingLengthIn, item.shippingWidthIn, item.shippingHeightIn]
+        .every(value => positiveInches(value) !== null);
+      return hasWeight && (hasCatalogDimensions || hasSavedDimensions);
     };
-    const invalidVariation = meaningful.some((item) => !validShippingData(item) || (item.price !== '' && Number(item.price) < 0) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
-    if (invalidVariation) nextErrors.variations = 'Each variation needs product weight and complete dimensions. Enter all three packed dimensions if using them.';
+    const invalidVariation = meaningful.some((item) => !validVariationMeasurements(item) || (item.price !== '' && Number(item.price) < 0) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
+    if (invalidVariation) nextErrors.variations = 'Each variation needs product weight and complete product dimensions.';
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
     setSaving(true); setErrors({});
     try {
@@ -172,12 +167,6 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
                 <label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={(event) => updateVariation(index, 'stock', event.target.value)} /></label>
               </div>
               <label className="product-variation__weight"><span>Product weight (kg) *</span><input type="number" min="0.001" step="0.001" required value={variation.weightKg} onChange={(event) => updateVariation(index, 'weightKg', event.target.value)} placeholder="Required for courier checkout" /></label>
-              {(variation.requiresWeight || !variation.id) && <details className="product-variation__shipping"><summary>Optional packed details</summary><p>Packed dimensions are optional when dimensions and height are filled in above.</p><div className="product-variation__shipping-fields">
-                <label><span>Packaging weight (kg)</span><input type="number" min="0" step="0.001" value={variation.packagingWeightKg} onChange={(event) => updateVariation(index, 'packagingWeightKg', event.target.value)} /></label>
-                <label><span>Packed length (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingLengthIn} onChange={(event) => updateVariation(index, 'shippingLengthIn', event.target.value)} /></label>
-                <label><span>Packed width (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingWidthIn} onChange={(event) => updateVariation(index, 'shippingWidthIn', event.target.value)} /></label>
-                <label><span>Packed height (in)</span><input type="number" min="0.01" step="0.01" value={variation.shippingHeightIn} onChange={(event) => updateVariation(index, 'shippingHeightIn', event.target.value)} /></label>
-              </div></details>}
             </article>)}</div>
             {errors.variations && <em role="alert">{errors.variations}</em>}
             <button className="product-editor__add" type="button" onClick={() => { setDirty(true); setVariations((current) => [...current, emptyDraft()]); }}><Plus aria-hidden="true" />Add Variation</button>

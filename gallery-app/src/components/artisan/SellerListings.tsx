@@ -1,3 +1,5 @@
+import AddProductDialog from '../products/AddProductDialog';
+import { ARTISAN_PRODUCT_PATHS } from '../products/productCreationPaths';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, CircleOff, Package, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +26,7 @@ const defaultFilters: ListingFilters = { search: '', status: 'all', inventory: '
 const emptyVariation = (): VariationDraft => ({ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' });
 
 export default function SellerListings() {
+  const [addProductOpen, setAddProductOpen] = useState(false);
   const { products, productPrices, loadingProducts, setProducts } = useArtisanPortal();
   const [filters, setFilters] = useState(defaultFilters);
   const [editing, setEditing] = useState<ArtisanProduct | null>(null);
@@ -114,6 +117,8 @@ export default function SellerListings() {
   }
 
   return <div className="seller-listing-page">
+    <div className="product-creation-heading"><div><h1>Products</h1><p>Manage your shop listings and inventory.</p></div><button type="button" className="seller-button seller-button--primary" onClick={() => setAddProductOpen(true)}><Plus size={17} /> Add Product</button></div>
+    {addProductOpen && <AddProductDialog paths={ARTISAN_PRODUCT_PATHS} onClose={() => setAddProductOpen(false)} />}
     {feedback ? <div className={`seller-section-feedback is-${feedback.tone}`} role={feedback.tone === 'error' ? 'alert' : 'status'}>{feedback.tone === 'success' ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}<span>{feedback.text}</span><button onClick={() => setFeedback(null)} aria-label="Dismiss">×</button></div> : null}
     <div className="seller-listing-stats">
       <div><Package /><span>Total listings<strong>{counts.total}</strong></span></div>
@@ -123,7 +128,7 @@ export default function SellerListings() {
       <div className="is-danger"><Archive /><span>Out of stock<strong>{counts.outOfStock}</strong></span></div>
     </div>
     <SellerListingToolbar filters={filters} categories={categories} resultCount={visible.length} onChange={setFilters} />
-    {loadingProducts ? <div className="seller-product-skeleton">{[1,2,3,4].map(item => <div key={item} />)}</div> : visible.length ? <div className="seller-product-list">{visible.map(product => <SellerListingCard key={product.id} product={product} price={productPrices[product.id] ?? product.price ?? 0} onEdit={openEdit} onArchive={setArchiveTarget} onToggleStatus={item => void updateStatus(item, item.status === 'active' ? 'inactive' : 'active')} />)}</div> : <div className="seller-empty-panel"><Package size={34} /><h2>No listings match this view</h2><p>Change or clear the filters to see more products.</p></div>}
+    {loadingProducts ? <div className="seller-product-skeleton">{[1,2,3,4].map(item => <div key={item} />)}</div> : visible.length ? <div className="seller-product-list">{visible.map(product => <SellerListingCard key={product.id} product={product} price={productPrices[product.id] ?? product.price ?? 0} onEdit={openEdit} onArchive={setArchiveTarget} onToggleStatus={item => void updateStatus(item, item.status === 'active' ? 'inactive' : 'active')} />)}</div> : <div className="seller-empty-panel"><Package size={34} /><h2>No listings match this view</h2><p>{products.length ? "Change or clear the filters to see more products." : "Add your first product to get started."}</p>{!products.length && <button type="button" className="seller-button seller-button--primary" onClick={() => setAddProductOpen(true)}>Add Product</button>}</div>}
 
     <SellerOverlay open={Boolean(editing)} title={editing ? `Edit ${editing.name}` : 'Edit listing'} description="Update materials, production details, pricing, and variation inventory." onClose={() => setEditing(null)} busy={saving} footer={<><button className="seller-button seller-button--secondary" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="seller-button seller-button--primary" onClick={() => void saveListing()} disabled={saving || editLoading}>{saving ? 'Saving…' : 'Save changes'}</button></>}>
       {editLoading ? <div className="seller-edit-loading">Loading listing details…</div> : <div className="seller-listing-editor">

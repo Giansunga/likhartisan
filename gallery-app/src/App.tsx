@@ -1,3 +1,4 @@
+import { ADMIN_PRODUCT_PATHS, ARTISAN_PRODUCT_PATHS } from './components/products/productCreationPaths';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -44,6 +45,8 @@ const AdminOrdersPage = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const ProductListPage = lazy(() => import('./pages/admin/ProductListPage'));
 const ProductCreatePage = lazy(() => import('./pages/admin/ProductCreatePage'));
+const Product3DToolsPage = lazy(() => import('./components/products/Product3DToolsPage'));
+const ArtisanProductCreatePage = lazy(() => import('./pages/artisan/ArtisanProductCreatePage'));
 const RoleAssignationPage = lazy(() => import('./pages/admin/RoleAssignationPage'));
 const ThemeCustomizer = lazy(() => import('./pages/admin/ThemeCustomizer'));
 const ArtisanManagePage = lazy(() => import('./pages/admin/ArtisanManagePage'));
@@ -118,6 +121,8 @@ function AppShell() {
               <Route path="orders" element={<ArtisanOrdersRoute />} />
               <Route path="messages" element={<ArtisanMessagesRoute />} />
               <Route path="listings" element={<ArtisanListingsRoute />} />
+              <Route path="listings/create" element={<ArtisanProductCreatePage />} />
+              <Route path="listings/create/3d-tools" element={<Product3DToolsPage paths={ARTISAN_PRODUCT_PATHS} />} />
               <Route path="requests" element={<ArtisanRequestsRoute />} />
               <Route path="profile" element={<ArtisanProfileRoute />} />
               <Route path="design-vault" element={<ArtisanVaultRoute />} />
@@ -131,6 +136,7 @@ function AppShell() {
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="products" element={<ProductListPage />} />
             <Route path="products/create" element={<ProductCreatePage />} />
+            <Route path="products/create/3d-tools" element={<Product3DToolsPage paths={ADMIN_PRODUCT_PATHS} />} />
             <Route path="roles" element={<RoleAssignationPage />} />
             <Route path="theme" element={<ThemeCustomizer />} />
             <Route path="artisans" element={<ArtisanManagePage />} />

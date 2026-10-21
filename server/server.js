@@ -187,7 +187,7 @@ app.use('/api/orders', createPurchasesRouter({ supabase, verifyAuth, requireSupe
 app.use('/api/lalamove', proxyLimiter, lalamoveRoutes);
 
 // Upload routes (presigned URLs for R2)
-app.use('/api/upload', createUploadRouter({ verifyAuth, requireSuperAdmin }));
+app.use('/api/upload', createUploadRouter({ verifyAuth, requireSuperAdmin, supabase }));
 
 // ── Presigned upload for design GLB exports ──────────────────────────────────
 app.post('/api/designs/upload-model', apiLimiter, async (req, res) => {

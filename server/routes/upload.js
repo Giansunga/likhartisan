@@ -24,6 +24,7 @@ const FOLDER_LIMITS = {
 export function createUploadRouter({
   verifyAuth,
   requireSuperAdmin,
+  supabase,
   storageClient = r2,
   bucket = BUCKET,
   publicUrl = PUBLIC_URL,
@@ -104,6 +105,48 @@ export function createUploadRouter({
       console.error('Upload proxy error:', error);
       res.status(500).json({ error: 'Failed to upload file' });
     }
+  });
+
+  // Artisan product uploads must carry a shop association verified on the server.
+  async function authorizeProductUpload(req, res, next) {
+    try {
+      const userId = await verifyAuth(req, res);
+      if (!userId) return;
+      const shopId = String(req.headers['x-shop-id'] || '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(shopId)) {
+        return res.status(400).json({ error: 'A valid shop ID is required' });
+      }
+      if (!supabase) return res.status(503).json({ error: 'Shop verification is unavailable' });
+      const { data, error } = await supabase.from('user_roles').select('shop_id')
+        .eq('user_id', userId).eq('role', 'shop_owner').eq('shop_id', shopId).maybeSingle();
+      if (error) return res.status(503).json({ error: 'Could not verify shop ownership' });
+      if (!data) return res.status(403).json({ error: 'You can only upload products for your own shop' });
+      req.uploadShopId = shopId;
+      next();
+    } catch (error) { next(error); }
+  }
+
+  router.put('/product-file', authorizeProductUpload, express.raw({ type: () => true, limit: `${MAX_UPLOAD_BYTES}b` }), async (req, res) => {
+    try {
+      let filename;
+      try { filename = decodeURIComponent(String(req.headers['x-file-name'] || '')); }
+      catch { return res.status(400).json({ error: 'Invalid filename' }); }
+      const folder = String(req.headers['x-upload-folder'] || '');
+      const size = Buffer.isBuffer(req.body) ? req.body.length : 0;
+      const validation = validateUpload(filename, folder, size);
+      if (validation.error) return res.status(validation.status || 400).json({ error: validation.error });
+      const allowed = folder === 'models' ? ['glb'] : ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+      if (!allowed.includes(validation.ext)) return res.status(400).json({ error: 'Choose a product image or .glb model for the selected folder' });
+      const key = `${folder}/${req.uploadShopId}/${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${validation.ext}`;
+      await storageClient.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: req.body, ContentType: validation.contentType }));
+      res.status(201).json({ key, publicUrl: `${publicUrl}/${key}` });
+    } catch (error) {
+      console.error('Product upload error:', error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  }, (error, _req, res, next) => {
+    if (error?.type === 'entity.too.large') return res.status(413).json({ error: 'File is too large. Maximum size is 25 MB' });
+    next(error);
   });
 
   return router;

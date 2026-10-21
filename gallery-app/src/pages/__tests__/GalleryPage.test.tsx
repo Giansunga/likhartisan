@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GalleryPage from '../GalleryPage';
@@ -87,6 +87,24 @@ describe('GalleryPage', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     });
+  });
+
+  it('places mobile filters at the document root and keeps the results action outside scrolling controls', async () => {
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const overlay = screen.getByText('Sort & Filter').closest('.gallery-filter-overlay') as HTMLElement;
+    expect(overlay.parentElement).toBe(document.body);
+    expect(overlay).toHaveClass('active');
+    const sorting = within(overlay).getByRole('combobox', { name: 'Sort products' });
+    fireEvent.change(sorting, { target: { value: 'price-asc' } });
+    const results = within(overlay).getByRole('button', { name: /View .* Results/ });
+    expect(results.closest('.gallery-filter-sheet__content')).toBeNull();
+    fireEvent.click(results);
+    expect(overlay).not.toHaveClass('active');
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(sorting).toHaveValue('price-asc');
+    await waitFor(() => expect(mocks.order).toHaveBeenCalledOnce());
   });
 
   it('loads sold counts in one batch and displays zero and comma-formatted counts beside categories', async () => {

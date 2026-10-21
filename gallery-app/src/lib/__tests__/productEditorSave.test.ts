@@ -17,18 +17,21 @@ describe('productVariationUpdateData', () => {
     expect(update).not.toHaveProperty('shipping_length_in');
   });
 
-  it('writes required weight and optional packed details for a new variation', () => {
+  it('writes required weight without optional package fields for a new variation', () => {
     const update = productVariationUpdateData({ ...variation, id: undefined, weightKg: '1.2', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '' });
-    expect(update).toEqual(expect.objectContaining({ product_weight_g: 1200, shipping_weight_g: 1200, shipping_length_in: null, shipping_width_in: null, shipping_height_in: null }));
+    expect(update).toEqual(expect.objectContaining({ product_weight_g: 1200, shipping_weight_g: 1200 }));
+    for (const key of ['packaging_weight_g', 'shipping_length_in', 'shipping_width_in', 'shipping_height_in']) expect(update).not.toHaveProperty(key);
   });
 
   it('can repair missing weight on an existing variation', () => {
     const update = productVariationUpdateData({ ...variation, shippingEdited: true });
-    expect(update).toEqual(expect.objectContaining({ product_weight_g: 400, shipping_weight_g: 500, shipping_length_in: 10, shipping_width_in: 8, shipping_height_in: 12 }));
+    expect(update).toEqual(expect.objectContaining({ product_weight_g: 400, shipping_weight_g: 500 }));
   });
 
   it('updates edited weight and retains saved package data', () => {
     const update = productVariationUpdateData({ ...variation, weightKg: '1.2', shippingEdited: true });
-    expect(update).toEqual(expect.objectContaining({ weight_kg: 1.2, product_weight_g: 1200, packaging_weight_g: 100, shipping_weight_g: 1300, shipping_length_in: 10, shipping_width_in: 8, shipping_height_in: 12 }));
+    expect(update).toEqual(expect.objectContaining({ weight_kg: 1.2, product_weight_g: 1200, shipping_weight_g: 1300 }));
+    for (const key of ['packaging_weight_g', 'shipping_length_in', 'shipping_width_in', 'shipping_height_in']) expect(update).not.toHaveProperty(key);
+    expect(variation).toEqual(expect.objectContaining({ packagingWeightKg: '0.1', shippingLengthIn: '10', shippingWidthIn: '8', shippingHeightIn: '12' }));
   });
 });

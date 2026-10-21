@@ -1,0 +1,47 @@
+.system-popup.add-product-popup { width: min(520px, calc(100vw - 32px)); }
+.add-product-options { padding: 0; margin: 0; border: 0; display: grid; gap: 12px; min-width: 0; }
+.add-product-option { display: flex; align-items: flex-start; gap: 11px; padding: 17px 14px; border: 1px solid #e7dfd5; border-radius: 14px; background: var(--bg-primary, #fffdfb); cursor: pointer; }
+.add-product-option.is-selected { border-color: var(--primary-color, #934308); box-shadow: 0 0 0 1px var(--primary-color, #934308); background: #fff; }
+.add-product-option:focus-within { outline: 2px solid var(--primary-color, #934308); outline-offset: 3px; }
+.add-product-option input { accent-color: var(--primary-color, #934308); margin: 4px 0 0; flex: 0 0 auto; }
+.add-product-option > svg { flex: 0 0 32px; width: 32px; height: 32px; padding: 7px; border-radius: 9px; background: #9343080b; color: var(--primary-color, #934308); }
+.add-product-option__copy { min-width: 0; flex: 1; display: grid; justify-items: start; gap: 6px; }
+.add-product-option strong { font: 650 1rem var(--font-serif); color: var(--text-dark); }
+.add-product-option small { font-size: .8rem; line-height: 1.5; color: #73675f; }
+.add-product-badge { display: inline-block; padding: 2px 6px; border-radius: 5px; background: #9343080a; color: #854b2c; font-size: .65rem; font-weight: 650; white-space: nowrap; }
+.add-product-note { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 9px; background: #f5efe8; font-size: .75rem; color: #776354; margin: 14px 0 0; }
+.add-product-note svg { flex-shrink: 0; color: var(--primary-color); }
+.add-product-popup .system-popup__actions { margin-top: 22px; }
+.product-tools-page { height: 100%; overflow: auto; overscroll-behavior: contain; min-height: 100%; background: var(--bg-primary, #faf7f2); padding-bottom: 32px; }
+.product-creation-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 18px 24px; border-bottom: 1px solid #ece4db; font-size: .8rem; color: #7c7067; }
+.product-creation-bar a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: inherit; }
+.product-creation-cancel { margin-left: auto; background: #eee6dc; padding: 7px 12px; border-radius: 8px; }
+.product-tools-card { width: min(630px, calc(100% - 32px)); margin: clamp(24px, 6vh, 70px) auto 0; border: 1px solid #eee5dc; border-radius: 24px; background: #fff; padding: clamp(20px, 4vw, 34px); box-shadow: 0 12px 40px #59382008; }
+.product-tools-heading { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.product-tools-heading h1 { font: 650 clamp(1.35rem, 3vw, 1.8rem)/1.2 var(--font-serif); color: var(--text-dark); margin: 0; }
+.product-tools-intro { font-size: .88rem; text-align: center; color: #796c62; line-height: 1.6; max-width: 440px; margin: 16px auto 26px; }
+.product-tools-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.product-tools-list li { display: flex; align-items: center; gap: 10px; background: #faf7f3; border: 1px solid #f0e8df; border-radius: 12px; padding: 12px; }
+.product-tools-list strong { font-size: .88rem; color: #392d25; }
+.product-tools-list a { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; border: 1px solid #eadbce; border-radius: 8px; padding: 7px 10px; color: var(--primary-color); font-size: .77rem; text-decoration: none; background: #fff9f4; }
+.product-tools-instructions { margin-top: 22px; background: #faf7f3; border: 1px solid #f0e8df; border-radius: 12px; padding: 15px; }
+.product-tools-instructions h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: .78rem; font-weight: 650; color: #6f4530; }
+.product-tools-instructions ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
+.product-tools-instructions li { display: flex; align-items: flex-start; gap: 8px; background: #fff; border: 1px solid #eee5dc; border-radius: 9px; padding: 11px; }
+.product-tools-instructions li > span { display: grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; background: var(--primary-color); color: #fff; border-radius: 50%; font-size: .68rem; }
+.product-tools-instructions p { margin: 0; font-size: .75rem; line-height: 1.5; color: #75665c; }
+.product-tools-instructions .product-tools-limits { margin-top: 12px; font-size: .7rem; }
+.product-tools-footer { margin-top: 22px; padding-top: 20px; border-top: 1px solid #eee5dc; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.product-tools-footer > a:first-child { color: #796c62; font-size: .8rem; }
+.product-creation-primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; background: var(--primary-color, #934308); color: #fff; text-decoration: none; padding: 11px 16px; border-radius: 9px; font-weight: 650; font-size: .82rem; }
+.product-creation-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.product-creation-heading h1 { margin: 0 0 6px; font: 650 1.5rem var(--font-serif); }
+.product-creation-heading p { margin: 0; color: #796c62; font-size: .87rem; }
+.product-create-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+@media(max-width: 520px) { .product-tools-instructions ol { grid-template-columns: 1fr; } .product-tools-footer .product-creation-primary { width: 100%; } .product-creation-bar { padding: 14px 16px; } .product-tools-list li { gap: 7px; padding: 10px; } .product-tools-list .add-product-badge { display: none; } .add-product-option { padding: 14px 10px; gap: 8px; } }
+
+.products-page__topbar > .product-creation-primary, .products-state > .product-creation-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; min-height: 40px; background: var(--primary-color, #934308); color: #fff; padding: 10px 16px; border-radius: 9px; cursor: pointer; font-weight: 650; }
+.product-creation-primary:focus-visible, .product-tools-page a:focus-visible { outline: 3px solid var(--primary-color, #934308); outline-offset: 3px; }
+
+.artisan-product-create { padding: clamp(16px, 3vw, 28px); max-width: 1200px; margin: 0 auto; }
+.artisan-product-create .product-creation-heading > a { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--primary-color); text-decoration: none; }

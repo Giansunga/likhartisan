@@ -1,17 +1,18 @@
 import { API_BASE } from './api';
 import { supabase } from './supabase';
 
-export async function uploadToR2(file: File, folder: string): Promise<string> {
+export async function uploadToR2(file: File, folder: string, scope?: { shopId: string }): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('You must be signed in to upload files.');
 
-  const response = await fetch(`${API_BASE}/api/upload/file`, {
+  const response = await fetch(`${API_BASE}/api/upload/${scope ? 'product-file' : 'file'}`, {
     method: 'PUT',
     headers: {
       'Content-Type': file.type || 'application/octet-stream',
       Authorization: `Bearer ${session.access_token}`,
       'X-File-Name': encodeURIComponent(file.name),
       'X-Upload-Folder': folder,
+      ...(scope ? { 'X-Shop-Id': scope.shopId } : {}),
     },
     body: file,
   });

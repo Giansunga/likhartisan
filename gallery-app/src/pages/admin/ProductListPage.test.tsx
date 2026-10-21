@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductListPage from './ProductListPage';
 
 const mocks = vi.hoisted(() => ({
+  empty: false,
   updateResult: { data: null as { id: string } | null, error: null as { message: string } | null },
   variationInsertResult: { data: { id: 'variation-1' }, error: null as { code: string; message: string } | null },
   insertVariation: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock('../../lib/supabase', () => ({
     from: (table: string) => {
       if (table === 'artisans') return { select: () => ({ eq: () => ({ eq: () => ({ single: async () => ({ data: { id: 'artisan-1' }, error: null }) }) }) }) };
       if (table === 'products') return {
-        select: () => ({ order: async () => ({ data: [{ id: 'product-1', name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' }], error: null }) }),
+        select: () => ({ order: async () => ({ data: mocks.empty ? [] : [{ id: 'product-1', name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' }], error: null }) }),
         update: (row: unknown) => { mocks.updateProduct(row); return { eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }; },
       };
       return {
@@ -50,6 +51,7 @@ vi.mock('../../components/admin/ProductEditorDialog', () => ({
 describe('admin product editor save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.empty = false;
     mocks.updateResult = { data: null, error: null };
     mocks.variationInsertResult = { data: { id: 'variation-1' }, error: null };
     mocks.tags = ['clay'];
@@ -98,4 +100,19 @@ describe('admin product editor save', () => {
     await waitFor(() => expect(mocks.recomputeProductStock).toHaveBeenCalledWith('product-1'));
     expect(mocks.updateProduct).toHaveBeenCalledWith(expect.objectContaining({ tags: [] }));
   });
+  it('opens the method selector from the catalog toolbar', async () => {
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Edit first product' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Product' }));
+    expect(screen.getByRole('dialog', { name: 'Add New Product' })).toBeInTheDocument();
+  });
+  it('opens the same method selector from the empty catalog', async () => {
+    mocks.empty = true;
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
+    await screen.findByRole('heading', { name: 'No products yet' });
+    expect(screen.getAllByRole('button', { name: 'Add Product' })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add Product' })[1]);
+    expect(screen.getByRole('radio', { name: /Create 3D Model/ })).toBeChecked();
+  });
+
 });
