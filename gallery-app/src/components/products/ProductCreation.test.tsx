@@ -24,10 +24,11 @@ describe.each([['admin', ADMIN_PRODUCT_PATHS], ['artisan', ARTISAN_PRODUCT_PATHS
     expect(screen.getByRole('radio', { name: /Create 3D Model/ })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'View 3D tools' }));
     expect(await screen.findByRole('heading', { name: 'Convert Images to 3D' })).toBeInTheDocument();
-    for (const name of ['Meshy', 'Tripo3D', 'CSM', 'Rodin']) {
+    for (const name of ['Meshy', 'Tripo3D', 'Hi3D', 'Rodin']) {
       const visit = screen.getByRole('link', { name: `Visit ${name} (opens in a new tab)` });
       expect(visit).toHaveAttribute('target', '_blank'); expect(visit).toHaveAttribute('rel', 'noopener noreferrer');
     }
+    expect(screen.getByRole('link', { name: 'Visit Hi3D (opens in a new tab)' })).toHaveAttribute('href', 'https://hi3d.pro/');
     expect(screen.getByText(/Product images: up to 5 MB/)).toHaveTextContent('25 MB');
     fireEvent.click(screen.getByRole('link', { name: 'Continue to product form' }));
     expect(screen.getByRole('heading', { name: 'Product upload form' })).toBeInTheDocument();

@@ -5,7 +5,7 @@ import './product-creation.css';
 const tools = [
   { name: 'Meshy', url: 'https://www.meshy.ai/' },
   { name: 'Tripo3D', url: 'https://www.tripo3d.ai/' },
-  { name: 'CSM', url: 'https://3d.csm.ai/' },
+  { name: 'Hi3D', url: 'https://hi3d.pro/' },
   { name: 'Rodin', url: 'https://hyper3d.ai/' },
 ];
 export default function Product3DToolsPage({ paths }: { paths: ProductCreationPaths }) {
