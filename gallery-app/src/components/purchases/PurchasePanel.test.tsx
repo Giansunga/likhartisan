@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { getCart, setCart } from '../../data/store';
 import type { PurchaseDetail, PurchaseSummary } from '../../types/purchases';
 
@@ -19,7 +19,7 @@ vi.mock('../../hooks/usePurchases', () => ({
 }));
 vi.mock('../../lib/purchaseApi', () => ({ purchaseApi: fixtures.purchaseApi }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: vi.fn() } } }));
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('../../lib/popups', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/popups')>()), toast: { error: vi.fn(), success: vi.fn() } }));
 
 import PurchasePanel from './PurchasePanel';
 
@@ -131,7 +131,7 @@ describe('PurchasePanel Buy again', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buy again' }));
     expect(await screen.findByText('None of these items are currently available.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add to cart' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Close', { selector: 'button' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(getCart()).toEqual([]);
   });
 

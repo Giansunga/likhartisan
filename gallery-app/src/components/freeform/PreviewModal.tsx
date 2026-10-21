@@ -3,7 +3,7 @@ import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { exportSceneToGLB, downloadGLB } from '../../services/exportService';
 import { applyFinishToScene, disposeFinishedScene, generateCylindricalUVs } from './finishMaterials';
 import type { MaterialParams } from './materials';

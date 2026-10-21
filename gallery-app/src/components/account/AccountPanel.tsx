@@ -1,3 +1,4 @@
+import { Popup } from '../Popup';
 import { useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import {
@@ -16,7 +17,7 @@ import {
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress } from '../../lib/geocoder';
@@ -262,15 +263,8 @@ function AccountPanelContent({ user }: { user: User }) {
       </footer>
 
       {showPasswordDialog ? <PasswordDialog email={savedProfile.email} onClose={() => setShowPasswordDialog(false)} /> : null}
-      {showDiscardDialog ? (
-        <div className="account-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setShowDiscardDialog(false); }}>
-          <div className="account-dialog account-dialog--compact" role="alertdialog" aria-modal="true" aria-labelledby="account-discard-title" aria-describedby="account-discard-description">
-            <h2 id="account-discard-title">Discard unsaved changes?</h2>
-            <p id="account-discard-description">Your profile will return to the last saved details.</p>
-            <div className="account-dialog__actions"><button type="button" className="account-button account-button--secondary" onClick={() => setShowDiscardDialog(false)}>Keep editing</button><button type="button" className="account-button account-button--danger" onClick={discardChanges}>Discard changes</button></div>
-          </div>
-        </div>
-      ) : null}
+      <Popup open={showDiscardDialog} title="Discard unsaved changes?" message="Your profile will return to the last saved details." confirmLabel="Discard changes" cancelLabel="Keep editing" danger onCancel={() => setShowDiscardDialog(false)} onConfirm={discardChanges} />
+
     </section>
   );
 }

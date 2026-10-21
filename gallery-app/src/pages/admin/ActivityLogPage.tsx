@@ -4,7 +4,7 @@ import {
   AlertTriangle, ChevronRight, Clock3, Download, FileClock, RefreshCw,
   Search, X,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
 import {
   ACTIVITY_CATEGORIES, ACTIVITY_PAGE_SIZE, activityFiltersToParams,

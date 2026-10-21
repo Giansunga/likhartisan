@@ -1,3 +1,4 @@
+import { Popup } from '../Popup';
 import { useId, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useOverlayA11y } from './useOverlayA11y';
@@ -57,14 +58,5 @@ interface ConfirmDialogProps {
 }
 
 export function SellerConfirmDialog({ open, title, description, confirmLabel, onConfirm, onClose, busy, danger = true }: ConfirmDialogProps) {
-  return (
-    <SellerOverlay open={open} title={title} description={description} onClose={onClose} busy={busy} variant="confirm">
-      <div className="seller-confirm-actions">
-        <button className="seller-button seller-button--secondary" type="button" onClick={onClose} disabled={busy}>Cancel</button>
-        <button className={`seller-button ${danger ? 'seller-button--danger' : 'seller-button--primary'}`} type="button" onClick={onConfirm} disabled={busy}>
-          {busy ? 'Please wait…' : confirmLabel}
-        </button>
-      </div>
-    </SellerOverlay>
-  );
+  return <Popup open={open} title={title} message={description} confirmLabel={confirmLabel} danger={danger} busy={busy} onConfirm={onConfirm} onCancel={onClose} />;
 }

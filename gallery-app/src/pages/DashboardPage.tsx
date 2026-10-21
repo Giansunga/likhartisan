@@ -1,6 +1,7 @@
+import { Popup } from '../components/Popup';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -328,24 +329,7 @@ export default function DashboardPage() {
 
 
       {/* Delete Review Confirmation */}
-      {deleteReviewId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }} onClick={() => setDeleteReviewId(null)}>
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '32px 36px', maxWidth: '440px', width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', marginBottom: '12px' }}>Delete Review</h3>
-            <p style={{ fontSize: '0.92rem', color: '#666', lineHeight: 1.6, marginBottom: '24px' }}>Are you sure you want to delete your review? This action cannot be undone.</p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button onClick={() => setDeleteReviewId(null)}
-                style={{ padding: '10px 24px', border: '1.5px solid #ccc', borderRadius: '8px', background: '#fff', color: '#666', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
-                CANCEL
-              </button>
-              <button onClick={() => handleDeleteReview(deleteReviewId)}
-                style={{ padding: '10px 24px', border: 'none', borderRadius: '8px', background: '#D32F2F', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
-                DELETE
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {deleteReviewId && <Popup title="Delete review?" message="Are you sure you want to delete your review? This action cannot be undone." confirmLabel="Delete review" danger onCancel={() => setDeleteReviewId(null)} onConfirm={() => handleDeleteReview(deleteReviewId)} />}
 
       {/* Rate Product Popup */}
       {rateOrder && (

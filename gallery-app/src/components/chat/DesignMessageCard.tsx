@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, LoaderCircle, Pencil, WalletCards } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { checkoutDesignOrder } from '../../lib/designQuoteCheckout';
 import { supabase } from '../../lib/supabase';
 import { getPattern } from '../freeform/decor';

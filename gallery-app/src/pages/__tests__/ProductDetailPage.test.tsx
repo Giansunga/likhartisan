@@ -114,7 +114,7 @@ describe('product detail presentation and shopping controls', () => {
   });
 
   it('merges repeated multi-unit additions and prevents exceeding remaining cart stock', async () => {
-    const { toast } = await import('sonner');
+    const { toast } = await import('../../lib/popups');
     const success = vi.spyOn(toast, 'success');
     const { animateProductToCart } = await import('../../lib/cartAnimation');
     const { getCart } = await import('../../data/store');

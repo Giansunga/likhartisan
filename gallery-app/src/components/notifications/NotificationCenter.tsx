@@ -1,3 +1,4 @@
+import { Popup } from '../Popup';
 import { useMemo, useState } from 'react';
 import { Bell, CheckCheck, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -61,7 +62,7 @@ export default function NotificationCenter({ context, data }: { context: Notific
         </article>)}</section>) : <div className="notification-center__empty"><Bell size={36} /><h2>{data.notifications.length ? 'Nothing in this category' : 'No notifications yet'}</h2><p>{data.notifications.length ? 'Choose another category to see more updates.' : 'Order, message, and account updates will appear here.'}</p>{data.error ? <button type="button" onClick={() => void data.reload()}>Try again</button> : null}</div>}
       </div>
 
-      {deleteTarget ? <div className="notification-dialog-backdrop" role="presentation" onMouseDown={() => setDeleteTarget(null)}><div className="notification-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-notification-title" onMouseDown={event => event.stopPropagation()}><h2 id="delete-notification-title">Delete notification?</h2><p>This notification will be permanently removed from your activity history.</p><div><button type="button" onClick={() => setDeleteTarget(null)}>Cancel</button><button className="is-danger" type="button" onClick={() => { void data.deleteNotification(deleteTarget.id); setDeleteTarget(null); }}>Delete notification</button></div></div></div> : null}
+      {deleteTarget ? <Popup title="Delete notification?" message="This notification will be permanently removed from your activity history." confirmLabel="Delete notification" danger onCancel={() => setDeleteTarget(null)} onConfirm={async () => { await data.deleteNotification(deleteTarget.id); setDeleteTarget(null); }} /> : null}
     </section>
   );
 }

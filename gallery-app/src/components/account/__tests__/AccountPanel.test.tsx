@@ -33,7 +33,7 @@ vi.mock('../../../lib/supabase', () => ({
   },
 }));
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../../lib/popups', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../lib/popups')>()), toast: { success: vi.fn(), error: vi.fn() } }));
 
 function makeUser(metadata: Record<string, unknown> = {}): User {
   return {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useJsApiLoader } from '@react-google-maps/api';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { ArrowLeft, Info, Trash2 } from 'lucide-react';
 import { getCart, setCart } from '../data/store';
 import { supabase } from '../lib/supabase';

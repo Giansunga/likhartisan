@@ -1,6 +1,8 @@
+import { useUnsavedProgress } from '../hooks/useUnsavedProgress';
+import { confirmAction } from '../lib/popups';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import FreeformViewer from '../components/freeform/FreeformViewer';
@@ -116,7 +118,23 @@ export default function FreeformPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [savedDesignsOpen, setSavedDesignsOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [cleanDesign, setCleanDesign] = useState<string | null>(null);
+  const currentDesign = JSON.stringify([selectedModelId || selectedModel, selectedShopId, shapeParams, materialParams, decorationParams, attachmentParams]);
+  const hasUnsavedChanges = Boolean(selectedModel) && cleanDesign !== currentDesign;
+  const markDesignClean = useRef(false);
+  const [, refreshCleanState] = useState(0);
+  function recordCleanDesign() {
+    markDesignClean.current = true;
+    refreshCleanState(revision => revision + 1);
+  }
+  useEffect(() => {
+    if (markDesignClean.current) {
+      markDesignClean.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Capture the completed load/reset transaction.
+      setCleanDesign(currentDesign);
+    }
+  });
+  useUnsavedProgress(hasUnsavedChanges);
 
   /* UI state */
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -205,7 +223,7 @@ function applyDesign(design: {
     setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
     setAttachmentSockets([]);
     setAttachmentPlacementLimits({});
-    setHasUnsavedChanges(false);
+    recordCleanDesign();
     if (design.shop_id) {
       setSelectedShopId(design.shop_id);
       setSelectedShopName(design.shop_name || '');
@@ -218,12 +236,12 @@ function applyDesign(design: {
       return;
     }
     if (selectedShopId && design.shop_id && design.shop_id !== selectedShopId) {
-      const ok = confirm(`Switch Shop?\n\nThis design was created for ${design.shops?.name || 'another shop'}.\nLoading it will switch your current shop and replace the current design.`);
+      const ok = await confirmAction(`Switch Shop?\n\nThis design was created for ${design.shops?.name || 'another shop'}.\nLoading it will switch your current shop and replace the current design.`);
       if (!ok) return;
     }
 
     if (hasUnsavedChanges && selectedModel) {
-      const ok = confirm(`Replace Current Design?\n\nYour current changes have not been saved.\nLoading another design will replace them.`);
+      const ok = await confirmAction(`Replace Current Design?\n\nYour current changes have not been saved.\nLoading another design will replace them.`);
       if (!ok) return;
     }
 
@@ -246,7 +264,7 @@ function applyDesign(design: {
       setAttachmentParams(normalizeAttachmentSelections(design.attachment_params));
       setAttachmentSockets([]);
       setAttachmentPlacementLimits({});
-      setHasUnsavedChanges(false);
+      recordCleanDesign();
 
       setActiveStep('review');
       setSavedDesignsOpen(false);
@@ -313,7 +331,7 @@ function applyDesign(design: {
         setRequestConversationId(null);
         setRequestToken(crypto.randomUUID());
         setActiveStep('review');
-        setHasUnsavedChanges(false);
+        recordCleanDesign();
         toast.info('Update the design, then send the revision back to the shop.');
         return;
       }
@@ -407,11 +425,6 @@ function applyDesign(design: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, revisionMode, revisionRequestId]);
 
-  useEffect(() => {
-    // Design updates originate in several child editors, so dirty-state tracking is centralized here.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (selectedModel) setHasUnsavedChanges(true);
-  }, [selectedModel, shapeParams, materialParams, decorationParams, attachmentParams]);
 
   /* ─── Viewport controls ─── */
 
@@ -457,8 +470,8 @@ function applyDesign(design: {
     goToAdjacentStep(1);
   }
 
-  function handleResetDesign() {
-    const shouldReset = !selectedModel || window.confirm('Reset all shape, material, pattern, and attachment changes?');
+  async function handleResetDesign() {
+    const shouldReset = !selectedModel || await confirmAction('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
     setShapeParams(modelBase ? shapeFromModelBase(modelBase) : DEFAULT_SHAPE);
     setMaterialParams(DEFAULT_MATERIAL);
@@ -467,6 +480,7 @@ function applyDesign(design: {
     setAttachmentSockets([]);
     setAttachmentPlacementLimits({});
     setMobileToolsOpen(false);
+    recordCleanDesign();
   }
 
   function captureScreenshot(): string | null {
@@ -532,6 +546,7 @@ function applyDesign(design: {
       return;
     }
 
+    setCleanDesign(currentDesign);
     setSaveModalOpen(false);
     setDesignName('');
     setSaveMessage('');

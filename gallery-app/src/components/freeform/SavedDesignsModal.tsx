@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSavedDesigns, type SavedDesign } from '../../hooks/useSavedDesigns';
@@ -73,7 +74,7 @@ export default function SavedDesignsModal({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this design?')) return;
+    if (!await confirmAction('Delete this design?')) return;
     await deleteDesign(id);
   }
 

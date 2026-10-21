@@ -1,6 +1,7 @@
+import { Popup } from '../Popup';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { useAuth } from '../../contexts/AuthContext';
 import { addToCart, getCart } from '../../data/store';
 import { usePurchases } from '../../hooks/usePurchases';
@@ -228,13 +229,12 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
       </article>;
     })}</div>}
     {data.pagination.totalPages > 1 && <nav className="purchase-pagination" aria-label="Purchase pages"><button disabled={page <= 1} onClick={() => update({ page: String(page - 1), order: null })}>Previous</button><span>Page {page} of {data.pagination.totalPages}</span><button disabled={page >= data.pagination.totalPages} onClick={() => update({ page: String(page + 1), order: null })}>Next</button></nav>}
-    {confirm && <Modal title={confirm.action === 'cancel' ? 'Cancel this order?' : 'Confirm receipt?'} onClose={() => setConfirm(null)}><p>{confirm.action === 'cancel' ? 'Only unpaid pending orders can be cancelled. This action cannot be undone.' : 'Check that every item arrived in satisfactory condition before confirming.'}</p><div className="purchase-modal__actions"><button className="purchase-btn secondary" onClick={() => setConfirm(null)}>Not now</button><button disabled={mutation === confirm.order.id} className={`purchase-btn ${confirm.action === 'cancel' ? 'danger' : 'primary'}`} onClick={() => void mutate(confirm.order, confirm.action)}>{mutation ? 'Working…' : 'Confirm'}</button></div></Modal>}
-    {reorderPlan && <Modal title="Buy again" onClose={() => { if (!addingReorderRef.current) setReorderPlan(null); }}>
+    {confirm && <Popup title={confirm.action === 'cancel' ? 'Cancel this order?' : 'Confirm receipt?'} message={confirm.action === 'cancel' ? 'Only unpaid pending orders can be cancelled. This action cannot be undone.' : 'Check that every item arrived in satisfactory condition before confirming.'} confirmLabel={confirm.action === 'cancel' ? 'Cancel order' : 'Confirm received'} danger={confirm.action === 'cancel'} busy={mutation === confirm.order.id} onCancel={() => setConfirm(null)} onConfirm={() => mutate(confirm.order, confirm.action)} />}
+    {reorderPlan && <Popup title="Buy again" confirmLabel={reorderPlan.available.length ? 'Add to cart' : 'Done'} busy={addingReorder} onCancel={reorderPlan.available.length ? () => setReorderPlan(null) : undefined} onConfirm={() => { if (reorderPlan.available.length) confirmReorder(); else setReorderPlan(null); }}>
       {reorderPlan.available.length > 0 ? <><p className="purchase-muted">Review the available items and their current prices before adding them to your cart.</p><ul className="purchase-reorder-list">{reorderPlan.available.map((item, index) => <li key={`${item.productId}:${item.variationId || ''}:${index}`}><img src={item.image} alt="" /><div><strong>{item.productName}</strong>{item.variation && <span>{displayVariation(item.variation)}</span>}<span>Quantity: {item.qty}</span></div><b>{money(item.price)} each</b></li>)}</ul></> : <p>None of these items are currently available.</p>}
       {reorderPlan.unavailable.length > 0 && <div className="purchase-reorder-unavailable"><h3>Unavailable items</h3><ul>{reorderPlan.unavailable.map((item, index) => <li key={`${item.productName}:${index}`}><strong>{item.productName}</strong><span>{item.reason}</span></li>)}</ul></div>}
       {reorderError && <p className="purchase-reorder-error" role="alert">{reorderError}</p>}
-      <div className="purchase-modal__actions"><button className="purchase-btn secondary" onClick={() => setReorderPlan(null)} disabled={addingReorder}>{reorderPlan.available.length ? 'Cancel' : 'Close'}</button>{reorderPlan.available.length > 0 && <button className="purchase-btn primary" onClick={confirmReorder} disabled={addingReorder}>{addingReorder ? 'Adding…' : 'Add to cart'}</button>}</div>
-    </Modal>}
+    </Popup>}
     {returnOrder && details[returnOrder.id] && <ReturnDialog order={returnOrder} detail={details[returnOrder.id]} onClose={() => setReturnOrder(null)} onDone={() => { setDetails(current => Object.fromEntries(Object.entries(current).filter(([id]) => id !== returnOrder.id))); void reload(); }} />}
   </section>;
 }

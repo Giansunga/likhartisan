@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/popups';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,7 +48,7 @@ export default function SaveTab({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this design?')) return;
+    if (!await confirmAction('Delete this design?')) return;
     await supabase.from('designs').delete().eq('id', id);
     if (userId) await fetchDesigns(userId);
   }

@@ -1,5 +1,6 @@
+import { Popup } from '../../components/Popup';
+import { notify } from '../../lib/popups';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -92,7 +93,6 @@ export default function OrdersPage() {
 
   // confirm dialogs
   const [confirm, setConfirm] = useState<{ open: boolean; title: string; message: string; confirmLabel?: string; confirmDanger?: boolean; action: () => void } | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // payment management
   const [verifyModal, setVerifyModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
@@ -142,8 +142,7 @@ export default function OrdersPage() {
   /* ── realtime activity log ── */
   /* ── toast helper ── */
   function showToast(message: string, type: 'success' | 'error') {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    notify(type, message);
   }
 
   /* ── helper: get user display name ── */
@@ -476,26 +475,6 @@ export default function OrdersPage() {
   /* ── render ── */
   return (
     <div className="orders-page">
-      {/* ── TOAST ── */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            style={{
-              position: 'fixed', top: '20px', right: '20px', zIndex: 3000,
-              padding: '14px 24px', borderRadius: '12px', fontWeight: 600, fontSize: '0.88rem',
-              color: toast.type === 'success' ? '#fff' : '#fff',
-              background: toast.type === 'success' ? '#2E7D32' : '#C62828',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-            }}
-          >
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="portal-action-bar">
         <span className="orders-page-header-meta">{filtered.length} matching order{filtered.length === 1 ? '' : 's'}</span>
       </div>
@@ -913,34 +892,17 @@ export default function OrdersPage() {
           message={confirm.message}
           confirmLabel={confirm.confirmLabel}
           confirmDanger={confirm.confirmDanger}
-          onConfirm={() => { confirm.action(); setConfirm(null); }}
+          onConfirm={async () => { await confirm.action(); setConfirm(null); }}
           onCancel={() => setConfirm(null)}
         />
       )}
 
       {/* verify payment modal */}
-      {verifyModal.open && verifyModal.order && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => setVerifyModal({ open: false, order: null })}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '420px', maxWidth: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0, fontFamily: 'var(--font-serif)' }}>Verify Payment</h3>
-            <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 0' }}>
-              Confirm that the payment of <strong>{formatCurrency(verifyModal.order.total)}</strong> for order #{verifyModal.order.id.slice(0, 8).toUpperCase()} has been received?
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
-              <button onClick={() => setVerifyModal({ open: false, order: null })} style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => verifyPayment(verifyModal.order!.id)} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#2E7D32', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Verify</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {verifyModal.open && verifyModal.order && <Popup title="Verify payment?" message={<>Confirm that the payment of <strong>{formatCurrency(verifyModal.order.total)}</strong> for order #{verifyModal.order.id.slice(0, 8).toUpperCase()} has been received?</>} confirmLabel="Verify payment" onCancel={() => setVerifyModal({ open: false, order: null })} onConfirm={() => verifyPayment(verifyModal.order!.id)} />}
 
       {/* reject payment modal */}
-      {rejectModal.open && rejectModal.order && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => { setRejectModal({ open: false, order: null }); setRejectReason(''); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '420px', maxWidth: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0, fontFamily: 'var(--font-serif)' }}>Reject Payment</h3>
+      {rejectModal.open && rejectModal.order && <Popup title="Reject payment" confirmLabel="Reject payment" danger={true} confirmDisabled={!rejectReason.trim()} onCancel={() => { setRejectModal({ open: false, order: null }); setRejectReason(''); }} onConfirm={() => rejectPayment(rejectModal.order!.id, rejectReason)}>
+
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 12px' }}>Provide a reason for rejecting this payment.</p>
             <textarea
               value={rejectReason} onChange={e => setRejectReason(e.target.value)}
@@ -948,20 +910,11 @@ export default function OrdersPage() {
               rows={3}
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
             />
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button onClick={() => { setRejectModal({ open: false, order: null }); setRejectReason(''); }} style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => rejectPayment(rejectModal.order!.id, rejectReason)} disabled={!rejectReason.trim()} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#C62828', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: rejectReason.trim() ? 'pointer' : 'default', opacity: rejectReason.trim() ? 1 : 0.5 }}>Reject</button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Popup>}
 
       {/* refund modal */}
-      {refundModal.open && refundModal.order && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => { setRefundModal({ open: false, order: null }); setRefundAmount(''); setRefundReason(''); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '440px', maxWidth: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0, fontFamily: 'var(--font-serif)' }}>Process Refund</h3>
+      {refundModal.open && refundModal.order && <Popup title="Process refund" confirmLabel="Process refund" danger={true} confirmDisabled={!refundAmount || !refundReason.trim()} onCancel={() => { setRefundModal({ open: false, order: null }); setRefundAmount(''); setRefundReason(''); }} onConfirm={() => processRefund(refundModal.order!.id, Number(refundAmount), refundReason)}>
+
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 16px' }}>
               Original amount: <strong>{formatCurrency(refundModal.order.total)}</strong>
             </p>
@@ -982,26 +935,11 @@ export default function OrdersPage() {
                 style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
               />
             </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => { setRefundModal({ open: false, order: null }); setRefundAmount(''); setRefundReason(''); }} style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
-              <button
-                onClick={() => processRefund(refundModal.order!.id, Number(refundAmount), refundReason)}
-                disabled={!refundAmount || !refundReason.trim()}
-                style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#6A1B9A', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: refundAmount && refundReason.trim() ? 'pointer' : 'default', opacity: refundAmount && refundReason.trim() ? 1 : 0.5 }}
-              >
-                Process Refund
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Popup>}
 
       {/* flag problem modal */}
-      {problemModal.open && problemModal.order && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => { setProblemModal({ open: false, order: null }); setProblemType(''); setProblemNotes(''); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '440px', maxWidth: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0, fontFamily: 'var(--font-serif)' }}>Flag Order as Problematic</h3>
+      {problemModal.open && problemModal.order && <Popup title="Flag problem" confirmLabel="Flag problem" danger={true} confirmDisabled={!problemType || !problemNotes.trim()} onCancel={() => { setProblemModal({ open: false, order: null }); setProblemType(''); setProblemNotes(''); }} onConfirm={() => flagProblem(problemModal.order!.id, problemType, problemNotes)}>
+
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 16px' }}>Select the type of problem and provide details.</p>
             <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', display: 'block', marginBottom: '4px' }}>Problem Type</label>
@@ -1024,26 +962,11 @@ export default function OrdersPage() {
                 style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
               />
             </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => { setProblemModal({ open: false, order: null }); setProblemType(''); setProblemNotes(''); }} style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
-              <button
-                onClick={() => flagProblem(problemModal.order!.id, problemType, problemNotes)}
-                disabled={!problemType || !problemNotes.trim()}
-                style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#C62828', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: problemType && problemNotes.trim() ? 'pointer' : 'default', opacity: problemType && problemNotes.trim() ? 1 : 0.5 }}
-              >
-                Flag Problem
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Popup>}
 
       {/* resolve problem modal */}
-      {resolveModal.open && resolveModal.order && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => { setResolveModal({ open: false, order: null }); setResolution(''); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '16px', width: '420px', maxWidth: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-dark)', margin: 0, fontFamily: 'var(--font-serif)' }}>Resolve Problem</h3>
+      {resolveModal.open && resolveModal.order && <Popup title="Resolve problem" confirmLabel="Resolve problem" danger={false} confirmDisabled={!resolution.trim()} onCancel={() => { setResolveModal({ open: false, order: null }); setResolution(''); }} onConfirm={() => resolveProblem(resolveModal.order!.id, resolution)}>
+
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 12px' }}>Describe how this problem was resolved.</p>
             <textarea
               value={resolution} onChange={e => setResolution(e.target.value)}
@@ -1051,13 +974,7 @@ export default function OrdersPage() {
               rows={3}
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
             />
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button onClick={() => { setResolveModal({ open: false, order: null }); setResolution(''); }} style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #E8E0D8', background: '#fff', color: 'var(--text-dark)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => resolveProblem(resolveModal.order!.id, resolution)} disabled={!resolution.trim()} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#2E7D32', color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: resolution.trim() ? 'pointer' : 'default', opacity: resolution.trim() ? 1 : 0.5 }}>Resolve</button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Popup>}
     </div>
   );
 }

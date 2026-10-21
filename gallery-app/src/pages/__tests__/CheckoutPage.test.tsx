@@ -33,7 +33,7 @@ vi.mock('../../lib/geocoder', () => ({
   reverseGeocodeCoords: async () => 'San Fernando, Pampanga',
 }));
 vi.mock('../../lib/api', () => ({ API_BASE: '' }));
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('../../lib/popups', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/popups')>()), toast: { error: vi.fn(), success: vi.fn() } }));
 
 const item: CartItem = {
   productId: 'p1', productName: 'Vase', image: '/vase.jpg', price: 400,

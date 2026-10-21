@@ -1,3 +1,4 @@
+import { Popup } from '../Popup';
 import FeaturedArtisanSelect from './FeaturedArtisanSelect';
 import ProductTagsInput from './ProductTagsInput';
 import { normalizeProductTags, resolveProductTags, type ProductTagsDraft } from '../../lib/productTags';
@@ -186,6 +187,6 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
       {errors.save && <div className="product-editor__error" role="alert"><AlertCircle aria-hidden="true" />{errors.save}</div>}
       <footer className="product-editor__footer"><button type="button" className="product-editor__cancel" onClick={requestClose} disabled={saving}>Cancel</button><button type="button" className="product-editor__save" onClick={() => void submit()} disabled={saving || variationLoading}>{saving ? 'Saving changes…' : 'Save changes'}</button></footer>
     </section>
-    {confirmDiscard && <div className="product-discard-backdrop"><section className="product-discard" role="dialog" aria-modal="true" aria-labelledby="product-discard-title"><h2 id="product-discard-title">Discard unsaved changes?</h2><p>Your product edits have not been saved.</p><div><button type="button" onClick={() => setConfirmDiscard(false)}>Keep editing</button><button type="button" onClick={onClose}>Discard changes</button></div></section></div>}
+    <Popup open={confirmDiscard} title="Discard unsaved changes?" message="Your product edits have not been saved." cancelLabel="Keep editing" confirmLabel="Discard changes" danger onCancel={() => setConfirmDiscard(false)} onConfirm={onClose} />
   </div>;
 }

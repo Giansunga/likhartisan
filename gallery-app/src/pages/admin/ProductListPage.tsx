@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Popup } from '../../components/Popup';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Box, CheckCircle2, CircleAlert, LoaderCircle, PackagePlus, RefreshCw, Search, ShoppingBag, Warehouse, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
 import { uploadToR2 } from '../../lib/r2';
 import { recomputeProductStock } from '../../lib/stockSync';
@@ -25,19 +26,9 @@ function SummaryCard({ label, value, note, active, onClick, icon }: { label: str
   return <button className="products-summary-card" type="button" aria-pressed={active} onClick={onClick}><span>{icon}{label}</span><strong>{value.toLocaleString()}</strong><small>{note}</small></button>;
 }
 
-function trapDialog(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
-  if (event.key === 'Escape') { event.preventDefault(); onDismiss(); return; }
-  if (event.key !== 'Tab') return;
-  const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
-  if (!focusable.length) return;
-  const first = focusable[0]; const last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-}
-
 function ProductConfirm({ product, action, busy, onCancel, onConfirm }: { product: Product; action: 'archive' | 'delete'; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const deleting = action === 'delete';
-  return <div className="products-confirm-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section className="products-confirm" role="dialog" aria-modal="true" aria-labelledby="products-confirm-title" tabIndex={-1} onKeyDown={(event) => trapDialog(event, () => { if (!busy) onCancel(); })}><h2 id="products-confirm-title">{deleting ? 'Delete product?' : product.status === 'archived' ? 'Activate product?' : 'Archive product?'}</h2><p>{product.name}</p><small>{deleting ? 'This permanently removes the product. This action cannot be undone.' : product.status === 'archived' ? 'This will make the product active in the catalog again.' : 'Archived products remain in the admin catalog but are removed from the active listing.'}</small><footer><button type="button" autoFocus onClick={onCancel} disabled={busy}>Cancel</button><button className={deleting ? 'is-danger' : ''} type="button" onClick={onConfirm} disabled={busy}>{busy ? 'Working…' : deleting ? 'Delete product' : product.status === 'archived' ? 'Activate product' : 'Archive product'}</button></footer></section></div>;
+  const label = action === 'delete' ? 'Delete product' : product.status === 'archived' ? 'Activate product' : 'Archive product';
+  return <Popup title={`${label}?`} message={<>{product.name}<br />{action === 'delete' ? 'This permanently removes the product. This action cannot be undone.' : product.status === 'archived' ? 'This will make the product active in the catalog again.' : 'Archived products remain in the admin catalog but are removed from the active listing.'}</>} confirmLabel={label} danger={action === 'delete'} busy={busy} onCancel={onCancel} onConfirm={onConfirm} />;
 }
 
 export default function ProductListPage() {

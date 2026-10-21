@@ -1,3 +1,4 @@
+import PopupHost from '../../components/Popup';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +12,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: {
-        id: 'model-1', file_url: '/models/vase.glb', base_height_in: 10, base_body_width_in: 8,
+        id: 'model-1', status: 'active', file_url: '/models/vase.glb', base_height_in: 10, base_body_width_in: 8,
         base_neck_width_in: 5, base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5,
       } })) })),
     })),
@@ -125,10 +126,9 @@ describe('FreeformPage send-to-shop flow', () => {
   });
 
   it('starts from the model baseline and both resets restore its estimate', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
+    render(<><PopupHost /><MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
       modelUrl: '/models/vase.glb', modelName: 'Test Vase', modelCategory: 'Vase', modelId: 'model-1',
-    } }]}><FreeformPage /></MemoryRouter>);
+    } }]}><FreeformPage /></MemoryRouter></>);
 
     await waitFor(() => expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0));
     expect(screen.getAllByText(/H 10.00 in/).length).toBeGreaterThan(0);
@@ -139,8 +139,17 @@ describe('FreeformPage send-to-shop flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
     expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Grow height' }));
+    const editedRefresh = new Event('beforeunload', { cancelable: true });
+    fireEvent(window, editedRefresh);
+    expect(editedRefresh.defaultPrevented).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: /Reset Design/i }));
-    expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Reset design' }));
+    await waitFor(() => expect(screen.getAllByText('₱1,250.00').length).toBeGreaterThan(0));
+    await waitFor(() => {
+      const refresh = new Event('beforeunload', { cancelable: true });
+      fireEvent(window, refresh);
+      expect(refresh.defaultPrevented).toBe(false);
+    });
     vi.restoreAllMocks();
   });
 
@@ -151,9 +160,9 @@ describe('FreeformPage send-to-shop flow', () => {
       removeEventListener: vi.fn(),
     }));
     HTMLElement.prototype.scrollTo = vi.fn();
-    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
+    render(<><PopupHost /><MemoryRouter initialEntries={[{ pathname: '/freeform', state: {
       modelUrl: '/models/vase.glb', modelName: 'Test Vase', modelCategory: 'Vase', modelId: 'model-1',
-    } }]}><FreeformPage /></MemoryRouter>);
+    } }]}><FreeformPage /></MemoryRouter></>);
 
     await waitFor(() => expect(screen.getAllByText('Test Vase').length).toBeGreaterThan(0));
     const viewer = screen.getByTestId('freeform-viewer');

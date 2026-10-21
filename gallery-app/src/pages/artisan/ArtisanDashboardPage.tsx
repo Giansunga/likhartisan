@@ -14,7 +14,7 @@ import {
   Inbox, Store, Layers, LogOut,
   ArrowUpRight, Bell
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { SellerConfirmDialog } from '../../components/artisan/Overlay';
 import { useOverlayA11y } from '../../components/artisan/useOverlayA11y';

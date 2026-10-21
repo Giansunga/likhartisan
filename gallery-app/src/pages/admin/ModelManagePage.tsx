@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -174,14 +175,14 @@ export default function ModelManagePage() {
     if (model.status === 'active' && await isFeatured(id)) return;
     const newStatus = model.status === 'archived' ? 'active' : 'archived';
     const label = newStatus === 'archived' ? 'Archive' : 'Activate';
-    if (!confirm(`${label} "${model.name}"?`)) return;
+    if (!await confirmAction(`${label} "${model.name}"?`)) return;
     await supabase.from('models_3d').update({ status: newStatus }).eq('id', id);
     fetchModels();
   }
 
   async function handleDelete(id: string) {
     if (await isFeatured(id)) return;
-    if (!confirm('Delete this model?')) return;
+    if (!await confirmAction('Delete this model?')) return;
     await supabase.from('models_3d').delete().eq('id', id);
     fetchModels();
   }

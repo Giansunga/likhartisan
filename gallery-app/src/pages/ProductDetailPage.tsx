@@ -1,7 +1,7 @@
 import { Component, useState, useEffect, useMemo, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart, getCart, onCartUpdate } from '../data/store';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { SITE_URL } from '../config';

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { getCart } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';

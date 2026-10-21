@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, KeyRound, LoaderCircle, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
 import { recordSecurityActivity } from '../../lib/activityApi';
 import { meetsPasswordRequirements, PASSWORD_REQUIREMENTS } from '../../lib/passwordPolicy';

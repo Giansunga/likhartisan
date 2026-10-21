@@ -4,7 +4,7 @@ import {
   MessageCircle, PackageCheck, Search, Send, SlidersHorizontal, X, XCircle,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
 import type {
   DesignRequest, DesignRequestEvent, DesignRequestQueueItem, DesignRequestRevision,

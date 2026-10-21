@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { useLikhAI } from '../../hooks/useLikhAI';
 import type { LikhAICard, LikhAIMessage } from '../../types/likhai';
 import ChatOrderCard from './ChatOrderCard';

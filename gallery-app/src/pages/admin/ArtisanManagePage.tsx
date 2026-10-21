@@ -1,3 +1,4 @@
+import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
@@ -137,7 +138,7 @@ export default function ArtisanManagePage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this artisan?')) return;
+    if (!await confirmAction('Delete this artisan?')) return;
     await supabase.from('artisans').delete().eq('id', id);
     fetchData();
   }

@@ -1,6 +1,7 @@
+import { confirmAction } from '../lib/popups';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { trackBuyerPresence } from '../realtime/buyerPresence';
 import { useAuth } from '../contexts/AuthContext';
@@ -226,7 +227,7 @@ export default function ChatPage() {
   }
 
   async function deleteConversation(convId: string) {
-    if (!confirm('Delete this conversation? This cannot be undone.')) return;
+    if (!await confirmAction('Delete this conversation? This cannot be undone.')) return;
     await supabase.from('messages').delete().eq('conversation_id', convId);
     await supabase.from('conversations').delete().eq('id', convId);
     setConversations(prev => prev.filter(c => c.id !== convId));

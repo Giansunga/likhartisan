@@ -22,12 +22,10 @@ const DEFAULT_FIT = createViewerFit(new THREE.Box3());
 function ProductModel({
   url,
   rotate,
-  shadowsEnabled,
   onFit,
 }: {
   url: string;
   rotate: boolean;
-  shadowsEnabled: boolean;
   onFit: (fit: ViewerFit) => void;
 }) {
   const { scene } = useGLTF(url);
@@ -42,11 +40,12 @@ function ProductModel({
   useEffect(() => {
     productScene.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        child.castShadow = shadowsEnabled;
-        child.receiveShadow = shadowsEnabled;
+        child.castShadow = false;
+        child.receiveShadow = false;
       }
+      if (child instanceof THREE.Light) child.castShadow = false;
     });
-  }, [productScene, shadowsEnabled]);
+  }, [productScene]);
 
   const fit = useMemo(() => {
     productScene.updateMatrixWorld(true);
@@ -98,10 +97,10 @@ function StudioCyclorama({ scale }: { scale: number }) {
     <group name="product-studio-cyclorama">
       <mesh rotation-x={-Math.PI / 2} position-y={layout.floorY} receiveShadow={false}>
         <circleGeometry args={[layout.floorRadius, 128]} />
-        <meshStandardMaterial color="#ededed" roughness={1} metalness={0} side={THREE.FrontSide} />
+        <meshBasicMaterial color="#ededed" side={THREE.FrontSide} />
       </mesh>
       <mesh geometry={geometry} receiveShadow={false}>
-        <meshStandardMaterial color="#ededed" roughness={1} metalness={0} side={THREE.BackSide} />
+        <meshBasicMaterial color="#ededed" side={THREE.BackSide} />
       </mesh>
     </group>
   );
@@ -122,18 +121,27 @@ function StudioLighting({ fit, enabled }: { fit: ViewerFit; enabled: boolean }) 
   return (
     <>
       <NeutralStudioEnvironment intensity={enabled ? 0.32 : 0.36} />
-      <ambientLight intensity={enabled ? 0.2 : 0.24} color="#ffffff" />
+      {/* Soft fill reaches the sides, back and underside without generating shadows. */}
+      <ambientLight intensity={1.15} color="#ffffff" />
+      <group name="product-balanced-fill">
+        <directionalLight position={[3, 0, 0]} intensity={0.65} castShadow={false} />
+        <directionalLight position={[-3, 0, 0]} intensity={0.65} castShadow={false} />
+        <directionalLight position={[0, 0, 3]} intensity={0.65} castShadow={false} />
+        <directionalLight position={[0, 0, -3]} intensity={0.65} castShadow={false} />
+        <directionalLight position={[0, -3, 0]} intensity={0.65} castShadow={false} />
+        <directionalLight position={[0, 3, 0]} intensity={0.65} castShadow={false} />
+      </group>
       <rectAreaLight
         ref={areaLightRef}
         position={rig.areaPosition}
         width={rig.areaWidth}
         height={rig.areaHeight}
-        intensity={rig.areaIntensity}
+        intensity={rig.areaIntensity * 0.35}
         color="#fffdf9"
       />
       <pointLight
         position={rig.pointPosition}
-        intensity={rig.pointIntensity}
+        intensity={rig.pointIntensity * 0.25}
         distance={rig.pointDistance}
         decay={2}
         color="#ffffff"
@@ -196,7 +204,6 @@ export default function ModelViewer({ url }: { url: string }) {
           <ProductModel
             url={url}
             rotate={!reduceMotion && !interacting}
-            shadowsEnabled={false}
             onFit={handleFit}
           />
         </Suspense>

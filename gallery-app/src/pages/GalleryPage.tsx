@@ -1,3 +1,4 @@
+import { confirmAction } from '../lib/popups';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -318,7 +319,7 @@ function GalleryView({ owner }: { owner: string }) {
 
   async function resetRecommendations() {
     if (!user || resettingRecommendations) return;
-    if (!window.confirm('Reset your recommendation history? This cannot be undone.')) return;
+    if (!await confirmAction('Reset your recommendation history? This cannot be undone.')) return;
     setResettingRecommendations(true);
     const { error } = await supabase
       .from('user_product_signals')

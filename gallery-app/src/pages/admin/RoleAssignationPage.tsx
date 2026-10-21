@@ -1,3 +1,4 @@
+import { Popup } from '../../components/Popup';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -5,7 +6,7 @@ import {
   LockKeyhole, RefreshCw, Search, ShieldCheck, ShoppingBag, Store, UserRound,
   Users, X,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
 import { SUPER_ADMIN_MANAGER_EMAILS } from '../../lib/constants';
 import {
@@ -109,7 +110,7 @@ export default function RoleAssignationPage() {
   const requestRef = useRef(0);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
-  const confirmRef = useRef<HTMLElement | null>(null);
+
 
   const currentUserCanManageSuperAdmins = SUPER_ADMIN_MANAGER_EMAILS.some((email) => email.toLowerCase() === user?.email?.trim().toLowerCase());
 
@@ -156,11 +157,7 @@ export default function RoleAssignationPage() {
     const timer = window.setTimeout(() => drawerRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus(), 0);
     return () => window.clearTimeout(timer);
   }, [confirmation, selectedUser]);
-  useEffect(() => {
-    if (!confirmationUser) return;
-    const timer = window.setTimeout(() => confirmRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus(), 0);
-    return () => window.clearTimeout(timer);
-  }, [confirmationUser]);
+
 
   const openDrawer = (target: AdminRoleUser) => {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -293,7 +290,7 @@ export default function RoleAssignationPage() {
         </aside></div>;
       })()}
 
-      {confirmation && confirmationUser && <div className="role-confirm-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !actionId) setConfirmation(null); }}><section ref={confirmRef} className="role-confirm" role="dialog" aria-modal="true" aria-labelledby="role-confirm-title" tabIndex={-1} onKeyDown={(event) => trapFocus(event, () => { if (!actionId) setConfirmation(null); })}><div className="role-confirm__body"><h2 id="role-confirm-title">{ACTION_COPY[confirmation.action].title}</h2><p>{ACTION_COPY[confirmation.action].prompt}</p><p><strong>{confirmationUser.email ?? '(no email)'}</strong></p><small>{ACTION_COPY[confirmation.action].detail}</small></div><div className="role-confirm__actions"><button className="role-confirm__cancel" data-autofocus type="button" onClick={() => setConfirmation(null)} disabled={Boolean(actionId)}>Cancel</button><button className={`role-confirm__submit ${confirmation.action === 'remove_elevated_access' ? 'is-danger' : ''}`} type="button" onClick={() => void confirmAction()} disabled={Boolean(actionId)}>{actionId ? 'Updating…' : ACTION_COPY[confirmation.action].confirm}</button></div></section></div>}
+      {confirmation && confirmationUser && <Popup title={ACTION_COPY[confirmation.action].title} message={<><p>{ACTION_COPY[confirmation.action].prompt}</p><p><strong>{confirmationUser.email ?? '(no email)'}</strong></p><p>{ACTION_COPY[confirmation.action].detail}</p></>} confirmLabel={ACTION_COPY[confirmation.action].confirm} danger={confirmation.action === 'remove_elevated_access'} busy={Boolean(actionId)} onCancel={() => setConfirmation(null)} onConfirm={confirmAction} />}
     </main>
   );
 }
