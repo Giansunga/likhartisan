@@ -2,7 +2,6 @@ import express, { Router } from 'express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
-import { uploadCompressedGLBCopy } from '../services/modelCompression.js';
 
 const r2 = new S3Client({
   region: 'auto',
@@ -97,10 +96,6 @@ export function createUploadRouter({
         Body: req.body,
         ContentType: validation.contentType,
       }));
-      if (folder === 'models' && validation.ext === 'glb') {
-        try { await uploadCompressedGLBCopy({ storageClient, bucket, key, buffer: req.body }); }
-        catch (error) { console.warn('Could not store the optional compressed model copy:', error); }
-      }
 
       res.status(201).json({ key, publicUrl: `${publicUrl}/${key}` });
     } catch (error) {
@@ -144,10 +139,6 @@ export function createUploadRouter({
       if (!allowed.includes(validation.ext)) return res.status(400).json({ error: 'Choose a product image or .glb model for the selected folder' });
       const key = `${folder}/${req.uploadShopId}/${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${validation.ext}`;
       await storageClient.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: req.body, ContentType: validation.contentType }));
-      if (folder === 'models' && validation.ext === 'glb') {
-        try { await uploadCompressedGLBCopy({ storageClient, bucket, key, buffer: req.body }); }
-        catch (error) { console.warn('Could not store the optional compressed model copy:', error); }
-      }
       res.status(201).json({ key, publicUrl: `${publicUrl}/${key}` });
     } catch (error) {
       console.error('Product upload error:', error);

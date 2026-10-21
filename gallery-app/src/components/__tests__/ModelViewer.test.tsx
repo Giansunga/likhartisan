@@ -8,7 +8,6 @@ const frameCallbacks: Array<(state: unknown, delta: number) => void> = [];
 let reducedMotion = false;
 const canvasSpy = vi.fn();
 const modelMeshes: Array<{ castShadow: boolean; receiveShadow: boolean }> = [];
-const modelSceneState = vi.hoisted(() => ({ scene: null as unknown }));
 
 Object.defineProperty(window, 'matchMedia', {
   configurable: true,
@@ -26,7 +25,6 @@ Object.defineProperty(window, 'matchMedia', {
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children, ...props }: { children: ReactNode; shadows: unknown }) => { canvasSpy(props); return <div data-testid="canvas">{children}</div>; },
-  useLoader: Object.assign(() => ({ scene: modelSceneState.scene }), { clear: vi.fn() }),
   useFrame: (callback: (state: unknown, delta: number) => void) => {
     frameCallbacks.push(callback);
   },
@@ -43,7 +41,6 @@ vi.mock('@react-three/fiber', () => ({
 vi.mock('@react-three/drei', async () => {
   const THREE = await import('three');
   const scene = new THREE.Group();
-  modelSceneState.scene = scene;
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial()));
   const clone = scene.clone.bind(scene);
   vi.spyOn(scene, 'clone').mockImplementation(recursive => {

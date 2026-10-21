@@ -1,9 +1,8 @@
 import { Suspense, useRef, useMemo, useEffect, Component, type ReactNode, type RefObject } from 'react';
 /* eslint-disable react-hooks/immutability -- R3F animation code intentionally mutates Three.js objects owned by the scene. */
 import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
-import { ResilientGLTFLoader } from '../../lib/modelDelivery';
-import ModelLoadSurface from '../ModelLoadSurface';
+import { Html, OrbitControls, useProgress } from '@react-three/drei';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
 import { getDecorationProjection } from './decorationProjection';
@@ -28,6 +27,29 @@ import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 import { getSectionAnchors, sectionScale } from './calibrateModel';
 import { isUneditedShape, restoreSourceGeometry } from './shapeGeometry';
 import { captureException } from '../../lib/sentry';
+
+class ModelErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: unknown) { captureException(error); }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+function LoadingIndicator() {
+  const { progress, active } = useProgress();
+  if (!active) return null;
+  return (
+    <Html center>
+      <div className="freeform-loading-container">
+        <div className="freeform-loading-spinner" />
+        <span className="freeform-loading-text">{Math.round(progress)}%</span>
+      </div>
+    </Html>
+  );
+}
 
 type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
@@ -221,7 +243,7 @@ function Scene({
   showAttachmentSockets?: boolean;
   previewMode?: boolean;
 }) {
-  const gltf = useLoader(ResilientGLTFLoader, modelFile);
+  const gltf = useLoader(GLTFLoader, modelFile);
   const { camera, controls, gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const initialized = useRef(false);
@@ -600,6 +622,15 @@ export default function FreeformViewer({
     );
   }
 
+  const errorFallback = (
+    <div className="freeform-viewer-inner" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="1.5" style={{ width: '48px', height: '48px' }}>
+        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Failed to load model</p>
+    </div>
+  );
+
   const previewBackground = preview
     ? 'radial-gradient(ellipse 70% 55% at 50% 58%, rgba(255,252,248,0.9) 0%, transparent 70%), linear-gradient(175deg, var(--bg-tertiary) 0%, var(--bg-secondary) 55%, #E8E0D8 100%)'
     : 'transparent';
@@ -635,7 +666,7 @@ export default function FreeformViewer({
           }}
         />
       )}
-      <ModelLoadSurface url={modelFile}>
+      <ModelErrorBoundary fallback={errorFallback}>
         <Canvas
           key={modelFile}
           camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}
@@ -651,7 +682,7 @@ export default function FreeformViewer({
           <directionalLight position={[0, 3, -8]} intensity={0.22} color="#FFFFFF" />
           <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
 
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingIndicator />}>
             <Scene
               key={modelFile}
               modelFile={modelFile}
@@ -683,7 +714,7 @@ export default function FreeformViewer({
             autoRotateSpeed={preview ? 1.2 : 0}
           />
         </Canvas>
-      </ModelLoadSurface>
+      </ModelErrorBoundary>
     </div>
   );
 }
