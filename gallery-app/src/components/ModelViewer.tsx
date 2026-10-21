@@ -1,10 +1,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* eslint-disable react-hooks/immutability -- R3F camera and cloned Three.js scene objects are intentionally configured in place. */
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import NeutralStudioEnvironment from './freeform/NeutralStudioEnvironment';
+import ModelLoadSurface from './ModelLoadSurface';
+import { ResilientGLTFLoader } from '../lib/modelDelivery';
 import {
   MODEL_ROTATION_SPEED,
   createCycloramaGeometry,
@@ -28,7 +30,7 @@ function ProductModel({
   rotate: boolean;
   onFit: (fit: ViewerFit) => void;
 }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useLoader(ResilientGLTFLoader, url);
   const rotationRef = useRef<THREE.Group>(null);
 
   const productScene = useMemo(() => {
@@ -182,47 +184,45 @@ export default function ModelViewer({ url }: { url: string }) {
         <span>Studio</span>
       </button>
 
-      <Canvas
-        key={url}
-        camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}
-        gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08 }}
-        shadows={false}
-        dpr={mobile ? [1, 1.5] : [1, 2]}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <color attach="background" args={[studioEnabled ? '#ededed' : '#f5f0eb']} />
-        <CameraRig fit={fit} />
-        <StudioLighting fit={fit} enabled={studioEnabled} />
+      <ModelLoadSurface url={url}>
+        <Canvas
+          key={url}
+          camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}
+          gl={{ antialias: true, alpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.08 }}
+          shadows={false}
+          dpr={mobile ? [1, 1.5] : [1, 2]}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <color attach="background" args={[studioEnabled ? '#ededed' : '#f5f0eb']} />
+          <CameraRig fit={fit} />
+          <StudioLighting fit={fit} enabled={studioEnabled} />
 
-        {studioEnabled ? (
-          <>
-            <StudioCyclorama scale={fit.scale} />
-          </>
-        ) : null}
+          {studioEnabled ? <StudioCyclorama scale={fit.scale} /> : null}
 
-        <Suspense fallback={null}>
-          <ProductModel
-            url={url}
-            rotate={!reduceMotion && !interacting}
-            onFit={handleFit}
+          <Suspense fallback={null}>
+            <ProductModel
+              url={url}
+              rotate={!reduceMotion && !interacting}
+              onFit={handleFit}
+            />
+          </Suspense>
+
+          <OrbitControls
+            target={fit.target}
+            enablePan={false}
+            enableZoom
+            enableRotate
+            enableDamping
+            autoRotate={false}
+            minDistance={fit.minDistance}
+            maxDistance={fit.maxDistance}
+            minPolarAngle={0.01}
+            maxPolarAngle={Math.PI - 0.01}
+            onStart={() => setInteracting(true)}
+            onEnd={() => setInteracting(false)}
           />
-        </Suspense>
-
-        <OrbitControls
-          target={fit.target}
-          enablePan={false}
-          enableZoom
-          enableRotate
-          enableDamping
-          autoRotate={false}
-          minDistance={fit.minDistance}
-          maxDistance={fit.maxDistance}
-          minPolarAngle={0.01}
-          maxPolarAngle={Math.PI - 0.01}
-          onStart={() => setInteracting(true)}
-          onEnd={() => setInteracting(false)}
-        />
-      </Canvas>
+        </Canvas>
+      </ModelLoadSurface>
     </div>
   );
 }

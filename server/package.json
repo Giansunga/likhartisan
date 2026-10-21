@@ -7,7 +7,9 @@
     "dev": "node --watch --import ./instrument.js server.js",
     "test": "node --test",
     "check:auth-config": "node scripts/check-likhai-auth-config.js",
-    "payments:reconcile": "node scripts/reconcile-payments.js"
+    "payments:reconcile": "node scripts/reconcile-payments.js",
+    "models:compress:preview": "node scripts/backfillCompressedModels.js",
+    "models:compress:upload": "node scripts/backfillCompressedModels.js --upload"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1102.0",

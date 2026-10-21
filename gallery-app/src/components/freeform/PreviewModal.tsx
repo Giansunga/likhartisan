@@ -1,7 +1,8 @@
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ResilientGLTFLoader } from '../../lib/modelDelivery';
+import ModelLoadSurface from '../ModelLoadSurface';
 import * as THREE from 'three';
 import { toast } from '../../lib/popups';
 import { exportSceneToGLB, downloadGLB } from '../../services/exportService';
@@ -19,7 +20,7 @@ function PreviewScene({
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
 }) {
-  const gltf = useLoader(GLTFLoader, modelFile);
+  const gltf = useLoader(ResilientGLTFLoader, modelFile);
   const materialFinish = materialParams.finish;
   const materialColor = materialParams.color;
 
@@ -137,30 +138,32 @@ export default function PreviewModal({
         </div>
 
         <div className="preview-viewer">
-          <Canvas
-            key={modelFile}
-            camera={{ position: [3, 1.5, 5], fov: 40 }}
-            gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-            style={{ width: '100%', height: '100%', display: 'block' }}
-            dpr={[1, 2]}
-          >
-            <NeutralStudioEnvironment intensity={0.95} />
-            <ambientLight intensity={0.65} color="#FFFFFF" />
-            <directionalLight position={[5, 10, 5]} intensity={1.15} color="#FFFFFF" />
-            <directionalLight position={[-4, 6, -3]} intensity={0.42} color="#F2F6FF" />
-            <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
-            <Suspense fallback={null}>
-              <PreviewScene modelFile={modelFile} shapeParams={shapeParams} materialParams={materialParams} />
-            </Suspense>
-            <OrbitControls
-              makeDefault
-              target={[0, 0, 0]}
-              enablePan={false}
-              enableZoom={false}
-              autoRotate
-              autoRotateSpeed={1.5}
-            />
-          </Canvas>
+          <ModelLoadSurface url={modelFile}>
+            <Canvas
+              key={modelFile}
+              camera={{ position: [3, 1.5, 5], fov: 40 }}
+              gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+              style={{ width: '100%', height: '100%', display: 'block' }}
+              dpr={[1, 2]}
+            >
+              <NeutralStudioEnvironment intensity={0.95} />
+              <ambientLight intensity={0.65} color="#FFFFFF" />
+              <directionalLight position={[5, 10, 5]} intensity={1.15} color="#FFFFFF" />
+              <directionalLight position={[-4, 6, -3]} intensity={0.42} color="#F2F6FF" />
+              <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
+              <Suspense fallback={null}>
+                <PreviewScene modelFile={modelFile} shapeParams={shapeParams} materialParams={materialParams} />
+              </Suspense>
+              <OrbitControls
+                makeDefault
+                target={[0, 0, 0]}
+                enablePan={false}
+                enableZoom={false}
+                autoRotate
+                autoRotateSpeed={1.5}
+              />
+            </Canvas>
+          </ModelLoadSurface>
         </div>
 
         <div className="preview-actions">
