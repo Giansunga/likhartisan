@@ -21,6 +21,7 @@ export interface ShopArtisan {
   experience: string;
   description: string;
   cover_image: string;
+  location?: string;
 }
 
 export interface RatingSummary {

@@ -1,3 +1,4 @@
+import AssetImage from '../../AssetImage';
 import { useNavigate } from 'react-router-dom';
 
 function fmt(n: number) {
@@ -76,7 +77,7 @@ export default function RecentProductsTable({ products }: RecentProductsTablePro
             >
               <td style={{ padding: '12px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {p.image && <img src={p.image} alt="" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E9DED2' }} />}
+                  {p.image && <AssetImage src={p.image} alt="" style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E9DED2' }} />}
                   <span style={{ fontWeight: 500, color: '#1F1F1F' }}>{p.name}</span>
                 </div>
               </td>

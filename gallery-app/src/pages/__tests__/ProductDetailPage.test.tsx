@@ -83,6 +83,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it('preloads the gateway image while preserving the source URL in the cart', async () => {
+    const source = 'https://pub-0cc6e7109e7e48a183d54d0426453a6a.r2.dev/products/preload.jpg';
+    mocks.products[0].image = source;
+    const preload = vi.spyOn(HTMLImageElement.prototype, 'src', 'set');
+    try {
+      renderProduct();
+      await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+      await waitFor(() => expect(preload).toHaveBeenCalledWith('/media/r2/products/preload.jpg'));
+      expect(preload).not.toHaveBeenCalledWith(source);
+      fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+      const { getCart } = await import('../../data/store');
+      expect(getCart()[0].image).toBe(source);
+    } finally { preload.mockRestore(); }
+  });
   it('bounds quantity by selected-size stock, retains it after adding, and resets on size/product changes', async () => {
     renderProduct();
     await screen.findByRole('heading', { name: 'Bigasan Terracotta' });

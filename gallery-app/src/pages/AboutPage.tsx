@@ -1,3 +1,4 @@
+import AssetImage from '../components/AssetImage';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Box, HandHeart, Palette, Search } from 'lucide-react';
@@ -290,7 +291,7 @@ export default function AboutPage() {
                     >
                       <Link to={destination} aria-label={`View ${artisan.name}${artisan.shop_id ? "'s shop" : ' in the artisan directory'}`}>
                         <div className="about-maker-card__image">
-                          <img
+                          <AssetImage
                             src={artisan.cover_image || '/images/artisan_1.jpg'}
                             alt={artisan.cover_image ? `${artisan.name}, participating pottery artisan` : ''}
                             loading="lazy"

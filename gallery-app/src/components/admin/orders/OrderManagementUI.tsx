@@ -1,3 +1,4 @@
+import AssetImage from '../../AssetImage';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Order } from '../../../types';
@@ -182,7 +183,7 @@ function ItemSummary({ order, compact = false }: { order: Order; compact?: boole
   if (!first) return <span className="orders-muted">No items</span>;
   return (
     <div className="orders-item-summary">
-      {first.image ? <img src={first.image} alt="" /> : <span className="orders-item-placeholder" aria-hidden="true" />}
+      {first.image ? <AssetImage src={first.image} alt="" /> : <span className="orders-item-placeholder" aria-hidden="true" />}
       <div><strong>{first.product_name || 'Product'}</strong><span>{compact ? `${first.qty} item${first.qty === 1 ? '' : 's'}` : `${first.shop_name || 'Shop'} · Qty ${first.qty}`}</span></div>
       {order.items.length > 1 ? <em>+{order.items.length - 1}</em> : null}
     </div>

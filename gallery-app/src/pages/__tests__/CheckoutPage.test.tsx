@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CartItem } from '../../types';
 import CheckoutPage from '../CheckoutPage';
+import { getCartLineKey } from '../../lib/cartCheckout';
 
 const authUser = vi.hoisted(() => ({
   id: 'buyer-1', email: 'buyer@example.com',
@@ -25,7 +26,7 @@ vi.mock('../../lib/supabase', () => ({
     from: () => ({ select: () => ({ eq: () => ({ single: async () => ({
       data: { location: 'Santo Tomas, Pampanga', latitude: 15, longitude: 120 }, error: null,
     }) }) }) }),
-    auth: { getSession: async () => ({ data: { session: { access_token: 'test-token' } } }), updateUser: async () => ({ error: null }) },
+    auth: { getSession: async () => ({ data: { session: { access_token: 'test-token' } } }), updateUser: vi.fn() },
   },
 }));
 vi.mock('../../lib/geocoder', () => ({
@@ -51,6 +52,11 @@ function quote(total: string) {
 }
 
 afterEach(() => vi.unstubAllGlobals());
+
+function ProfileStub() {
+  const resume = useLocation().state.profileReturn; const navigate = useNavigate();
+  return <button onClick={() => navigate(resume.pathname, { state: resume.state })}>Return to checkout</button>;
+}
 
 describe('product checkout', () => {
   it('refreshes a changed courier fee and requires a second payment click', async () => {
@@ -87,6 +93,32 @@ describe('product checkout', () => {
     expect(checkoutBodies[1].quotedShippingFeeCentavos).toBe(9500);
     await waitFor(() => expect(quoteCalls).toBe(3));
     expect(screen.getByText(/Your order or delivery route changed\. We are refreshing/)).toBeInTheDocument();
+  });
+
+  it('ignores stale cart destination overrides and only quotes saved profile coordinates', async () => {
+    localStorage.setItem('lk_cart', JSON.stringify([item]));
+    const fetchMock = vi.fn(async (...args: [string, RequestInit]) => { void args; return { ok: true, json: async () => quote('85.00') }; });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { checkoutDraft: { version: 1, source: 'cart', shopId: item.shopId, lineKeys: [getCartLineKey(item)], deliveryOption: 'courier', destination: { address: 'Stale cart address', coordinates: { lat: 1, lng: 2 } } } } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes></MemoryRouter>);
+    await screen.findByText('Courier fee confirmed for this checkout:');
+    expect(screen.getByText('San Fernando, Pampanga')).toBeInTheDocument();
+    expect(screen.queryByText('Stale cart address')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ dropoffAddress: 'San Fernando, Pampanga', dropoffCoords: { lat: 15.1, lng: 120.1 } });
+  });
+
+  it('preserves Buy Now quantity and delivery method through Profile and requests a fresh quote', async () => {
+    const fetchMock = vi.fn(async (...args: [string, RequestInit]) => { void args; return { ok: true, json: async () => quote('85.00') }; });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { buyNowItem: { ...item, qty: 3, variationId: 'v1', variation: 'Large' }, deliveryOption: 'courier' } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /><Route path="/dashboard" element={<ProfileStub />} /></Routes></MemoryRouter>);
+    await screen.findByText('Courier fee confirmed for this checkout:');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit in Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Return to checkout' }));
+    await screen.findByText('Courier fee confirmed for this checkout:');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ items: [{ productId: 'p1', variationId: 'v1', quantity: 3 }] });
+    expect(screen.getByText('Large')).toBeInTheDocument();
+    expect(screen.getByLabelText('Quantity 3')).toBeInTheDocument();
   });
 
   it('keeps pickup checkout available without requesting a courier quote', async () => {

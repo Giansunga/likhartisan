@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
   ArrowLeft,
@@ -32,7 +33,7 @@ function BuyerAvatar({ conversation, size = 'medium' }: { conversation: ArtisanC
   const name = conversation.buyer_name || FALLBACK_BUYER_NAME;
   return (
     <div className={`seller-message-avatar seller-message-avatar--${size}`}>
-      {conversation.buyer_avatar ? <img src={conversation.buyer_avatar} alt={`${name} profile`} /> : <span>{name.charAt(0).toUpperCase()}</span>}
+      {conversation.buyer_avatar ? <AssetImage src={conversation.buyer_avatar} alt={`${name} profile`} /> : <span>{name.charAt(0).toUpperCase()}</span>}
     </div>
   );
 }
@@ -274,8 +275,8 @@ export default function SellerMessages() {
                         {!outgoing ? isLast ? <BuyerAvatar conversation={selected} size="small" /> : <span className="seller-chat-avatar-space" /> : null}
                         <div className="seller-chat-bubble-wrap">
                           {content.design ? <DesignMessageCard data={content.design as Record<string, unknown>} audience="artisan" isLatestForRequest={latestDesignMessages.get(String(content.design.request_id)) === message.id} /> : null}
-                          {content.product?.productId ? <a className="seller-message-product" href={`/product/${content.product.productId}`} target="_blank" rel="noreferrer">{content.product.productImage ? <img src={content.product.productImage} alt="" /> : <ImageIcon />}<span><strong>{content.product.productName || 'Product inquiry'}</strong>{content.product.variantDimensions ? <small>{content.product.variantDimensions}</small> : null}<b>{fmt(content.product.productPrice || 0)}</b></span></a> : null}
-                          <div className="seller-chat-bubble">{message.image_url ? <a className="seller-chat-image" href={message.image_url} target="_blank" rel="noreferrer"><img src={message.image_url} alt="Customer attachment" /></a> : null}{content.text ? <span>{content.text}</span> : null}</div>
+                          {content.product?.productId ? <a className="seller-message-product" href={`/product/${content.product.productId}`} target="_blank" rel="noreferrer">{content.product.productImage ? <AssetImage src={content.product.productImage} alt="" /> : <ImageIcon />}<span><strong>{content.product.productName || 'Product inquiry'}</strong>{content.product.variantDimensions ? <small>{content.product.variantDimensions}</small> : null}<b>{fmt(content.product.productPrice || 0)}</b></span></a> : null}
+                          <div className="seller-chat-bubble">{message.image_url ? <a className="seller-chat-image" href={message.image_url} target="_blank" rel="noreferrer"><AssetImage src={message.image_url} alt="Customer attachment" /></a> : null}{content.text ? <span>{content.text}</span> : null}</div>
                         </div>
                       </div>;
                     })}
@@ -285,7 +286,7 @@ export default function SellerMessages() {
               })}</div> : <div className="seller-chat-empty"><BuyerAvatar conversation={selected} size="large" /><strong>Start the conversation</strong><p>Reply to {selected.buyer_name || FALLBACK_BUYER_NAME} below.</p></div>}
             </div>
             <footer className="seller-composer">
-              {imagePreview ? <div className="seller-composer__attachment"><img src={imagePreview} alt="Attachment preview" /><span><strong>{pendingImage?.name}</strong><small>{pendingImage ? `${(pendingImage.size / 1024 / 1024).toFixed(1)} MB` : ''}</small></span><button type="button" onClick={clearAttachment} aria-label="Remove attachment"><X size={16} /></button></div> : null}
+              {imagePreview ? <div className="seller-composer__attachment"><AssetImage src={imagePreview} alt="Attachment preview" /><span><strong>{pendingImage?.name}</strong><small>{pendingImage ? `${(pendingImage.size / 1024 / 1024).toFixed(1)} MB` : ''}</small></span><button type="button" onClick={clearAttachment} aria-label="Remove attachment"><X size={16} /></button></div> : null}
               <div className="seller-composer__row"><label className="seller-composer__attach" aria-label="Attach an image"><Paperclip size={18} /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={pickImage} /></label><textarea rows={1} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Write a message…" aria-label="Message" /><button className="seller-composer__send" type="button" disabled={(!draft.trim() && !pendingImage) || sending} onClick={() => void sendMessage()} aria-label="Send message">{sending ? <LoaderCircle className="seller-spin" size={18} /> : <Send size={18} />}</button></div>
               <small>Enter to send · Shift + Enter for a new line</small>
             </footer>

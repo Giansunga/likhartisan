@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
   },
   followers: { data: null, count: 2, error: null },
   following: { data: null, error: null },
-  artisans: { data: [], count: 0, error: null },
+  artisans: { data: [] as Array<{ id: string; name: string; specialty: string; cover_image: string }>, count: 0, error: null },
   variations: { data: [], error: null },
   reviews: { data: [], error: null },
   followAction: { data: null, error: null },
@@ -62,7 +62,7 @@ vi.mock('../../lib/supabase', () => ({
         select: vi.fn((_fields?: string, options?: { head?: boolean }) => { countQuery = Boolean(options?.head); operation = 'select'; return query; }),
         eq: vi.fn(() => query),
         order: vi.fn(() => query),
-        limit: vi.fn(() => query),
+        limit: vi.fn(() => { if (table === 'artisans') throw new Error('Do not truncate shop artisans'); return query; }),
         in: vi.fn(() => query),
         not: vi.fn(() => query),
         insert: vi.fn(() => { operation = 'insert'; return query; }),
@@ -92,6 +92,7 @@ function renderShop() {
 describe('ShopPage', () => {
   beforeEach(() => {
     mocks.user = null;
+    mocks.artisans = { data: [], count: 0, error: null };
     mocks.shop.error = null;
     mocks.products.error = null;
     mocks.followAction.error = null;
@@ -110,6 +111,14 @@ describe('ShopPage', () => {
     expect(screen.queryByText('Verified Shop')).not.toBeInTheDocument();
     expect(screen.queryByText('100%')).not.toBeInTheDocument();
     expect(screen.queryByText('Phone')).not.toBeInTheDocument();
+  });
+
+  it('renders all eight assigned makers in order with the loaded count', async () => {
+    mocks.artisans = { data: Array.from({ length: 8 }, (_, i) => ({ id: `a${i}`, name: `Maker ${i + 1}`, specialty: 'Potter', cover_image: '' })), count: 8, error: null };
+    renderShop();
+    await screen.findByRole('heading', { name: 'Maker 8' });
+    expect(screen.getByText('8 local artisans contribute to this shop.')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: /Maker [1-8]/ }).map(e => e.textContent)).toEqual(Array.from({ length: 8 }, (_, i) => `Maker ${i + 1}`));
   });
 
   it('opens authentication when a signed-out shopper follows the shop', async () => {

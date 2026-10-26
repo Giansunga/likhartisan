@@ -1,3 +1,5 @@
+import { assetBackground } from '../lib/assetDelivery';
+import AssetImage from '../components/AssetImage';
 import { confirmAction } from '../lib/popups';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -467,7 +469,7 @@ function GalleryView({ owner }: { owner: string }) {
                   className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
                   <div
                     className="zoom-card-bg"
-                    style={{ backgroundImage: `url(${cat.bg})` }}
+                    style={{ backgroundImage: assetBackground(cat.bg) }}
                   />
                   <div className="zoom-card-overlay" />
                   <div className="zoom-card-content">
@@ -606,7 +608,7 @@ function GalleryView({ owner }: { owner: string }) {
               {products.map(p => (
                 <Link key={p.id} data-gallery-product={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
-                    <img src={p.image} alt={p.name} />
+                    <AssetImage src={p.image} alt={p.name} />
                     <button
                       className={`gallery-favorite-icon-button ${favorites.includes(p.id) ? 'active' : ''}`}
                       aria-pressed={favorites.includes(p.id)}

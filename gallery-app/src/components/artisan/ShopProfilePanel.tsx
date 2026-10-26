@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -191,11 +192,11 @@ export default function ShopProfilePanel() {
               <div><h2 id="profile-preview-title">Storefront preview</h2><span className="seller-card__meta">Updates as you type</span></div>
             </div>
             <div className="seller-profile-preview__cover">
-              {draft.banner ? <img src={draft.banner} alt="Shop cover preview" /> : <ImageIcon aria-hidden="true" />}
+              {draft.banner ? <AssetImage src={draft.banner} alt="Shop cover preview" /> : <ImageIcon aria-hidden="true" />}
             </div>
             <div className="seller-profile-preview__body">
               <div className="seller-profile-preview__avatar">
-                {draft.image ? <img src={draft.image} alt="Shop profile preview" /> : <Store aria-hidden="true" />}
+                {draft.image ? <AssetImage src={draft.image} alt="Shop profile preview" /> : <Store aria-hidden="true" />}
               </div>
               <h3>{draft.name.trim() || 'Your shop name'}</h3>
               <p>{draft.description.trim() || 'Add a short tagline that tells shoppers what makes your work special.'}</p>
@@ -221,11 +222,11 @@ export default function ShopProfilePanel() {
           <section className="seller-card seller-profile-section">
             <div className="seller-profile-section__heading"><div className="seller-profile-section__icon"><Camera aria-hidden="true" /></div><div><h2>Shop branding</h2><p>Use clear, high-quality images. JPG, PNG, or WebP up to 5 MB.</p></div></div>
             <div className="seller-profile-media seller-profile-media--cover">
-              <div className="seller-profile-media__preview">{draft.banner ? <img src={draft.banner} alt="Current cover" /> : <ImageIcon aria-hidden="true" />}</div>
+              <div className="seller-profile-media__preview">{draft.banner ? <AssetImage src={draft.banner} alt="Current cover" /> : <ImageIcon aria-hidden="true" />}</div>
               <div><h3>Cover photo</h3><p>Recommended landscape image, at least 1400 × 420 pixels.</p><div className="seller-profile-media__actions"><label className="seller-button seller-button--secondary"><Upload size={15} /> {draft.banner ? 'Replace' : 'Upload'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => selectImage('cover', event)} /></label>{draft.banner ? <button className="seller-button seller-button--ghost-danger" type="button" onClick={() => removeImage('cover')}><Trash2 size={15} /> Remove</button> : null}</div></div>
             </div>
             <div className="seller-profile-media">
-              <div className="seller-profile-media__preview seller-profile-media__preview--avatar">{draft.image ? <img src={draft.image} alt="Current profile" /> : <Store aria-hidden="true" />}</div>
+              <div className="seller-profile-media__preview seller-profile-media__preview--avatar">{draft.image ? <AssetImage src={draft.image} alt="Current profile" /> : <Store aria-hidden="true" />}</div>
               <div><h3>Profile photo</h3><p>A square logo or product image works best.</p><div className="seller-profile-media__actions"><label className="seller-button seller-button--secondary"><Upload size={15} /> {draft.image ? 'Replace' : 'Upload'}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => selectImage('profile', event)} /></label>{draft.image ? <button className="seller-button seller-button--ghost-danger" type="button" onClick={() => removeImage('profile')}><Trash2 size={15} /> Remove</button> : null}</div></div>
             </div>
           </section>

@@ -1,3 +1,4 @@
+import AssetImage from '../../components/AssetImage';
 import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -285,7 +286,7 @@ export default function ArtisanManagePage() {
                 <div onClick={handleCoverClick} className="relative w-full h-40 rounded-xl border-2 border-dashed border-cream-tertiary cursor-pointer overflow-hidden hover:border-accent transition-colors group">
                   {coverPreview ? (
                     <>
-                      <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
+                      <AssetImage src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                         <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Change</span>
                       </div>

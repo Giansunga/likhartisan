@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Link } from 'react-router-dom';
 import type { LikhAIOrderCard } from '../../types/likhai';
 
@@ -24,7 +25,7 @@ export default function ChatOrderCard({ order }: { order: LikhAIOrderCard }) {
         <span className="likhai-status" style={{ color: meta.color, background: meta.bg }}>{meta.label}</span>
       </div>
       <div className="likhai-card__body">
-        {order.image && <img src={order.image} alt="" className="likhai-card__image likhai-card__image--small" />}
+        {order.image && <AssetImage src={order.image} alt="" className="likhai-card__image likhai-card__image--small" />}
         <div className="likhai-card__content">
           <strong>{order.productName || 'Order items'}</strong>
           <span>{order.itemCount} item{order.itemCount === 1 ? '' : 's'} · {date}</span>

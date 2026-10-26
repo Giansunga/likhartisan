@@ -1,3 +1,4 @@
+import { resolveAssetUrl } from './assetDelivery';
 const FLIGHT_DURATION_MS = 1200;
 const ARRIVAL_DURATION_MS = 900;
 const activeAnimations = new WeakMap<Document, () => void>();
@@ -77,7 +78,7 @@ export function animateProductToCart(imageUrl: string, root: Document = document
   view.addEventListener('pagehide', cleanup, { once: true });
   if (reduceMotion) { arrive(); return true; }
   flight = root.createElement('img');
-  flight.src = imageUrl; flight.alt = ''; flight.setAttribute('aria-hidden', 'true');
+  flight.src = resolveAssetUrl(imageUrl)!; flight.alt = ''; flight.setAttribute('aria-hidden', 'true');
   flight.className = 'cart-flight-item';
   flight.style.cssText = [
     `--cart-flight-start-x:${start.x}px`, `--cart-flight-start-y:${start.y}px`,

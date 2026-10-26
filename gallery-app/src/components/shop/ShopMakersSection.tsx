@@ -1,12 +1,14 @@
+import ArtisanCard from '../ArtisanCard';
 import { UserRound } from 'lucide-react';
 import type { ShopArtisan } from './shopStorefront';
 
 interface ShopMakersSectionProps {
   artisans: ShopArtisan[];
   artisanCount: number;
+  shop?: { id: string; name: string };
 }
 
-export default function ShopMakersSection({ artisans, artisanCount }: ShopMakersSectionProps) {
+export default function ShopMakersSection({ artisans, artisanCount, shop }: ShopMakersSectionProps) {
   return (
     <section className="shop-section shop-makers" id="shop-makers" aria-labelledby="shop-makers-title">
       <div className="shop-container">
@@ -18,19 +20,9 @@ export default function ShopMakersSection({ artisans, artisanCount }: ShopMakers
           </div>
         </div>
         {artisans.length ? (
-          <div className="shop-maker-grid">
+          <div className="artisan-cards">
             {artisans.map(artisan => (
-              <article className="shop-maker-card" key={artisan.id}>
-                <div className="shop-maker-card__image">
-                  {artisan.cover_image ? <img src={artisan.cover_image} alt={artisan.name} loading="lazy" /> : <UserRound aria-hidden="true" />}
-                </div>
-                <div className="shop-maker-card__body">
-                  <p>{artisan.specialty || 'Pottery artisan'}</p>
-                  <h3>{artisan.name}</h3>
-                  {artisan.description ? <span>{artisan.description}</span> : null}
-                  {artisan.experience ? <small>{artisan.experience} experience</small> : null}
-                </div>
-              </article>
+              <ArtisanCard key={artisan.id} artisan={artisan} shop={shop} />
             ))}
           </div>
         ) : (

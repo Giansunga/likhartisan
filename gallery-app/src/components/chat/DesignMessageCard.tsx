@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, LoaderCircle, Pencil, WalletCards } from 'lucide-react';
 import { toast } from '../../lib/popups';
@@ -146,7 +147,7 @@ export default function DesignMessageCard({ data, audience = 'buyer', isLatestFo
     const order = normalizedOrder(request);
     const unpaidApproved = matchesCurrent && status === 'approved' && request?.order_id && order && order.payment_status !== 'paid';
     return <div className="chat-design-request-card">
-      <div className="chat-design-request-card__head"><span style={{ background: summary?.material.color || requestPayload.summary?.color || '#BE734F' }}>{summary?.model.thumbnail ? <img src={summary.model.thumbnail} alt="" /> : <span>3D</span>}</span><div><small>CUSTOM DESIGN REQUEST</small><strong>{summary?.model.name || requestPayload.summary?.model || 'Custom pottery'}</strong>{status ? <b className={`is-${status}`}>{REQUEST_STATUS_LABELS[status]}</b> : null}</div></div>
+      <div className="chat-design-request-card__head"><span style={{ background: summary?.material.color || requestPayload.summary?.color || '#BE734F' }}>{summary?.model.thumbnail ? <AssetImage src={summary.model.thumbnail} alt="" /> : <span>3D</span>}</span><div><small>CUSTOM DESIGN REQUEST</small><strong>{summary?.model.name || requestPayload.summary?.model || 'Custom pottery'}</strong>{status ? <b className={`is-${status}`}>{REQUEST_STATUS_LABELS[status]}</b> : null}</div></div>
       {loading ? <div className="chat-design-request-loading"><LoaderCircle className="seller-spin" /> Loading original design…</div> : <>
         <dl>{finish ? <div><dt>Finish</dt><dd>{getFinishDefinition(finish).label}</dd></div> : null}{summary ? <div><dt>Pattern</dt><dd>{getPattern(summary.decoration.patternId)?.name || 'None'}</dd></div> : null}{quantity != null ? <div><dt>Quantity</dt><dd>{quantity}</dd></div> : null}{summary ? <div><dt>Dimensions</dt><dd>H {formatInches(summary.dimensions.heightIn)} · W {formatInches(summary.dimensions.widthIn)}</dd></div> : null}</dl>
         {!summary ? <p className="chat-design-response">Original design details unavailable</p> : null}

@@ -1,3 +1,4 @@
+import AssetImage from '../../components/AssetImage';
 import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -275,7 +276,7 @@ export default function ModelManagePage() {
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-cream-secondary flex-shrink-0 border border-cream-tertiary">
                         {m.thumbnail ? (
-                          <img src={m.thumbnail} alt={m.name} className="w-full h-full object-cover" />
+                          <AssetImage src={m.thumbnail} alt={m.name} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" className="w-6 h-6">
@@ -428,7 +429,7 @@ export default function ModelManagePage() {
                 <div onClick={() => thumbInputRef.current?.click()}
                   className="w-full h-28 rounded-xl border-2 border-dashed border-cream-tertiary cursor-pointer overflow-hidden hover:border-accent transition-colors">
                   {thumbPreview ? (
-                    <img src={thumbPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <AssetImage src={thumbPreview} alt="Thumbnail" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-brown-light">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 mb-1"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>

@@ -1,3 +1,5 @@
+import { resolveAssetUrl } from '../lib/assetDelivery';
+import AssetImage from '../components/AssetImage';
 import { Component, useState, useEffect, useMemo, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart, getCart, onCartUpdate } from '../data/store';
@@ -121,7 +123,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!product?.image) return;
     const animationImage = new Image();
-    animationImage.src = product.image;
+    animationImage.src = resolveAssetUrl(product.image);
   }, [product?.image]);
 
   async function handleAskSubmit(e: React.FormEvent) {
@@ -455,7 +457,7 @@ export default function ProductDetailPage() {
             <section className="pdp-shop" aria-label="Product shop">
               <div className="pdp-shop-identity">
                 <div className="pdp-shop-avatar">
-                  {shopImage ? <img src={shopImage} alt="" /> : <Store aria-hidden="true" />}
+                  {shopImage ? <AssetImage src={shopImage} alt="" /> : <Store aria-hidden="true" />}
                 </div>
                 <div className="pdp-shop-details">
                   <h2>{product.shopName || 'Shop'}</h2>
@@ -483,12 +485,12 @@ export default function ProductDetailPage() {
                   <Heart aria-hidden="true" fill={favorites.includes(product.id) ? 'currentColor' : 'none'} />
                 </button>
                 {product.model3d ? (
-                  <ProductMediaErrorBoundary key={product.model3d} fallback={<img src={product.image} alt={product.name} id="viewer-main-img" />}>
+                  <ProductMediaErrorBoundary key={product.model3d} fallback={<AssetImage src={product.image} alt={product.name} id="viewer-main-img" />}>
                     <Suspense fallback={<div className="pdp-media-loading" role="status"><span className="pdp-spinner" />Loading 3D model…</div>}>
                       <ModelViewer url={product.model3d} />
                     </Suspense>
                   </ProductMediaErrorBoundary>
-                ) : <img src={product.image} alt={product.name} id="viewer-main-img" />}
+                ) : <AssetImage src={product.image} alt={product.name} id="viewer-main-img" />}
               </div>
               <ProductFeaturedArtisan key={product.id} artisanId={product.featuredArtisanId} shopId={product.shopId} />
             </div>
@@ -563,7 +565,7 @@ export default function ProductDetailPage() {
                   {(review.sellerServiceRating || 0) > 0 && <span>Seller Service: <span className="pdp-stars" role="img" aria-label={`${review.sellerServiceRating} out of 5 stars`}>{renderStars(review.sellerServiceRating || 0, 12)}</span></span>}
                   {(review.deliveryServiceRating || 0) > 0 && <span>Delivery Service: <span className="pdp-stars" role="img" aria-label={`${review.deliveryServiceRating} out of 5 stars`}>{renderStars(review.deliveryServiceRating || 0, 12)}</span></span>}
                 </div>
-                {review.images?.length > 0 && <div className="pdp-review-images">{review.images.map((image, index) => <a key={index} href={image} target="_blank" rel="noopener noreferrer"><img src={image} alt={`Review photo ${index + 1}`} loading="lazy" /></a>)}</div>}
+                {review.images?.length > 0 && <div className="pdp-review-images">{review.images.map((image, index) => <a key={index} href={resolveAssetUrl(image)} target="_blank" rel="noopener noreferrer"><AssetImage src={image} alt={`Review photo ${index + 1}`} loading="lazy" /></a>)}</div>}
               </article>)}
             </div>}
           </section>
@@ -616,7 +618,7 @@ export default function ProductDetailPage() {
         <section className="pdp-desktop-dock" aria-label="Sticky purchase controls">
           <div className="pdp-dock-container">
             <div className="pdp-dock-identity">
-              {product.image && <img src={product.image} alt="" />}
+              {product.image && <AssetImage src={product.image} alt="" />}
               <div className="pdp-dock-copy">
                 <h2>{product.name}</h2>
                 <div className="pdp-dock-meta">{sizeLabel && <span title={sizeLabel}>{sizeLabel}</span>}<small>{product.shopName}</small></div>

@@ -59,7 +59,7 @@ describe('cart components', () => {
         estimateLoading={false}
         estimateError=""
         onDeliveryOptionChange={vi.fn()}
-        onAddressChange={vi.fn()}
+        onEditProfile={vi.fn()}
         onEstimate={vi.fn()}
         onCheckout={onCheckout}
       />,

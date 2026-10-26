@@ -15,27 +15,14 @@ const item: CartItem = {
 };
 
 describe('checkout components', () => {
-  it('provides labelled contact fields and save controls', () => {
-    const onFormChange = vi.fn();
-    render(
-      <ContactCard
-        name="Buyer"
-        phone="09123456789"
-        address="San Fernando, Pampanga"
-        editing
-        form={{ name: 'Buyer', phone: '09123456789', address: 'San Fernando, Pampanga' }}
-        saving={false}
-        requiresAddress
-        onEdit={vi.fn()}
-        onCancel={vi.fn()}
-        onFormChange={onFormChange}
-        onSave={vi.fn()}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '09999999999' } });
-    expect(onFormChange).toHaveBeenCalledWith(expect.objectContaining({ phone: '09999999999' }));
-    expect(screen.getByRole('button', { name: 'Save details' })).toBeEnabled();
+  it('shows saved contact details without editable fields and links to Profile', () => {
+    const edit = vi.fn();
+    render(<ContactCard name="Buyer" phone="09123456789" address="San Fernando, Pampanga" requiresAddress onEditProfile={edit} />);
+    expect(screen.getByText('San Fernando, Pampanga')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save details' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit in Profile' }));
+    expect(edit).toHaveBeenCalledOnce();
   });
 
   it('shows courier quote failures with an explicit retry action', () => {

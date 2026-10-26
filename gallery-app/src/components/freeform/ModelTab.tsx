@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { modelBaseFromRow, type ModelBase, type ModelBaseColumns } from './modelEstimate';
@@ -70,7 +71,7 @@ export default function ModelTab({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {model.thumbnail ? (
-                  <img src={model.thumbnail} alt={model.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <AssetImage src={model.thumbnail} alt={model.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" style={{ width: '20px', height: '20px' }}>
                     <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z" />

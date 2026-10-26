@@ -1,3 +1,4 @@
+import ArtisanCard from '../components/ArtisanCard';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -32,13 +33,13 @@ export default function ArtisansPage() {
         return;
       }
 
-      const shopIds = [...new Set(artisanData.map((a: any) => a.shop_id).filter(Boolean))];
+      const shopIds = [...new Set(artisanData.map((a: ArtisanRow) => a.shop_id).filter((id): id is string => Boolean(id)))];
       let shopMap = new Map<string, string>();
-      let productCounts = new Map<string, number>();
+      const productCounts = new Map<string, number>();
 
       if (shopIds.length > 0) {
         const { data: shopData } = await supabase.from('shops').select('id, name').in('id', shopIds);
-        if (shopData) shopMap = new Map(shopData.map((s: any) => [s.id, s.name]));
+        if (shopData) shopMap = new Map(shopData.map((s: { id: string; name: string }) => [s.id, s.name]));
 
         const countResults = await Promise.all(
           shopIds.map(sid =>
@@ -50,7 +51,7 @@ export default function ArtisansPage() {
         });
       }
 
-      setArtisans(artisanData.map((a: any) => ({
+      setArtisans(artisanData.map((a: ArtisanRow) => ({
         id: a.id,
         shop_id: a.shop_id,
         name: a.name,
@@ -59,8 +60,8 @@ export default function ArtisansPage() {
         location: a.location,
         description: a.description,
         cover_image: a.cover_image,
-        shop_name: shopMap.get(a.shop_id) || '',
-        works: productCounts.get(a.shop_id) || 0,
+        shop_name: shopMap.get(a.shop_id || '') || '',
+        works: productCounts.get(a.shop_id || '') || 0,
       })));
       setLoading(false);
     }
@@ -101,30 +102,9 @@ export default function ArtisansPage() {
               <p className="text-brown-light text-sm mt-1">Artisans added by the admin will appear here</p>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-[30px] justify-start">
+            <div className="artisan-cards">
               {artisans.map((a) => (
-                <div key={a.id} className="w-[calc(25%-22.5px)] min-w-[280px] bg-white rounded-[15px] shadow-[0_4px_15px_rgba(0,0,0,0.06)] overflow-hidden border border-black/3 flex flex-col group hover:-translate-y-2 hover:shadow-[0_10px_25px_rgba(0,0,0,0.12)] hover:border-primary/10 transition-all cursor-pointer">
-                  <div className="h-[210px] overflow-hidden">
-                    <img src={a.cover_image || '/images/hero_1.jpg'} alt={a.name} className="w-full h-full object-cover transition-all duration-[0.6s] group-hover:scale-105" />
-                  </div>
-                  <div className="p-5 flex flex-col flex-grow">
-                    <h4 className="text-[1.25rem] font-bold text-brown-dark mb-1">{a.name}</h4>
-                    <p className="artisan-shop-name">
-                      {a.shop_id && a.shop_name ? <Link to={`/shop/${a.shop_id}`}>{a.shop_name}</Link> : a.shop_id ? 'Shop unavailable' : 'No shop assigned'}
-                    </p>
-                    {a.specialty && <p className="text-[0.95rem] font-semibold text-primary mb-3">{a.specialty}</p>}
-                    <div className="w-[36px] h-[3px] bg-primary mb-3.5" />
-                    <p className="text-[0.85rem] text-brown-medium leading-[1.6] mb-5 flex-grow">{a.description}</p>
-                    <div className="flex gap-3 items-center mt-auto">
-                      {a.experience && (
-                        <span className="text-[0.75rem] font-semibold text-brown-light bg-cream-secondary px-2.5 py-1 rounded-[6px]">{a.experience}</span>
-                      )}
-                      {a.location && (
-                        <span className="text-[0.75rem] font-semibold text-brown-light bg-cream-secondary px-2.5 py-1 rounded-[6px]">{a.location}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <ArtisanCard key={a.id} artisan={a} shop={{ id: a.shop_id, name: a.shop_name }} />
               ))}
             </div>
           )}

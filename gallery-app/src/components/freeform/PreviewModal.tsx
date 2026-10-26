@@ -1,7 +1,8 @@
 import { Suspense, useState, useEffect, useMemo } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { PublicGLTFLoader } from '../../lib/publicModelLoader';
+import ModelLoadSurface from '../ModelLoadSurface';
 import * as THREE from 'three';
 import { toast } from '../../lib/popups';
 import { exportSceneToGLB, downloadGLB } from '../../services/exportService';
@@ -19,7 +20,7 @@ function PreviewScene({
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
 }) {
-  const gltf = useLoader(GLTFLoader, modelFile);
+  const gltf = useLoader(PublicGLTFLoader, modelFile);
   const materialFinish = materialParams.finish;
   const materialColor = materialParams.color;
 
@@ -137,6 +138,7 @@ export default function PreviewModal({
         </div>
 
         <div className="preview-viewer">
+          <ModelLoadSurface source={modelFile}>
           <Canvas
             key={modelFile}
             camera={{ position: [3, 1.5, 5], fov: 40 }}
@@ -161,6 +163,7 @@ export default function PreviewModal({
               autoRotateSpeed={1.5}
             />
           </Canvas>
+          </ModelLoadSurface>
         </div>
 
         <div className="preview-actions">

@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import type { ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -14,18 +15,11 @@ import {
   Store,
   Truck,
   UserRound,
-  X,
 } from 'lucide-react';
 import type { CartItem } from '../../types';
 import { fmt } from '../../lib/utils';
 
 export type CheckoutDeliveryOption = 'pickup' | 'courier';
-
-export interface CheckoutAddressForm {
-  name: string;
-  phone: string;
-  address: string;
-}
 
 interface CheckoutHeaderProps {
   itemCount: number;
@@ -57,107 +51,18 @@ export function CheckoutHeader({ itemCount, shopName, isBuyNow, onBack }: Checko
 }
 
 interface ContactCardProps {
-  name: string;
-  phone: string;
-  address: string;
-  editing: boolean;
-  form: CheckoutAddressForm;
-  saving: boolean;
-  requiresAddress: boolean;
-  onEdit: () => void;
-  onCancel: () => void;
-  onFormChange: (next: CheckoutAddressForm) => void;
-  onSave: () => void;
+  name: string; phone: string; address: string; requiresAddress: boolean; onEditProfile: () => void;
 }
-
-export function ContactCard({
-  name,
-  phone,
-  address,
-  editing,
-  form,
-  saving,
-  requiresAddress,
-  onEdit,
-  onCancel,
-  onFormChange,
-  onSave,
-}: ContactCardProps) {
-  return (
-    <section className="checkout-card checkout-contact" aria-labelledby="checkout-contact-title">
-      <div className="checkout-card__heading">
-        <div>
-          <span className="checkout-section-number">01</span>
-          <div>
-            <h2 id="checkout-contact-title">Contact details</h2>
-            <p>Used for order updates and delivery coordination.</p>
-          </div>
-        </div>
-        {editing ? (
-          <button type="button" className="checkout-text-button" onClick={onCancel}>
-            <X size={15} aria-hidden="true" /> Cancel
-          </button>
-        ) : (
-          <button type="button" className="checkout-text-button" onClick={onEdit}>
-            <Pencil size={14} aria-hidden="true" /> Edit
-          </button>
-        )}
-      </div>
-
-      {editing ? (
-        <div className="checkout-form">
-          <div className="checkout-form__row">
-            <label>
-              <span>Full name</span>
-              <input
-                autoComplete="name"
-                value={form.name}
-                onChange={event => onFormChange({ ...form, name: event.target.value })}
-                placeholder="Your full name"
-              />
-            </label>
-            <label>
-              <span>Phone number</span>
-              <input
-                autoComplete="tel"
-                inputMode="tel"
-                value={form.phone}
-                onChange={event => onFormChange({ ...form, phone: event.target.value })}
-                placeholder="09XX XXX XXXX"
-              />
-            </label>
-          </div>
-          <label>
-            <span>Delivery address {requiresAddress ? '' : '(optional for pickup)'}</span>
-            <input
-              autoComplete="street-address"
-              value={form.address}
-              onChange={event => onFormChange({ ...form, address: event.target.value })}
-              placeholder="Street, barangay, municipality, province"
-            />
-          </label>
-          <div className="checkout-form__actions">
-            <button type="button" className="checkout-secondary-button" onClick={onCancel}>Discard changes</button>
-            <button type="button" className="checkout-primary-button checkout-primary-button--compact" disabled={saving} onClick={onSave}>
-              {saving ? <><LoaderCircle className="checkout-spin" size={16} aria-hidden="true" /> Saving…</> : 'Save details'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="checkout-contact__summary">
-          <span className="checkout-icon-tile"><UserRound size={20} aria-hidden="true" /></span>
-          <div>
-            <strong>{name || 'Add your name'}</strong>
-            <span>{phone || 'Add a contact number'}</span>
-            <p>{address || (requiresAddress ? 'Add a delivery address' : 'No address needed for shop pickup')}</p>
-          </div>
-          {name && phone && (!requiresAddress || address) ? (
-            <span className="checkout-complete"><Check size={13} aria-hidden="true" /> Complete</span>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
+export function ContactCard({ name, phone, address, requiresAddress, onEditProfile }: ContactCardProps) {
+  return <section className="checkout-card checkout-contact" aria-labelledby="checkout-contact-title">
+    <div className="checkout-card__heading"><div><span className="checkout-section-number">01</span><div>
+      <h2 id="checkout-contact-title">Contact details</h2><p>Saved in your Profile for order updates and delivery.</p>
+    </div></div><button type="button" className="checkout-text-button" onClick={onEditProfile}><Pencil size={14} aria-hidden="true" /> Edit in Profile</button></div>
+    <div className="checkout-contact__summary"><span className="checkout-icon-tile"><UserRound size={20} aria-hidden="true" /></span><div>
+      <strong>{name || 'Add your name in Profile'}</strong><span>{phone || 'Add a contact number in Profile'}</span>
+      <p>{address || (requiresAddress ? 'Add a delivery address in Profile' : 'No address needed for shop pickup')}</p>
+    </div></div>
+  </section>;
 }
 
 interface DeliveryCardProps {
@@ -266,8 +171,8 @@ export function LocationCard({ hasDropoff, children }: LocationCardProps) {
         <div>
           <span className="checkout-section-number">03</span>
           <div>
-            <h2 id="checkout-location-title">Confirm delivery pin</h2>
-            <p>Click the map or drag the delivery marker to refine the exact location.</p>
+            <h2 id="checkout-location-title">Saved delivery pin</h2>
+            <p>View your saved delivery location. Update your address or pin in Profile.</p>
           </div>
         </div>
       </div>
@@ -324,7 +229,7 @@ export function OrderReview({
         {items.map(item => (
           <article className="checkout-review-line" key={`${item.productId}\v${item.variationId || ''}`}>
             <div className="checkout-review-line__image">
-              <img src={item.image} alt="" />
+              <AssetImage src={item.image} alt="" />
               <span aria-label={`Quantity ${item.qty}`}>{item.qty}</span>
             </div>
             <div className="checkout-review-line__details">
@@ -359,29 +264,6 @@ export function OrderReview({
         <span><PackageCheck size={16} aria-hidden="true" /> Only these items will be purchased</span>
       </div>
     </aside>
-  );
-}
-
-interface LocationDialogProps {
-  address: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-export function LocationDialog({ address, onCancel, onConfirm }: LocationDialogProps) {
-  return (
-    <div className="checkout-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) onCancel(); }}>
-      <div className="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby="checkout-location-dialog-title">
-        <span className="checkout-dialog__icon"><MapPin size={22} aria-hidden="true" /></span>
-        <h2 id="checkout-location-dialog-title">Use this delivery location?</h2>
-        <p>The courier will use the selected pin and this matching address.</p>
-        <address>{address}</address>
-        <div className="checkout-dialog__actions">
-          <button type="button" className="checkout-secondary-button" onClick={onCancel}>Keep current pin</button>
-          <button type="button" className="checkout-primary-button checkout-primary-button--compact" onClick={onConfirm}>Use this location</button>
-        </div>
-      </div>
-    </div>
   );
 }
 

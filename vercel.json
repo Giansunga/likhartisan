@@ -16,9 +16,14 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/media/:path*", "destination": "https://likhartisan-assets.likhartisan-assets.workers.dev/:path*" },
+    { "source": "/((?!api/|media/).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/media/:path*",
+      "headers": [{ "key": "x-vercel-enable-rewrite-caching", "value": "1" }]
+    },
     {
       "source": "/videos/(.*)",
       "headers": [

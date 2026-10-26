@@ -44,6 +44,11 @@ opencode.jsonc
 opencode.json
 
 .vercel
+.wrangler/
+.dev.vars*
+.deploy-artifacts/
+.playwright-cli/
+output/playwright/
 
 # Codex/local verification artifacts
 .codex-likhai-deploy/

@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Link } from 'react-router-dom';
 import {
   LockKeyhole,
@@ -96,7 +97,7 @@ export function ShopCartGroup({
               </label>
 
               <Link className="cart-line__image-link" to={`/product/${item.productId}`} aria-label={`View ${item.productName}`}>
-                <img src={item.image} alt="" className="cart-line__image" />
+                <AssetImage src={item.image} alt="" className="cart-line__image" />
               </Link>
 
               <div className="cart-line__details">
@@ -166,7 +167,8 @@ interface CartSummaryProps {
   estimateLoading: boolean;
   estimateError: string;
   onDeliveryOptionChange: (option: 'pickup' | 'courier') => void;
-  onAddressChange: (address: string) => void;
+  name?: string; phone?: string; signedIn?: boolean;
+  onEditProfile: () => void;
   onEstimate: () => void;
   onCheckout: () => void;
 }
@@ -182,7 +184,7 @@ export function CartSummary({
   estimateLoading,
   estimateError,
   onDeliveryOptionChange,
-  onAddressChange,
+  name, phone, signedIn, onEditProfile,
   onEstimate,
   onCheckout,
 }: CartSummaryProps) {
@@ -224,17 +226,12 @@ export function CartSummary({
 
         {deliveryOption === 'courier' ? (
           <div className="cart-estimator">
-            <label htmlFor="cart-delivery-address">Delivery address</label>
-            <div className="cart-estimator__field">
-              <MapPin size={17} aria-hidden="true" />
-              <input
-                id="cart-delivery-address"
-                value={address}
-                onChange={event => onAddressChange(event.target.value)}
-                placeholder="Enter your delivery address"
-                autoComplete="street-address"
-              />
-            </div>
+            <span>Saved delivery details</span>
+            <div className="cart-estimator__field"><MapPin size={17} aria-hidden="true" /><div>
+              <strong>{name || 'Name not saved'}</strong><p>{phone || 'Phone not saved'}</p>
+              <address style={{ fontStyle: 'normal', overflowWrap: 'anywhere' }}>{address || 'No address saved in Profile'}</address>
+            </div></div>
+            <button type="button" className="cart-estimator__button" onClick={onEditProfile}>{signedIn ? 'Edit in Profile' : 'Sign in to update Profile'}</button>
             <button
               type="button"
               className="cart-estimator__button"

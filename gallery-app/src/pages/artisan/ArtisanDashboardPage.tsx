@@ -1,3 +1,4 @@
+import AssetImage from '../../components/AssetImage';
 import React, { useState, useEffect, useRef, useCallback, Component, type ReactNode } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -709,7 +710,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', background: '#E8E0D8', border: '1px solid #EDE8E2' }}>
                         {imgSrc
-                          ? <img src={imgSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ? <AssetImage src={imgSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={18} style={{ color: '#B8A89A' }} /></div>
                         }
                       </div>
@@ -768,7 +769,7 @@ function OverviewPanel({ products, productPrices, shopId, shopName, loadingOrder
                 >
                   <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, background: '#E8E0D8', border: '1px solid #EDE8E2' }}>
                     {item.image
-                      ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <AssetImage src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Package size={18} style={{ color: '#B8A89A' }} /></div>
                     }
                   </div>
@@ -976,7 +977,7 @@ export function ListingsPanel({ products, productPrices, onProductsUpdated, load
                 width: '64px', height: '64px', borderRadius: '8px',
                 overflow: 'hidden', flexShrink: 0, background: 'var(--bg-secondary)'
               }}>
-                <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <AssetImage src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '2px' }}>{item.name}</div>
@@ -1288,7 +1289,7 @@ export function VaultPanel({ products, productPrices, onProductsUpdated }: { pro
                 width: '64px', height: '64px', borderRadius: '8px',
                 overflow: 'hidden', flexShrink: 0, background: 'var(--bg-secondary)'
               }}>
-                <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(30%)' }} />
+                <AssetImage src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(30%)' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '2px' }}>{item.name}</div>
@@ -1593,7 +1594,7 @@ return (
                 <td style={{ padding: '14px 18px', fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.82rem' }}>{order.id.slice(0, 8).toUpperCase()}</td>
                 <td style={{ padding: '14px 18px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img src={order.item_image} alt={order.item_name} style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0, background: 'var(--bg-secondary)' }} />
+                    <AssetImage src={order.item_image} alt={order.item_name} style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0, background: 'var(--bg-secondary)' }} />
                     <div>
                       <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: '2px' }}>{order.item_name}</div>
                       {order.order_type === 'customized' && <a href={`/artisan-dashboard/requests?requestId=${encodeURIComponent(order.design_request_id)}`} onClick={event => event.stopPropagation()} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#823E0B' }}>Custom design · View request</a>}
@@ -1689,7 +1690,7 @@ return (
             <div style={{ padding: '20px 28px', borderBottom: '1px solid #E8E0D8' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8C7B6E', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Item Summary</div>
               <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                <img src={selectedOrder.item_image} alt="" style={{ width: '56px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
+                <AssetImage src={selectedOrder.item_image} alt="" style={{ width: '56px', height: '56px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: 'var(--text-dark)', marginBottom: '2px' }}>{selectedOrder.item_name}</div>
                   {selectedOrder.item_variation && <div style={{ fontSize: '0.78rem', color: 'var(--text-light)' }}>{displayVariation(selectedOrder.item_variation)}</div>}
@@ -2025,7 +2026,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                   {/* Avatar */}
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     {conv.buyer_avatar
-                      ? <img src={conv.buyer_avatar} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
+                      ? <AssetImage src={conv.buyer_avatar} alt="" style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
                       : <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(conv.buyer_name || 'B').charAt(0)}</div>
                     }
                     {(() => { const bs = getBuyerActiveStatus(conv.buyer_id); return (
@@ -2086,7 +2087,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
               )}
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 {selectedConv.buyer_avatar
-                  ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ? <AssetImage src={selectedConv.buyer_avatar} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
                   : <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
                 }
                 {(() => { const bs = getBuyerActiveStatus(selectedConv.buyer_id); return (
@@ -2106,7 +2107,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
               {messages.length === 0 && (
                 <div className="chat-empty-state-inner">
                   {selectedConv.buyer_avatar
-                    ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px' }} />
+                    ? <AssetImage src={selectedConv.buyer_avatar} alt="" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px' }} />
                     : <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.5rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
                   }
                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', color: 'var(--primary-color)', marginBottom: '4px' }}>Chat with {selectedConv.buyer_name || FALLBACK_BUYER_NAME}</h3>
@@ -2151,7 +2152,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                                   ? (
                                     <div className="msg-avatar">
                                       {selectedConv.buyer_avatar
-                                        ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ? <AssetImage src={selectedConv.buyer_avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         : <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.75rem' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</span>
                                       }
                                     </div>
@@ -2165,7 +2166,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                                   <DesignMessageCard data={designData} />
                                 ) : productData?.productId ? (
                                   <a href={`/product/${productData.productId}`} target="_blank" rel="noopener noreferrer" className="chat-product-card">
-                                    <img src={productData.productImage} alt={productData.productName} className="chat-product-img" />
+                                    <AssetImage src={productData.productImage} alt={productData.productName} className="chat-product-img" />
                                     <div className="chat-product-info">
                                       <span className="chat-product-name">{productData.productName}</span>
                                       {productData.variantDimensions && <span className="chat-product-variant">{productData.variantDimensions}</span>}
@@ -2176,7 +2177,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
                                 <div className={`msg-bubble msg-bubble--${dir}`}>
                                   {msg.image_url && (
                                     <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="chat-image-bubble">
-                                      <img src={msg.image_url} alt="attachment" style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block', border: '1px solid rgba(0,0,0,0.08)' }} />
+                                      <AssetImage src={msg.image_url} alt="attachment" style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block', border: '1px solid rgba(0,0,0,0.08)' }} />
                                     </a>
                                   )}
                                   {text}
@@ -2211,7 +2212,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
             <div style={{ padding: '12px 20px', background: '#fff', borderTop: '1px solid #EDE8E2', flexShrink: 0 }}>
               {imagePreview && (
                 <div style={{ position: 'relative', display: 'inline-block', marginBottom: '10px' }}>
-                  <img src={imagePreview} alt="preview" style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #EDE8E2' }} />
+                  <AssetImage src={imagePreview} alt="preview" style={{ width: '96px', height: '96px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #EDE8E2' }} />
                   <button onClick={() => { URL.revokeObjectURL(imagePreview); setPendingImage(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#d32f2f', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>×</button>
                 </div>
               )}
@@ -2253,7 +2254,7 @@ export function MessagesPanel({ shopId, loadingMessages, setLoadingMessages, buy
         {selectedConv ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 20px' }}>
             {selectedConv.buyer_avatar
-              ? <img src={selectedConv.buyer_avatar} alt="" style={{ width: '76px', height: '76px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px', border: '3px solid #EDE8E2' }} />
+              ? <AssetImage src={selectedConv.buyer_avatar} alt="" style={{ width: '76px', height: '76px', borderRadius: '50%', objectFit: 'cover', marginBottom: '12px', border: '3px solid #EDE8E2' }} />
               : <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'var(--accent-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.8rem', marginBottom: '12px' }}>{(selectedConv.buyer_name || 'B').charAt(0)}</div>
             }
              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)', marginBottom: '4px', textAlign: 'center' }}>{selectedConv.buyer_name || FALLBACK_BUYER_NAME}</div>
@@ -2424,7 +2425,7 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
         {/* Cover Photo - Full Width */}
         <div style={{ position: 'relative', width: '100%', height: '260px', overflow: 'hidden', background: 'var(--bg-secondary)', borderBottom: '1px solid #E8E0D8', cursor: 'pointer' }} onClick={() => document.getElementById('shop-cover-input')?.click()}>
           {coverPreview ? (
-            <img src={coverPreview} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <AssetImage src={coverPreview} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)', gap: '8px' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '36px', height: '36px' }}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -2443,7 +2444,7 @@ export function ShopSettingsPanel({ shopData, onShopUpdated }: { shopData: any; 
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '28px' }}>
             <div style={{ width: '120px', height: '120px', borderRadius: '50%', overflow: 'hidden', background: 'var(--bg-secondary)', border: '3px solid #E8E0D8', flexShrink: 0, cursor: 'pointer' }} onClick={() => document.getElementById('shop-profile-input')?.click()}>
               {profilePreview ? (
-                <img src={profilePreview} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <AssetImage src={profilePreview} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)', fontSize: '0.85rem' }}>Add Photo</div>
               )}

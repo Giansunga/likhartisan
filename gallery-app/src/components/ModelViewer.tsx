@@ -1,7 +1,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* eslint-disable react-hooks/immutability -- R3F camera and cloned Three.js scene objects are intentionally configured in place. */
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import ModelLoadSurface from './ModelLoadSurface';
+import { PublicGLTFLoader } from '../lib/publicModelLoader';
 import * as THREE from 'three';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import NeutralStudioEnvironment from './freeform/NeutralStudioEnvironment';
@@ -28,7 +30,7 @@ function ProductModel({
   rotate: boolean;
   onFit: (fit: ViewerFit) => void;
 }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useLoader(PublicGLTFLoader, url);
   const rotationRef = useRef<THREE.Group>(null);
 
   const productScene = useMemo(() => {
@@ -182,6 +184,7 @@ export default function ModelViewer({ url }: { url: string }) {
         <span>Studio</span>
       </button>
 
+      <ModelLoadSurface source={url}>
       <Canvas
         key={url}
         camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}
@@ -223,6 +226,7 @@ export default function ModelViewer({ url }: { url: string }) {
           onEnd={() => setInteracting(false)}
         />
       </Canvas>
+      </ModelLoadSurface>
     </div>
   );
 }

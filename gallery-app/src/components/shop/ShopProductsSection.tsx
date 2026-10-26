@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { ArrowRight, PackageOpen, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { fmt } from '../../lib/utils';
@@ -39,7 +40,7 @@ export default function ShopProductsSection({ shopId, shopName, products, produc
               return (
                 <Link className="shop-product-card" to={`/product/${product.id}`} key={product.id}>
                   <div className="shop-product-card__image">
-                    {product.image ? <img src={product.image} alt={product.name} loading="lazy" /> : <PackageOpen aria-hidden="true" />}
+                    {product.image ? <AssetImage src={product.image} alt={product.name} loading="lazy" /> : <PackageOpen aria-hidden="true" />}
                     {product.category ? <span>{product.category}</span> : null}
                   </div>
                   <div className="shop-product-card__body">

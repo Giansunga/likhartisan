@@ -1,3 +1,4 @@
+import AssetImage from './AssetImage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './Navbar.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -285,7 +286,7 @@ export default function Navbar() {
                     <button ref={profileButtonRef} className="navbar-profile-button" aria-expanded={showProfileDropdown} aria-controls="navbar-profile-panel" onClick={() => { setShowProfileDropdown(!showProfileDropdown); setShowNavigation(false); setShowNotifications(false); }} aria-label="User menu" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <div className="rounded-full bg-[#D9D9D9] border-2 border-cream-tertiary overflow-hidden" style={{ width: isMobile ? '34px' : '44px', height: isMobile ? '34px' : '44px' }}>
                         {userAvatar ? (
-                          <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
+                          <AssetImage src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full bg-primary text-white flex items-center justify-center text-xs font-bold">
                             {(userEmail || 'U').charAt(0).toUpperCase()}

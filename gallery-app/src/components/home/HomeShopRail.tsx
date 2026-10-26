@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { ArrowLeft, ArrowRight, MapPin, Store } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -63,9 +64,9 @@ export default function HomeShopRail({ shops, loading, error }: HomeShopRailProp
           : shops.length === 0 ? <div className="home-rail-state"><Store aria-hidden="true" /><p>Participating shops will appear here soon.</p></div>
           : <div className="home-rail" ref={railRef} onScroll={updateEdges} tabIndex={0} aria-label="Participating pottery shops">
             {shops.map((shop, index) => <article className="home-shop-card" key={shop.id}>
-              <div className="home-shop-card__image"><img src={shop.banner || '/images/shops-hero.PNG'} alt="" loading="lazy" onError={event => { event.currentTarget.src = '/images/shops-hero.PNG'; }} /></div>
+              <div className="home-shop-card__image"><AssetImage src={shop.banner || '/images/shops-hero.PNG'} alt="" loading="lazy" onError={event => { event.currentTarget.src = '/images/shops-hero.PNG'; }} /></div>
               <div className="home-shop-card__body">
-                <div className="home-shop-card__mark"><span>{shop.name.charAt(0).toUpperCase()}</span>{shop.image && <img src={shop.image} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}</div>
+                <div className="home-shop-card__mark"><span>{shop.name.charAt(0).toUpperCase()}</span>{shop.image && <AssetImage src={shop.image} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}</div>
                 <span className="home-shop-card__issue">Shop {String(index + 1).padStart(2, '0')}</span>
                 <p className="home-shop-card__location"><MapPin aria-hidden="true" />{shop.location || 'Santo Tomas, Pampanga'}</p>
                 <h3>{shop.name}</h3>

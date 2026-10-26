@@ -5,6 +5,7 @@ import ProductListPage from './ProductListPage';
 
 const mocks = vi.hoisted(() => ({
   empty: false,
+  productCount: 1,
   updateResult: { data: null as { id: string } | null, error: null as { message: string } | null },
   variationInsertResult: { data: { id: 'variation-1' }, error: null as { code: string; message: string } | null },
   insertVariation: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock('../../lib/supabase', () => ({
     from: (table: string) => {
       if (table === 'artisans') return { select: () => ({ eq: () => ({ eq: () => ({ single: async () => ({ data: { id: 'artisan-1' }, error: null }) }) }) }) };
       if (table === 'products') return {
-        select: () => ({ order: async () => ({ data: mocks.empty ? [] : [{ id: 'product-1', name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' }], error: null }) }),
+        select: () => ({ order: async () => ({ data: mocks.empty ? [] : Array.from({ length: mocks.productCount }, (_, i) => ({ id: `product-${i + 1}`, name: 'Pet Bowl', category: 'Others', stock: 2, status: 'active', shop_id: 'shop-1', shop_name: 'Clay Studio' })), error: null }) }),
         update: (row: unknown) => { mocks.updateProduct(row); return { eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }; },
       };
       return {
@@ -52,6 +53,7 @@ describe('admin product editor save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.empty = false;
+    mocks.productCount = 1;
     mocks.updateResult = { data: null, error: null };
     mocks.variationInsertResult = { data: { id: 'variation-1' }, error: null };
     mocks.tags = ['clay'];
@@ -88,6 +90,30 @@ describe('admin product editor save', () => {
     expect(mocks.insertVariation).toHaveBeenCalledWith(expect.objectContaining({ product_id: 'product-1' }));
     expect(mocks.saveError).not.toHaveBeenCalled();
     expect(mocks.updateProduct).toHaveBeenCalledWith(expect.objectContaining({ tags: ['clay'] }));
+  });
+
+  it('replaces repeated save feedback and leaves pagination and focus available', async () => {
+    mocks.productCount = 25;
+    mocks.updateResult = { data: { id: 'product-1' }, error: null };
+    mocks.recomputeProductStock.mockResolvedValue(2);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit first product' }));
+    const saveButton = screen.getByRole('button', { name: 'Save changes' });
+    saveButton.focus();
+    fireEvent.click(saveButton);
+    await screen.findByText('Product changes saved.');
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(mocks.recomputeProductStock).toHaveBeenCalledTimes(2));
+    expect(screen.getAllByText('Product changes saved.')).toHaveLength(1);
+    expect(saveButton).toHaveFocus();
+    expect(document.body.style.overflow).not.toBe('hidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText(/Page 2 of/)).toBeInTheDocument();
+    expect(screen.getByText('Product changes saved.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(screen.getByText(/Page 1 of/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss product message' }));
+    expect(screen.queryByText('Product changes saved.')).not.toBeInTheDocument();
   });
 
   it('writes an empty tags array when all tags are removed', async () => {

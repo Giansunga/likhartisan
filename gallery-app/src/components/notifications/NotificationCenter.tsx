@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Popup } from '../Popup';
 import { useMemo, useState } from 'react';
 import { Bell, CheckCheck, Trash2, X } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function NotificationCenter({ context, data }: { context: Notific
       <div className="notification-center__feed">
         {data.loading ? <div className="notification-center__skeleton" aria-label="Loading notifications">{[1, 2, 3, 4].map(item => <div key={item}><i /><span><b /><small /></span></div>)}</div> : groups.length ? groups.map(([label, items]) => <section key={label} className="notification-center__group"><h2>{label}</h2>{items.map(notification => <article className={`notification-center__row is-${notificationCategory(notification)} ${notification.read ? '' : 'is-unread'}`} key={notification.id}>
           <button className="notification-center__main" type="button" onClick={() => openNotification(notification)}>
-            {notification.product_image ? <img src={notification.product_image} alt="" /> : <span className="notification-center__icon"><NotificationIcon notification={notification} /></span>}
+            {notification.product_image ? <AssetImage src={notification.product_image} alt="" /> : <span className="notification-center__icon"><NotificationIcon notification={notification} /></span>}
             <span className="notification-center__copy"><strong>{notification.title}{!notification.read ? <i aria-label="Unread" /> : null}</strong><span>{notification.message}</span><small>{relativeNotificationTime(notification.created_at)} · {notification.order_id ? 'View order' : notification.type === 'message' ? 'Open conversation' : 'View notification'}</small></span>
           </button>
           <div className="notification-center__row-actions"><button type="button" onClick={() => void data.markRead(notification.id, !notification.read)}>{notification.read ? 'Mark unread' : 'Mark read'}</button><button className="is-danger" type="button" aria-label={`Delete ${notification.title}`} onClick={() => setDeleteTarget(notification)}><Trash2 size={15} /></button></div>

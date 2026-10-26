@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Popup } from '../Popup';
 import { useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -22,6 +23,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress } from '../../lib/geocoder';
 import PasswordDialog from './PasswordDialog';
+import ProfileAddressEditor from './ProfileAddressEditor';
+import { validAddressCoordinates } from '../../lib/profileAddress';
 import {
   accountProfileFromUser,
   isAccountDraftDirty,
@@ -64,7 +67,10 @@ function AccountPanelContent({ user }: { user: User }) {
   }
 
   async function saveProfile() {
+    if (saveStatus === 'saving') return;
     const normalized = normalizeAccountDraft(draft);
+    // A name/phone edit must not normalize or replace a legacy saved address.
+    if (draft.address === savedProfile.address) normalized.address = savedProfile.address;
     const nextErrors = validateAccountDraft(normalized);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -76,53 +82,62 @@ function AccountPanelContent({ user }: { user: User }) {
     setSaveStatus('saving');
     setSaveMessage('Saving your account details…');
     const addressChanged = normalized.address !== savedProfile.address;
-    let addressLat = savedProfile.addressLat;
-    let addressLng = savedProfile.addressLng;
+    const addressPartsChanged = JSON.stringify(normalized.addressParts ?? null) !== JSON.stringify(savedProfile.addressParts ?? null);
+    const pinChanged = normalized.addressLat !== savedProfile.addressLat || normalized.addressLng !== savedProfile.addressLng;
+    let addressLat = normalized.addressLat ?? null;
+    let addressLng = normalized.addressLng ?? null;
 
-    if (addressChanged) {
+    if (addressChanged && !validAddressCoordinates(addressLat, addressLng)) {
       addressLat = null;
       addressLng = null;
       if (normalized.address) {
         try {
           const coordinates = await geocodeAddress(normalized.address);
-          if (coordinates) {
-            addressLat = coordinates.lat;
-            addressLng = coordinates.lng;
+          const valid = coordinates && validAddressCoordinates(coordinates.lat, coordinates.lng);
+          if (valid) {
+            addressLat = valid.lat;
+            addressLng = valid.lng;
           }
         } catch (error) {
-          console.warn('Account address geocoding failed; checkout will retry.', error);
+          console.warn('Account address geocoding failed.', error);
         }
       }
     }
 
-    const { data, error } = await supabase.auth.updateUser({
-      data: {
-        name: normalized.fullName,
-        phone: normalized.phone,
-        address: normalized.address,
-        address_lat: addressLat,
-        address_lng: addressLng,
-        avatar_url: savedProfile.avatarUrl,
-      },
-    });
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          name: normalized.fullName,
+          phone: normalized.phone,
+          ...(addressChanged || addressPartsChanged || pinChanged ? {
+            address: normalized.address, address_lat: addressLat, address_lng: addressLng,
+            ...(addressChanged || addressPartsChanged ? { address_parts: normalized.addressParts ?? null } : {}),
+          } : {}),
+          avatar_url: savedProfile.avatarUrl,
+        },
+      });
 
-    if (error) {
+      if (error) {
+        setSaveStatus('error');
+        setSaveMessage(error.message || 'Could not save your changes.');
+        return;
+      }
+
+      const nextProfile = data.user
+        ? accountProfileFromUser(data.user)
+        : { ...savedProfile, ...normalized, addressLat, addressLng };
+      setSavedProfile(nextProfile);
+      setDraft(profileToDraft(nextProfile));
+      setErrors({});
+      setSaveStatus('saved');
+      setSaveMessage(addressChanged && normalized.address && addressLat === null
+        ? 'Saved. Confirm a delivery pin here in Profile before courier checkout.'
+        : 'Your account details are up to date.');
+      toast.success('Account details saved.');
+    } catch (error) {
       setSaveStatus('error');
-      setSaveMessage(error.message || 'Could not save your changes.');
-      return;
+      setSaveMessage(error instanceof Error ? error.message : 'Could not save your changes.');
     }
-
-    const nextProfile = data.user
-      ? accountProfileFromUser(data.user)
-      : { ...savedProfile, ...normalized, addressLat, addressLng };
-    setSavedProfile(nextProfile);
-    setDraft(profileToDraft(nextProfile));
-    setErrors({});
-    setSaveStatus('saved');
-    setSaveMessage(addressChanged && normalized.address && addressLat === null
-      ? 'Saved. Your address pin will be confirmed again during checkout.'
-      : 'Your account details are up to date.');
-    toast.success('Account details saved.');
   }
 
   function discardChanges() {
@@ -187,7 +202,7 @@ function AccountPanelContent({ user }: { user: User }) {
             disabled={avatarStatus === 'uploading'}
             onClick={() => fileInputRef.current?.click()}
           >
-            {savedProfile.avatarUrl ? <img src={savedProfile.avatarUrl} alt="" /> : <span>{draft.fullName.charAt(0).toUpperCase() || 'U'}</span>}
+            {savedProfile.avatarUrl ? <AssetImage src={savedProfile.avatarUrl} alt="" /> : <span>{draft.fullName.charAt(0).toUpperCase() || 'U'}</span>}
             <i>{avatarStatus === 'uploading' ? <LoaderCircle className="account-spin" size={19} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}</i>
           </button>
           <input
@@ -234,15 +249,11 @@ function AccountPanelContent({ user }: { user: User }) {
         <section className="account-card" aria-labelledby="account-address-title">
           <div className="account-card__heading">
             <span><MapPin size={20} aria-hidden="true" /></span>
-            <div><h2 id="account-address-title">Default delivery address</h2><p>Pre-filled when you request courier delivery.</p></div>
+            <div><h2 id="account-address-title">Default delivery address</h2><p>Your saved details are used at cart and checkout.</p></div>
           </div>
-          <div className="account-fields">
-            <label htmlFor="account-address">
-              <span>Full address <em>Optional</em></span>
-              <textarea id="account-address" rows={5} autoComplete="street-address" placeholder="Street, barangay, municipality, province" value={draft.address} aria-invalid={Boolean(errors.address)} aria-describedby={errors.address ? 'account-address-error' : 'account-address-help'} onChange={event => updateField('address', event.target.value)} />
-              {errors.address ? <small id="account-address-error" role="alert">{errors.address}</small> : <small id="account-address-help">Checkout will confirm the exact delivery pin and courier fee.</small>}
-            </label>
-          </div>
+          <ProfileAddressEditor draft={draft} error={errors.address} disabled={saveStatus === 'saving'} onChange={next => {
+            setDraft(next); setErrors(current => ({ ...current, address: undefined })); setSaveStatus('idle'); setSaveMessage('');
+          }} />
         </section>
       </div>
 

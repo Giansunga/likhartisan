@@ -33,6 +33,12 @@ vi.mock('../../../lib/supabase', () => ({
   },
 }));
 
+vi.mock('../ProfileAddressEditor', () => ({ default: ({ draft, onChange }: { draft: import('../accountProfile').AccountProfileDraft; onChange: (d: import('../accountProfile').AccountProfileDraft) => void }) => <>
+  <label>Test address<input value={draft.address} onChange={e => onChange({ ...draft, address: e.target.value, addressLat: null, addressLng: null })} /></label>
+  <button onClick={() => onChange({ ...draft, addressLat: 15.2, addressLng: 120.2 })}>Refine test pin</button>
+  <button onClick={() => onChange({ ...draft, address: '', addressParts: null, addressLat: null, addressLng: null })}>Clear address</button>
+</> }));
+
 vi.mock('../../../lib/popups', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../lib/popups')>()), toast: { success: vi.fn(), error: vi.fn() } }));
 
 function makeUser(metadata: Record<string, unknown> = {}): User {
@@ -89,7 +95,7 @@ describe('AccountPanel', () => {
 
   it('geocodes a changed address and saves normalized metadata', async () => {
     render(<AccountPanel />);
-    fireEvent.change(screen.getByLabelText(/^Full address/), { target: { value: '  Quezon City, Metro Manila  ' } });
+    fireEvent.change(screen.getByLabelText('Test address'), { target: { value: '  Quezon City, Metro Manila  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledWith({
@@ -105,13 +111,51 @@ describe('AccountPanel', () => {
   it('preserves changed address text but clears stale coordinates when geocoding fails', async () => {
     mocks.geocodeAddress.mockResolvedValue(null);
     render(<AccountPanel />);
-    fireEvent.change(screen.getByLabelText(/^Full address/), { target: { value: 'New delivery address' } });
+    fireEvent.change(screen.getByLabelText('Test address'), { target: { value: 'New delivery address' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledWith({
       data: expect.objectContaining({ address: 'New delivery address', address_lat: null, address_lng: null }),
     }));
-    expect(screen.getByText(/address pin will be confirmed again/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confirm a delivery pin here/i)).toBeInTheDocument();
+  });
+
+  it('rejects invalid geocoder coordinates instead of saving a partial pin', async () => {
+    mocks.geocodeAddress.mockResolvedValue({ lat: NaN, lng: 121 });
+    render(<AccountPanel />);
+    fireEvent.change(screen.getByLabelText('Test address'), { target: { value: 'A new delivery address' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledWith({ data: expect.objectContaining({ address_lat: null, address_lng: null }) }));
+  });
+
+  it('preserves legacy address and coordinates when only the name changes', async () => {
+    mocks.user = makeUser({ address: '  Legacy   address  ' });
+    render(<AccountPanel />);
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Maria Cruz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledWith({ data: expect.objectContaining({ name: 'Maria Cruz' }) }));
+    expect(mocks.geocodeAddress).not.toHaveBeenCalled();
+    expect(mocks.updateUser.mock.calls[0][0].data).not.toHaveProperty('address_parts');
+    expect(mocks.updateUser.mock.calls[0][0].data).not.toHaveProperty('address');
+    expect(mocks.updateUser.mock.calls[0][0].data).not.toHaveProperty('address_lat');
+  });
+
+  it('keeps pin changes in the draft until saving and keeps failed drafts', async () => {
+    mocks.updateUser.mockResolvedValue({ data: { user: null }, error: { message: 'Save unavailable' } });
+    render(<AccountPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Refine test pin' }));
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByText('Save unavailable');
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
+    expect(mocks.updateUser).toHaveBeenCalledWith({ data: expect.objectContaining({ address_lat: 15.2, address_lng: 120.2 }) });
+  });
+
+  it('explicitly clears the saved address metadata and pin', async () => {
+    render(<AccountPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear address' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mocks.updateUser).toHaveBeenCalledWith({ data: expect.objectContaining({ address: '', address_parts: null, address_lat: null, address_lng: null }) }));
   });
 
   it('validates the password dialog before re-authenticating', async () => {

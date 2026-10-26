@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Heart, LoaderCircle, MapPin, MessageCircle, Package, Store, Users } from 'lucide-react';
 import type { ShopProfile } from './shopStorefront';
 
@@ -30,7 +31,7 @@ export default function ShopHero({
     <>
       <header className="shop-hero">
         <div className="shop-hero__media" aria-hidden={!shop.banner}>
-          <img
+          <AssetImage
             src={shop.banner || '/images/vases_collection.png'}
             alt={shop.banner ? `${shop.name} shop cover` : ''}
             fetchPriority="high"
@@ -40,7 +41,7 @@ export default function ShopHero({
         <div className="shop-container shop-hero__content">
           <div className="shop-hero__identity">
             <div className="shop-hero__avatar">
-              {shop.image ? <img src={shop.image} alt={`${shop.name} profile`} /> : <Store aria-hidden="true" />}
+              {shop.image ? <AssetImage src={shop.image} alt={`${shop.name} profile`} /> : <Store aria-hidden="true" />}
             </div>
             <div className="shop-hero__copy">
               <p className="shop-hero__eyebrow">Local pottery shop</p>

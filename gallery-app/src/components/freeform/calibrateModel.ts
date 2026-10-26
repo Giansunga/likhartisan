@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { PublicGLTFLoader } from '../../lib/publicModelLoader';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 type Dimensions = { height: number; bodyWidth: number; neckWidth: number; rimSize: number };
@@ -136,7 +136,7 @@ export function calibrateModelScene(scene: THREE.Group, dimensions: Dimensions, 
 export async function calibrateModelFile(file: File, dimensions: Dimensions): Promise<File> {
   const sourceBuffer = await file.arrayBuffer();
   const source = await new Promise<THREE.Group>((resolve, reject) => {
-    new GLTFLoader().parse(sourceBuffer, '', (gltf) => resolve(gltf.scene), reject);
+    new PublicGLTFLoader().parse(sourceBuffer, '', (gltf) => resolve(gltf.scene), reject);
   });
   const scene = calibrateModelScene(source, dimensions);
   const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {

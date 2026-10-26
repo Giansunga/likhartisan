@@ -5,7 +5,8 @@ import { toast } from '../lib/popups';
 import { getCart } from '../data/store';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { geocodeAddress, reverseGeocodeCoords } from '../lib/geocoder';
+import { geocodeAddress } from '../lib/geocoder';
+import { validAddressCoordinates } from '../lib/profileAddress';
 import { API_BASE } from '../lib/api';
 import { checkoutQuoteKey } from '../lib/checkoutQuote';
 import type { CartCheckoutDraft, CartItem } from '../types';
@@ -20,10 +21,8 @@ import {
   ContactCard,
   DeliveryCard,
   LocationCard,
-  LocationDialog,
   MobileCheckoutBar,
   OrderReview,
-  type CheckoutAddressForm,
   type CheckoutDeliveryOption,
 } from '../components/checkout/CheckoutComponents';
 import './CheckoutPage.css';
@@ -75,9 +74,9 @@ function quoteErrorMessage(error: unknown): string {
   if (code === 'ERR_OUT_OF_SERVICE_AREA') return "This delivery address is outside Lalamove's service area.";
   if (code === 'ERR_INVALID_SERVICE_TYPE') return 'Motorcycle delivery is currently unavailable for this route.';
   if (code === 'ERR_REVERSE_GEOCODE_FAILURE' || code === 'ERR_INVALID_LOCATION') {
-    return 'Please adjust the delivery pin to a valid road-accessible location.';
+    return 'Update your delivery pin in Profile to a road-accessible location.';
   }
-  if (code === 'ERR_INVALID_COORDINATES') return 'Please adjust the delivery pin to a valid location.';
+  if (code === 'ERR_INVALID_COORDINATES') return 'Update your delivery pin in Profile.';
   if (error instanceof Error && error.message) return error.message;
   return 'We could not confirm a courier fee. Check the address and try again.';
 }
@@ -98,22 +97,17 @@ export default function CheckoutPage() {
   ));
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
 
-  const [userName, setUserName] = useState('');
-  const [userPhone, setUserPhone] = useState('');
-  const [userAddress, setUserAddress] = useState(() => cartDraft?.destination?.address || '');
-  const [editAddress, setEditAddress] = useState(false);
-  const [editForm, setEditForm] = useState<CheckoutAddressForm>({
-    name: '',
-    phone: '',
-    address: cartDraft?.destination?.address || '',
-  });
   const [deliveryOption, setDeliveryOption] = useState<CheckoutDeliveryOption | null>(
     routeState?.deliveryOption || cartDraft?.deliveryOption || null,
   );
   const [placing, setPlacing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [confirmMapClick, setConfirmMapClick] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const userId = user?.id || null;
+  const userName = String(user?.user_metadata?.name || '');
+  const userPhone = String(user?.user_metadata?.phone || '');
+  const userAddress = String(user?.user_metadata?.address || '');
+  const savedLat = user?.user_metadata?.address_lat;
+  const savedLng = user?.user_metadata?.address_lng;
+  const savedDropoff = useMemo(() => validAddressCoordinates(savedLat, savedLng), [savedLat, savedLng]);
 
   const [lalamoveQuote, setLalamoveQuote] = useState<LalamoveQuote | null>(null);
   const [lalamoveLoading, setLalamoveLoading] = useState(false);
@@ -125,7 +119,7 @@ export default function CheckoutPage() {
   const [storedPickupCoordinates, setStoredPickupCoordinates] = useState<Coordinates | null>(null);
   const [mapCoords, setMapCoords] = useState<{ pickup: Coordinates; dropoff: Coordinates | null }>({
     pickup: { lat: 15.026, lng: 120.691 },
-    dropoff: cartDraft?.destination?.coordinates || null,
+    dropoff: null,
   });
   const mapRef = useRef<google.maps.Map | null>(null);
   const quoteRequestSequence = useRef(0);
@@ -178,15 +172,8 @@ export default function CheckoutPage() {
     setLalamoveLoading(true);
     setLalamoveError(null);
     try {
-      const dropoffCoordinates = validDropoff || validCoordinates(await geocodeAddress(dropoff));
-      if (!dropoffCoordinates) {
-        const error = new Error('Please adjust the delivery pin to a valid road-accessible location.') as Error & { code?: string };
-        error.code = 'ERR_INVALID_LOCATION';
-        throw error;
-      }
-      if (!validDropoff) {
-        setMapCoords(current => ({ ...current, dropoff: dropoffCoordinates }));
-      }
+      const dropoffCoordinates = validDropoff;
+      if (!dropoffCoordinates) throw new Error('Save a valid delivery pin in Profile before requesting courier delivery.');
       if (sequence !== quoteRequestSequence.current) return;
 
       const controller = new AbortController();
@@ -236,41 +223,10 @@ export default function CheckoutPage() {
   }, [items.length, navigate]);
 
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    async function loadProfile() {
-      const metadata = user!.user_metadata || {};
-      const name = metadata.name || user!.email || '';
-      const phone = metadata.phone || '';
-      const address = cartDraft?.destination?.address || metadata.address || '';
-      if (cancelled) return;
-
-      setUserName(name);
-      setUserPhone(phone);
-      setUserAddress(address);
-      setEditForm({ name, phone, address });
-      setUserId(user!.id);
-
-      const draftCoordinates = validCoordinates(cartDraft?.destination?.coordinates);
-      if (draftCoordinates) {
-        setMapCoords(current => ({ ...current, dropoff: draftCoordinates }));
-      } else if (metadata.address_lat && metadata.address_lng) {
-        const coordinates = validCoordinates({ lat: Number(metadata.address_lat), lng: Number(metadata.address_lng) });
-        if (coordinates) setMapCoords(current => ({ ...current, dropoff: coordinates }));
-        else if (address) {
-          const geocoded = await geocodeAddress(address);
-          if (geocoded && !cancelled) setMapCoords(current => ({ ...current, dropoff: geocoded }));
-        }
-      } else if (address) {
-        const coordinates = await geocodeAddress(address);
-        if (coordinates && !cancelled) setMapCoords(current => ({ ...current, dropoff: coordinates }));
-      }
-    }
-
-    void loadProfile();
-    return () => { cancelled = true; };
-  }, [cartDraft, user]);
+    // Profile owns the delivery pin; cart drafts must never override it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMapCoords(current => ({ ...current, dropoff: savedDropoff }));
+  }, [savedDropoff]);
 
   useEffect(() => {
     const shopId = items[0]?.shopId;
@@ -302,7 +258,6 @@ export default function CheckoutPage() {
       return;
     }
     if (!shopAddress || !isLoaded) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPickupReady(false);
       return;
     }
@@ -334,7 +289,7 @@ export default function CheckoutPage() {
       setLalamoveLoading(false);
       return;
     }
-    if (!isLoaded || !pickupReady || userAddress.trim().length < 5 || !validCoordinates(mapCoords.pickup)) {
+    if (!isLoaded || !pickupReady || userAddress.trim().length < 5 || !validCoordinates(mapCoords.pickup) || !savedDropoff) {
       setLalamoveError(null);
       setLalamoveLoading(false);
       return;
@@ -350,7 +305,7 @@ export default function CheckoutPage() {
       );
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [currentQuoteKey, deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.dropoff, mapCoords.pickup, pickupReady, quoteRefreshToken, shopAddress, userAddress]);
+  }, [currentQuoteKey, deliveryOption, fetchLalamoveQuote, isLoaded, mapCoords.dropoff, mapCoords.pickup, pickupReady, quoteRefreshToken, shopAddress, userAddress, savedDropoff]);
 
   useEffect(() => {
     if (deliveryOption !== 'courier' || !lalamoveQuote?.expiresAt || !hasValidCourierQuote) return;
@@ -390,95 +345,25 @@ export default function CheckoutPage() {
     }
   }, [isLoaded, mapCoords, mapReady]);
 
-  const handleMarkerDragEnd = useCallback(async (lat: number, lng: number) => {
-    const coordinates = validCoordinates({ lat, lng });
-    if (!coordinates) return;
-    const address = await reverseGeocodeCoords(lat, lng);
-    if (!address) return;
-    setMapCoords(current => ({ ...current, dropoff: coordinates }));
-    setUserAddress(address);
-    setEditForm(current => ({ ...current, address }));
-    if (user) await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
-  }, [user]);
-
-  const handleMapClick = useCallback(async (lat: number, lng: number) => {
-    const coordinates = validCoordinates({ lat, lng });
-    if (!coordinates) return;
-    const address = await reverseGeocodeCoords(lat, lng);
-    setConfirmMapClick({ ...coordinates, address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}` });
-  }, []);
-
-  const confirmMapLocation = useCallback(async () => {
-    if (!confirmMapClick) return;
-    const { lat, lng, address } = confirmMapClick;
-    const coordinates = validCoordinates({ lat, lng });
-    if (!coordinates) return;
-    setMapCoords(current => ({ ...current, dropoff: coordinates }));
-    setUserAddress(address);
-    setEditForm(current => ({ ...current, address }));
-    if (user) await supabase.auth.updateUser({ data: { address, address_lat: lat, address_lng: lng } });
-    setConfirmMapClick(null);
-  }, [confirmMapClick, user]);
-
-  function cancelEditing() {
-    setEditForm({ name: userName, phone: userPhone, address: userAddress });
-    setEditAddress(false);
-  }
-
-  async function saveDetails() {
-    const name = editForm.name.trim();
-    const phone = editForm.phone.trim();
-    const address = editForm.address.trim();
-    if (name.length < 2 || phone.length < 7) {
-      toast.error('Please provide your full name and a valid phone number.');
-      return;
-    }
-    if (deliveryOption === 'courier' && address.length < 5) {
-      toast.error('A complete delivery address is required for courier delivery.');
-      return;
-    }
-    if (!user) return;
-
-    setSaving(true);
-    try {
-      const coordinates = address ? await geocodeAddress(address) : null;
-      const resolvedCoordinates = validCoordinates(coordinates);
-      if (deliveryOption === 'courier' && !resolvedCoordinates) {
-        toast.error('Please provide an address that can be located on the map.');
-        return;
-      }
-      const updateData: Record<string, string | number> = { name, phone, address };
-      if (resolvedCoordinates) {
-        updateData.address_lat = resolvedCoordinates.lat;
-        updateData.address_lng = resolvedCoordinates.lng;
-      }
-      const { error } = await supabase.auth.updateUser({ data: updateData });
-      if (error) throw error;
-
-      setUserName(name);
-      setUserPhone(phone);
-      setUserAddress(address);
-      if (resolvedCoordinates) setMapCoords(current => ({ ...current, dropoff: resolvedCoordinates }));
-      setEditAddress(false);
-      toast.success('Checkout details updated.');
-    } catch (error) {
-      console.error('Failed to save checkout details:', error);
-      toast.error('Could not save your details. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+  function editProfile() {
+    const state = {
+      ...(buyNowItem ? { buyNowItem } : { checkoutDraft: cartDraft || undefined }), deliveryOption: deliveryOption || undefined,
+    };
+    navigate('/checkout', { replace: true, state });
+    navigate('/dashboard?tab=account', { state: { profileReturn: { pathname: '/checkout', state } } });
   }
 
   const disabledReason = useMemo(() => {
     if (!deliveryOption) return 'Select pickup or courier delivery.';
     if (!userId) return 'Loading your account details…';
-    if (userName.trim().length < 2 || userPhone.trim().length < 7) return 'Add your full name and phone number.';
-    if (deliveryOption === 'courier' && userAddress.trim().length < 5) return 'Add a complete delivery address.';
+    if (userName.trim().length < 2 || userPhone.trim().length < 7) return 'Add your full name and phone number in Profile.';
+    if (deliveryOption === 'courier' && userAddress.trim().length < 5) return 'Save a complete delivery address in Profile.';
+    if (deliveryOption === 'courier' && !savedDropoff) return 'Save a valid delivery pin in Profile.';
     if (deliveryOption === 'courier' && lalamoveLoading) return 'Confirming the courier fee…';
     if (deliveryOption === 'courier' && quoteExpired) return 'Refreshing the courier fee…';
     if (deliveryOption === 'courier' && !hasValidCourierQuote) return 'A confirmed courier quote is required.';
     return null;
-  }, [deliveryOption, hasValidCourierQuote, lalamoveLoading, quoteExpired, userAddress, userId, userName, userPhone]);
+  }, [deliveryOption, hasValidCourierQuote, lalamoveLoading, quoteExpired, savedDropoff, userAddress, userId, userName, userPhone]);
 
   async function handlePlaceOrder() {
     if (disabledReason || !deliveryOption || items.length === 0 || !userId) {
@@ -567,14 +452,8 @@ export default function CheckoutPage() {
               name={userName}
               phone={userPhone}
               address={userAddress}
-              editing={editAddress}
-              form={editForm}
-              saving={saving}
               requiresAddress={deliveryOption === 'courier'}
-              onEdit={() => setEditAddress(true)}
-              onCancel={cancelEditing}
-              onFormChange={setEditForm}
-              onSave={() => void saveDetails()}
+              onEditProfile={editProfile}
             />
 
             <DeliveryCard
@@ -599,19 +478,12 @@ export default function CheckoutPage() {
                     center={mapCoords.pickup}
                     zoom={13}
                     onLoad={map => { mapRef.current = map; setMapReady(true); }}
-                    onClick={event => {
-                      if (event.latLng) void handleMapClick(event.latLng.lat(), event.latLng.lng());
-                    }}
                     options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
                   >
                     <Marker position={mapCoords.pickup} label={{ text: 'P', color: '#fff', fontSize: '12px', fontWeight: '700' }} />
                     {mapCoords.dropoff ? (
                       <Marker
                         position={mapCoords.dropoff}
-                        draggable
-                        onDragEnd={event => {
-                          if (event.latLng) void handleMarkerDragEnd(event.latLng.lat(), event.latLng.lng());
-                        }}
                         label={{ text: 'D', color: '#fff', fontSize: '12px', fontWeight: '700' }}
                       />
                     ) : null}
@@ -641,13 +513,6 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {confirmMapClick ? (
-        <LocationDialog
-          address={confirmMapClick.address}
-          onCancel={() => setConfirmMapClick(null)}
-          onConfirm={() => void confirmMapLocation()}
-        />
-      ) : null}
 
       <MobileCheckoutBar
         total={total}

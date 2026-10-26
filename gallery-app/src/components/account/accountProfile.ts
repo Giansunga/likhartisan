@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import { readAddressParts, type AddressParts } from '../../lib/profileAddress';
 
 export interface AccountProfile {
   fullName: string;
@@ -8,12 +9,16 @@ export interface AccountProfile {
   addressLat: number | null;
   addressLng: number | null;
   avatarUrl: string;
+  addressParts?: AddressParts | null;
 }
 
 export interface AccountProfileDraft {
   fullName: string;
   phone: string;
   address: string;
+  addressParts?: AddressParts | null;
+  addressLat?: number | null;
+  addressLng?: number | null;
 }
 
 export type AccountFieldErrors = Partial<Record<keyof AccountProfileDraft, string>>;
@@ -38,6 +43,7 @@ export function accountProfileFromUser(user: User): AccountProfile {
     addressLat: addressLat !== null && Number.isFinite(addressLat) ? addressLat : null,
     addressLng: addressLng !== null && Number.isFinite(addressLng) ? addressLng : null,
     avatarUrl: String(metadata.avatar_url || ''),
+    addressParts: readAddressParts(metadata.address_parts),
   };
 }
 
@@ -46,11 +52,15 @@ export function profileToDraft(profile: AccountProfile): AccountProfileDraft {
     fullName: profile.fullName,
     phone: profile.phone,
     address: profile.address,
+    addressParts: profile.addressParts ?? null,
+    addressLat: profile.addressLat,
+    addressLng: profile.addressLng,
   };
 }
 
 export function normalizeAccountDraft(draft: AccountProfileDraft): AccountProfileDraft {
   return {
+    ...draft,
     fullName: draft.fullName.trim().replace(/\s+/g, ' '),
     phone: draft.phone.trim(),
     address: draft.address.trim().replace(/\s+/g, ' '),
@@ -61,7 +71,10 @@ export function isAccountDraftDirty(draft: AccountProfileDraft, profile: Account
   const normalized = normalizeAccountDraft(draft);
   return normalized.fullName !== profile.fullName
     || normalized.phone !== profile.phone
-    || normalized.address !== profile.address;
+    || (draft.address !== profile.address && normalized.address !== profile.address)
+    || JSON.stringify(normalized.addressParts ?? null) !== JSON.stringify(profile.addressParts ?? null)
+    || (normalized.addressLat !== undefined && normalized.addressLat !== profile.addressLat)
+    || (normalized.addressLng !== undefined && normalized.addressLng !== profile.addressLng);
 }
 
 export function validateAccountDraft(draft: AccountProfileDraft): AccountFieldErrors {
@@ -74,6 +87,9 @@ export function validateAccountDraft(draft: AccountProfileDraft): AccountFieldEr
   }
   if (normalized.address && normalized.address.length < 5) {
     errors.address = 'Enter a more complete address.';
+  }
+  if (normalized.addressParts && (!normalized.addressParts.region || !normalized.addressParts.city || !normalized.addressParts.barangay || !normalized.addressParts.street.trim())) {
+    errors.address = 'Choose your region, city or municipality, barangay, and enter a street or landmark.';
   }
 
   return errors;

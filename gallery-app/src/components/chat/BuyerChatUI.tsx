@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { getChatMessagePreview } from '../../lib/chatMessages';
@@ -54,7 +55,7 @@ interface ShopAvatarProps {
 export function BuyerShopAvatar({ image, name, size = 'md', decorative = false }: ShopAvatarProps) {
   return (
     <span className={`buyer-chat-avatar buyer-chat-avatar--${size}`} aria-hidden={decorative || undefined}>
-      {image ? <img src={image} alt={decorative ? '' : name} /> : <span>{name?.charAt(0) || 'S'}</span>}
+      {image ? <AssetImage src={image} alt={decorative ? '' : name} /> : <span>{name?.charAt(0) || 'S'}</span>}
     </span>
   );
 }
@@ -263,7 +264,7 @@ export function BuyerMessageComposer({
     <div className="buyer-chat-composer">
       {imagePreview ? (
         <div className="buyer-chat-composer__preview">
-          <img src={imagePreview} alt="Attachment preview" />
+          <AssetImage src={imagePreview} alt="Attachment preview" />
           <span>{pendingImage?.name}</span>
           <button type="button" onClick={onRemoveImage} aria-label="Remove image attachment">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -342,7 +343,7 @@ export function BuyerShopDetails({ open, mobile, shop, activity, onClose }: Shop
         </div>
         <div className="buyer-shop-panel__scroll">
           <div className="buyer-shop-hero">
-            <img src={shop.banner || '/images/vases_collection.png'} alt="" />
+            <AssetImage src={shop.banner || '/images/vases_collection.png'} alt="" />
             <BuyerShopAvatar image={shop.image} name={shop.name} size="lg" />
           </div>
           <div className="buyer-shop-summary">

@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -249,7 +250,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
         <div className="attachment-filter" role="tablist" aria-label="Attachment families">{ATTACHMENT_FAMILIES.map((family) => <button type="button" role="tab" aria-selected={activeFamily === family.id} className={activeFamily === family.id ? 'active' : ''} key={family.id} onClick={() => { setActiveFamily(family.id); setSelectedRecipeKey(''); setActiveStage(1); }}>{family.label}</button>)}</div>
         {loading ? <p className="attachment-empty">Analyzing compatible attachments…</p> : error ? <p className="attachment-empty attachment-error">{error}</p> : familySockets.length === 0 ? <p className="attachment-empty">This shape has no safe {ATTACHMENT_FAMILIES.find((family) => family.id === activeFamily)?.label.toLowerCase()} sockets.</p> : familyAssets.length === 0 ? <p className="attachment-empty">No configured recipe fits this shape safely.</p> : <div className="attachment-grid">{familyAssets.map((asset) => {
           const selected = selectedAsset?.recipe.key === asset.recipe.key;
-          return <button type="button" key={asset.recipe.key} aria-pressed={selected} className={`attachment-card ${selected ? 'selected' : ''}`} onClick={() => { setSelectedRecipeKey(asset.recipe.key); setActiveStage(2); }}><img src={asset.recipe.thumbnail} alt="" /><span>{asset.recipe.name}</span><small>₱{asset.priceAdjustment.toLocaleString()} each</small></button>;
+          return <button type="button" key={asset.recipe.key} aria-pressed={selected} className={`attachment-card ${selected ? 'selected' : ''}`} onClick={() => { setSelectedRecipeKey(asset.recipe.key); setActiveStage(2); }}><AssetImage src={asset.recipe.thumbnail} alt="" /><span>{asset.recipe.name}</span><small>₱{asset.priceAdjustment.toLocaleString()} each</small></button>;
         })}</div>}
       </PanelSection>
 

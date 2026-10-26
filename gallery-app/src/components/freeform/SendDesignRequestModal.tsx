@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useState } from 'react';
 import { CheckCircle2, ChevronLeft, LoaderCircle, Send, Store, X } from 'lucide-react';
 import { getPattern } from './decor';
@@ -53,7 +54,7 @@ export default function SendDesignRequestModal({
             <div className="freeform-request-heading"><Store size={25} /><div><h2 id="send-request-title">Choose a shop</h2><p>Select the artisan shop that should quote this design.</p></div></div>
             <div className="freeform-request-shop-list">
               {shops.map(item => <button type="button" key={item.id} onClick={() => { onSelectShop(item); setChangingShop(false); }}>
-                <span className="freeform-request-shop-avatar">{item.image ? <img src={item.image} alt="" /> : item.name.slice(0, 1)}</span>
+                <span className="freeform-request-shop-avatar">{item.image ? <AssetImage src={item.image} alt="" /> : item.name.slice(0, 1)}</span>
                 <span><strong>{item.name}</strong><small>{item.location || 'Pottery artisan shop'}</small></span>
               </button>)}
             </div>
@@ -67,7 +68,7 @@ export default function SendDesignRequestModal({
                 <FreeformViewer modelFile={snapshot.model.file} shapeParams={snapshot.shape} materialParams={snapshot.material} decorationParams={snapshot.decoration} attachmentParams={snapshot.attachments} showAttachmentSockets={false} onMorphDetected={() => {}} preview />
               </div>
               <div className="freeform-request-form">
-                <div className="freeform-request-selected-shop"><span className="freeform-request-shop-avatar">{shop.image ? <img src={shop.image} alt="" /> : shop.name.slice(0, 1)}</span><span><small>{revisionMode ? 'REVISION FOR' : 'SENDING TO'}</small><strong>{shop.name}</strong></span>{revisionMode ? null : <button type="button" onClick={() => setChangingShop(true)}>Change</button>}</div>
+                <div className="freeform-request-selected-shop"><span className="freeform-request-shop-avatar">{shop.image ? <AssetImage src={shop.image} alt="" /> : shop.name.slice(0, 1)}</span><span><small>{revisionMode ? 'REVISION FOR' : 'SENDING TO'}</small><strong>{shop.name}</strong></span>{revisionMode ? null : <button type="button" onClick={() => setChangingShop(true)}>Change</button>}</div>
                 <dl className="freeform-request-specs">
                   <div><dt>Model</dt><dd>{snapshot.model.name}</dd></div>
                   <div><dt>Finish</dt><dd><i style={{ background: snapshot.material.color }} />{getFinishDefinition(snapshot.material.finish).label}</dd></div>

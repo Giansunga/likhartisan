@@ -1,3 +1,4 @@
+import AssetImage from '../../components/AssetImage';
 import { Popup } from '../../components/Popup';
 import { notify } from '../../lib/popups';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -584,7 +585,7 @@ export default function OrdersPage() {
                         <InfoRow label="Reason" value={returnRequest.reason.replaceAll('_', ' ')} />
                         <InfoRow label="Requested resolution" value={returnRequest.requested_resolution} />
                         <InfoRow label="Buyer description" value={returnRequest.description || '--'} />
-                        {returnRequest.order_return_evidence?.length ? <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>{returnRequest.order_return_evidence.map(evidence => evidence.signedUrl ? <a key={evidence.id} href={evidence.signedUrl} target="_blank" rel="noreferrer"><img src={evidence.signedUrl} alt="Return evidence" style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover' }} /></a> : null)}</div> : null}
+                        {returnRequest.order_return_evidence?.length ? <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>{returnRequest.order_return_evidence.map(evidence => evidence.signedUrl ? <a key={evidence.id} href={evidence.signedUrl} target="_blank" rel="noreferrer"><AssetImage src={evidence.signedUrl} alt="Return evidence" style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover' }} /></a> : null)}</div> : null}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
                           {returnRequest.status === 'submitted' ? <button className="orders-secondary-action" onClick={() => void updateReturn('under_review')}>Start review</button> : null}
                           {['submitted', 'under_review'].includes(returnRequest.status) ? <><button className="orders-secondary-action" onClick={() => void updateReturn('approved')}>Approve</button><button className="orders-secondary-action" onClick={() => void updateReturn('rejected')}>Reject</button></> : null}
@@ -606,7 +607,7 @@ export default function OrdersPage() {
                     <SectionCard title="Shop & Artisan">
                       {(selectedOrder.items || []).map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: idx < (selectedOrder.items || []).length - 1 ? '10px' : 0 }}>
-                          {item.image && <img src={item.image} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />}
+                          {item.image && <AssetImage src={item.image} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />}
                           <div style={{ flex: 1 }}>
                             <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{item.product_name || 'Product'}</p>
                             <p style={{ fontSize: '0.75rem', color: '#8C7B6E' }}>{item.shop_name || 'Shop'} &middot; Qty: {item.qty}</p>
@@ -702,7 +703,7 @@ export default function OrdersPage() {
                     <SectionCard title="Payment Proof (QR)">
                       {selectedOrder.payment_proof_url ? (
                         <div style={{ textAlign: 'center' }}>
-                          <img src={selectedOrder.payment_proof_url} alt="Payment Proof" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '10px', border: '1px solid #E8E0D8', objectFit: 'contain' }} />
+                          <AssetImage src={selectedOrder.payment_proof_url} alt="Payment Proof" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '10px', border: '1px solid #E8E0D8', objectFit: 'contain' }} />
                           <p style={{ fontSize: '0.78rem', color: '#8C7B6E', marginTop: '8px' }}>Uploaded by customer</p>
                         </div>
                       ) : (

@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 export default function ModelThumb({
   thumbnail,
   size = 48,
@@ -7,7 +8,7 @@ export default function ModelThumb({
 }) {
   if (thumbnail) {
     return (
-      <img
+      <AssetImage
         src={thumbnail}
         alt=""
         style={{

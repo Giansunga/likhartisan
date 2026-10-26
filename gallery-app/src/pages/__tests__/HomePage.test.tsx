@@ -64,7 +64,7 @@ describe('HomePage editorial landing page', () => {
     }, hero);
     expect(shopTour).not.toBeNull();
     expect(shopTour?.nextElementSibling).toBe(reviews);
-    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops').querySelector('source')).toHaveAttribute('src', 'https://pub-0cc6e7109e7e48a183d54d0426453a6a.r2.dev/Landing%20Page%20Video/LikhArtisan%203min.mp4');
+    expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops').querySelector('source')).toHaveAttribute('src', '/media/r2/Landing%20Page%20Video/LikhArtisan%203min.mp4');
     expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('preload', 'metadata');
     expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('controls');
     expect(screen.getByTitle('A Tour of Santo Tomas: Inside the Shops')).toHaveAttribute('playsinline');

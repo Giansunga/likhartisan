@@ -1,13 +1,20 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   server: {
     host: true,
     allowedHosts: true as any,
+    proxy: {
+      '/media/': {
+        target: loadEnv(mode, process.cwd(), '').ASSET_GATEWAY_ORIGIN || 'https://likhartisan-assets.likhartisan-assets.workers.dev',
+        changeOrigin: true,
+        rewrite: value => value.replace(/^\/media/, ''),
+      },
+    },
   },
   resolve: {
     alias: {
@@ -30,4 +37,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

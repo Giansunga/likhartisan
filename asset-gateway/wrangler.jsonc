@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "likhartisan-assets",
+  "main": "src/index.js",
+  "account_id": "27f7bdcf6af0f2a93b39785b458d5a93",
+  "compatibility_date": "2026-10-21",
+  "workers_dev": true,
+  "r2_buckets": [
+    { "binding": "ASSETS", "bucket_name": "likhartisan-2026" }
+  ]
+}

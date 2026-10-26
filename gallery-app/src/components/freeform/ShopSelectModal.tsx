@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -123,7 +124,7 @@ export default function ShopSelectModal({
                 <div className="shop-card-header">
                   <div className="shop-card-avatar">
                     {shop.image ? (
-                      <img src={shop.image} alt={shop.name} />
+                      <AssetImage src={shop.image} alt={shop.name} />
                     ) : (
                       <span>{shop.name.charAt(0)}</span>
                     )}
@@ -137,7 +138,7 @@ export default function ShopSelectModal({
                   <div className="shop-card-thumbs">
                     {shop.thumbnails.map((thumb, i) => (
                       <div key={i} className="shop-card-thumb">
-                        <img src={thumb} alt="" />
+                        <AssetImage src={thumb} alt="" />
                       </div>
                     ))}
                   </div>

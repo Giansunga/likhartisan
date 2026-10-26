@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useEffect, useRef, useState } from 'react';
 import { Ellipsis, Eye, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
 import type { Product } from '../../types';
@@ -20,7 +21,7 @@ function StatusBadge({ product }: { product: Product }) {
 }
 
 function ProductImage({ product }: { product: Product }) {
-  return <img className="product-cell__image" src={product.image || '/placeholder.svg'} alt="" onError={(event) => { event.currentTarget.src = '/placeholder.svg'; }} />;
+  return <AssetImage className="product-cell__image" src={product.image || '/placeholder.svg'} alt="" onError={(event) => { event.currentTarget.src = '/placeholder.svg'; }} />;
 }
 
 function ProductActions({ product, busy, onEdit, onArchive, onDelete }: { product: Product; busy: boolean; onEdit: () => void; onArchive: () => void; onDelete: () => void }) {

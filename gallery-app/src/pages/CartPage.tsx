@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useJsApiLoader } from '@react-google-maps/api';
 import { toast } from '../lib/popups';
 import { ArrowLeft, Info, Trash2 } from 'lucide-react';
@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase';
 import type { CartCheckoutDraft, CartItem } from '../types';
 import { geocodeAddress } from '../lib/geocoder';
 import { useAuth } from '../contexts/AuthContext';
+import { validAddressCoordinates } from '../lib/profileAddress';
+import type { ProfileReturn } from '../lib/profileNavigation';
 import { API_BASE } from '../lib/api';
 import {
   getCartLineKey,
@@ -127,27 +129,36 @@ function initialShopSelection(items: CartItem[]): { shopKey: string | null; line
 
 export default function CartPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnSelection = (location.state as ProfileReturn['state'])?.cartSelection;
   const { user } = useAuth();
   const { isLoaded: mapsLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
   });
   const [items, setItems] = useState<CartItem[]>(getCart);
-  const [initialSelection] = useState(() => initialShopSelection(items));
+  const [initialSelection] = useState(() => returnSelection ? { shopKey: returnSelection.shopKey, lineKeys: new Set(returnSelection.lineKeys) } : initialShopSelection(items));
   const [activeShopKey, setActiveShopKey] = useState<string | null>(initialSelection.shopKey);
   const [selected, setSelected] = useState<Set<string>>(initialSelection.lineKeys);
   const [catalog, setCatalog] = useState<Record<string, CatalogLineState>>({});
   const [validationStatus, setValidationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [shopAddresses, setShopAddresses] = useState<Record<string, string>>({});
   const [shopCoordinates, setShopCoordinates] = useState<Record<string, Coordinates | null>>({});
-  const [deliveryOption, setDeliveryOption] = useState<'pickup' | 'courier' | null>(null);
-  const [address, setAddress] = useState<string | null>(null);
+  const [deliveryOption, setDeliveryOption] = useState<'pickup' | 'courier' | null>(returnSelection?.deliveryOption || null);
   const [estimate, setEstimate] = useState<DeliveryEstimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState('');
   const estimateRequestSequence = useRef(0);
   const estimateAbortController = useRef<AbortController | null>(null);
 
-  const effectiveAddress = address ?? user?.user_metadata?.address ?? '';
+  const effectiveAddress = String(user?.user_metadata?.address || '');
+  const savedLat = user?.user_metadata?.address_lat;
+  const savedLng = user?.user_metadata?.address_lng;
+  const savedCoordinates = useMemo(() => validAddressCoordinates(savedLat, savedLng), [savedLat, savedLng]);
+
+  useEffect(() => {
+    // A profile change invalidates any fee for the old destination.
+    invalidateEstimate();
+  }, [effectiveAddress, savedCoordinates]);
 
   const cartIdentity = useMemo(() => items.map(getCartLineKey).sort().join('|'), [items]);
 
@@ -371,12 +382,16 @@ export default function CartPage() {
     toast.success(`${keys.length} ${keys.length === 1 ? 'item' : 'items'} removed from your cart.`);
   }
 
-  async function requestEstimate() {
+  const requestEstimate = useCallback(async () => {
     if (deliveryOption !== 'courier' || !activeGroup || selectedItems.length === 0) return;
     const shopId = activeGroup.items[0]?.shopId;
     const shopAddress = shopId ? shopAddresses[shopId] : '';
     if (!shopAddress) {
       setEstimateError('This artisan has not provided a pickup address yet. Delivery can still be arranged at checkout.');
+      return;
+    }
+    if (!effectiveAddress.trim() || !savedCoordinates) {
+      setEstimateError('Save a complete delivery address and valid pin in Profile first.');
       return;
     }
     if (!mapsLoaded) {
@@ -393,7 +408,7 @@ export default function CartPage() {
     try {
       const [pickupCoords, dropoffCoords] = await Promise.all([
         shopId ? Promise.resolve(shopCoordinates[shopId] || geocodeAddress(shopAddress)) : geocodeAddress(shopAddress),
-        geocodeAddress(effectiveAddress.trim()),
+        Promise.resolve(savedCoordinates),
       ]);
       if (sequence !== estimateRequestSequence.current) return;
       const validPickup = validCoordinates(pickupCoords);
@@ -441,7 +456,7 @@ export default function CartPage() {
       } else if (code === 'ERR_INVALID_SERVICE_TYPE') {
         setEstimateError('Courier delivery is currently unavailable for this route.');
       } else if (code === 'ERR_INVALID_COORDINATES' || code === 'ERR_REVERSE_GEOCODE_FAILURE' || code === 'ERR_INVALID_LOCATION') {
-        setEstimateError('Please adjust the delivery address to a valid road-accessible location.');
+        setEstimateError('Update the delivery address and pin in Profile to a road-accessible location.');
       } else if (error instanceof Error && error.message && error.message !== 'Address not found') {
         setEstimateError(error.message);
       } else {
@@ -453,7 +468,14 @@ export default function CartPage() {
         setEstimateLoading(false);
       }
     }
-  }
+  }, [activeGroup, deliveryOption, effectiveAddress, mapsLoaded, savedCoordinates, selectedItems, selectedVehicle, shopAddresses, shopCoordinates]);
+
+  const resumedEstimate = useRef(false);
+  useEffect(() => {
+    if (resumedEstimate.current || !returnSelection || deliveryOption !== 'courier' || !mapsLoaded || validationStatus !== 'ready' || !savedCoordinates || !effectiveAddress.trim() || !activeGroup || !shopAddresses[activeGroup.items[0]?.shopId || '']) return;
+    resumedEstimate.current = true;
+    void requestEstimate();
+  }, [activeGroup, deliveryOption, effectiveAddress, mapsLoaded, requestEstimate, returnSelection, savedCoordinates, shopAddresses, validationStatus]);
 
   useEffect(() => () => {
     estimateRequestSequence.current += 1;
@@ -549,7 +571,13 @@ export default function CartPage() {
               estimateLoading={estimateLoading}
               estimateError={estimateError}
               onDeliveryOptionChange={option => { invalidateEstimate(); setDeliveryOption(option); }}
-              onAddressChange={value => { invalidateEstimate(); setAddress(value); }}
+              name={user?.user_metadata?.name} phone={user?.user_metadata?.phone} signedIn={Boolean(user)}
+              onEditProfile={() => {
+                if (!user) { window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } })); return; }
+                const state = { cartSelection: { shopKey: resolvedActiveShopKey, lineKeys: [...effectiveSelected], deliveryOption } };
+                navigate('/cart', { replace: true, state });
+                navigate('/dashboard?tab=account', { state: { profileReturn: { pathname: '/cart', state } } });
+              }}
               onEstimate={requestEstimate}
               onCheckout={beginCheckout}
             />

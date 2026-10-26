@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { confirmAction } from '../../lib/popups';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -160,7 +161,7 @@ export default function SavedDesignsModal({
                 <div key={d.id} className="saved-design-card">
                   <div className="saved-design-card-thumb">
                     {d.thumbnail ? (
-                      <img src={d.thumbnail} alt="" />
+                      <AssetImage src={d.thumbnail} alt="" />
                     ) : (
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" style={{ width: '28px', height: '28px' }}>
                         <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z" />

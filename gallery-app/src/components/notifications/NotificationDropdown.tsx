@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useEffect } from 'react';
 import { notificationCategory, relativeNotificationTime } from '../../lib/notifications';
 import type { NotificationContext, NotificationRecord } from '../../types/notifications';
@@ -51,7 +52,7 @@ export default function NotificationDropdown({ context, notifications, unreadCou
           <div className="notification-popover__state"><NotificationIcon notification={{ id: 'empty', user_id: '', type: 'notification', title: '', message: '', recipient_context: context, read: true, created_at: new Date().toISOString() }} /><strong>You're all caught up</strong><p>No notifications yet.</p></div>
         ) : notifications.map(notification => (
           <button className={`notification-popover__item ${notification.read ? '' : 'is-unread'}`} type="button" key={notification.id} onClick={() => onOpenNotification(notification)}>
-            {notification.product_image ? <img src={notification.product_image} alt="" /> : <span className={`notification-popover__icon is-${notificationCategory(notification)}`}><NotificationIcon notification={notification} /></span>}
+            {notification.product_image ? <AssetImage src={notification.product_image} alt="" /> : <span className={`notification-popover__icon is-${notificationCategory(notification)}`}><NotificationIcon notification={notification} /></span>}
             <span className="notification-popover__copy"><strong>{notification.title}</strong><span>{notification.message}</span><time dateTime={notification.created_at}>{relativeNotificationTime(notification.created_at)}</time></span>
             {!notification.read ? <i className="notification-popover__unread" aria-label="Unread" /> : null}
           </button>

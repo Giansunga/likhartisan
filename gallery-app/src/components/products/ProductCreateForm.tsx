@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import FeaturedArtisanSelect from '../admin/FeaturedArtisanSelect';
 import ProductTagsInput from '../admin/ProductTagsInput';
 import { resolveProductTags, type ProductTagsDraft } from '../../lib/productTags';
@@ -424,7 +425,7 @@ export default function ProductCreateForm({ lockedShop, listPath, onCreated }: P
                   <span style={{ fontSize: '0.75rem', color: '#B8A89A', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
                   <input type="file" aria-label="Product image" accept=".jpg,.jpeg,.png,.webp,.gif" onChange={handleImageChange} style={{ display: 'none' }} />
                 </label>
-                {imagePreview && <img src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
+                {imagePreview && <AssetImage src={imagePreview} alt="Preview" style={{ marginTop: '12px', width: '80px', height: '80px', borderRadius: '10px', objectFit: 'cover' }} />}
               </div>
               <div>
                 <label style={labelStyle}>3D Model (.glb)</label>

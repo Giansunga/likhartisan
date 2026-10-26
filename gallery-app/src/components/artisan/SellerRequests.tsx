@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownUp, CheckCircle2, ChevronRight, Clock3, Eye, Inbox, LoaderCircle,
@@ -221,7 +222,7 @@ export default function SellerRequests() {
       <div className="seller-request-queue" role="list">
         <div className="seller-request-queue__head" aria-hidden="true"><span>Request</span><span>Buyer</span><span>Stage</span><span>Quote</span><span>Updated</span><span /></div>
         {visible.map(request => <button type="button" role="listitem" className="seller-request-row" key={request.id} onClick={() => openRequest(request)}>
-          <span className="seller-request-row__design"><span className="seller-request-row__visual" style={{ background: request.design_snapshot.material.color }}>{request.design_snapshot.model.thumbnail ? <img src={request.design_snapshot.model.thumbnail} alt="" /> : <span>3D</span>}</span><span><strong>{request.design_snapshot.model.name || 'Custom pottery design'}</strong><small>#{request.id.slice(0, 8).toUpperCase()} · Rev {request.current_revision || 1} · Qty {request.quantity}</small></span></span>
+          <span className="seller-request-row__design"><span className="seller-request-row__visual" style={{ background: request.design_snapshot.material.color }}>{request.design_snapshot.model.thumbnail ? <AssetImage src={request.design_snapshot.model.thumbnail} alt="" /> : <span>3D</span>}</span><span><strong>{request.design_snapshot.model.name || 'Custom pottery design'}</strong><small>#{request.id.slice(0, 8).toUpperCase()} · Rev {request.current_revision || 1} · Qty {request.quantity}</small></span></span>
           <span className="seller-request-row__buyer"><strong>{request.buyer_name}</strong><small>{request.design_snapshot.model.category || 'Custom design'}</small></span>
           <span><b className={`seller-request-stage is-${request.stage}`}>{DESIGN_REQUEST_STAGE_LABELS[request.stage]}</b><small className="seller-request-next">{requestNextAction(request)}</small></span>
           <span className="seller-request-row__quote">{request.quoted_price ? money(request.quoted_price) : '—'}<small>{request.lead_time_days ? `${request.lead_time_days} days` : 'Not quoted'}</small></span>

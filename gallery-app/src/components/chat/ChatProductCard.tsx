@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Link } from 'react-router-dom';
 import type { LikhAIProductCard } from '../../types/likhai';
 
@@ -8,7 +9,7 @@ const FALLBACK = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 export default function ChatProductCard({ product }: { product: LikhAIProductCard }) {
   return (
     <Link to={product.href} className="likhai-card likhai-product-card" aria-label={`View ${product.name}`}>
-      <img
+      <AssetImage
         src={product.image?.trim() || FALLBACK}
         alt=""
         className="likhai-card__image"

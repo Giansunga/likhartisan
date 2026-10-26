@@ -42,6 +42,7 @@ export default function ProductListPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmation, setConfirmation] = useState<{ product: Product; action: 'archive' | 'delete' } | null>(null);
@@ -95,13 +96,13 @@ export default function ProductListPage() {
         const { error: deleteError } = await supabase.from('products').delete().eq('id', product.id);
         if (deleteError) throw deleteError;
         setProducts((current) => current.filter((item) => item.id !== product.id));
-        toast.success('Product deleted.');
+        setSuccessMessage('Product deleted.');
       } else {
         const status = product.status === 'archived' ? 'active' : 'archived';
         const { error: archiveError } = await supabase.from('products').update({ status }).eq('id', product.id);
         if (archiveError) throw archiveError;
         setProducts((current) => current.map((item) => item.id === product.id ? { ...item, status } : item));
-        toast.success(status === 'active' ? 'Product activated.' : 'Product archived.');
+        setSuccessMessage(status === 'active' ? 'Product activated.' : 'Product archived.');
       }
       setConfirmation(null);
     } catch (cause) {
@@ -152,7 +153,7 @@ export default function ProductListPage() {
     if (removalError) throw new Error(removalError.message || 'Could not remove deleted variations.');
     const stock = await recomputeProductStock(product.id);
     setProducts((current) => current.map((item) => item.id === product.id ? { ...item, name: data.name, category: data.category, materials: data.materials, technique: data.technique, stock, inStock: stock > 0, ...(typeof updateData.image === 'string' ? { image: updateData.image } : {}), ...(typeof updateData.model3d === 'string' ? { model3d: updateData.model3d } : {}) } : item));
-    toast.success('Product changes saved.');
+    setSuccessMessage('Product changes saved.');
     void load();
   };
 
@@ -164,6 +165,7 @@ export default function ProductListPage() {
     <div className="products-page__topbar" aria-live="polite"><span className={refreshing ? 'is-refreshing' : ''}>{refreshing ? <LoaderCircle aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{refreshing ? 'Refreshing' : 'Live data'}</span>{updatedAt && <small>Updated {updatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</small>}<button type="button" onClick={() => void load()} disabled={refreshing}><RefreshCw aria-hidden="true" />Refresh</button><button type="button" className="product-creation-primary" onClick={() => setAddProductOpen(true)}><PackagePlus aria-hidden="true" />Add Product</button></div>
     <section className="products-summary-grid" aria-label="Product inventory summary"><SummaryCard label="Total products" value={counts.total} note="All catalog items" active={filters.status === 'all' && filters.inventory === 'all'} onClick={() => changeFilters({ status: 'all', inventory: 'all' })} icon={<Box aria-hidden="true" />} /><SummaryCard label="Active" value={counts.active} note="Visible catalog items" active={filters.status === 'active'} onClick={() => changeFilters({ status: 'active', inventory: 'all' })} icon={<ShoppingBag aria-hidden="true" />} /><SummaryCard label="Low stock" value={counts.low} note="1–3 units remaining" active={filters.inventory === 'low'} onClick={() => changeFilters({ inventory: 'low' })} icon={<Warehouse aria-hidden="true" />} /><SummaryCard label="Out of stock" value={counts.out} note="Needs replenishment" active={filters.inventory === 'out'} onClick={() => changeFilters({ inventory: 'out' })} icon={<AlertCircle aria-hidden="true" />} /></section>
     <section className="products-toolbar" aria-label="Product filters"><div className="products-toolbar__main"><label className="products-search"><Search aria-hidden="true" /><span className="sr-only">Search products and shops</span><input type="search" value={filters.q} placeholder="Search products or shops" onChange={(event) => changeFilters({ q: event.target.value })} />{filters.q && <button type="button" aria-label="Clear product search" onClick={() => changeFilters({ q: '' })}><X aria-hidden="true" /></button>}</label><label className="products-sort"><span className="sr-only">Sort products</span><select value={filters.sort} onChange={(event) => changeFilters({ sort: event.target.value as ProductSort })}>{SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div><div className="products-toolbar__filters"><select aria-label="Shop" value={filters.shop} onChange={(event) => changeFilters({ shop: event.target.value })}><option value="">All shops</option>{shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}</select><select aria-label="Category" value={filters.category} onChange={(event) => changeFilters({ category: event.target.value })}><option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</select><select aria-label="Status" value={filters.status} onChange={(event) => changeFilters({ status: event.target.value as ProductAdminFilters['status'] })}><option value="all">All status</option><option value="active">Active</option><option value="archived">Archived</option><option value="draft">Draft</option></select><select aria-label="Inventory" value={filters.inventory} onChange={(event) => changeFilters({ inventory: event.target.value as ProductAdminFilters['inventory'] })}><option value="all">All inventory</option><option value="low">Low stock</option><option value="out">Out of stock</option></select></div><footer><span>{filtered.length.toLocaleString()} of {products.length.toLocaleString()} products</span>{hasFilters && <button type="button" onClick={() => updateFilters(DEFAULT_PRODUCT_FILTERS)}>Clear filters</button>}</footer></section>
+    {successMessage && <div className="products-notice products-notice--success" role="status"><CheckCircle2 aria-hidden="true" /><span>{successMessage}</span><button type="button" aria-label="Dismiss product message" onClick={() => setSuccessMessage('')}><X size={16} aria-hidden="true" /></button></div>}
     {error && <div className="products-notice" role="status"><AlertCircle aria-hidden="true" />{error}<button type="button" onClick={() => void load()}>Retry</button></div>}
     <section className="products-panel" aria-label="Product catalog">{products.length === 0 ? <div className="products-state"><Box aria-hidden="true" /><h2>No products yet</h2><p>Upload the first 3D product to start the catalog.</p><button type="button" className="product-creation-primary" onClick={() => setAddProductOpen(true)}>Add Product</button></div> : filtered.length === 0 ? <div className="products-state"><Search aria-hidden="true" /><h2>No products match these filters</h2><p>Try another search or clear the active filters.</p><button type="button" onClick={() => updateFilters(DEFAULT_PRODUCT_FILTERS)}>Clear filters</button></div> : <><ProductTable products={pagination.items} busyProductId={busyProductId} onEdit={setEditing} onArchive={(product) => setConfirmation({ product, action: 'archive' })} onDelete={(product) => setConfirmation({ product, action: 'delete' })} />{pagination.totalPages > 1 && <footer className="products-pagination"><span>Page {pagination.page} of {pagination.totalPages}</span><div><button type="button" disabled={pagination.page === 1} onClick={() => updateFilters({ ...filters, page: pagination.page - 1 })}>Previous</button><button type="button" disabled={pagination.page === pagination.totalPages} onClick={() => updateFilters({ ...filters, page: pagination.page + 1 })}>Next</button></div></footer>}</>}</section>
     <ProductEditorDialog product={editing} onClose={() => setEditing(null)} onSave={saveProduct} />

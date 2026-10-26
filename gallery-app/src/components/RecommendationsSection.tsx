@@ -1,3 +1,4 @@
+import AssetImage from './AssetImage';
 import { useState, useEffect, useRef, useId, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
@@ -112,7 +113,7 @@ export default function RecommendationsSection({
         <div ref={scrollRef} id={regionId} className="pdp-rail-viewport" role="region" aria-label={`${title} products`} tabIndex={0}>
           <div className="pdp-rail-track">
             {products.map(product => <Link key={product.id} to={`/product/${product.id}`} className="pdp-card">
-              <div className="pdp-card-image"><img src={product.image} alt="" loading="lazy" />{product.category && <span>{product.category}</span>}</div>
+              <div className="pdp-card-image"><AssetImage src={product.image} alt="" loading="lazy" />{product.category && <span>{product.category}</span>}</div>
               <div className="pdp-card-info">
                 <h3 title={product.name}>{product.name}</h3>
                 <p>{product.shopName}</p>

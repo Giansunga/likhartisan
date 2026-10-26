@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useMemo, type RefObject } from 'react';
 import { latestDesignMessageIds, parseChatMessage } from '../../lib/chatMessages';
 import { fmt } from '../../lib/utils';
@@ -48,7 +49,7 @@ export default function BuyerMessageList({ messages, userId, shopName, shopImage
                   <div className={`msg-bubble-wrap msg-bubble-wrap--${direction}`}>
                     {designData ? <DesignMessageCard data={designData} isLatestForRequest={latestDesignMessages.get(String(designData.request_id)) === message.id} /> : productData?.productId ? (
                       <a href={`/product/${productData.productId}`} target="_blank" rel="noopener noreferrer" className="chat-product-card">
-                        {productData.productImage ? <img src={productData.productImage} alt={productData.productName || 'Product'} className="chat-product-img" /> : null}
+                        {productData.productImage ? <AssetImage src={productData.productImage} alt={productData.productName || 'Product'} className="chat-product-img" /> : null}
                         <div className="chat-product-info">
                           <span className="chat-product-name">{productData.productName || 'Product'}</span>
                           {productData.variantDimensions ? <span className="chat-product-variant">{productData.variantDimensions}</span> : null}
@@ -58,7 +59,7 @@ export default function BuyerMessageList({ messages, userId, shopName, shopImage
                     ) : null}
                     {message.image_url ? (
                       <a href={message.image_url} target="_blank" rel="noopener noreferrer" className="chat-image-bubble">
-                        <img src={message.image_url} alt="Message attachment" />
+                        <AssetImage src={message.image_url} alt="Message attachment" />
                       </a>
                     ) : null}
                     {text ? <div className={`msg-bubble msg-bubble--${direction}`}>{text}</div> : null}

@@ -1,10 +1,12 @@
+import AssetImage from '../components/AssetImage';
 import { Popup } from '../components/Popup';
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { profileReturnFromState } from '../lib/profileNavigation';
 import AccountPanel from '../components/account/AccountPanel';
 import PurchasePanel from '../components/purchases/PurchasePanel';
 import type { PurchaseSummary } from '../types/purchases';
@@ -68,6 +70,8 @@ const SIDEBAR_ITEMS = [
 
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const profileReturn = profileReturnFromState(useLocation().state);
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [activePanel, setActivePanel] = useState<string>(() => {
     const tab = searchParams.get('tab');
@@ -246,7 +250,7 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #E8E0D8' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--primary-color)' }}>
                   {accountSummaryImage ? (
-                    <img src={accountSummaryImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <AssetImage src={accountSummaryImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', background: 'var(--accent-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-sans)' }}>
                       {accountSummaryInitial}
@@ -301,7 +305,10 @@ export default function DashboardPage() {
 
             {/* Main Content */}
             {activePanel === 'account' ? (
-              <AccountPanel />
+              <div style={{ minWidth: 0 }}>
+                {profileReturn && <button type="button" className="account-button account-button--secondary" style={{ marginBottom: 16 }} onClick={() => navigate(profileReturn.pathname, { state: profileReturn.state })}>Back to {profileReturn.pathname === '/cart' ? 'cart' : 'checkout'}</button>}
+                <AccountPanel />
+              </div>
             ) : activePanel === 'notifications' ? (
               <NotificationCenter context="buyer" data={buyerNotifications} />
             ) : (
@@ -353,7 +360,7 @@ export default function DashboardPage() {
                 {/* Product info */}
                 {rateOrder.items[rateItemIndex] && (
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '20px' }}>
-                    <img src={rateOrder.items[rateItemIndex].image} alt="" style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
+                    <AssetImage src={rateOrder.items[rateItemIndex].image} alt="" style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', border: '1px solid #E8E0D8' }} />
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>{rateOrder.items[rateItemIndex].productName}</div>
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-light)' }}>{rateOrder.shop}</div>
@@ -398,7 +405,7 @@ export default function DashboardPage() {
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
                     {rateImagePreviews.map((src, i) => (
                       <div key={i} style={{ position: 'relative' }}>
-                        <img src={src} alt="" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E8E0D8' }} />
+                        <AssetImage src={src} alt="" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E8E0D8' }} />
                         <button onClick={() => {
                           if (i < existingImages.length) {
                             setExistingImages(prev => prev.filter((_, j) => j !== i));

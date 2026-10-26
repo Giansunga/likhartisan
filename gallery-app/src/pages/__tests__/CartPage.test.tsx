@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CartPage from '../CartPage';
 import type { CartItem } from '../../types';
 import { readCartCheckoutDraft } from '../../lib/cartCheckout';
 
-const mocks = vi.hoisted(() => ({ user: null as { user_metadata?: { address?: string } } | null }));
+const mocks = vi.hoisted(() => ({ user: null as { id: string; user_metadata: { name?: string; phone?: string; address?: string; address_lat?: number | null; address_lng?: number | null } } | null }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mocks.user, loading: false }),
@@ -42,6 +42,12 @@ const cart: CartItem[] = [
   { productId: 'p1', productName: 'Moon Vase', image: '/moon.jpg', price: 900, qty: 1, shopId: 's1', shopName: 'Clay House' },
   { productId: 'p2', productName: 'Sun Jar', image: '/sun.jpg', price: 700, qty: 1, shopId: 's2', shopName: 'Earth Studio' },
 ];
+
+function ProfileStub() {
+  const location = useLocation(); const navigate = useNavigate();
+  const resume = location.state.profileReturn;
+  return <button onClick={() => { mocks.user!.user_metadata = { ...mocks.user!.user_metadata, address: 'Updated profile address', address_lat: 16, address_lng: 121 }; navigate(resume.pathname, { state: resume.state }); }}>Return from Profile</button>;
+}
 
 describe('CartPage guest shop flow', () => {
   beforeEach(() => {
@@ -83,11 +89,13 @@ describe('CartPage guest shop flow', () => {
   });
 
   it('invalidates a courier estimate after quantity changes', async () => {
+    mocks.user = { id: 'buyer', user_metadata: { name: 'Buyer', phone: '09123456789', address: 'San Pablo City', address_lat: 14.1, address_lng: 121.1 } } as typeof mocks.user;
     render(<MemoryRouter><CartPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByText('Moon Vase')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /Courier.*Get estimate/ }));
-    fireEvent.change(screen.getByLabelText('Delivery address'), { target: { value: 'San Pablo City' } });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText('San Pablo City')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Estimate delivery' }));
 
     await waitFor(() => expect(screen.getByText(/Estimated Motorcycle delivery/)).toBeInTheDocument());
@@ -97,12 +105,43 @@ describe('CartPage guest shop flow', () => {
     expect(screen.queryByText(/Estimated Motorcycle delivery/)).not.toBeInTheDocument();
   });
 
+  it('restores the selected shop, variation, quantity and courier choice after Profile', async () => {
+    mocks.user = { id: 'buyer', user_metadata: { address: 'Old profile address', address_lat: 15, address_lng: 120 } };
+    localStorage.setItem('lk_cart', JSON.stringify([cart[0], { ...cart[1], qty: 2 }]));
+    render(<MemoryRouter initialEntries={['/cart']}><Routes><Route path="/cart" element={<CartPage />} /><Route path="/dashboard" element={<ProfileStub />} /></Routes></MemoryRouter>);
+    await screen.findByText('Sun Jar');
+    fireEvent.click(screen.getByLabelText('Select Sun Jar'));
+    fireEvent.click(screen.getByRole('button', { name: /Courier.*Get estimate/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit in Profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Return from Profile' }));
+    await screen.findByText('Updated profile address');
+    expect(screen.getByLabelText('Select Sun Jar')).toBeChecked();
+    expect(screen.getByLabelText('Select Moon Vase')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /Courier.*Get estimate/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Checkout 2 items' })).toBeEnabled();
+    await screen.findByText(/Estimated Motorcycle delivery/);
+    const request = JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.body));
+    expect(request).toMatchObject({ dropoffAddress: 'Updated profile address', dropoffCoords: { lat: 16, lng: 121 }, items: [{ productId: 'p2', variationId: null, quantity: 2 }] });
+  });
+
+  it('does not request a courier estimate without a saved delivery pin', async () => {
+    mocks.user = { id: 'buyer', user_metadata: { address: 'Saved address without pin' } };
+    render(<MemoryRouter><CartPage /></MemoryRouter>);
+    await screen.findByText('Moon Vase');
+    fireEvent.click(screen.getByRole('button', { name: /Courier.*Get estimate/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Estimate delivery' }));
+    expect(screen.getByText(/Save a complete delivery address and valid pin in Profile first/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('sends the selected cart lines to the authoritative quotation endpoint', async () => {
+    mocks.user = { id: 'buyer', user_metadata: { name: 'Buyer', phone: '09123456789', address: 'San Pablo City', address_lat: 14.1, address_lng: 121.1 } } as typeof mocks.user;
     render(<MemoryRouter><CartPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByText('Moon Vase')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /Courier.*Get estimate/ }));
-    fireEvent.change(screen.getByLabelText('Delivery address'), { target: { value: 'San Pablo City' } });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText('San Pablo City')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Estimate delivery' }));
     await waitFor(() => expect(screen.getByText(/Estimated Motorcycle delivery/)).toBeInTheDocument());
 

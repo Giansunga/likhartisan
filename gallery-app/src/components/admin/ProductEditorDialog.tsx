@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { Popup } from '../Popup';
 import FeaturedArtisanSelect from './FeaturedArtisanSelect';
 import ProductTagsInput from './ProductTagsInput';
@@ -149,7 +150,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
         <section className="product-editor__section product-editor__media">
           <h3>Media Upload</h3>
           <div className="product-editor__media-grid">
-            <div><span className="product-editor__media-label">Product Image</span><label className="product-upload"><ImagePlus aria-hidden="true" /><strong>{imageFile ? imageFile.name : 'Change Image'}</strong><small>JPG or PNG · up to 5 MB</small><input type="file" accept="image/jpeg,image/png" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>{errors.image && <em>{errors.image}</em>}{imagePreview && <img className="product-editor__preview" src={imagePreview} alt="Product preview" />}</div>
+            <div><span className="product-editor__media-label">Product Image</span><label className="product-upload"><ImagePlus aria-hidden="true" /><strong>{imageFile ? imageFile.name : 'Change Image'}</strong><small>JPG or PNG · up to 5 MB</small><input type="file" accept="image/jpeg,image/png" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>{errors.image && <em>{errors.image}</em>}{imagePreview && <AssetImage className="product-editor__preview" src={imagePreview} alt="Product preview" />}</div>
             <div><span className="product-editor__media-label">3D Model (.glb)</span><label className="product-upload"><FileBox aria-hidden="true" /><strong>{modelFile ? modelFile.name : product.model3d ? 'Replace 3D Model' : 'Choose 3D Model'}</strong><small>GLB format only</small><input type="file" accept=".glb,model/gltf-binary" onChange={(event) => chooseModel(event.target.files?.[0])} /></label>{errors.model && <em>{errors.model}</em>}{(modelFile || product.model3d) && <p className="product-editor__model-note">{modelFile ? modelFile.name : 'Current model attached'}</p>}</div>
           </div>
         </section>

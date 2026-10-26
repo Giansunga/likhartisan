@@ -20,7 +20,7 @@ if (!globalThis.sessionStorage) {
 }
 
 // jsdom does not implement the browser top-layer dialog methods.
-if (!HTMLDialogElement.prototype.showModal) {
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 }

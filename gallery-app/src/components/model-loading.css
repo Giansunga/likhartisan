@@ -1,0 +1,14 @@
+.model-load-surface { position: relative; width: 100%; height: 100%; min-height: inherit; }
+.model-load-status { position: absolute; z-index: 10; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: none; }
+.model-load-status--error { pointer-events: auto; background: var(--bg-secondary, #f5f0ea); }
+.model-load-card { display: flex; align-items: center; gap: 12px; max-width: 100%; padding: 16px; border: 1px solid var(--border-color, #e5d9cc); border-radius: 16px; color: var(--text-primary, #36271e); background: var(--bg-primary, #fff); }
+.model-load-card strong, .model-load-card span { display: block; }
+.model-load-card strong { font-size: .9rem; }
+.model-load-card div > span { font-size: .78rem; margin-top: 4px; color: var(--text-muted, #75665b); }
+.model-load-card button { border: 0; border-radius: 8px; background: var(--accent-color, #934308); color: white; padding: 10px 14px; cursor: pointer; }
+.model-load-card button:focus-visible { outline: 3px solid var(--accent-color, #934308); outline-offset: 3px; }
+.model-load-indicator { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.model-load-spinner { width: 40px; height: 40px; border: 3px solid var(--bg-tertiary, #ded2c6); border-top-color: var(--primary-color, #934308); border-radius: 50%; animation: model-loading-spin .8s linear infinite; }
+.model-load-text { font-size: .82rem; font-weight: 600; color: var(--text-muted, #75665b); font-family: var(--font-sans); }
+@keyframes model-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .model-load-spinner { animation: none; } }

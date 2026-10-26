@@ -40,6 +40,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const ChatbotPage = lazy(() => import('./pages/ChatbotPage'));
 const FreeformPage = lazy(() => import('./pages/FreeformPage'));
+const AssetCheckPage = lazy(() => import('./pages/AssetCheckPage'));
 // Admin lazy pages
 const AdminOrdersPage = lazy(() => import('./pages/admin/OrdersPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
@@ -114,6 +115,7 @@ function AppShell() {
             <Route path="chat" element={<ChatPage />} />
             <Route path="likhai" element={<ChatbotPage />} />
             <Route path="freeform" element={<FreeformPage />} />
+            <Route path="asset-check" element={<AssetCheckPage />} />
           </Route>
           <Route path="artisan-dashboard" element={<Layout />}>
             <Route element={<ArtisanLayout />}>

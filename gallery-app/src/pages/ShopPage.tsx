@@ -24,7 +24,7 @@ type ActionStatus = { tone: 'success' | 'error'; text: string } | null;
 
 const SHOP_FIELDS = 'id, name, owner_name, email, description, about, image, banner, location, created_at';
 const PRODUCT_FIELDS = 'id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at';
-const ARTISAN_FIELDS = 'id, name, specialty, experience, description, cover_image';
+const ARTISAN_FIELDS = 'id, name, specialty, experience, description, cover_image, location';
 
 export default function ShopPage() {
   const { id } = useParams();
@@ -77,8 +77,7 @@ export default function ShopPage() {
           .from('artisans')
           .select(ARTISAN_FIELDS, { count: 'exact' })
           .eq('shop_id', id)
-          .order('created_at', { ascending: false })
-          .limit(4),
+          .order('created_at', { ascending: false }),
       ]);
 
       if (currentRequest !== requestId.current) return;
@@ -108,7 +107,7 @@ export default function ShopPage() {
         products,
         productCount: productResult.count ?? products.length,
         followerCount: followerResult.error ? 0 : followerResult.count ?? 0,
-        artisanCount: artisanResult.error ? 0 : artisanResult.count ?? artisanResult.data?.length ?? 0,
+        artisanCount: artisanResult.error ? 0 : artisanResult.data?.length ?? 0,
         artisans: artisanResult.error ? [] : (artisanResult.data ?? []) as ShopArtisan[],
         productPrices,
         productAvailability,
@@ -285,7 +284,7 @@ export default function ShopPage() {
       </nav>
       <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} availability={storefront.productAvailability} ratings={storefront.productRatings} />
       <ShopStorySection shop={shop} membershipYear={membershipYear} />
-      <ShopMakersSection artisans={storefront.artisans} artisanCount={storefront.artisanCount} />
+      <ShopMakersSection shop={{ id: shop.id, name: shop.name }} artisans={storefront.artisans} artisanCount={storefront.artisanCount} />
       <ShopClosingSection shopName={shop.name} messagePending={messagePending} onMessage={() => void handleMessageShop()} />
     </main>
   );

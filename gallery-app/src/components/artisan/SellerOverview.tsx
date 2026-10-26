@@ -1,3 +1,4 @@
+import AssetImage from '../AssetImage';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -222,12 +223,12 @@ export default function SellerOverview() {
         <SectionCard title="Top Products by Revenue" action={<Link to="listings">View all <ArrowRight size={14} /></Link>}>
           {topProducts.length ? <div className="seller-compact-list">{topProducts.map(item => {
             const product = products.find(candidate => candidate.id === item.id || candidate.name === item.name);
-            return <div key={item.id}><div className="seller-listing-thumb">{product?.image ? <img src={product.image} alt="" /> : <Package />}</div><span>{item.name}</span><small>{item.orders} orders</small><strong>{money(item.revenue)}</strong></div>;
+            return <div key={item.id}><div className="seller-listing-thumb">{product?.image ? <AssetImage src={product.image} alt="" /> : <Package />}</div><span>{item.name}</span><small>{item.orders} orders</small><strong>{money(item.revenue)}</strong></div>;
           })}</div> : <div className="seller-mini-empty"><ShoppingBag /><p>No sales in this period yet.</p></div>}
         </SectionCard>
 
         <SectionCard title="Recent Listings" action={<Link to="listings">View all <ArrowRight size={14} /></Link>}>
-          {recentListings.length ? <div className="seller-compact-list">{recentListings.map(product => <div key={product.id}><div className="seller-listing-thumb"><img src={product.image} alt="" /></div><span>{product.name}</span><small>{product.category}</small><strong>{money(product.price)}</strong></div>)}</div> : <div className="seller-mini-empty"><Package /><p>No listings yet.</p></div>}
+          {recentListings.length ? <div className="seller-compact-list">{recentListings.map(product => <div key={product.id}><div className="seller-listing-thumb"><AssetImage src={product.image} alt="" /></div><span>{product.name}</span><small>{product.category}</small><strong>{money(product.price)}</strong></div>)}</div> : <div className="seller-mini-empty"><Package /><p>No listings yet.</p></div>}
         </SectionCard>
 
         <div className="seller-side-summaries">

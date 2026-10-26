@@ -1,3 +1,4 @@
+import AssetImage from '../components/AssetImage';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -65,11 +66,11 @@ export default function ShopsPage() {
               {shops.map(s => (
                 <div key={s.id} className="artisan-card-grid">
                   <div className="artisan-cover">
-                    <img src={s.banner || '/images/vases_collection.png'} alt={s.name} />
+                    <AssetImage src={s.banner || '/images/vases_collection.png'} alt={s.name} />
                   </div>
                   <div className="artisan-avatar-container">
                     {s.image ? (
-                      <img src={s.image} alt={s.name} className="w-full h-full object-cover rounded-full" />
+                      <AssetImage src={s.image} alt={s.name} className="w-full h-full object-cover rounded-full" />
                     ) : (
                       <div className="w-full h-full bg-primary text-white flex items-center justify-center text-2xl font-bold rounded-full">
                         {s.name.charAt(0)}

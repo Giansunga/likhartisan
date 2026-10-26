@@ -1,3 +1,4 @@
+import { assetBackground } from '../lib/assetDelivery';
 import { Link } from 'react-router-dom';
 import type { ThemeName } from '../contexts/ThemeContext';
 
@@ -17,7 +18,7 @@ export default function GalleryHero({ currentTheme, isMobile }: GalleryHeroProps
     <header
       className="gallery-header-banner"
     >
-      <div className="gallery-banner-bg" style={{ backgroundImage: `url(${backgroundImage})` }} />
+      <div className="gallery-banner-bg" style={{ backgroundImage: assetBackground(backgroundImage) }} />
       <div className="gallery-banner-overlay" />
       <div
         className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
