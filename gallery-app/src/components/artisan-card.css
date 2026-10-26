@@ -13,6 +13,8 @@
 .artisan-card__facts span { max-width: 100%; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 12px; background: var(--bg-secondary, #f5f0ea); color: var(--text-muted); font-size: .74rem; overflow-wrap: anywhere; }
 .artisan-card__facts svg { flex: 0 0 auto; color: var(--primary-color); }
 @media (min-width: 768px) {
+  .artisan-card { aspect-ratio: auto; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .artisan-card__portrait { aspect-ratio: 6 / 5; }
   .artisan-card__portrait img { object-position: center 30%; }
 }
 @media (max-width: 767px) {
