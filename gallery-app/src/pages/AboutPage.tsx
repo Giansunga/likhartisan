@@ -97,13 +97,10 @@ export default function AboutPage() {
   }, []);
 
   useEffect(() => {
-    const previousTitle = document.title;
     const metadata = [
       ['meta[name="description"]', 'LikhArtisan connects Santo Tomas pottery, participating local shops, artisan profiles, and an interactive 3D design experience.'],
-      ['meta[property="og:title"]', 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable'],
       ['meta[property="og:description"]', 'Meet the makers, understand the local craft, and see how LikhArtisan connects pottery with digital discovery and custom design.'],
       ['meta[property="og:url"]', `${SITE_URL}/about`],
-      ['meta[name="twitter:title"]', 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable'],
       ['meta[name="twitter:description"]', 'Meet the makers and discover how LikhArtisan connects Santo Tomas pottery with digital discovery and custom design.'],
     ].map(([selector, value]) => {
       const element = document.querySelector<HTMLMetaElement>(selector);
@@ -114,11 +111,9 @@ export default function AboutPage() {
     const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     const previousCanonical = canonical?.href;
 
-    document.title = 'About LikhArtisan — Santo Tomas Pottery, Made Discoverable';
     if (canonical) canonical.href = `${SITE_URL}/about`;
 
     return () => {
-      document.title = previousTitle;
       metadata.forEach(({ element, previous }) => {
         if (element && previous !== undefined) element.content = previous;
       });

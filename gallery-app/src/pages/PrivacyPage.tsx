@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPage() {
-  useEffect(() => { document.title = 'Privacy Policy | LikhArtisan'; }, []);
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px 80px' }}>
