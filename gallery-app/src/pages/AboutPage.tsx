@@ -166,8 +166,8 @@ export default function AboutPage() {
           <div className="about-container about-origin__grid">
             <motion.figure {...reveal} className="about-photo about-origin__photo">
               <img
-                src="/images/connect_with_local_artisans.jpg"
-                alt="Pottery workers shaping and finishing large clay vessels inside a workshop"
+                src="/images/about-workshop.jpg"
+                alt="Two artisans working with clay beside shelves of pottery in a workshop"
                 loading="lazy"
               />
               <figcaption>Craft is learned in the workshop, through practice, patience, and shared knowledge.</figcaption>
