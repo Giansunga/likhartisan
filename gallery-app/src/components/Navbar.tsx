@@ -219,15 +219,13 @@ export default function Navbar() {
       {isArtisanDashboard ? (
         <div className="h-full flex items-center justify-between" style={{ padding: '0 24px' }}>
           <Link to="/" className="logo flex items-center gap-2">
-            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
-            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
+            <img className="seasonal-wordmark" src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : '46px', width: 'auto' }} />
           </Link>
         </div>
       ) : (
         <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} navbar-layout h-full relative`}>
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
-            <img className="christmas-logo-hat" src="/images/christmas-santa-hat.png" alt="" aria-hidden="true" />
-            <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : isTablet ? '38px' : '46px', width: 'auto' }} />
+            <img className="seasonal-wordmark" src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : isTablet ? '38px' : '46px', width: 'auto' }} />
           </Link>
 
           {/* Desktop nav links */}

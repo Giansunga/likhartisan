@@ -170,22 +170,6 @@ html.theme-christmas #main-navbar {
   position: relative;
 }
 
-.christmas-logo-hat {
-  display: none;
-  position: absolute;
-  z-index: 2;
-  width: 48px;
-  height: auto;
-  left: 0;
-  top: 50%;
-  transform: translateY(-39px) rotate(-5deg);
-  pointer-events: none;
-}
-
-html.theme-christmas #main-navbar .christmas-logo-hat {
-  display: block;
-}
-
 .christmas-navbar-snowflakes {
   display: none;
 }
@@ -397,12 +381,6 @@ html.theme-christmas .modal-box {
 
   html.theme-christmas .control-bar {
     padding: 0;
-  }
-
-  .christmas-logo-hat {
-    width: 31px;
-    left: -1px;
-    transform: translateY(-29px) rotate(-5deg);
   }
 
 }
@@ -4290,3 +4268,18 @@ body {
 
 .cart-added-badge { position: fixed; z-index: 10001; padding: 4px 9px; border-radius: 999px; background: var(--accent-color); color: white; font-size: 0.9rem; font-weight: 700; box-shadow: 0 3px 12px rgba(0,0,0,.2); pointer-events: none; }
 .cart-target-arrival--reduced { animation: none; background: #f7e6dc; color: var(--accent-color); box-shadow: 0 0 0 4px rgba(193,87,13,.18); }
+
+/* Supplied seasonal wordmarks retain their original transparent PNG artwork. */
+html.theme-christmas .seasonal-wordmark,
+html.theme-valentines .seasonal-wordmark {
+  aspect-ratio: 3.2;
+  object-fit: cover;
+}
+html.theme-christmas .seasonal-wordmark {
+  content: url('/images/Christmas.png');
+  object-position: 50% 44%;
+}
+html.theme-valentines .seasonal-wordmark {
+  content: url('/images/Valentines.png');
+  object-position: center;
+}

@@ -278,9 +278,9 @@ export function CartSummary({
 export function EmptyCartState() {
   return (
     <section className="cart-empty" aria-labelledby="empty-cart-title">
-      <div className="cart-empty__icon"><ShoppingBag size={42} aria-hidden="true" /></div>
-      <h1 id="empty-cart-title">Your cart is waiting for something handmade.</h1>
-      <Link to="/gallery" className="cart-empty__action">Explore the gallery</Link>
+      <div className="cart-empty__icon"><ShoppingBag size={28} aria-hidden="true" /></div>
+      <h1 id="empty-cart-title">Your cart is empty</h1>
+      <Link to="/gallery" className="cart-empty__action">Explore gallery</Link>
     </section>
   );
 }

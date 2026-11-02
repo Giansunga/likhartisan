@@ -39,7 +39,7 @@ export default function Footer() {
               <img
                 src="/images/likhartisan-brown-wordmark.png"
                 alt="LikhArtisan"
-                className="footer-logo"
+                className="footer-logo seasonal-wordmark"
                 loading="lazy"
               />
             </Link>
