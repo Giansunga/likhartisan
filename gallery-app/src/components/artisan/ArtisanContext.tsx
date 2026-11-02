@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { getErrorMessage } from '../../lib/portalErrors';
+import { captureException } from '../../lib/sentry';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { SHOP_EMAILS } from '../../lib/constants';
@@ -13,7 +15,8 @@ import { ArtisanContext, useArtisanPortal, type ArtisanContextValue } from './ar
 function ArtisanRealtimeBridge({ refreshProducts }: { refreshProducts: () => Promise<void> }) {
   const { shop, setShop } = useArtisanPortal();
   const refreshShop = useCallback(async () => {
-    const { data } = await supabase.from('shops').select('*').eq('id', shop.id).maybeSingle();
+    const { data, error } = await supabase.from('shops').select('*').eq('id', shop.id).maybeSingle();
+    if (error) throw error;
     if (data) setShop(data as ArtisanShop);
   }, [setShop, shop.id]);
   usePortalRealtimeRefresh(['products', 'product_variations'], refreshProducts);
@@ -22,6 +25,11 @@ function ArtisanRealtimeBridge({ refreshProducts }: { refreshProducts: () => Pro
 }
 
 export default function ArtisanProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  return <ArtisanSessionProvider key={user?.id || 'signed-out'}>{children}</ArtisanSessionProvider>;
+}
+
+function ArtisanSessionProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
   const [shop, setShop] = useState<ArtisanShop | null>(null);
   const [products, setProducts] = useState<ArtisanProduct[]>([]);
@@ -31,6 +39,11 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [buyerActiveMap, setBuyerActiveMap] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState(false);
+  const [accessError, setAccessError] = useState('');
+  const [productsError, setProductsError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const productRequest = useRef(0);
+  const shopId = shop?.id;
 
   useEffect(() => {
     if (authLoading) return;
@@ -38,33 +51,37 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
 
     async function resolveShop() {
       if (!user) {
-        if (active) setChecked(true);
+        if (active) { setShop(null); setChecked(true); }
         return;
       }
 
       const email = user.email?.trim().toLowerCase() || '';
       const configuredSeller = SHOP_EMAILS.some((item: string) => item.trim().toLowerCase() === email);
-      const { data: roles } = await supabase
+      const { data: roles, error: roleError } = await supabase
         .from('user_roles')
         .select('role, shop_id')
         .eq('user_id', user.id);
+      if (roleError) throw roleError;
       const ownerRole = roles?.find(role => role.role === 'shop_owner');
       if (!configuredSeller && !ownerRole) {
-        if (active) setChecked(true);
+        if (active) { setShop(null); setChecked(true); }
         return;
       }
 
       let shopResult: ArtisanShop | null = null;
       if (configuredSeller) {
-        const { data } = await supabase.from('shops').select('*').eq('email', user.email).maybeSingle();
+        const { data, error } = await supabase.from('shops').select('*').eq('email', email).limit(1).maybeSingle();
+        if (error) throw error;
         shopResult = data as ArtisanShop | null;
       }
       if (!shopResult && ownerRole?.shop_id) {
-        const { data } = await supabase.from('shops').select('*').eq('id', ownerRole.shop_id).maybeSingle();
+        const { data, error } = await supabase.from('shops').select('*').eq('id', ownerRole.shop_id).maybeSingle();
+        if (error) throw error;
         shopResult = data as ArtisanShop | null;
       }
       if (!shopResult && configuredSeller) {
-        const { data } = await supabase.from('shops').select('*').eq('owner_id', user.id).maybeSingle();
+        const { data, error } = await supabase.from('shops').select('*').eq('owner_id', user.id).limit(1).maybeSingle();
+        if (error) throw error;
         shopResult = data as ArtisanShop | null;
       }
       if (active) {
@@ -75,58 +92,57 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
 
     void resolveShop().catch(error => {
       console.error('Seller access check failed:', error);
-      if (active) setChecked(true);
+      if (active) { setAccessError(getErrorMessage(error, 'Your shop access could not be verified.')); setChecked(true); }
     });
     return () => { active = false; };
-  }, [authLoading, user]);
+  }, [attempt, authLoading, user]);
 
   const fetchProducts = useCallback(async () => {
-    if (!shop?.id) return;
+    if (!shopId) return;
+    const request = ++productRequest.current;
     setLoadingProducts(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('shop_id', shop.id)
-      .order('created_at', { ascending: false });
-    if (error) {
-      setLoadingProducts(false);
-      throw error;
-    }
-    const nextProducts = ((data || []) as ArtisanProduct[]).map(product => ({ ...product, category: normalizeProductCategory(product.category) }));
-    setProducts(nextProducts);
-    const ids = nextProducts.map(product => product.id);
-    if (ids.length) {
-      const { data: variations } = await supabase
-        .from('product_variations')
-        .select('product_id, price')
-        .in('product_id', ids);
+    try {
+      const { data, error } = await supabase.from('products').select('*').eq('shop_id', shopId).order('created_at', { ascending: false });
+      if (error) throw error;
+      const nextProducts = ((data || []) as ArtisanProduct[]).map(product => ({ ...product, category: normalizeProductCategory(product.category) }));
+      const ids = nextProducts.map(product => product.id);
       const nextPrices: Record<string, number> = {};
-      for (const variation of variations || []) {
-        const price = Number(variation.price) || 0;
-        if (!(variation.product_id in nextPrices) || price < nextPrices[variation.product_id]) {
-          nextPrices[variation.product_id] = price;
+      if (ids.length) {
+        const { data: variations, error: variationError } = await supabase.from('product_variations').select('product_id, price').in('product_id', ids);
+        if (variationError) throw variationError;
+        for (const variation of variations || []) {
+          if (variation.price == null) continue;
+          const price = Number(variation.price);
+          if (!Number.isFinite(price)) continue;
+          if (!(variation.product_id in nextPrices) || price < nextPrices[variation.product_id]) nextPrices[variation.product_id] = price;
         }
       }
+      if (request !== productRequest.current) return;
+      setProducts(nextProducts);
       setProductPrices(nextPrices);
-    } else {
-      setProductPrices({});
-    }
-    setLoadingProducts(false);
-  }, [shop]);
+      setProductsError('');
+    } catch (error) {
+      if (request === productRequest.current) setProductsError(getErrorMessage(error, 'Listings could not be loaded. Please try again.'));
+      throw error;
+    } finally { if (request === productRequest.current) setLoadingProducts(false); }
+  }, [shopId]);
 
+  const invalidateProducts = useCallback(() => { productRequest.current++; }, []);
   useEffect(() => {
     if (!shop?.id) return;
-    queueMicrotask(() => { void fetchProducts().catch(error => console.error('Seller products failed:', error)); });
-  }, [fetchProducts, shop?.id]);
+    let active = true;
+    queueMicrotask(() => { if (active) void fetchProducts().catch(() => undefined); });
+    return () => { active = false; invalidateProducts(); };
+  }, [fetchProducts, invalidateProducts, shop?.id]);
 
   useEffect(() => {
     if (!shop?.id) return;
     const channel = supabase.channel(`shop:${shop.id}`, { config: { presence: { key: shop.id } } });
     channel.subscribe(status => {
-      if (status === 'SUBSCRIBED') void channel.track({ shop_id: shop.id, online_at: new Date().toISOString() });
+      if (status === 'SUBSCRIBED') void channel.track({ shop_id: shop.id, online_at: new Date().toISOString() }).catch(captureException);
     });
-    void supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shop.id);
-    return () => { void supabase.removeChannel(channel); };
+    void Promise.resolve(supabase.from('shops').update({ last_seen_at: new Date().toISOString() }).eq('id', shop.id)).catch(captureException);
+    return () => { void supabase.removeChannel(channel).catch(captureException); };
   }, [shop?.id]);
 
   useEffect(() => {
@@ -150,11 +166,13 @@ export default function ArtisanProvider({ children }: { children: ReactNode }) {
   }) : null, [shop, user, products, productPrices, loadingProducts, loadingOrders, loadingMessages, buyerActiveMap, fetchProducts]);
 
   if (!checked || authLoading) return <div className="seller-route-loader">Loading your shop…</div>;
-  if (!value) return <Navigate to="/" replace />;
+  if (accessError) return <section className="seller-route-loader" role="alert"><h2>Unable to verify shop access</h2><p>{accessError}</p><button type="button" onClick={() => { setAccessError(''); setChecked(false); setAttempt(value => value + 1); }}>Try again</button></section>;
+  if (!shop || !user) return <Navigate to="/" replace />;
   return (
-    <PortalRealtimeProvider topics={[`shop:${value.shop.id}`, `user:${value.userId}`]}>
+    <PortalRealtimeProvider topics={[`shop:${shop.id}`, `user:${user.id}`]}>
       <ArtisanContext.Provider value={value}>
         <ArtisanRealtimeBridge refreshProducts={fetchProducts} />
+        {productsError && <div className="seller-message-error" role="alert"><span>{productsError}</span><button type="button" onClick={() => void fetchProducts().catch(() => undefined)}>Try again</button></div>}
         {children}
       </ArtisanContext.Provider>
     </PortalRealtimeProvider>

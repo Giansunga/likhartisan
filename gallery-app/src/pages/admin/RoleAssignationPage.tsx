@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import { Popup } from '../../components/Popup';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -96,7 +97,7 @@ export default function RoleAssignationPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchKey = searchParams.toString();
-  const query = useMemo(() => roleQueryFromSearch(searchParams), [searchKey]);
+  const query = useMemo(() => roleQueryFromSearch(new URLSearchParams(searchKey)), [searchKey]);
   const [users, setUsers] = useState<AdminRoleUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,6 +108,7 @@ export default function RoleAssignationPage() {
   const [confirmation, setConfirmation] = useState<{ userId: string; action: RoleAction } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const hasLoadedRef = useRef(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const requestRef = useRef(0);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -118,6 +120,7 @@ export default function RoleAssignationPage() {
     const request = ++requestRef.current;
     if (hasLoadedRef.current) setRefreshing(true); else setLoading(true);
     setLoadError('');
+    try {
     const { data, error } = await supabase.rpc('list_users_with_roles');
     if (request !== requestRef.current) return;
     if (error) {
@@ -127,13 +130,16 @@ export default function RoleAssignationPage() {
       return;
     }
     setUsers(((data as unknown as AdminRoleUser[]) ?? []).map(normalizeRoles));
-    hasLoadedRef.current = true;
+    hasLoadedRef.current = true; setHasLoaded(true);
     setUpdatedAt(new Date());
     setLoading(false);
     setRefreshing(false);
+    } catch (cause) { if (request === requestRef.current) setLoadError(getErrorMessage(cause, 'Could not load this page.')); }
+    finally { if (request === requestRef.current) { setLoading(false); setRefreshing(false); } }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const invalidateLoad = useCallback(() => { requestRef.current++; }, []);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void load(); }); return () => { active = false; invalidateLoad(); }; }, [invalidateLoad, load]);
   usePortalRealtimeRefresh(['user_roles', 'shops'], load);
 
   const updateQuery = useCallback((next: RoleQuery, replace = false) => {
@@ -151,7 +157,7 @@ export default function RoleAssignationPage() {
   useEffect(() => {
     if (query.page !== pagination.page) updateQuery({ ...query, page: pagination.page }, true);
   }, [pagination.page, query, updateQuery]);
-  useEffect(() => { if (selectedUserId && !selectedUser) setSelectedUserId(null); }, [selectedUser, selectedUserId]);
+  useEffect(() => { if (selectedUserId && !selectedUser) queueMicrotask(() => setSelectedUserId(null)); }, [selectedUser, selectedUserId]);
   useEffect(() => {
     if (!selectedUser || confirmation) return;
     const timer = window.setTimeout(() => drawerRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus(), 0);
@@ -171,23 +177,29 @@ export default function RoleAssignationPage() {
     window.setTimeout(() => returnFocusRef.current?.focus(), 0);
   }, [actionId]);
   const copyUserId = async (id: string) => {
-    try { await navigator.clipboard?.writeText(id); toast.success('User ID copied.'); }
+    try { if (!navigator.clipboard) throw new Error('Clipboard is unavailable.'); await navigator.clipboard.writeText(id); toast.success('User ID copied.'); }
     catch { toast.error('Could not copy the user ID.'); }
   };
 
+  const actionPending = useRef(false);
   const performAction = async (target: AdminRoleUser, action: RoleAction) => {
+    if (actionPending.current) return;
+    actionPending.current = true;
+    requestRef.current++;
     setActionId(`${target.id}:${action}`);
     setActionError('');
     try {
       if (action === 'grant_shop_owner') {
         let shopId: string | null = null;
         const local = (target.email ?? '').split('@')[0];
-        const { data: existing } = await supabase.from('shops').select('id').eq('email', target.email ?? '').maybeSingle();
+        const { data: existing, error: shopError } = await supabase.from('shops').select('id').eq('email', target.email ?? '').limit(1).maybeSingle();
+        if (shopError) throw shopError;
         if (existing) shopId = existing.id;
         else {
           const { data: created, error: insertError } = await supabase.from('shops').insert({ name: `${local}'s Shop`, email: target.email, owner_id: target.id }).select('id').single();
           if (insertError) throw insertError;
-          shopId = created?.id ?? null;
+          if (!created?.id) throw new Error('The new shop could not be confirmed. Reload before retrying.');
+          shopId = created.id;
         }
         const { error } = await supabase.rpc('assign_shop_owner', { p_user_id: target.id, p_shop_id: shopId, p_assigned_by: user?.id ?? null });
         if (error) throw error;
@@ -211,7 +223,7 @@ export default function RoleAssignationPage() {
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : 'Could not update role access.');
       toast.error('Role access could not be updated.');
-    } finally { setActionId(null); }
+    } finally { actionPending.current = false; setActionId(null); }
   };
 
   const confirmAction = async () => {
@@ -226,11 +238,11 @@ export default function RoleAssignationPage() {
     return <><>{protection && <span className="role-protected"><LockKeyhole aria-hidden="true" />Protected</span>}</><button className="role-row-action" type="button" onClick={() => openDrawer(target)}>{protection ? 'View access' : 'Manage access'}</button></>;
   };
 
-  if (loading && !hasLoadedRef.current) {
+  if (loading && !hasLoaded) {
     return <main className="role-assignment-page" aria-busy="true"><h1 className="sr-only">Role Assignment</h1><div className="role-summary-grid">{[0, 1, 2, 3].map((item) => <div className="role-summary-card role-skeleton" key={item}><span /></div>)}</div><div className="role-list-panel role-skeleton">{[0, 1, 2, 3, 4].map((item) => <span key={item} />)}</div></main>;
   }
 
-  if (loadError && !hasLoadedRef.current) {
+  if (loadError && !hasLoaded) {
     return <main className="role-assignment-page"><h1 className="sr-only">Role Assignment</h1><section className="role-list-panel role-state" aria-live="polite"><AlertCircle aria-hidden="true" /><h2>Role assignments could not be loaded</h2><p>{loadError}</p><button className="role-assignment-page__retry" type="button" onClick={() => void load()}>Try again</button></section></main>;
   }
 

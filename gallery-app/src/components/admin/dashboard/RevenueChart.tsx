@@ -46,7 +46,7 @@ function niceCeil(v: number) {
   return nice * pow;
 }
 
-function RevenueTooltip({ active, payload }: any) {
+function RevenueTooltip({ active, payload }: { active?: boolean; payload?: readonly { value?: number; payload?: RevenueDataPoint }[] }) {
   if (!active || !payload || payload.length === 0) return null;
   const item = payload[0]?.payload;
   const value = payload[0].value;
@@ -65,7 +65,7 @@ function RevenueTooltip({ active, payload }: any) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#934308', flexShrink: 0 }} />
         <span style={{ fontSize: '0.78rem', color: '#77716B' }}>Revenue</span>
-        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#934308', marginLeft: 'auto' }}>{fmtPeso(value)}</span>
+        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#934308', marginLeft: 'auto' }}>{fmtPeso(Number(value) || 0)}</span>
       </div>
     </div>
   );
@@ -122,7 +122,7 @@ export default function RevenueChart({ data, period, onPeriodChange }: RevenueCh
               tickLine={false}
               axisLine={false}
               width={44}
-              tickFormatter={(v: any) => fmtShort(Number(v))}
+              tickFormatter={(v: number) => fmtShort(Number(v))}
             />
             <Tooltip content={<RevenueTooltip />} />
             <Area

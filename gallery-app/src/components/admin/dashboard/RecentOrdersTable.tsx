@@ -40,7 +40,7 @@ interface Order {
   status: string;
   delivery_status?: string;
   created_at: string;
-  items?: any[];
+  items?: { shop_name?: string }[];
 }
 
 interface RecentOrdersTableProps {

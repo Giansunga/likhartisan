@@ -4,11 +4,12 @@ import ProductTagsInput from '../admin/ProductTagsInput';
 import { resolveProductTags, type ProductTagsDraft } from '../../lib/productTags';
 import { useShopArtisans } from '../../hooks/useShopArtisans';
 import { validateFeaturedArtisan } from '../../lib/featuredArtisan';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { uploadToR2 } from '../../lib/r2';
-import { recomputeProductStock } from '../../lib/stockSync';
+import { getErrorMessage } from '../../lib/portalErrors';
+import { toast } from '../../lib/popups';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { normalizeCatalogMeasurement } from '../../lib/measurements';
 import { kgToGrams } from '../../lib/shipping';
@@ -33,13 +34,22 @@ interface VariationDraft {
   stock: string;
 }
 
+interface CreationAttempt {
+  id: string;
+  variationIds: Map<number, string>;
+  uploads: Map<File, string>;
+}
+
 function newVariation(id: number): VariationDraft {
   return { id, dimensions: '', height: '', openingDiameter: '', weightKg: '', price: '', stock: '' };
 }
 
 function hasValidVariation(variation: VariationDraft): boolean {
   const hasCatalogDimensions = /\d/.test(variation.dimensions) && /\d/.test(variation.height);
-  return (kgToGrams(variation.weightKg) || 0) > 0 && hasCatalogDimensions;
+  const price = Number(variation.price || 0);
+  const stock = Number(variation.stock || 0);
+  return (kgToGrams(variation.weightKg) || 0) > 0 && hasCatalogDimensions
+    && Number.isFinite(price) && price >= 0 && Number.isInteger(stock) && stock >= 0;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -88,6 +98,8 @@ export default function ProductCreateForm({ lockedShop, listPath, onCreated }: P
   const navigate = useNavigate();
   const nextVariationId = useRef(1);
   const submitting = useRef(false);
+  const creationAttempts = useRef(new Map<string, CreationAttempt>());
+  const shopRequest = useRef(0);
   const [shops, setShops] = useState<Shop[]>(lockedShop ? [{ ...lockedShop, email: lockedShop.email || '' }] : []);
   const [form, setForm] = useState({
     name: '', category: '',
@@ -103,23 +115,27 @@ export default function ProductCreateForm({ lockedShop, listPath, onCreated }: P
   const [tagDraft, setTagDraft] = useState<ProductTagsDraft>({ tags: [], input: '' });
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [shopError, setShopError] = useState('');
 
-  useEffect(() => {
+  const refreshShops = useCallback(async () => {
     if (lockedShop) return;
-    let active = true;
-    void supabase
-      .from('shops')
-      .select('id, name, email')
-      .order('name')
-      .then(({ data }) => { if (active && data) setShops(data); });
-    return () => { active = false; };
+    const request = ++shopRequest.current;
+    setShopError('');
+    try {
+      const { data, error } = await supabase.from('shops').select('id, name, email').order('name');
+      if (error) throw error;
+      if (request === shopRequest.current) setShops(data || []);
+    } catch (error) {
+      if (request === shopRequest.current) setShopError(getErrorMessage(error, 'Shops could not be loaded.'));
+    }
   }, [lockedShop]);
 
-  async function refreshShops() {
-    if (lockedShop) return;
-    const { data } = await supabase.from('shops').select('id, name, email').order('name');
-    if (data) setShops(data);
-  }
+  const invalidateShopRequest = useCallback(() => { ++shopRequest.current; }, []);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => { if (active) void refreshShops(); });
+    return () => { active = false; invalidateShopRequest(); };
+  }, [refreshShops, invalidateShopRequest]);
 
   usePortalRealtimeRefresh(['shops'], refreshShops);
 
@@ -188,68 +204,99 @@ export default function ProductCreateForm({ lockedShop, listPath, onCreated }: P
       if (!form.name.trim() || !form.category) throw new Error('Enter a product name and category.');
       await validateFeaturedArtisan(form.shopId, form.featuredArtisanId);
       if (variations.some((variation) => !hasValidVariation(variation))) {
-        throw new Error('Every variation needs product weight plus length, width, and height.');
+        throw new Error('Every variation needs product weight plus length, width, and height, with a valid price and whole-number stock.');
       }
-      const imageUrl = imageFile ? await uploadFile(imageFile) : '/placeholder.svg';
-      const model3dUrl = glbFile ? await uploadFile(glbFile) : null;
-      const totalStock = variations.reduce((s, v) => s + (Number(v.stock) || 0), 0);
+      // Retain identities across retries: a lost response must not create a
+      // second product or a second copy of an already-persisted variation.
+      let attempt = creationAttempts.current.get(form.shopId);
+      if (!attempt) {
+        attempt = { id: crypto.randomUUID(), variationIds: new Map(), uploads: new Map() };
+        creationAttempts.current.set(form.shopId, attempt);
+      }
+      const uploadOnce = async (file: File) => {
+        const existing = attempt.uploads.get(file);
+        if (existing) return existing;
+        const url = await uploadFile(file);
+        attempt.uploads.set(file, url);
+        return url;
+      };
+      const imageUrl = imageFile ? await uploadOnce(imageFile) : '/placeholder.svg';
+      const model3dUrl = glbFile ? await uploadOnce(glbFile) : null;
+      const totalStock = variations.reduce((sum, variation) => sum + Number(variation.stock || 0), 0);
 
-      const { data: productData, error } = await supabase
-        .from('products')
-        .insert({
-          name: form.name,
-          description: '',
-          category: form.category,
-          tags: resolvedTags.tags,
-          price: 0,
-          stock: totalStock,
-          image: imageUrl,
-          model3d: model3dUrl,
-          materials: form.materials,
-          dimensions: '',
-          height: '',
-          opening_diameter: '',
+      const { data: productData, error } = await supabase.from('products').upsert({
+        id: attempt.id,
+        name: form.name.trim(),
+        description: '',
+        category: form.category,
+        tags: resolvedTags.tags,
+        price: 0,
+        stock: totalStock,
+        image: imageUrl,
+        model3d: model3dUrl,
+        materials: form.materials,
+        dimensions: '', height: '', opening_diameter: '', measurement_unit: 'in',
+        technique: form.technique || 'Handcrafted & Kiln-Fired',
+        shop_id: form.shopId,
+        featured_artisan_id: form.featuredArtisanId,
+        shop_name: shop.name,
+        status: 'draft',
+      }, { onConflict: 'id' }).select('id').single();
+      if (error) throw error;
+      if (productData?.id !== attempt.id) throw new Error('The product draft was not confirmed. Please try again.');
+
+      const variationRows = variations.map((variation, sortOrder) => {
+        let id = attempt.variationIds.get(variation.id);
+        if (!id) { id = crypto.randomUUID(); attempt.variationIds.set(variation.id, id); }
+        return {
+          id, product_id: attempt.id,
+          dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'),
+          height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'),
+          opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'),
           measurement_unit: 'in',
-          technique: form.technique || 'Handcrafted & Kiln-Fired',
-          shop_id: form.shopId,
-          featured_artisan_id: form.featuredArtisanId,
-          shop_name: shop.name,
-          status: 'active',
-        })
-        .select('id')
-        .single();
-
-      if (error) throw new Error(error.message || 'Could not save the product.');
-
-      if (productData && variations.length > 0) {
-        const variationRows = variations
-          .filter(v => v.dimensions.trim() || v.height.trim() || v.openingDiameter.trim() || v.weightKg.trim())
-          .map((v, i) => ({
-            product_id: productData.id,
-            dimensions: normalizeCatalogMeasurement(v.dimensions.trim() || 'N/A', 'in'),
-            height: normalizeCatalogMeasurement(v.height.trim() || 'N/A', 'in'),
-            opening_diameter: normalizeCatalogMeasurement(v.openingDiameter.trim() || 'N/A', 'in'),
-            measurement_unit: 'in',
-            weight_kg: v.weightKg === '' ? null : Number(v.weightKg),
-            product_weight_g: kgToGrams(v.weightKg),
-            shipping_weight_g: kgToGrams(v.weightKg),
-            price: v.price ? Number(v.price) : null,
-            stock: Number(v.stock) || 0,
-            sort_order: i,
-          }));
-        if (variationRows.length > 0) {
-          const { error: variationError } = await supabase.from('product_variations').insert(variationRows);
-          if (variationError) throw new Error(variationError.message || 'Could not save product variations.');
-          await recomputeProductStock(productData.id);
+          weight_kg: variation.weightKg === '' ? null : Number(variation.weightKg),
+          product_weight_g: kgToGrams(variation.weightKg),
+          shipping_weight_g: kgToGrams(variation.weightKg),
+          price: variation.price ? Number(variation.price) : null,
+          stock: Number(variation.stock || 0), sort_order: sortOrder,
+        };
+      });
+      if (variationRows.length) {
+        const { data: savedVariations, error: variationError } = await supabase.from('product_variations')
+          .upsert(variationRows, { onConflict: 'id' }).select('id');
+        if (variationError) throw variationError;
+        if (savedVariations?.length !== variationRows.length || !variationRows.every(row => savedVariations.some(saved => saved.id === row.id))) {
+          throw new Error('Product variations were not confirmed. Your product is still a draft. Please try again.');
         }
+      }
+      const expectedIds = new Set(variationRows.map(row => row.id));
+      const removedIds = [...attempt.variationIds.values()].filter(id => !expectedIds.has(id));
+      if (removedIds.length) {
+        const { error: removeError } = await supabase.from('product_variations').delete().eq('product_id', attempt.id).in('id', removedIds);
+        if (removeError) throw removeError;
+      }
+      const { data: confirmedVariations, error: readError } = await supabase.from('product_variations').select('id,stock').eq('product_id', attempt.id);
+      if (readError) throw readError;
+      if (confirmedVariations?.length !== expectedIds.size || !confirmedVariations.every(row => expectedIds.has(row.id))) {
+        throw new Error('The complete variation list could not be confirmed. Your product is still a draft. Please try again.');
+      }
+      const confirmedStock = confirmedVariations.reduce((sum, row) => sum + Number(row.stock || 0), 0);
+      if (!Number.isSafeInteger(confirmedStock) || confirmedStock < 0) throw new Error('Product inventory could not be confirmed.');
+      const { data: published, error: publishError } = await supabase.from('products')
+        .update({ status: 'active', stock: confirmedStock }).eq('id', attempt.id).select('id,status,stock').maybeSingle();
+      if (publishError) throw publishError;
+      if (published?.id !== attempt.id || published.status !== 'active' || Number(published.stock) !== confirmedStock) {
+        throw new Error('Publishing the product was not confirmed. Please retry to finish this draft.');
       }
 
       setSubmitted(true);
-      if (onCreated) { await onCreated(); navigate(listPath); }
-      else setTimeout(() => navigate(listPath), 1500);
+      if (onCreated) {
+        try { await onCreated(); }
+        catch { toast.error('Product created. Refresh listings to see the latest products.'); }
+        navigate(listPath);
+      } else setTimeout(() => navigate(listPath), 1500);
     } catch (error) {
-      console.error('Product upload error:', error);
-      setSubmitError(error instanceof Error ? error.message : 'Could not upload the product. Please try again.');
+      setSubmitError(getErrorMessage(error, 'Could not upload the product. Please try again.'));
     } finally {
       submitting.current = false;
       setLoading(false);
@@ -260,6 +307,7 @@ export default function ProductCreateForm({ lockedShop, listPath, onCreated }: P
 
   return (
     <div className="product-create-page">
+      {shopError && <div role="alert">{shopError} <button type="button" onClick={() => void refreshShops()}>Retry shops</button></div>}
 
       {submitted ? (
         <div style={{

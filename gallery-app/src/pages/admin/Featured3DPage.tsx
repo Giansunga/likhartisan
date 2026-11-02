@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import ModelImageFallback from '../../components/ModelImageFallback';
 import { Link } from 'react-router-dom';
@@ -39,10 +40,12 @@ export default function Featured3DPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
     async function load() {
+      try {
       const [modelResult, shopResult, settingResult] = await Promise.all([
         supabase.from('models_3d').select('*').order('name'),
         supabase.from('shops').select('id,name').order('name'),
@@ -68,11 +71,12 @@ export default function Featured3DPage() {
         else if (settingResult.data) setNotice('The saved preview needs attention. Review its stages and publish a valid model.');
       }
       if (settingResult.error) setNotice('Published settings could not be loaded. You can preview models, but publishing may be unavailable.');
-      setLoading(false);
+      } catch (cause) { if (active) setError(getErrorMessage(cause, 'Could not load the featured preview.')); }
+      finally { if (active) setLoading(false); }
     }
     void load();
     return () => { active = false; };
-  }, []);
+  }, [loadAttempt]);
 
   const model = useMemo(() => models.find((entry) => entry.id === selectedId), [models, selectedId]);
   const stageKey: StageKey = tab === 'finish' ? finishLook : tab;
@@ -147,6 +151,7 @@ export default function Featured3DPage() {
     }
   }
 
+  if (error && !feature && !loading) return <section role="alert" className="featured-admin-empty"><p>{error}</p><button type="button" onClick={() => { setLoading(true); setError(''); setLoadAttempt(value => value + 1); }}>Try again</button></section>;
   if (loading) return <div className="featured-admin-empty">Loading featured preview...</div>;
 
   return <div className="featured-admin">

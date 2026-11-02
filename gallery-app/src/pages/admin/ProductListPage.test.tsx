@@ -24,7 +24,7 @@ vi.mock('../../lib/supabase', () => ({
         update: (row: unknown) => { mocks.updateProduct(row); return { eq: () => ({ select: () => ({ maybeSingle: async () => mocks.updateResult }) }) }; },
       };
       return {
-        select: () => ({ in: async () => ({ data: [], error: null }) }),
+        select: () => ({ in: async () => ({ data: [], error: null }), eq: async () => ({ data: [{ id: 'variation-1' }], error: null }) }),
         insert: (row: unknown) => {
           mocks.insertVariation(row);
           return { select: () => ({ single: async () => mocks.variationInsertResult }) };

@@ -112,3 +112,17 @@ describe('seller listing status', () => {
     await screen.findByText('Clay Vase is active and visible in My Listings.');
   });
 });
+
+
+it.each(['network', 'zero-row'])('keeps the restore dialog usable after a %s failure', async kind => {
+  if (kind === 'network') mocks.request.mockRejectedValueOnce(new Error('Network unavailable'));
+  else mocks.request.mockResolvedValueOnce({ data: null, error: null });
+  render(<Portal initialProducts={[{ ...product, status: 'archived' }]} vault />);
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Restore listing' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: 'Restore listing' })).toBeEnabled();
+  expect(screen.queryByText('Clay Vase is active and visible in My Listings.')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Restore listing' }));
+  await screen.findByText('Clay Vase is active and visible in My Listings.');
+});

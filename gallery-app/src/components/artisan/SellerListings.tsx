@@ -1,3 +1,5 @@
+import { saveCatalogVariations } from '../../lib/catalogVariations';
+import { getErrorMessage } from '../../lib/portalErrors';
 import AddProductDialog from '../products/AddProductDialog';
 import { ARTISAN_PRODUCT_PATHS } from '../products/productCreationPaths';
 import { useMemo, useRef, useState } from 'react';
@@ -15,6 +17,7 @@ import { normalizeCatalogMeasurement } from '../../lib/measurements';
 
 interface VariationDraft {
   id?: string;
+  clientId?: string;
   dimensions: string;
   height: string;
   openingDiameter: string;
@@ -23,11 +26,11 @@ interface VariationDraft {
 }
 
 const defaultFilters: ListingFilters = { search: '', status: 'all', inventory: 'all', category: 'all', sort: 'newest' };
-const emptyVariation = (): VariationDraft => ({ dimensions: '', height: '', openingDiameter: '', price: '', stock: '' });
+const emptyVariation = (): VariationDraft => ({ clientId: crypto.randomUUID(), dimensions: '', height: '', openingDiameter: '', price: '', stock: '' });
 
 export default function SellerListings() {
   const [addProductOpen, setAddProductOpen] = useState(false);
-  const { products, productPrices, loadingProducts, setProducts } = useArtisanPortal();
+  const { products, productPrices, loadingProducts, setProducts, refreshProducts } = useArtisanPortal();
   const [filters, setFilters] = useState(defaultFilters);
   const [editing, setEditing] = useState<ArtisanProduct | null>(null);
   const [materials, setMaterials] = useState('');
@@ -38,29 +41,39 @@ export default function SellerListings() {
   const [saving, setSaving] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<ArtisanProduct | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const knownVariationIds = useRef(new Set<string>());
+  const editSequence = useRef(0);
+  const savePending = useRef(false);
+  const [editError, setEditError] = useState('');
   const pendingActions = useRef(new Set<string>());
   const [pendingProductIds, setPendingProductIds] = useState(new Set<string>());
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const currentProducts = useMemo(() => products.filter(product => product.status !== 'archived'), [products]);
+  const currentProducts = useMemo(() => products.filter(product => product.status !== 'archived' && product.status !== 'draft'), [products]);
   const categories = useMemo(() => [...new Set(currentProducts.map(product => product.category).filter(Boolean))].sort(), [currentProducts]);
   const visible = useMemo(() => filterAndSortListings(currentProducts, filters, productPrices), [currentProducts, filters, productPrices]);
   const counts = getListingCounts(products);
 
   async function openEdit(product: ArtisanProduct) {
     if (pendingActions.current.has(product.id)) return;
+    const request = ++editSequence.current;
     setEditing(product);
+    setEditError('');
     setMaterials(product.materials || '');
     setTechnique(product.technique || '');
     setVariations([]);
     setEditLoading(true);
     setFeedback(null);
+    try {
     const { data, error } = await supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order');
-    if (error) setFeedback({ tone: 'error', text: error.message });
+    if (request !== editSequence.current) return;
+    if (error) throw error;
     const rows = data || [];
     setVariations(rows.map(row => ({ id: row.id, dimensions: normalizeCatalogMeasurement(row.dimensions, row.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(row.height, row.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(row.opening_diameter, row.measurement_unit === 'in' ? 'in' : 'cm'), price: row.price == null ? '' : String(row.price), stock: String(row.stock ?? 0) })));
     setOriginalVariationIds(rows.map(row => row.id));
-    setEditLoading(false);
+    knownVariationIds.current = new Set(rows.map(row => row.id));
+    } catch (cause) { if (request === editSequence.current) setEditError(getErrorMessage(cause, 'Listing details could not be loaded.')); }
+    finally { if (request === editSequence.current) setEditLoading(false); }
   }
 
   function updateVariation(index: number, key: keyof VariationDraft, value: string) {
@@ -68,34 +81,41 @@ export default function SellerListings() {
   }
 
   async function saveListing() {
-    if (!editing || saving) return;
-    const invalid = variations.some(variation => Number(variation.price || 0) < 0 || Number(variation.stock || 0) < 0 || !Number.isInteger(Number(variation.stock || 0)));
+    if (!editing || savePending.current || editLoading || editError) return;
+    const invalid = variations.some(variation => (!Number.isFinite(Number(variation.price || 0)) || Number(variation.price || 0) < 0) || Number(variation.stock || 0) < 0 || !Number.isInteger(Number(variation.stock || 0)));
     if (invalid) { setFeedback({ tone: 'error', text: 'Prices must be zero or more and stock must be a whole number.' }); return; }
+    savePending.current = true;
     setSaving(true);
     setFeedback(null);
     try {
-      const { error: productError } = await supabase.from('products').update({ materials: materials.trim(), technique: technique.trim() }).eq('id', editing.id).select('id').single();
+      const { data: savedProduct, error: productError } = await supabase.from('products').update({ materials: materials.trim(), technique: technique.trim() }).eq('id', editing.id).select('id').single();
       if (productError) throw productError;
-      const retainedIds = variations.flatMap(variation => variation.id ? [variation.id] : []);
-      const removedIds = originalVariationIds.filter(id => !retainedIds.includes(id));
-      const operations = variations.filter(variation => variation.dimensions.trim() || variation.height.trim() || variation.openingDiameter.trim()).map((variation, sortOrder) => {
-        const payload = { dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'), height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'), opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'), measurement_unit: 'in' as const, price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0, sort_order: sortOrder };
-        return variation.id ? supabase.from('product_variations').update(payload).eq('id', variation.id) : supabase.from('product_variations').insert({ ...payload, product_id: editing.id });
-      });
-      const results = await Promise.all(operations);
-      const variationError = results.find(result => result.error)?.error;
-      if (variationError) throw variationError;
+      if (!savedProduct) throw new Error('The saved listing could not be confirmed.');
+      const meaningful = variations.filter(variation => variation.id || variation.dimensions.trim() || variation.height.trim() || variation.openingDiameter.trim());
+      meaningful.forEach(variation => { const id = variation.id || variation.clientId; if (id) knownVariationIds.current.add(id); });
+      const retainedIds = await saveCatalogVariations(editing.id, meaningful.map((variation, sortOrder) => ({
+        id: variation.id, clientId: variation.clientId || crypto.randomUUID(), values: {
+          dimensions: normalizeCatalogMeasurement(variation.dimensions.trim() || 'N/A', 'in'), height: normalizeCatalogMeasurement(variation.height.trim() || 'N/A', 'in'),
+          opening_diameter: normalizeCatalogMeasurement(variation.openingDiameter.trim() || 'N/A', 'in'), measurement_unit: 'in',
+          price: variation.price ? Number(variation.price) : null, stock: Number(variation.stock) || 0, sort_order: sortOrder,
+        },
+      })));
+      const removedIds = [...new Set([...originalVariationIds, ...knownVariationIds.current])].filter(id => !retainedIds.includes(id));
       if (removedIds.length) {
-        const { error: removeError } = await supabase.from('product_variations').delete().in('id', removedIds);
+        const { error: removeError } = await supabase.from('product_variations').delete().eq('product_id', editing.id).in('id', removedIds);
         if (removeError) throw removeError;
+        const { data: remaining, error: checkError } = await supabase.from('product_variations').select('id').eq('product_id', editing.id).in('id', removedIds);
+        if (checkError) throw checkError;
+        if (remaining?.length) throw new Error('Some removed variations could not be confirmed. Reload before retrying.');
       }
       const stock = await recomputeProductStock(editing.id);
       setProducts(current => current.map(product => product.id === editing.id ? { ...product, materials: materials.trim(), technique: technique.trim(), stock } : product));
       setEditing(null);
+      void refreshProducts().catch(() => undefined);
       setFeedback({ tone: 'success', text: `${editing.name} was updated successfully.` });
     } catch (error) {
-      setFeedback({ tone: 'error', text: `${error instanceof Error ? error.message : 'Listing could not be saved.'} Your changes are still here.` });
-    } finally { setSaving(false); }
+      setFeedback({ tone: 'error', text: `${getErrorMessage(error, 'Listing could not be saved.')} Some changes may already be saved. Your draft is preserved for retry.` });
+    } finally { savePending.current = false; setSaving(false); }
   }
 
   function beginProductAction(id: string) {
@@ -159,13 +179,16 @@ export default function SellerListings() {
     <SellerListingToolbar filters={filters} categories={categories} resultCount={visible.length} onChange={setFilters} />
     {loadingProducts ? <div className="seller-product-skeleton">{[1,2,3,4].map(item => <div key={item} />)}</div> : visible.length ? <div className="seller-product-list">{visible.map(product => <SellerListingCard key={product.id} product={product} busy={pendingProductIds.has(product.id)} price={productPrices[product.id] ?? product.price ?? 0} onEdit={openEdit} onArchive={setArchiveTarget} onToggleStatus={item => void updateStatus(item, item.status === 'active' ? 'inactive' : 'active')} />)}</div> : <div className="seller-empty-panel"><Package size={34} /><h2>No listings match this view</h2><p>{products.length ? "Change or clear the filters to see more products." : "Add your first product to get started."}</p>{!products.length && <button type="button" className="seller-button seller-button--primary" onClick={() => setAddProductOpen(true)}>Add Product</button>}</div>}
 
-    <SellerOverlay open={Boolean(editing)} title={editing ? `Edit ${editing.name}` : 'Edit listing'} description="Update materials, production details, pricing, and variation inventory." onClose={() => setEditing(null)} busy={saving} footer={<><button className="seller-button seller-button--secondary" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="seller-button seller-button--primary" onClick={() => void saveListing()} disabled={saving || editLoading}>{saving ? 'Saving…' : 'Save changes'}</button></>}>
+    <SellerOverlay open={Boolean(editing)} title={editing ? `Edit ${editing.name}` : 'Edit listing'} description="Update materials, production details, pricing, and variation inventory." onClose={() => { editSequence.current++; setEditing(null); }} busy={saving} footer={<><button className="seller-button seller-button--secondary" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="seller-button seller-button--primary" onClick={() => void saveListing()} disabled={saving || editLoading || Boolean(editError)}>{saving ? 'Saving…' : 'Save changes'}</button></>}>
+      <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+      {editError && <p role="alert">{editError}<button type="button" onClick={() => { if (editing) void openEdit(editing); }}>Retry loading details</button></p>}
       {editLoading ? <div className="seller-edit-loading">Loading listing details…</div> : <div className="seller-listing-editor">
         <section><h3>Product specifications</h3><div className="seller-editor-grid"><label><span>Materials</span><input value={materials} onChange={event => setMaterials(event.target.value)} placeholder="e.g. Stoneware clay" /></label><label><span>Technique</span><input value={technique} onChange={event => setTechnique(event.target.value)} placeholder="e.g. Hand-thrown" /></label></div></section>
         <section><div className="seller-editor-section-heading"><div><h3>Variations</h3><p>Keep pricing and stock accurate for every option.</p></div><button type="button" onClick={() => setVariations(current => [...current, emptyVariation()])}><Plus size={15} /> Add variation</button></div>
            {variations.length ? <div className="seller-variation-list">{variations.map((variation, index) => <div className="seller-variation-card" key={variation.id || `new-${index}`}><header><strong>Variation {index + 1}</strong><button type="button" onClick={() => setVariations(current => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove variation ${index + 1}`}><Trash2 size={15} /></button></header><div className="seller-editor-grid seller-editor-grid--three"><label><span>Dimensions (in)</span><input value={variation.dimensions} onChange={event => updateVariation(index, 'dimensions', event.target.value)} placeholder="e.g. 4 × 4 in" /></label><label><span>Height (in)</span><input value={variation.height} onChange={event => updateVariation(index, 'height', event.target.value)} placeholder="e.g. 8 in" /></label><label><span>Opening diameter (in)</span><input value={variation.openingDiameter} onChange={event => updateVariation(index, 'openingDiameter', event.target.value)} placeholder="e.g. 3 in" /></label><label><span>Price</span><input type="number" min="0" value={variation.price} onChange={event => updateVariation(index, 'price', event.target.value)} /></label><label><span>Stock</span><input type="number" min="0" step="1" value={variation.stock} onChange={event => updateVariation(index, 'stock', event.target.value)} /></label></div></div>)}</div> : <div className="seller-editor-empty"><p>No variations yet.</p><button type="button" onClick={() => setVariations([emptyVariation()])}><Plus size={15} /> Add the first variation</button></div>}
         </section>
       </div>}
+      </fieldset>
     </SellerOverlay>
     <SellerConfirmDialog open={Boolean(archiveTarget)} title="Archive listing?" description={archiveTarget ? `${archiveTarget.name} will be hidden from customers and moved to Design Vault.` : ''} confirmLabel="Archive listing" busy={archiving} onClose={() => { if (!archiving) setArchiveTarget(null); }} onConfirm={() => void archiveListing()} />
   </div>;

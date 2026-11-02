@@ -1,5 +1,6 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import AssetImage from '../AssetImage';
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownUp, CheckCircle2, ChevronRight, Clock3, Eye, Inbox, LoaderCircle,
   MessageCircle, PackageCheck, Search, Send, SlidersHorizontal, X, XCircle,
@@ -82,52 +83,65 @@ export default function SellerRequests() {
   const [revisions, setRevisions] = useState<DesignRequestRevision[]>([]);
   const [events, setEvents] = useState<DesignRequestEvent[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [action, setAction] = useState<ResponseAction>('quote');
   const [response, setResponse] = useState('');
   const [quote, setQuote] = useState('');
   const [leadDays, setLeadDays] = useState('');
   const [saving, setSaving] = useState(false);
+  const listSequence = useRef(0);
+  const historySequence = useRef(0);
+  const actionPending = useRef(false);
+  const currentSelection = useRef<string | null>(null);
   const [now] = useState(() => Date.now());
   const selected = requests.find(item => item.id === selectedId) || null;
   const panelRef = useOverlayA11y(Boolean(selected), closeRequest, saving);
   const requestedRequestId = searchParams.get('requestId');
 
   const load = useCallback(async (silent = false) => {
+    if (actionPending.current) return;
+    const sequence = ++listSequence.current;
     if (!silent) setLoading(true);
     setError('');
-    const { data, error: requestError } = await supabase.from('design_requests')
-      .select('*, conversations(buyer_name), order:orders!design_request_id(id,status,payment_status,delivery_status,total,checkout_session_id,order_type)')
-      .eq('shop_id', shop.id).order('created_at', { ascending: false });
-    if (requestError) setError(requestError.message);
-    else {
+    try {
+      const { data, error: requestError } = await supabase.from('design_requests')
+        .select('*, conversations(buyer_name), order:orders!design_request_id(id,status,payment_status,delivery_status,total,checkout_session_id,order_type)')
+        .eq('shop_id', shop.id).order('created_at', { ascending: false });
+      if (requestError) throw requestError;
+      if (sequence !== listSequence.current) return;
       const rows = ((data || []) as unknown as RequestRecord[]).map(row => {
         const order = normalizeRequestOrder(row.order);
-        const buyerName = row.conversations?.buyer_name?.trim() || 'Customer';
-        return { ...row, buyer_name: buyerName, order, stage: deriveDesignRequestStage(row, order) } as DesignRequestQueueItem;
+        return { ...row, buyer_name: row.conversations?.buyer_name?.trim() || 'Customer', order, stage: deriveDesignRequestStage(row, order) } as DesignRequestQueueItem;
       });
       setRequests(rows);
-      if (requestedRequestId && rows.some(item => item.id === requestedRequestId)) setSelectedId(requestedRequestId);
-    }
-    if (!silent) setLoading(false);
-  }, [requestedRequestId, shop.id]);
+    } catch (cause) {
+      if (sequence === listSequence.current) setError(getErrorMessage(cause, 'Could not load design requests.'));
+    } finally { if (sequence === listSequence.current) setLoading(false); }
+  }, [shop.id]);
 
   const loadHistory = useCallback(async (requestId: string, silent = false) => {
-    if (!silent) setDetailLoading(true);
-    const [revisionResult, eventResult] = await Promise.all([
-      supabase.from('design_request_revisions').select('*').eq('request_id', requestId).order('revision_number', { ascending: false }),
-      supabase.from('design_request_events').select('*').eq('request_id', requestId).order('created_at', { ascending: false }),
-    ]);
-    if (revisionResult.error || eventResult.error) {
-      toast.error(revisionResult.error?.message || eventResult.error?.message || 'Could not load request history.');
-    } else {
+    if (requestId !== currentSelection.current) return;
+    const sequence = ++historySequence.current;
+    setHistoryError('');
+    if (!silent) { setDetailLoading(true); setRevisions([]); setEvents([]); }
+    try {
+      const [revisionResult, eventResult] = await Promise.all([
+        supabase.from('design_request_revisions').select('*').eq('request_id', requestId).order('revision_number', { ascending: false }),
+        supabase.from('design_request_events').select('*').eq('request_id', requestId).order('created_at', { ascending: false }),
+      ]);
+      if (revisionResult.error || eventResult.error) throw revisionResult.error || eventResult.error;
+      if (sequence !== historySequence.current || requestId !== currentSelection.current) return;
       setRevisions((revisionResult.data || []) as DesignRequestRevision[]);
       setEvents((eventResult.data || []) as DesignRequestEvent[]);
-    }
-    if (!silent) setDetailLoading(false);
+    } catch (cause) {
+      if (sequence === historySequence.current && requestId === currentSelection.current) setHistoryError(getErrorMessage(cause, 'Could not load request history.'));
+    } finally { if (sequence === historySequence.current && requestId === currentSelection.current) setDetailLoading(false); }
   }, []);
 
-  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
-  useEffect(() => { if (selectedId) queueMicrotask(() => { void loadHistory(selectedId); }); }, [loadHistory, selectedId]);
+  const invalidateList = useCallback(() => { listSequence.current++; }, []);
+  const invalidateHistory = useCallback(() => { historySequence.current++; }, []);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void load(); }); return () => { active = false; invalidateList(); }; }, [invalidateList, load]);
+  useEffect(() => { let active = true; if (selectedId) queueMicrotask(() => { if (active) void loadHistory(selectedId); }); return () => { active = false; invalidateHistory(); }; }, [invalidateHistory, loadHistory, selectedId]);
   usePortalRealtimeRefresh(['design_requests', 'orders'], () => load(true));
   usePortalRealtimeRefresh(['design_request_revisions', 'design_request_events'], () => selectedId ? loadHistory(selectedId, true) : Promise.resolve());
 
@@ -142,36 +156,72 @@ export default function SellerRequests() {
     return sort === 'newest' ? delta : -delta;
   }), [deferredSearch, requests, sort, stageFilter]);
 
-  function openRequest(request: DesignRequestQueueItem) {
+  const selectRequest = useCallback((request: DesignRequestQueueItem) => {
+    if (actionPending.current) return;
+    currentSelection.current = request.id;
+    historySequence.current++;
     setSelectedId(request.id);
+    setRevisions([]);
+    setEvents([]);
+    setHistoryError('');
+    setDetailLoading(true);
     setAction('quote');
     setResponse(request.shop_response || '');
     setQuote(request.quoted_price?.toString() || '');
     setLeadDays(request.lead_time_days?.toString() || '');
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    currentSelection.current = null;
+    historySequence.current++;
+    setSelectedId(null);
+    setRevisions([]);
+    setEvents([]);
+    setHistoryError('');
+    setDetailLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (saving || requestedRequestId === currentSelection.current) return;
+    if (!requestedRequestId) {
+      if (currentSelection.current) queueMicrotask(() => { if (active) clearSelection(); });
+      return () => { active = false; };
+    }
+    const requested = requests.find(request => request.id === requestedRequestId);
+    if (requested) queueMicrotask(() => { if (active) selectRequest(requested); });
+    return () => { active = false; };
+  }, [clearSelection, requestedRequestId, requests, saving, selectRequest]);
+
+  function openRequest(request: DesignRequestQueueItem) {
+    if (actionPending.current) return;
+    selectRequest(request);
     const params = new URLSearchParams(searchParams);
     params.set('requestId', request.id);
     setSearchParams(params, { replace: true });
   }
 
   function closeRequest() {
-    if (saving) return;
-    setSelectedId(null);
-    setRevisions([]);
-    setEvents([]);
+    if (actionPending.current) return;
+    clearSelection();
     const params = new URLSearchParams(searchParams);
     params.delete('requestId');
     setSearchParams(params, { replace: true });
   }
 
   async function submitResponse() {
-    if (!selected || saving) return;
-    if (action === 'quote' && (!(Number(quote) > 0) || !(Number(leadDays) >= 1) || Number(leadDays) > 365)) {
+    if (!selected || actionPending.current) return;
+    if (action === 'quote' && (!Number.isFinite(Number(quote)) || !(Number(quote) > 0) || !Number.isInteger(Number(leadDays)) || !(Number(leadDays) >= 1) || Number(leadDays) > 365)) {
       toast.error('Enter a valid total quote and lead time.'); return;
     }
     if (action !== 'quote' && !response.trim()) {
       toast.error(action === 'decline' ? 'Enter a decline reason.' : 'Describe the requested changes.'); return;
     }
+    actionPending.current = true;
+    listSequence.current++;
+    setLoading(false);
     setSaving(true);
+    try {
     const { data, error: responseError } = await supabase.rpc('respond_to_design_request', {
       p_request_id: selected.id,
       p_action: action,
@@ -179,26 +229,35 @@ export default function SellerRequests() {
       p_quoted_price: action === 'quote' ? Number(quote) : null,
       p_lead_time_days: action === 'quote' ? Number(leadDays) : null,
     });
-    setSaving(false);
-    if (responseError) { toast.error(responseError.message); return; }
+    if (responseError) throw responseError;
+    if (!data || data.id !== selected.id) throw new Error('The saved response could not be confirmed. Reload this request before retrying.');
     const updatedRequest = data as DesignRequest;
     setRequests(current => current.map(item => item.id === updatedRequest.id
       ? { ...item, ...updatedRequest, stage: deriveDesignRequestStage(updatedRequest, item.order) }
       : item));
-    await loadHistory(selected.id, true);
     toast.success(action === 'quote' ? 'Quote sent to the buyer.' : action === 'request_changes' ? 'Change request sent.' : 'Request declined.');
+    await loadHistory(selected.id, true);
+    } catch (cause) { toast.error(getErrorMessage(cause, 'The response could not be confirmed. Please reload before retrying.')); }
+    finally { actionPending.current = false; setSaving(false); }
   }
 
   async function advanceOrder() {
-    if (!selected?.order || saving) return;
+    if (!selected?.order || actionPending.current) return;
     const next = { pending: 'preparing', preparing: 'shipped', shipped: 'delivered', delivered: 'completed' }[selected.order.delivery_status];
     if (!next) return;
+    actionPending.current = true;
+    listSequence.current++;
+    setLoading(false);
     setSaving(true);
-    const { error: advanceError } = await supabase.rpc('advance_custom_order', { p_order_id: selected.order.id, p_next_status: next });
-    setSaving(false);
-    if (advanceError) { toast.error(advanceError.message); return; }
+    try {
+    const { data, error: advanceError } = await supabase.rpc('advance_custom_order', { p_order_id: selected.order.id, p_next_status: next });
+    if (advanceError) throw advanceError;
+    if (!data || data.id !== selected.order.id) throw new Error('The saved order could not be confirmed. Reload before retrying.');
+    setRequests(current => current.map(item => item.id === selected.id ? { ...item, order: { ...item.order!, ...data }, stage: deriveDesignRequestStage(item, { ...item.order!, ...data }) } : item));
     toast.success(next === 'preparing' ? 'Production started.' : `Order marked ${next}.`);
     await Promise.all([load(true), loadHistory(selected.id, true)]);
+    } catch (cause) { toast.error(getErrorMessage(cause, 'The order update could not be confirmed. Reload before retrying.')); }
+    finally { actionPending.current = false; setSaving(false); }
   }
 
   return <div className="seller-requests-workflow">
@@ -251,7 +310,7 @@ export default function SellerRequests() {
 
           {selected.status === 'declined' ? <section className="seller-request-final is-declined"><strong><XCircle /> Request declined</strong><p>{selected.shop_response}</p></section> : selected.status === 'approved' ? <section className="seller-request-final"><strong><CheckCircle2 /> Quote approved</strong><p>The approved request is now tracked through its linked custom order.</p></section> : <section className="seller-request-response-card"><h3>Respond to buyer</h3><div className="seller-request-action-tabs">{([{ id: 'quote', label: 'Send Quote' }, { id: 'request_changes', label: 'Request Changes' }, { id: 'decline', label: 'Decline' }] as { id: ResponseAction; label: string }[]).map(item => <button type="button" className={action === item.id ? 'is-active' : ''} onClick={() => setAction(item.id)} key={item.id}>{item.label}</button>)}</div>{action === 'quote' ? <div className="seller-request-quote-fields"><label><span>Total quote</span><div className="seller-money-input"><b>₱</b><input type="number" min="1" step="0.01" value={quote} onChange={event => setQuote(event.target.value)} placeholder="0.00" /></div></label><label><span>Lead time (days)</span><input type="number" min="1" max="365" value={leadDays} onChange={event => setLeadDays(event.target.value)} placeholder="7" /></label></div> : null}<label className="seller-request-response-note"><span>{action === 'quote' ? 'Reply note (optional)' : action === 'decline' ? 'Reason' : 'Changes needed'}</span><textarea rows={4} maxLength={2000} value={response} onChange={event => setResponse(event.target.value)} /><small>{response.length}/2000</small></label><button className={`seller-button ${action === 'decline' ? 'seller-button--danger' : 'seller-button--primary'}`} type="button" disabled={saving} onClick={() => void submitResponse()}>{saving ? <LoaderCircle className="seller-spin" /> : action === 'quote' ? <Send /> : action === 'request_changes' ? <Clock3 /> : <XCircle />}{saving ? 'Saving…' : action === 'quote' ? 'Send quote' : action === 'request_changes' ? 'Request changes' : 'Decline request'}</button></section>}
 
-          <section className="seller-request-history"><h3>Request history</h3>{detailLoading ? <div className="seller-request-history__loading"><LoaderCircle className="seller-spin" /> Loading history…</div> : events.length ? <ol>{events.map(event => <li key={event.id}><span className={`is-${event.event_type}`} /><div><strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong><p>{eventDescription(event)}</p><time>{new Date(event.created_at).toLocaleString()}</time></div></li>)}</ol> : <p>No history is available for this request yet.</p>}{revisions.length > 1 ? <small>{revisions.length} immutable design revisions preserved. The current revision is shown above.</small> : null}</section>
+          <section className="seller-request-history"><h3>Request history</h3>{detailLoading ? <div className="seller-request-history__loading"><LoaderCircle className="seller-spin" /> Loading history…</div> : historyError ? <div role="alert"><p>{historyError}</p><button type="button" onClick={() => void loadHistory(selected.id)}>Retry history</button></div> : events.length ? <ol>{events.map(event => <li key={event.id}><span className={`is-${event.event_type}`} /><div><strong>{EVENT_LABELS[event.event_type] || event.event_type}</strong><p>{eventDescription(event)}</p><time>{new Date(event.created_at).toLocaleString()}</time></div></li>)}</ol> : <p>No history is available for this request yet.</p>}{revisions.length > 1 ? <small>{revisions.length} immutable design revisions preserved. The current revision is shown above.</small> : null}</section>
           </SellerDesignDetails>
         </div>
         <footer className="seller-request-drawer__footer">{selected.conversation_id ? <button type="button" onClick={() => navigate(`/artisan-dashboard/messages?conversation=${encodeURIComponent(selected.conversation_id!)}`)}><MessageCircle /> Open conversation</button> : null}<span>Last updated {formatAge(selected.updated_at, now)}</span></footer>

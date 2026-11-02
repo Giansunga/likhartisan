@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import AssetImage from '../AssetImage';
 import { Popup } from '../Popup';
 import FeaturedArtisanSelect from './FeaturedArtisanSelect';
@@ -31,7 +32,7 @@ interface ProductEditorDialogProps {
   onSave: (product: Product, data: ProductEditorSave) => Promise<void>;
 }
 
-function emptyDraft(): ProductVariationDraft { return { dimensions: '', height: '', openingDiameter: '', weightKg: '', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '', stock: '', requiresWeight: true }; }
+function emptyDraft(): ProductVariationDraft { return { clientId: crypto.randomUUID(), dimensions: '', height: '', openingDiameter: '', weightKg: '', packagingWeightKg: '', shippingLengthIn: '', shippingWidthIn: '', shippingHeightIn: '', price: '', stock: '', requiresWeight: true }; }
 function totalStock(variations: ProductVariationDraft[]) { return variations.reduce((sum, item) => sum + (Number(item.stock) || 0), 0); }
 
 function trapFocus(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
@@ -44,43 +45,53 @@ function trapFocus(event: KeyboardEvent<HTMLElement>, onDismiss: () => void) {
   if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 }
 
-export default function ProductEditorDialog({ product, onClose, onSave }: ProductEditorDialogProps) {
-  const [form, setForm] = useState({ name: '', category: '', materials: '', technique: '', featuredArtisanId: '' });
+export default function ProductEditorDialog(props: ProductEditorDialogProps) {
+  return props.product ? <ProductEditorForId key={props.product.id} {...props} product={props.product} /> : null;
+}
+
+function ProductEditorForId({ product, onClose, onSave }: Omit<ProductEditorDialogProps, 'product'> & { product: Product }) {
+  const [initialProduct] = useState(product);
+  const [syncedProduct, setSyncedProduct] = useState(product);
+  const [form, setForm] = useState(() => ({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', featuredArtisanId: product.featuredArtisanId || '' }));
   const artisanOptions = useShopArtisans(product?.shopId || '');
   const [variations, setVariations] = useState<ProductVariationDraft[]>([]);
-  const [variationLoading, setVariationLoading] = useState(false);
+  const [variationLoading, setVariationLoading] = useState(true);
+  const [variationLoadError, setVariationLoadError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState('');
+  const [imagePreview, setImagePreview] = useState(product.image || '');
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<ProductEditorErrors>({});
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [tagDraft, setTagDraft] = useState<ProductTagsDraft>({ tags: [], input: '' });
+  const [tagDraft, setTagDraft] = useState<ProductTagsDraft>(() => ({ tags: normalizeProductTags(product.tags), input: '' }));
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const sequence = useRef(0);
 
   useEffect(() => {
-    if (!product) return;
+    let active = true;
     const request = ++sequence.current;
-    setTagDraft({ tags: normalizeProductTags(product.tags), input: '' });
-    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', featuredArtisanId: product.featuredArtisanId || '' });
-    setVariations([]); setImageFile(null); setImagePreview(product.image || ''); setModelFile(null); setErrors({}); setDirty(false); setConfirmDiscard(false); setVariationLoading(true);
-    void supabase.from('product_variations').select('*').eq('product_id', product.id).order('sort_order').then(({ data, error }) => {
-      if (request !== sequence.current) return;
-      if (error) setErrors({ save: error.message || 'Could not load product variations.' });
-      else setVariations((data ?? []).map((item: any) => {
+    void Promise.resolve(supabase.from('product_variations').select('*').eq('product_id', initialProduct.id).order('sort_order')).then(({ data, error }) => {
+      if (!active || request !== sequence.current) return;
+      if (error) { setVariationLoadError(getErrorMessage(error, 'Could not load product variations.')); return; }
+      else setVariations((data ?? []).map((item) => {
         const weightKg = item.product_weight_g == null ? (item.weight_kg == null ? '' : String(item.weight_kg)) : String(item.product_weight_g / 1000);
         return { id: item.id, dimensions: normalizeCatalogMeasurement(item.dimensions, item.measurement_unit === 'in' ? 'in' : 'cm'), height: normalizeCatalogMeasurement(item.height, item.measurement_unit === 'in' ? 'in' : 'cm'), openingDiameter: normalizeCatalogMeasurement(item.opening_diameter, item.measurement_unit === 'in' ? 'in' : 'cm'), weightKg, packagingWeightKg: item.packaging_weight_g == null ? '' : String(item.packaging_weight_g / 1000), shippingLengthIn: item.shipping_length_in == null ? '' : String(item.shipping_length_in), shippingWidthIn: item.shipping_width_in == null ? '' : String(item.shipping_width_in), shippingHeightIn: item.shipping_height_in == null ? '' : String(item.shipping_height_in), price: item.price == null ? '' : String(item.price), stock: String(item.stock ?? 0), requiresWeight: !(kgToGrams(weightKg) || 0) };
       }));
-      setVariationLoading(false);
-    });
-  }, [product]);
+      setVariationLoadError('');
+    }).catch(cause => { if (active) setVariationLoadError(getErrorMessage(cause, 'Could not load product variations.')); }).finally(() => { if (active) setVariationLoading(false); });
+    return () => { active = false; };
+  }, [initialProduct, loadAttempt]);
 
   useEffect(() => () => { if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
   useEffect(() => { if (!product) return; const timer = window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus(), 0); return () => window.clearTimeout(timer); }, [product]);
 
-  if (!product) return null;
+  if (product !== syncedProduct && !dirty) {
+    setSyncedProduct(product);
+    setForm({ name: product.name || '', category: product.category || '', materials: product.materials || '', technique: product.technique || '', featuredArtisanId: product.featuredArtisanId || '' });
+    setTagDraft({ tags: normalizeProductTags(product.tags), input: '' });
+  }
 
   const requestClose = () => { if (saving) return; if (dirty) setConfirmDiscard(true); else onClose(); };
   const change = (key: keyof typeof form, value: string) => { setDirty(true); setForm((current) => ({ ...current, [key]: value })); };
@@ -105,6 +116,7 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
   };
 
   const submit = async () => {
+    if (saving || variationLoading || variationLoadError) return;
     const nextErrors: ProductEditorErrors = {};
     const resolvedTags = resolveProductTags(tagDraft);
     if (resolvedTags.error) nextErrors.tags = resolvedTags.error;
@@ -120,22 +132,24 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
         .every(value => positiveInches(value) !== null);
       return hasWeight && (hasCatalogDimensions || hasSavedDimensions);
     };
-    const invalidVariation = meaningful.some((item) => !validVariationMeasurements(item) || (item.price !== '' && Number(item.price) < 0) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
+    const invalidVariation = meaningful.some((item) => !validVariationMeasurements(item) || (item.price !== '' && (!Number.isFinite(Number(item.price)) || Number(item.price) < 0)) || Number(item.stock || 0) < 0 || !Number.isInteger(Number(item.stock || 0)));
     if (invalidVariation) nextErrors.variations = 'Each variation needs product weight and complete product dimensions.';
     if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; }
     setSaving(true); setErrors({});
     try {
       await onSave(product, { ...form, tags: resolvedTags.tags, name: form.name.trim(), materials: form.materials.trim(), technique: form.technique.trim(), variations: meaningful, imageFile, modelFile });
+      setTagDraft({ tags: resolvedTags.tags, input: '' });
+      setDirty(false);
       onClose();
     } catch (cause) {
-      setErrors({ save: cause instanceof Error ? cause.message : 'Could not save product changes.' });
+      setErrors({ save: getErrorMessage(cause, 'Could not save product changes.') });
     } finally { setSaving(false); }
   };
 
   return <div className="product-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}>
     <section ref={dialogRef} className="product-editor" role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} onKeyDown={(event) => trapFocus(event, requestClose)}>
       <header className="product-editor__header"><div><h2 id="product-editor-title">Edit Product</h2><p>Update {product.name}’s catalog details, media, pricing, and stock.</p></div><button className="product-editor__close" data-autofocus type="button" aria-label="Close product editor" onClick={requestClose} disabled={saving}><X aria-hidden="true" /></button></header>
-      <div className="product-editor__body">
+      <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><div className="product-editor__body">
         <section className="product-editor__section product-editor__details">
           <h3>Product Specifications</h3>
           <div className="product-editor__fields">
@@ -175,7 +189,9 @@ export default function ProductEditorDialog({ product, onClose, onSave }: Produc
         </section>
       </div>
       {errors.save && <div className="product-editor__error" role="alert"><AlertCircle aria-hidden="true" />{errors.save}</div>}
-      <footer className="product-editor__footer"><button type="button" className="product-editor__cancel" onClick={requestClose} disabled={saving}>Cancel</button><button type="button" className="product-editor__save" onClick={() => void submit()} disabled={saving || variationLoading}>{saving ? 'Saving changes…' : 'Save changes'}</button></footer>
+      </fieldset>
+      {variationLoadError && <p role="alert">{variationLoadError}<button type="button" onClick={() => { setVariationLoading(true); setLoadAttempt(value => value + 1); }}>Retry loading variations</button></p>}
+      <footer className="product-editor__footer"><button type="button" className="product-editor__cancel" onClick={requestClose} disabled={saving}>Cancel</button><button type="button" className="product-editor__save" onClick={() => void submit()} disabled={saving || variationLoading || Boolean(variationLoadError)}>{saving ? 'Saving changes…' : 'Save changes'}</button></footer>
     </section>
     <Popup open={confirmDiscard} title="Discard unsaved changes?" message="Your product edits have not been saved." cancelLabel="Keep editing" confirmLabel="Discard changes" danger onCancel={() => setConfirmDiscard(false)} onConfirm={onClose} />
   </div>;

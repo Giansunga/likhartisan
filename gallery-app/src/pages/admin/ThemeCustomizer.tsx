@@ -7,7 +7,7 @@ const THEME_DESCRIPTIONS: Record<ThemeName, string> = {
 };
 
 export default function ThemeCustomizer() {
-  const { currentTheme, autoDetect, setTheme, setAutoDetect, loading } = useTheme();
+  const { currentTheme, autoDetect, setTheme, setAutoDetect, loading, saving, error } = useTheme();
 
   if (loading) {
     return (
@@ -17,6 +17,7 @@ export default function ThemeCustomizer() {
 
   return (
     <div>
+      {error && <p role="alert">{error}</p>}
       {/* Auto-detect Toggle */}
       <div style={{
         background: '#fff', border: '1px solid #E8E0D8', borderRadius: '12px',
@@ -32,7 +33,8 @@ export default function ThemeCustomizer() {
           </div>
         </div>
         <button
-          onClick={() => setAutoDetect(!autoDetect)}
+          disabled={saving}
+          onClick={() => void setAutoDetect(!autoDetect)}
           style={{
             width: '52px', height: '28px', borderRadius: '14px', border: 'none', cursor: 'pointer',
             background: autoDetect ? 'var(--primary-color)' : '#D4C8BB',
@@ -59,7 +61,8 @@ export default function ThemeCustomizer() {
           return (
             <button
               key={name}
-              onClick={() => setTheme(name)}
+              disabled={saving}
+              onClick={() => void setTheme(name)}
               style={{
                 background: '#fff', border: isActive ? '2px solid var(--primary-color)' : '1px solid #E8E0D8',
                 borderRadius: '14px', padding: '0', cursor: 'pointer', textAlign: 'left',

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type ThemeName = 'default' | 'christmas' | 'valentines';
@@ -116,6 +116,8 @@ interface ThemeContextType {
   setTheme: (name: ThemeName) => Promise<void>;
   setAutoDetect: (val: boolean) => Promise<void>;
   loading: boolean;
+  saving: boolean;
+  error: string;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -125,6 +127,8 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: async () => {},
   setAutoDetect: async () => {},
   loading: true,
+  saving: false,
+  error: '',
 });
 
 export function useTheme() {
@@ -135,6 +139,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [currentTheme, setCurrentTheme] = useState<ThemeName>('default');
   const [autoDetect, setAutoDetectState] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const saveVersion = useRef(0);
+  const loadVersion = useRef(0);
 
   const applyTheme = useCallback((name: ThemeName) => {
     setCurrentTheme(name);
@@ -142,6 +150,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadTheme = useCallback(async () => {
+    const request = ++loadVersion.current;
+    const save = saveVersion.current;
     try {
       const { data } = await supabase
         .from('theme_settings')
@@ -149,6 +159,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         .eq('id', 'current')
         .single();
 
+      if (request !== loadVersion.current || save !== saveVersion.current) return;
       if (data) {
         setAutoDetectState(data.auto_detect ?? true);
         if (data.auto_detect) {
@@ -160,7 +171,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         applyTheme(getAutoDetectTheme());
       }
     } catch {
-      applyTheme(getAutoDetectTheme());
+      if (request === loadVersion.current && save === saveVersion.current) applyTheme(getAutoDetectTheme());
     } finally {
       setLoading(false);
     }
@@ -195,19 +206,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [autoDetect, applyTheme]);
 
   async function setTheme(name: ThemeName) {
+    const request = ++saveVersion.current;
+    loadVersion.current++;
+    const previous = currentTheme;
+    setSaving(true); setError('');
     applyTheme(name);
     try {
       const { error } = await supabase
         .from('theme_settings')
         .upsert({ id: 'current', theme_name: name, auto_detect: false, updated_at: new Date().toISOString() });
       if (error) throw error;
-      setAutoDetectState(false);
-    } catch (e) {
-      console.error('Failed to save theme:', e);
-    }
+      if (request === saveVersion.current) setAutoDetectState(false);
+    } catch {
+      if (request === saveVersion.current) { applyTheme(previous); setError('The theme could not be saved. Please try again.'); }
+    } finally { if (request === saveVersion.current) setSaving(false); }
   }
 
   async function setAutoDetect(val: boolean) {
+    const request = ++saveVersion.current;
+    loadVersion.current++;
+    const previousTheme = currentTheme;
+    const previousAuto = autoDetect;
+    setSaving(true); setError('');
     setAutoDetectState(val);
     if (val) {
       applyTheme(getAutoDetectTheme());
@@ -217,9 +237,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         .from('theme_settings')
         .upsert({ id: 'current', auto_detect: val, updated_at: new Date().toISOString() });
       if (error) throw error;
-    } catch (e) {
-      console.error('Failed to save auto-detect setting:', e);
-    }
+    } catch {
+      if (request === saveVersion.current) { setAutoDetectState(previousAuto); applyTheme(previousTheme); setError('Automatic theme settings could not be saved. Please try again.'); }
+    } finally { if (request === saveVersion.current) setSaving(false); }
   }
 
   return (
@@ -230,6 +250,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme,
       setAutoDetect,
       loading,
+      saving,
+      error,
     }}>
       {children}
     </ThemeContext.Provider>

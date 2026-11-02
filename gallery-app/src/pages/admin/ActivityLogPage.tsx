@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../../lib/popups';
 import { supabase } from '../../lib/supabase';
+import { getErrorMessage } from '../../lib/portalErrors';
 import {
   ACTIVITY_CATEGORIES, ACTIVITY_PAGE_SIZE, activityFiltersToParams,
   formatActivityLabel, formatActivityTime, getActivityChanges,
@@ -45,6 +46,8 @@ export default function ActivityLogPage() {
   const [exporting, setExporting] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const requests = useRef({ generation: 0, firstPagePending: false, pagePending: null as symbol | null });
+  const exportPending = useRef(false);
   const portalRealtime = usePortalRealtime();
   const subscribe = portalRealtime?.subscribe;
   const realtimeStatus = portalRealtime?.status || 'disconnected';
@@ -55,8 +58,17 @@ export default function ActivityLogPage() {
   }, [filters.search]);
 
   const loadRecords = useCallback(async (nextCursor: ActivityCursor | null = null) => {
+    const lifecycle = requests.current;
+    if (nextCursor && (lifecycle.firstPagePending || lifecycle.pagePending)) return;
+    const generation = nextCursor ? lifecycle.generation : ++lifecycle.generation;
+    const pageToken = nextCursor ? Symbol('activity-page') : null;
+    lifecycle.pagePending = pageToken;
     if (nextCursor) setLoadingMore(true);
-    else setLoading(true);
+    else {
+      lifecycle.firstPagePending = true;
+      setLoading(true);
+      setLoadingMore(false);
+    }
     if (!nextCursor) setError('');
     try {
       const dateRange = getActivityDateRange(filters.range);
@@ -80,6 +92,7 @@ export default function ActivityLogPage() {
         query = query.or(`occurred_at.lt.${nextCursor.occurredAt},and(occurred_at.eq.${nextCursor.occurredAt},id.lt.${nextCursor.id})`);
       }
       const { data, error: queryError } = await query;
+      if (generation !== lifecycle.generation) return;
       if (queryError) {
         if (queryError.code === '42501') {
           throw new Error('Activity Logs require a super-admin role.');
@@ -89,24 +102,37 @@ export default function ActivityLogPage() {
       const page = (data || []) as ActivityLogRecord[];
       const hasMore = page.length > ACTIVITY_PAGE_SIZE;
       const visiblePage = page.slice(0, ACTIVITY_PAGE_SIZE);
-      setRecords(current => nextCursor ? [...current, ...visiblePage] : visiblePage);
+      setRecords(current => nextCursor ? [...new Map([...current, ...visiblePage].map(row => [row.id, row])).values()] : visiblePage);
       const last = visiblePage.at(-1);
       setCursor(hasMore && last ? { occurredAt: last.occurred_at, id: last.id } : null);
       if (!nextCursor) setNewCount(0);
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : 'Could not load activity.';
+      if (generation !== lifecycle.generation) return;
+      const message = getErrorMessage(caught, 'Could not load activity.');
       if (!nextCursor) setError(message);
       else toast.error(message);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (generation === lifecycle.generation) {
+        if (nextCursor && lifecycle.pagePending === pageToken) {
+          lifecycle.pagePending = null;
+          setLoadingMore(false);
+        } else if (!nextCursor) {
+          lifecycle.firstPagePending = false;
+          setLoading(false);
+        }
+      }
     }
   }, [filters]);
 
+  const invalidateRecords = useCallback(() => {
+    requests.current.generation++;
+    requests.current.firstPagePending = false;
+    requests.current.pagePending = null;
+  }, []);
   useEffect(() => {
     const timer = window.setTimeout(() => { void loadRecords(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadRecords]);
+    return () => { invalidateRecords(); window.clearTimeout(timer); };
+  }, [invalidateRecords, loadRecords]);
 
   useEffect(() => subscribe?.(event => {
     if (event.table === 'activity_log' && event.operation === 'INSERT') setNewCount(count => count + 1);
@@ -137,13 +163,16 @@ export default function ActivityLogPage() {
   }
 
   async function handleExport() {
+    if (exportPending.current) return;
+    exportPending.current = true;
     setExporting(true);
     try {
       await exportActivityLog(filters);
       toast.success('Activity log exported.');
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : 'Export failed.');
+      toast.error(getErrorMessage(caught, 'Export failed.'));
     } finally {
+      exportPending.current = false;
       setExporting(false);
     }
   }

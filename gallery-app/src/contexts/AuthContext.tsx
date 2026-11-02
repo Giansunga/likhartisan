@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setSession(data.session);
-    }).finally(() => {
+    }).catch(() => { if (active) setSession(null); }).finally(() => {
       if (!active) return;
       setLoading(false);
       authReady.resolve();

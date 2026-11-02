@@ -15,6 +15,7 @@ export interface ProductAdminFilters {
 
 export interface ProductVariationDraft {
   id?: string;
+  clientId?: string;
   dimensions: string;
   height: string;
   openingDiameter: string;

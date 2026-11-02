@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { usePortalRealtime } from './PortalRealtimeProvider';
+import { captureException } from '../lib/sentry';
 
 export function usePortalRealtimeRefresh(
   tables: readonly string[],
@@ -10,6 +11,7 @@ export function usePortalRealtimeRefresh(
   const subscribe = realtime?.subscribe;
   const connectedEpoch = realtime?.connectedEpoch;
   const refreshRef = useRef(refresh);
+  const workerRef = useRef({ running: false, pending: false, schedule: null as (() => void) | null });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tableKey = useMemo(() => [...new Set(tables)].sort().join('|'), [tables]);
 
@@ -18,14 +20,28 @@ export function usePortalRealtimeRefresh(
   }, [refresh]);
 
   useEffect(() => {
-    const scheduleRefresh = () => {
+    let active = true;
+    const worker = workerRef.current;
+    async function runRefresh() {
+      if (!active) return;
+      if (worker.running) { worker.pending = true; return; }
+      worker.running = true;
+      try { await refreshRef.current(); }
+      catch (error) { captureException(error); }
+      finally {
+        worker.running = false;
+        if (worker.pending) { worker.pending = false; worker.schedule?.(); }
+      }
+    }
+    function scheduleRefresh() {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        void refreshRef.current();
+        void runRefresh();
       }, debounceMs);
-    };
+    }
 
+    worker.schedule = scheduleRefresh;
     const acceptedTables = new Set(tableKey.split('|').filter(Boolean));
     const unsubscribe = subscribe?.(event => {
       if (acceptedTables.has(event.table)) scheduleRefresh();
@@ -33,23 +49,14 @@ export function usePortalRealtimeRefresh(
 
     const handleFocus = () => scheduleRefresh();
     window.addEventListener('focus', handleFocus);
+    if (connectedEpoch) scheduleRefresh();
 
     return () => {
+      active = false;
+      if (worker.schedule === scheduleRefresh) worker.schedule = null;
       unsubscribe?.();
       window.removeEventListener('focus', handleFocus);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [debounceMs, subscribe, tableKey]);
-
-  useEffect(() => {
-    if (!connectedEpoch) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      void refreshRef.current();
-    }, debounceMs);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [connectedEpoch, debounceMs]);
+  }, [connectedEpoch, debounceMs, subscribe, tableKey]);
 }

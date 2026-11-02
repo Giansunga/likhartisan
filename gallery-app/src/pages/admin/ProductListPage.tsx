@@ -1,3 +1,5 @@
+import { saveCatalogVariations } from '../../lib/catalogVariations';
+import { getErrorMessage } from '../../lib/portalErrors';
 import AddProductDialog from '../../components/products/AddProductDialog';
 import { ADMIN_PRODUCT_PATHS } from '../../components/products/productCreationPaths';
 import { Popup } from '../../components/Popup';
@@ -37,7 +39,7 @@ export default function ProductListPage() {
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const searchKey = searchParams.toString();
-  const filters = useMemo(() => productFiltersFromSearch(searchParams), [searchKey]);
+  const filters = useMemo(() => productFiltersFromSearch(new URLSearchParams(searchKey)), [searchKey]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,16 +50,20 @@ export default function ProductListPage() {
   const [confirmation, setConfirmation] = useState<{ product: Product; action: 'archive' | 'delete' } | null>(null);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const requestRef = useRef(0);
+  const mutationPending = useRef(false);
 
   const load = useCallback(async () => {
+    if (mutationPending.current) return;
     const request = ++requestRef.current;
     if (hasLoadedRef.current) setRefreshing(true); else setLoading(true);
     setError('');
+    try {
     const { data, error: productsError } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (request !== requestRef.current) return;
     if (productsError) { setError(productsError.message || 'Could not load products.'); setLoading(false); setRefreshing(false); return; }
-    const mapped = ((data ?? []) as any[]).map(mapSupabaseProduct) as Product[];
+    const mapped = (data ?? []).map(mapSupabaseProduct) as Product[];
     if (mapped.length) {
       const { data: variations, error: variationsError } = await supabase.from('product_variations').select('product_id, price').in('product_id', mapped.map((product) => product.id));
       if (request !== requestRef.current) return;
@@ -68,10 +74,13 @@ export default function ProductListPage() {
       }
       mapped.forEach((product) => { if (lowest[product.id] != null) product.price = lowest[product.id]; });
     }
-    setProducts(mapped); hasLoadedRef.current = true; setUpdatedAt(new Date()); setLoading(false); setRefreshing(false);
+    setProducts(mapped); hasLoadedRef.current = true; setHasLoaded(true); setUpdatedAt(new Date()); setLoading(false); setRefreshing(false);
+    } catch (cause) { if (request === requestRef.current) setError(getErrorMessage(cause, 'Could not load this page.')); }
+    finally { if (request === requestRef.current) { setLoading(false); setRefreshing(false); } }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const invalidateLoad = useCallback(() => { requestRef.current++; }, []);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void load(); }); return () => { active = false; invalidateLoad(); }; }, [invalidateLoad, load]);
   usePortalRealtimeRefresh(['products', 'product_variations'], load);
 
   const updateFilters = useCallback((next: ProductAdminFilters, replace = false) => {
@@ -88,29 +97,40 @@ export default function ProductListPage() {
   useEffect(() => { if (filters.page !== pagination.page) updateFilters({ ...filters, page: pagination.page }, true); }, [filters, pagination.page, updateFilters]);
 
   const performConfirmation = async () => {
-    if (!confirmation) return;
+    if (!confirmation || mutationPending.current) return;
+    mutationPending.current = true;
+    requestRef.current++;
+    setRefreshing(false); setLoading(false);
     const { product, action } = confirmation;
     setBusyProductId(product.id);
     try {
       if (action === 'delete') {
-        const { error: deleteError } = await supabase.from('products').delete().eq('id', product.id);
+        const { data: removed, error: deleteError } = await supabase.from('products').delete().eq('id', product.id).select('id').maybeSingle();
         if (deleteError) throw deleteError;
+        if (!removed) throw new Error('This product could not be deleted. Reload and try again.');
         setProducts((current) => current.filter((item) => item.id !== product.id));
         setSuccessMessage('Product deleted.');
       } else {
         const status = product.status === 'archived' ? 'active' : 'archived';
-        const { error: archiveError } = await supabase.from('products').update({ status }).eq('id', product.id);
+        const { data: saved, error: archiveError } = await supabase.from('products').update({ status }).eq('id', product.id).select('id').maybeSingle();
         if (archiveError) throw archiveError;
+        if (!saved) throw new Error('This product could not be updated. Reload and try again.');
         setProducts((current) => current.map((item) => item.id === product.id ? { ...item, status } : item));
         setSuccessMessage(status === 'active' ? 'Product activated.' : 'Product archived.');
       }
       setConfirmation(null);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Product action failed.');
-    } finally { setBusyProductId(null); }
+    } finally { requestRef.current++; mutationPending.current = false; setBusyProductId(null); setRefreshing(false); setLoading(false); }
   };
 
   const saveProduct = async (product: Product, data: ProductEditorSave) => {
+    if (mutationPending.current) throw new Error('Another product action is still in progress.');
+    mutationPending.current = true;
+    requestRef.current++;
+    setRefreshing(false); setLoading(false);
+    let detailsSaved = false;
+    try {
     await validateFeaturedArtisan(product.shopId, data.featuredArtisanId);
     const updateData: Record<string, unknown> = {
       featured_artisan_id: data.featuredArtisanId,
@@ -130,35 +150,33 @@ export default function ProductListPage() {
     const { data: savedProduct, error: productError } = await supabase.from('products').update(updateData).eq('id', product.id).select('id').maybeSingle();
     if (productError) throw new Error(productError.message || 'Could not save product details.');
     if (!savedProduct) throw new Error('This product is no longer available. Refresh the product list and try again.');
-    const keptIds: string[] = [];
-    for (const [index, variation] of data.variations.entries()) {
-      const variationData = productVariationUpdateData(variation);
-      if (variation.id) {
-        const { error: variationError } = await supabase.from('product_variations').update(variationData).eq('id', variation.id);
-        if (variationError) throw new Error(variationError.message || 'Could not save a product variation.');
-        keptIds.push(variation.id);
-      } else {
-        const { data: inserted, error: variationError } = await supabase.from('product_variations').insert({ product_id: product.id, ...variationData, sort_order: index }).select('id').single();
-        if (variationError) {
-          if (variationError.code === '23503' && variationError.message?.includes('product_variations_product_id_fkey')) {
-            throw new Error('This product is no longer available. Refresh the product list and try again.');
-          }
-          throw new Error(variationError.message || 'Could not add a product variation.');
-        }
-        if (inserted?.id) keptIds.push(inserted.id);
-      }
-    }
+    detailsSaved = true;
+    const keptIds = await saveCatalogVariations(product.id, data.variations.map((variation, index) => ({
+      id: variation.id, clientId: variation.clientId || crypto.randomUUID(),
+      values: { ...productVariationUpdateData(variation), sort_order: index },
+    })));
     const removal = keptIds.length ? supabase.from('product_variations').delete().eq('product_id', product.id).not('id', 'in', `(${keptIds.join(',')})`) : supabase.from('product_variations').delete().eq('product_id', product.id);
     const { error: removalError } = await removal;
     if (removalError) throw new Error(removalError.message || 'Could not remove deleted variations.');
+    const { data: confirmedVariations, error: confirmationError } = await supabase.from('product_variations').select('id').eq('product_id', product.id);
+    if (confirmationError) throw confirmationError;
+    if (confirmedVariations?.length !== keptIds.length || !confirmedVariations.every(row => keptIds.includes(row.id))) throw new Error('The complete variation list could not be confirmed. Reload before retrying.');
     const stock = await recomputeProductStock(product.id);
     setProducts((current) => current.map((item) => item.id === product.id ? { ...item, name: data.name, category: data.category, materials: data.materials, technique: data.technique, stock, inStock: stock > 0, ...(typeof updateData.image === 'string' ? { image: updateData.image } : {}), ...(typeof updateData.model3d === 'string' ? { model3d: updateData.model3d } : {}) } : item));
     setSuccessMessage('Product changes saved.');
-    void load();
+    } catch (cause) {
+      const message = getErrorMessage(cause, 'Product changes could not be saved.');
+      if (message.includes('product_variations_product_id_fkey')) throw new Error('This product is no longer available. Refresh the product list and try again.', { cause });
+      if (!detailsSaved) throw new Error(message, { cause });
+      throw new Error(`${message} Some changes may already be saved. Your draft is preserved; reload details before starting a different edit.`, { cause });
+    } finally {
+      requestRef.current++; mutationPending.current = false; setRefreshing(false); setLoading(false);
+      void load();
+    }
   };
 
-  if (loading && !hasLoadedRef.current) return <main className="products-page" aria-busy="true"><h1 className="sr-only">Products</h1><div className="products-summary-grid">{[0, 1, 2, 3].map((item) => <div className="products-summary-card products-skeleton" key={item}><span /></div>)}</div><div className="products-panel products-skeleton">{[0, 1, 2, 3, 4].map((item) => <span key={item} />)}</div></main>;
-  if (error && !hasLoadedRef.current) return <main className="products-page"><h1 className="sr-only">Products</h1><section className="products-panel products-state"><CircleAlert aria-hidden="true" /><h2>Products could not be loaded</h2><p>{error}</p><button type="button" onClick={() => void load()}>Try again</button></section></main>;
+  if (loading && !hasLoaded) return <main className="products-page" aria-busy="true"><h1 className="sr-only">Products</h1><div className="products-summary-grid">{[0, 1, 2, 3].map((item) => <div className="products-summary-card products-skeleton" key={item}><span /></div>)}</div><div className="products-panel products-skeleton">{[0, 1, 2, 3, 4].map((item) => <span key={item} />)}</div></main>;
+  if (error && !hasLoaded) return <main className="products-page"><h1 className="sr-only">Products</h1><section className="products-panel products-state"><CircleAlert aria-hidden="true" /><h2>Products could not be loaded</h2><p>{error}</p><button type="button" onClick={() => void load()}>Try again</button></section></main>;
 
   return <main className="products-page">
     <h1 className="sr-only">Products</h1>

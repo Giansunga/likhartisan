@@ -1,7 +1,7 @@
 import AssetImage from '../../components/AssetImage';
 import { Popup } from '../../components/Popup';
 import { notify } from '../../lib/popups';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +20,7 @@ import {
 import { formatCurrency, matchesQueue } from '../../components/admin/orders/orderManagementUtils';
 import { exportToCsv } from '../../lib/csvExport';
 import { purchaseApi } from '../../lib/purchaseApi';
+import { getErrorMessage } from '../../lib/portalErrors';
 import type { Order } from '../../types';
 import type { ActivityLogRecord } from '../../types/activity';
 import { formatActivityLabel } from '../../lib/activityLog';
@@ -87,13 +88,26 @@ export default function OrdersPage() {
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
   const [activityLogs, setActivityLogs] = useState<ActivityLogRecord[]>([]);
   const [returnRequest, setReturnRequest] = useState<ReturnRequest | null>(null);
-  const [sellerNotes, setSellerNotes] = useState('');
-  const [buyerNotes, setBuyerNotes] = useState('');
+  const [notesDraft, setNotesDraft] = useState<{ orderId: string; seller: string; buyer: string } | null>(null);
+  const sellerNotes = notesDraft?.orderId === selectedOrder?.id ? notesDraft?.seller || '' : selectedOrder?.seller_notes || '';
+  const buyerNotes = notesDraft?.orderId === selectedOrder?.id ? notesDraft?.buyer || '' : selectedOrder?.customer_notes || '';
   const [notesSaving, setNotesSaving] = useState(false);
-  const [, setStatusUpdating] = useState(false);
+  const [mutatingOrderId, setMutatingOrderId] = useState<string | null>(null);
+  const [activityError, setActivityError] = useState('');
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [returnError, setReturnError] = useState('');
+  const [returnRetry, setReturnRetry] = useState(0);
+  const pendingOrders = useRef(new Set<string>());
+  const orderRequest = useRef(0);
+  const activityRequest = useRef(0);
+  const mutationVersion = useRef(0);
+  const appliedDeepLink = useRef<string | null>(null);
+  const selectedOrderId = selectedOrder?.id;
+  const invalidateOrderRequests = useCallback(() => { ++orderRequest.current; }, []);
+  const invalidateActivityRequests = useCallback(() => { ++activityRequest.current; }, []);
 
   // confirm dialogs
-  const [confirm, setConfirm] = useState<{ open: boolean; title: string; message: string; confirmLabel?: string; confirmDanger?: boolean; action: () => void } | null>(null);
+  const [confirm, setConfirm] = useState<{ open: boolean; title: string; message: string; confirmLabel?: string; confirmDanger?: boolean; action: () => Promise<boolean> } | null>(null);
 
   // payment management
   const [verifyModal, setVerifyModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
@@ -112,250 +126,207 @@ export default function OrdersPage() {
 
   /* ── fetch ── */
   const fetchOrders = useCallback(async () => {
+    const request = ++orderRequest.current;
+    const version = mutationVersion.current;
     setLoading(true);
     setLoadError('');
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
       if (error) throw error;
+      if (request !== orderRequest.current || version !== mutationVersion.current) return;
       const nextOrders = (data || []) as Order[];
+      const requestedDeepLink = deepLinkOrderId !== appliedDeepLink.current ? deepLinkOrderId : null;
+      appliedDeepLink.current = deepLinkOrderId;
       setOrders(nextOrders);
       setSelectedOrder(current => {
-        const requestedId = deepLinkOrderId || current?.id;
+        const requestedId = requestedDeepLink || current?.id;
         return requestedId ? nextOrders.find(order => order.id === requestedId) || null : null;
       });
-    } catch (e: any) {
-      console.error('Failed to fetch orders:', e);
-      setLoadError(e?.message || 'Check your connection and try again.');
-      showToast('Failed to load orders', 'error');
+    } catch (error) {
+      if (request === orderRequest.current && version === mutationVersion.current) {
+        setLoadError(getErrorMessage(error, 'Check your connection and try again.'));
+      }
     } finally {
-      setLoading(false);
+      if (request === orderRequest.current) setLoading(false);
     }
   }, [deepLinkOrderId]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => { if (active) void fetchOrders(); });
+    return () => { active = false; invalidateOrderRequests(); };
+  }, [fetchOrders, invalidateOrderRequests]);
   usePortalRealtimeRefresh(['orders'], fetchOrders);
 
-  /* ── realtime ── */
-  /* ── realtime activity log ── */
-  /* ── toast helper ── */
   function showToast(message: string, type: 'success' | 'error') {
     notify(type, message);
   }
 
-  /* ── helper: get user display name ── */
-  /* ── update order status ── */
+  // A successful HTTP request can still update zero rows under RLS or after a
+  // deletion. Only reconcile the screen with a row actually returned by storage.
+  async function saveOrder(orderId: string, updates: Partial<Order>): Promise<Order | null> {
+    if (pendingOrders.current.has(orderId)) return null;
+    pendingOrders.current.add(orderId);
+    setMutatingOrderId(orderId);
+    ++mutationVersion.current;
+    try {
+      const { data, error } = await supabase.from('orders').update(updates).eq('id', orderId).select('*').maybeSingle();
+      if (error) throw error;
+      if (!data || data.id !== orderId) throw new Error('Order could not be saved. It may have changed or you may no longer have access. Reload and try again.');
+      const saved = data as Order;
+      ++mutationVersion.current;
+      setOrders(current => current.map(order => order.id === orderId ? saved : order));
+      setSelectedOrder(current => current?.id === orderId ? saved : current);
+      return saved;
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Order could not be saved. Please try again.'), 'error');
+      return null;
+    } finally {
+      pendingOrders.current.delete(orderId);
+      setMutatingOrderId(current => current === orderId ? null : current);
+    }
+  }
+
   async function updateOrderStatus(orderId: string, newStatus: string, reason?: string) {
-    setStatusUpdating(true);
-    try {
-      const updates: Record<string, any> = {};
-      if (newStatus === 'cancelled') {
-        updates.status = 'cancelled';
-        updates.delivery_status = 'cancelled';
-        updates.cancel_reason = reason || null;
-        updates.cancelled_by = user?.id || null;
-      } else if (['paid', 'completed', 'refunded'].includes(newStatus)) {
-        updates.status = newStatus;
-      }
-      const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
-      if (error) throw error;
-
-      showToast(`Order status updated to ${updates.status || newStatus}`, 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, ...updates } : prev);
-    } catch (e: any) {
-      console.error(e);
-      showToast(e.message || 'Failed to update status', 'error');
-    } finally {
-      setStatusUpdating(false);
-    }
+    const updates: Partial<Order> = newStatus === 'cancelled'
+      ? { status: 'cancelled', delivery_status: 'cancelled', cancel_reason: reason || '', cancelled_by: user?.id }
+      : { status: newStatus };
+    if (!await saveOrder(orderId, updates)) return false;
+    showToast(`Order status updated to ${newStatus}`, 'success');
+    return true;
   }
 
-  /* ── update delivery status ── */
-  async function updateDeliveryStatus(orderId: string, newDelivery: string, _reason?: string) {
-    setStatusUpdating(true);
-    try {
-      const updates: Record<string, any> = { delivery_status: newDelivery };
-      if (newDelivery === 'completed') updates.status = 'completed';
-      if (newDelivery === 'cancelled') {
-        updates.status = 'cancelled';
-        updates.cancelled_by = user?.id || null;
-      }
-      const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
-      if (error) throw error;
-
-      showToast(`Delivery status updated to ${newDelivery}`, 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, ...updates } : prev);
-    } catch (e: any) {
-      console.error(e);
-      showToast(e.message || 'Failed to update delivery', 'error');
-    } finally {
-      setStatusUpdating(false);
-    }
+  async function updateDeliveryStatus(orderId: string, newDelivery: string) {
+    const updates: Partial<Order> = { delivery_status: newDelivery };
+    if (newDelivery === 'completed' || newDelivery === 'cancelled') updates.status = newDelivery;
+    if (newDelivery === 'cancelled') updates.cancelled_by = user?.id;
+    if (!await saveOrder(orderId, updates)) return false;
+    showToast(`Delivery status updated to ${newDelivery}`, 'success');
+    return true;
   }
 
-  /* ── save notes ── */
   async function saveNotes(orderId: string) {
+    if (pendingOrders.current.has(orderId)) return;
     setNotesSaving(true);
     try {
-      const { error } = await supabase.from('orders').update({
-        seller_notes: sellerNotes,
-        customer_notes: buyerNotes,
-      }).eq('id', orderId);
-      if (error) throw error;
+      if (!await saveOrder(orderId, { seller_notes: sellerNotes, customer_notes: buyerNotes })) return;
+      setNotesDraft(current => current?.orderId === orderId && current.seller === sellerNotes && current.buyer === buyerNotes ? null : current);
       showToast('Notes saved', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, seller_notes: sellerNotes, customer_notes: buyerNotes } : o));
-    } catch (e: any) {
-      showToast(e.message || 'Failed to save notes', 'error');
-    } finally {
-      setNotesSaving(false);
-    }
+    } finally { setNotesSaving(false); }
   }
 
-  /* ── payment verify / reject ── */
   async function verifyPayment(orderId: string) {
-    try {
-      const { error } = await supabase.from('orders').update({
-        payment_status: 'paid',
-        status: 'paid',
-        payment_verified_at: new Date().toISOString(),
-        payment_verified_by: user?.id,
-      }).eq('id', orderId);
-      if (error) throw error;
-
-      showToast('Payment verified', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: 'paid', status: 'paid' } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, payment_status: 'paid', status: 'paid' } : prev);
-      setVerifyModal({ open: false, order: null });
-    } catch (e: any) {
-      showToast(e.message || 'Failed to verify payment', 'error');
-    }
+    if (!await saveOrder(orderId, { payment_status: 'paid', status: 'paid', payment_verified_at: new Date().toISOString(), payment_verified_by: user?.id })) return;
+    showToast('Payment verified', 'success');
+    setVerifyModal({ open: false, order: null });
   }
 
-  async function rejectPayment(orderId: string, _reason: string) {
-    try {
-      const { error } = await supabase.from('orders').update({ payment_status: 'failed' }).eq('id', orderId);
-      if (error) throw error;
-
-      showToast('Payment rejected', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: 'failed' } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, payment_status: 'failed' } : prev);
-      setRejectModal({ open: false, order: null });
-      setRejectReason('');
-    } catch (e: any) {
-      showToast(e.message || 'Failed to reject payment', 'error');
-    }
+  async function rejectPayment(orderId: string) {
+    if (!await saveOrder(orderId, { payment_status: 'failed' })) return;
+    showToast('Payment rejected', 'success');
+    setRejectModal({ open: false, order: null });
+    setRejectReason('');
   }
 
-  /* ── refund ── */
-  async function processRefund(orderId: string, amount: number, _reason: string) {
-    try {
-      const { error } = await supabase.from('orders').update({
-        refund_status: 'refunded', refund_amount: amount, status: 'refunded',
-      }).eq('id', orderId);
-      if (error) throw error;
-
-      showToast(`Refund of ${formatCurrency(amount)} processed`, 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, refund_status: 'refunded', refund_amount: amount, status: 'refunded' } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, refund_status: 'refunded', refund_amount: amount, status: 'refunded' } : prev);
-      setRefundModal({ open: false, order: null });
-      setRefundAmount('');
-      setRefundReason('');
-    } catch (e: any) {
-      showToast(e.message || 'Failed to process refund', 'error');
+  async function processRefund(orderId: string, amount: number) {
+    const order = orders.find(item => item.id === orderId);
+    if (!Number.isFinite(amount) || amount <= 0 || !order || amount > order.total) {
+      showToast('Enter a refund amount greater than zero and no more than the order total.', 'error');
+      return;
     }
+    if (!await saveOrder(orderId, { refund_status: 'refunded', refund_amount: amount, status: 'refunded' })) return;
+    showToast(`Refund of ${formatCurrency(amount)} processed`, 'success');
+    setRefundModal({ open: false, order: null });
+    setRefundAmount('');
+    setRefundReason('');
   }
 
-  /* ── problem/dispute ── */
   async function flagProblem(orderId: string, type: string, notes: string) {
-    try {
-      const { error } = await supabase.from('orders').update({
-        is_problematic: true, problem_type: type, problem_notes: notes,
-      }).eq('id', orderId);
-      if (error) throw error;
-
-      showToast('Order flagged as problematic', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, is_problematic: true, problem_type: type, problem_notes: notes } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, is_problematic: true, problem_type: type, problem_notes: notes } : prev);
-      setProblemModal({ open: false, order: null });
-      setProblemType('');
-      setProblemNotes('');
-    } catch (e: any) {
-      showToast(e.message || 'Failed to flag problem', 'error');
-    }
+    if (!await saveOrder(orderId, { is_problematic: true, problem_type: type, problem_notes: notes })) return;
+    showToast('Order flagged as problematic', 'success');
+    setProblemModal({ open: false, order: null });
+    setProblemType('');
+    setProblemNotes('');
   }
 
-  async function resolveProblem(orderId: string, res: string) {
-    try {
-      const { error } = await supabase.from('orders').update({
-        is_problematic: false, problem_resolution: res,
-      }).eq('id', orderId);
-      if (error) throw error;
-
-      showToast('Problem resolved', 'success');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, is_problematic: false, problem_resolution: res } : o));
-      if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, is_problematic: false, problem_resolution: res } : prev);
-      setResolveModal({ open: false, order: null });
-      setResolution('');
-    } catch (e: any) {
-      showToast(e.message || 'Failed to resolve problem', 'error');
-    }
+  async function resolveProblem(orderId: string, resolutionText: string) {
+    if (!await saveOrder(orderId, { is_problematic: false, problem_resolution: resolutionText })) return;
+    showToast('Problem resolved', 'success');
+    setResolveModal({ open: false, order: null });
+    setResolution('');
   }
 
-  /* ── toggle investigation ── */
   async function toggleInvestigation(orderId: string) {
-    const order = orders.find(o => o.id === orderId);
+    const order = orders.find(item => item.id === orderId);
     if (!order) return;
-    const newVal = !order.flagged_for_investigation;
-    await supabase.from('orders').update({ flagged_for_investigation: newVal }).eq('id', orderId);
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, flagged_for_investigation: newVal } : o));
-    if (selectedOrder?.id === orderId) setSelectedOrder(prev => prev ? { ...prev, flagged_for_investigation: newVal } : prev);
-    showToast(newVal ? 'Order flagged for investigation' : 'Investigation flag removed', 'success');
+    const saved = await saveOrder(orderId, { flagged_for_investigation: !order.flagged_for_investigation });
+    if (saved) showToast(saved.flagged_for_investigation ? 'Order flagged for investigation' : 'Investigation flag removed', 'success');
   }
 
-  /* ── load activity logs for selected order ── */
-  const fetchActivityLogs = useCallback(async () => {
-    if (!selectedOrder) { setActivityLogs([]); return; }
-    const { data } = await supabase
-      .from('activity_log')
-      .select('*')
-      .eq('entity_type', 'orders')
-      .eq('entity_id', selectedOrder.id)
-      .order('occurred_at', { ascending: false });
-    setActivityLogs((data || []) as ActivityLogRecord[]);
-  }, [selectedOrder]);
+  async function reviewCancellation(orderId: string, approved: boolean) {
+    const updates: Partial<Order> = { cancellation_approved: approved, cancellation_reviewed_by: user?.id };
+    if (approved) { updates.status = 'cancelled'; updates.delivery_status = 'cancelled'; }
+    if (!await saveOrder(orderId, updates)) return false;
+    showToast(approved ? 'Cancellation approved' : 'Cancellation rejected', 'success');
+    return true;
+  }
 
-  useEffect(() => { queueMicrotask(() => { void fetchActivityLogs(); }); }, [fetchActivityLogs]);
+  const fetchActivityLogs = useCallback(async () => {
+    const request = ++activityRequest.current;
+    setActivityError('');
+    setActivityLogs([]);
+    if (!selectedOrderId) { setActivityLoading(false); return; }
+    setActivityLoading(true);
+    try {
+      const { data, error } = await supabase.from('activity_log').select('*').eq('entity_type', 'orders').eq('entity_id', selectedOrderId).order('occurred_at', { ascending: false });
+      if (error) throw error;
+      if (request === activityRequest.current) setActivityLogs((data || []) as ActivityLogRecord[]);
+    } catch (error) {
+      if (request === activityRequest.current) setActivityError(getErrorMessage(error, 'Activity could not be loaded.'));
+    } finally {
+      if (request === activityRequest.current) setActivityLoading(false);
+    }
+  }, [selectedOrderId]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => { if (active) void fetchActivityLogs(); });
+    return () => { active = false; invalidateActivityRequests(); };
+  }, [fetchActivityLogs, invalidateActivityRequests]);
   usePortalRealtimeRefresh(['activity_log'], fetchActivityLogs);
 
   useEffect(() => {
-    if (!selectedOrder) { setReturnRequest(null); return; }
     let active = true;
-    purchaseApi<{ returnRequest: ReturnRequest | null }>(`/admin/returns/order/${selectedOrder.id}`)
-      .then(result => { if (active) setReturnRequest(result.returnRequest); })
-      .catch(() => { if (active) setReturnRequest(null); });
-    return () => { active = false; };
-  }, [selectedOrder]);
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!active) return;
+      setReturnRequest(null);
+      setReturnError('');
+      if (!selectedOrderId) return;
+      void purchaseApi<{ returnRequest: ReturnRequest | null }>(`/admin/returns/order/${selectedOrderId}`, {}, controller.signal)
+        .then(result => { if (active) setReturnRequest(result.returnRequest); })
+        .catch(error => { if (active) setReturnError(getErrorMessage(error, 'Return request could not be loaded.')); });
+    });
+    return () => { active = false; controller.abort(); };
+  }, [selectedOrderId, returnRetry]);
 
   async function updateReturn(status: ReturnRequest['status']) {
-    if (!returnRequest) return;
+    if (!returnRequest || !selectedOrderId || pendingOrders.current.has(selectedOrderId)) return;
+    const orderId = selectedOrderId;
+    const requestId = returnRequest.id;
+    pendingOrders.current.add(orderId);
+    setMutatingOrderId(orderId);
     try {
-      const updated = await purchaseApi<ReturnRequest>(`/admin/returns/${returnRequest.id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-      setReturnRequest(updated);
-      showToast(`Return marked ${status.replaceAll('_', ' ')}`, 'success');
-    } catch (error) { showToast((error as Error).message, 'error'); }
+      const updated = await purchaseApi<ReturnRequest>(`/admin/returns/${requestId}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      if (!updated || updated.id !== requestId) throw new Error('Return request could not be saved. Reload and try again.');
+      setReturnRequest(current => current?.id === requestId ? updated : current);
+      showToast(`Return marked ${updated.status.replaceAll('_', ' ')}`, 'success');
+    } catch (error) { showToast(getErrorMessage(error, 'Return request could not be saved.'), 'error'); }
+    finally {
+      pendingOrders.current.delete(orderId);
+      setMutatingOrderId(current => current === orderId ? null : current);
+    }
   }
-
-  /* ── sync notes when selecting order ── */
-  useEffect(() => {
-    if (!selectedOrder) return;
-    setSellerNotes(selectedOrder.seller_notes || '');
-    setBuyerNotes(selectedOrder.customer_notes || '');
-  }, [selectedOrder?.id]);
 
   /* ── filtering ── */
   const filtered = useMemo(() => {
@@ -390,7 +361,8 @@ export default function OrdersPage() {
   }, [orders, activeQueue, search, filterPayment, filterType, exceptionFilter, dateFrom, dateTo, sortField, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const currentPage = Math.max(1, Math.min(page, totalPages || 1));
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   /* ── summary stats ── */
   const stats = useMemo(() => ({
@@ -412,7 +384,7 @@ export default function OrdersPage() {
       { key: 'id', label: 'Order ID', transform: (v: string) => v.slice(0, 8).toUpperCase() },
       { key: 'user_name', label: 'Customer' },
       { key: 'email', label: 'Email' },
-      { key: 'items', label: 'Products', transform: (v: any[]) => (v || []).map((i: any) => `${i.product_name} (x${i.qty})`).join('; ') },
+      { key: 'items', label: 'Products', transform: (v: Order['items']) => (v || []).map((i) => `${i.product_name} (x${i.qty})`).join('; ') },
       { key: 'subtotal', label: 'Subtotal', transform: (v: number) => `₱${(v || 0).toFixed(2)}` },
       { key: 'shipping_fee', label: 'Shipping', transform: (v: number) => `₱${(v || 0).toFixed(2)}` },
       { key: 'total', label: 'Total', transform: (v: number) => `₱${(v || 0).toFixed(2)}` },
@@ -475,7 +447,7 @@ export default function OrdersPage() {
 
   /* ── render ── */
   return (
-    <div className="orders-page">
+    <div className="orders-page" aria-busy={Boolean(mutatingOrderId)}>
       <div className="portal-action-bar">
         <span className="orders-page-header-meta">{filtered.length} matching order{filtered.length === 1 ? '' : 's'}</span>
       </div>
@@ -522,20 +494,20 @@ export default function OrdersPage() {
 
       {totalPages > 1 ? (
         <div className="orders-pagination">
-          <span>Page {page} of {totalPages} · {filtered.length} orders</span>
+          <span>Page {currentPage} of {totalPages} · {filtered.length} orders</span>
           <div className="orders-pagination-buttons">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(1)} aria-label="First page">«</button>
-            <button type="button" disabled={page <= 1} onClick={() => setPage(current => current - 1)} aria-label="Previous page">‹</button>
+            <button type="button" disabled={currentPage <= 1} onClick={() => setPage(1)} aria-label="First page">«</button>
+            <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} aria-label="Previous page">‹</button>
             {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
               let pageNumber: number;
               if (totalPages <= 5) pageNumber = index + 1;
-              else if (page <= 3) pageNumber = index + 1;
-              else if (page >= totalPages - 2) pageNumber = totalPages - 4 + index;
-              else pageNumber = page - 2 + index;
-              return <button type="button" className={pageNumber === page ? 'is-active' : ''} key={pageNumber} onClick={() => setPage(pageNumber)} aria-label={`Page ${pageNumber}`} aria-current={pageNumber === page ? 'page' : undefined}>{pageNumber}</button>;
+              else if (currentPage <= 3) pageNumber = index + 1;
+              else if (currentPage >= totalPages - 2) pageNumber = totalPages - 4 + index;
+              else pageNumber = currentPage - 2 + index;
+              return <button type="button" className={pageNumber === currentPage ? 'is-active' : ''} key={pageNumber} onClick={() => setPage(pageNumber)} aria-label={`Page ${pageNumber}`} aria-current={pageNumber === currentPage ? 'page' : undefined}>{pageNumber}</button>;
             })}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage(current => current + 1)} aria-label="Next page">›</button>
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage(totalPages)} aria-label="Last page">»</button>
+            <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)} aria-label="Next page">›</button>
+            <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(totalPages)} aria-label="Last page">»</button>
           </div>
         </div>
       ) : null}
@@ -552,7 +524,7 @@ export default function OrdersPage() {
         footer={selectedOrder ? (
           <>
             <div className="orders-drawer-footer-secondary">
-              <button type="button" className="orders-secondary-action" onClick={() => toggleInvestigation(selectedOrder.id)}>
+              <button type="button" disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => toggleInvestigation(selectedOrder.id)}>
                 {selectedOrder.flagged_for_investigation ? 'Remove flag' : 'Investigate'}
               </button>
               {!selectedOrder.is_problematic ? (
@@ -564,11 +536,11 @@ export default function OrdersPage() {
               {!['cancelled', 'completed', 'refunded'].includes(selectedOrder.status) ? <button type="button" className="orders-secondary-action" onClick={() => setConfirm({ open: true, title: 'Cancel Order', message: 'Are you sure? This cannot be undone.', confirmLabel: 'Cancel Order', confirmDanger: true, action: () => updateOrderStatus(selectedOrder.id, 'cancelled', 'Cancelled by admin') })}>Cancel</button> : null}
             </div>
             <div className="orders-drawer-footer-primary">
-              {selectedOrder.status === 'pending' ? <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Confirm Order', message: 'Mark this order as confirmed (paid)?', confirmLabel: 'Confirm', action: () => updateOrderStatus(selectedOrder.id, 'paid') })}>Confirm order</ActionBtn> : null}
-              {selectedOrder.status !== 'pending' && selectedOrder.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(selectedOrder.status) ? <ActionBtn color="#1565C0" onClick={() => setConfirm({ open: true, title: 'Start Preparing', message: 'Move this order to preparing status?', confirmLabel: 'Start', action: () => updateDeliveryStatus(selectedOrder.id, 'preparing') })}>Start preparing</ActionBtn> : null}
-              {selectedOrder.delivery_status === 'preparing' ? <ActionBtn color="#6A1B9A" onClick={() => setConfirm({ open: true, title: 'Ship Order', message: 'Mark this order as shipped?', confirmLabel: 'Ship', action: () => updateDeliveryStatus(selectedOrder.id, 'shipped') })}>Ship order</ActionBtn> : null}
-              {selectedOrder.delivery_status === 'shipped' ? <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Mark Delivered', message: 'Confirm this order has been delivered?', confirmLabel: 'Delivered', action: () => updateDeliveryStatus(selectedOrder.id, 'delivered') })}>Mark delivered</ActionBtn> : null}
-              {selectedOrder.delivery_status === 'delivered' ? <ActionBtn color="#1B5E20" onClick={() => setConfirm({ open: true, title: 'Complete Order', message: 'Mark this order as fully completed?', confirmLabel: 'Complete', action: () => updateDeliveryStatus(selectedOrder.id, 'completed') })}>Complete order</ActionBtn> : null}
+              {selectedOrder.status === 'pending' ? <ActionBtn disabled={Boolean(mutatingOrderId)} color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Confirm Order', message: 'Mark this order as confirmed (paid)?', confirmLabel: 'Confirm', action: () => updateOrderStatus(selectedOrder.id, 'paid') })}>Confirm order</ActionBtn> : null}
+              {selectedOrder.status !== 'pending' && selectedOrder.delivery_status === 'pending' && !['cancelled', 'completed', 'refunded'].includes(selectedOrder.status) ? <ActionBtn disabled={Boolean(mutatingOrderId)} color="#1565C0" onClick={() => setConfirm({ open: true, title: 'Start Preparing', message: 'Move this order to preparing status?', confirmLabel: 'Start', action: () => updateDeliveryStatus(selectedOrder.id, 'preparing') })}>Start preparing</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'preparing' ? <ActionBtn disabled={Boolean(mutatingOrderId)} color="#6A1B9A" onClick={() => setConfirm({ open: true, title: 'Ship Order', message: 'Mark this order as shipped?', confirmLabel: 'Ship', action: () => updateDeliveryStatus(selectedOrder.id, 'shipped') })}>Ship order</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'shipped' ? <ActionBtn disabled={Boolean(mutatingOrderId)} color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Mark Delivered', message: 'Confirm this order has been delivered?', confirmLabel: 'Delivered', action: () => updateDeliveryStatus(selectedOrder.id, 'delivered') })}>Mark delivered</ActionBtn> : null}
+              {selectedOrder.delivery_status === 'delivered' ? <ActionBtn disabled={Boolean(mutatingOrderId)} color="#1B5E20" onClick={() => setConfirm({ open: true, title: 'Complete Order', message: 'Mark this order as fully completed?', confirmLabel: 'Complete', action: () => updateDeliveryStatus(selectedOrder.id, 'completed') })}>Complete order</ActionBtn> : null}
             </div>
           </>
         ) : undefined}
@@ -578,6 +550,7 @@ export default function OrdersPage() {
                 {/* ── OVERVIEW TAB ── */}
                 {detailTab === 'overview' && (
                   <div className="orders-detail-summary-grid">
+                    {returnError ? <div role="alert">{returnError} <button type="button" onClick={() => setReturnRetry(value => value + 1)}>Retry return request</button></div> : null}
 
                     {returnRequest && (
                       <SectionCard title="Return Request" className="orders-detail-span-2">
@@ -587,10 +560,10 @@ export default function OrdersPage() {
                         <InfoRow label="Buyer description" value={returnRequest.description || '--'} />
                         {returnRequest.order_return_evidence?.length ? <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>{returnRequest.order_return_evidence.map(evidence => evidence.signedUrl ? <a key={evidence.id} href={evidence.signedUrl} target="_blank" rel="noreferrer"><AssetImage src={evidence.signedUrl} alt="Return evidence" style={{ width: '72px', height: '72px', borderRadius: '8px', objectFit: 'cover' }} /></a> : null)}</div> : null}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                          {returnRequest.status === 'submitted' ? <button className="orders-secondary-action" onClick={() => void updateReturn('under_review')}>Start review</button> : null}
-                          {['submitted', 'under_review'].includes(returnRequest.status) ? <><button className="orders-secondary-action" onClick={() => void updateReturn('approved')}>Approve</button><button className="orders-secondary-action" onClick={() => void updateReturn('rejected')}>Reject</button></> : null}
-                          {returnRequest.status === 'approved' && returnRequest.requested_resolution === 'refund' ? <button className="orders-secondary-action" onClick={() => void updateReturn('refunded')}>Mark refund complete</button> : null}
-                          {['approved', 'rejected', 'refunded'].includes(returnRequest.status) ? <button className="orders-secondary-action" onClick={() => void updateReturn('closed')}>Close request</button> : null}
+                          {returnRequest.status === 'submitted' ? <button disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => void updateReturn('under_review')}>Start review</button> : null}
+                          {['submitted', 'under_review'].includes(returnRequest.status) ? <><button disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => void updateReturn('approved')}>Approve</button><button disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => void updateReturn('rejected')}>Reject</button></> : null}
+                          {returnRequest.status === 'approved' && returnRequest.requested_resolution === 'refund' ? <button disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => void updateReturn('refunded')}>Mark refund complete</button> : null}
+                          {['approved', 'rejected', 'refunded'].includes(returnRequest.status) ? <button disabled={Boolean(mutatingOrderId)} className="orders-secondary-action" onClick={() => void updateReturn('closed')}>Close request</button> : null}
                         </div>
                       </SectionCard>
                     )}
@@ -653,7 +626,7 @@ export default function OrdersPage() {
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', display: 'block', marginBottom: '6px' }}>Seller Notes</label>
                         <textarea
                           value={sellerNotes}
-                          onChange={e => setSellerNotes(e.target.value)}
+                          onChange={e => setNotesDraft({ orderId: selectedOrder.id, seller: e.target.value, buyer: buyerNotes })}
                           placeholder="Internal notes visible to seller..."
                           rows={2}
                           style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
@@ -663,7 +636,7 @@ export default function OrdersPage() {
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#8C7B6E', display: 'block', marginBottom: '6px' }}>Customer Notes</label>
                         <textarea
                           value={buyerNotes}
-                          onChange={e => setBuyerNotes(e.target.value)}
+                          onChange={e => setNotesDraft({ orderId: selectedOrder.id, seller: sellerNotes, buyer: e.target.value })}
                           placeholder="Notes visible to customer..."
                           rows={2}
                           style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '8px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
@@ -716,16 +689,16 @@ export default function OrdersPage() {
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {selectedOrder.payment_status === 'pending' && (
                           <>
-                            <ActionBtn color="#2E7D32" onClick={() => setVerifyModal({ open: true, order: selectedOrder })}>
+                            <ActionBtn disabled={Boolean(mutatingOrderId)} color="#2E7D32" onClick={() => setVerifyModal({ open: true, order: selectedOrder })}>
                               Verify Payment
                             </ActionBtn>
-                            <ActionBtn color="#C62828" onClick={() => setRejectModal({ open: true, order: selectedOrder })}>
+                            <ActionBtn disabled={Boolean(mutatingOrderId)} color="#C62828" onClick={() => setRejectModal({ open: true, order: selectedOrder })}>
                               Reject Payment
                             </ActionBtn>
                           </>
                         )}
                         {selectedOrder.payment_status === 'paid' && (
-                          <ActionBtn color="#6A1B9A" onClick={() => setRefundModal({ open: true, order: selectedOrder })}>
+                          <ActionBtn disabled={Boolean(mutatingOrderId)} color="#6A1B9A" onClick={() => setRefundModal({ open: true, order: selectedOrder })}>
                             Process Refund
                           </ActionBtn>
                         )}
@@ -777,7 +750,7 @@ export default function OrdersPage() {
                 {detailTab === 'activity' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <SectionCard title="Activity Log">
-                      {activityLogs.length === 0 ? (
+                      {activityError ? <div role="alert">{activityError} <button type="button" onClick={() => void fetchActivityLogs()}>Retry activity</button></div> : activityLoading ? <p role="status">Loading activity…</p> : activityLogs.length === 0 ? (
                         <p style={{ fontSize: '0.88rem', color: '#A89688', textAlign: 'center', padding: '20px 0' }}>No activity recorded yet.</p>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
@@ -827,10 +800,10 @@ export default function OrdersPage() {
                           <InfoRow label="Resolution" value={selectedOrder.problem_resolution} />
                         )}
                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-                          <ActionBtn color="#2E7D32" onClick={() => setResolveModal({ open: true, order: selectedOrder })}>
+                          <ActionBtn disabled={Boolean(mutatingOrderId)} color="#2E7D32" onClick={() => setResolveModal({ open: true, order: selectedOrder })}>
                             Resolve Problem
                           </ActionBtn>
-                          <ActionBtn color="#E65100" onClick={() => toggleInvestigation(selectedOrder.id)}>
+                          <ActionBtn disabled={Boolean(mutatingOrderId)} color="#E65100" onClick={() => toggleInvestigation(selectedOrder.id)}>
                             {selectedOrder.flagged_for_investigation ? 'Remove Flag' : 'Flag for Investigation'}
                           </ActionBtn>
                         </div>
@@ -844,7 +817,7 @@ export default function OrdersPage() {
                       <div style={{ textAlign: 'center', padding: '40px 0' }}>
                         <p style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '8px' }}>No problems reported</p>
                         <p style={{ fontSize: '0.85rem', color: '#A89688', marginBottom: '16px' }}>Flag this order if there is an issue that needs attention.</p>
-                        <ActionBtn color="#C62828" onClick={() => setProblemModal({ open: true, order: selectedOrder })}>
+                        <ActionBtn disabled={Boolean(mutatingOrderId)} color="#C62828" onClick={() => setProblemModal({ open: true, order: selectedOrder })}>
                           Flag as Problematic
                         </ActionBtn>
                       </div>
@@ -856,20 +829,10 @@ export default function OrdersPage() {
                         <InfoRow label="Reason" value={selectedOrder.cancel_reason} />
                         <p style={{ fontSize: '0.78rem', color: '#A89688', marginTop: '4px' }}>Awaiting admin review</p>
                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                          <ActionBtn color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Approve Cancellation', message: 'Approve this cancellation request?', confirmLabel: 'Approve', action: async () => {
-                            await supabase.from('orders').update({ cancellation_approved: true, status: 'cancelled', delivery_status: 'cancelled', cancellation_reviewed_by: user?.id }).eq('id', selectedOrder.id);
-                            setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, cancellation_approved: true, status: 'cancelled', delivery_status: 'cancelled' } : o));
-                            setSelectedOrder(prev => prev ? { ...prev, cancellation_approved: true, status: 'cancelled', delivery_status: 'cancelled' } : prev);
-                            showToast('Cancellation approved', 'success');
-                          } })}>
+                          <ActionBtn disabled={Boolean(mutatingOrderId)} color="#2E7D32" onClick={() => setConfirm({ open: true, title: 'Approve Cancellation', message: 'Approve this cancellation request?', confirmLabel: 'Approve', action: () => reviewCancellation(selectedOrder.id, true) })}>
                             Approve
                           </ActionBtn>
-                          <ActionBtn color="#C62828" onClick={() => setConfirm({ open: true, title: 'Reject Cancellation', message: 'Reject this cancellation request?', confirmLabel: 'Reject', confirmDanger: true, action: async () => {
-                            await supabase.from('orders').update({ cancellation_approved: false, cancellation_reviewed_by: user?.id }).eq('id', selectedOrder.id);
-                            setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, cancellation_approved: false } : o));
-                            setSelectedOrder(prev => prev ? { ...prev, cancellation_approved: false } : prev);
-                            showToast('Cancellation rejected', 'success');
-                          } })}>
+                          <ActionBtn disabled={Boolean(mutatingOrderId)} color="#C62828" onClick={() => setConfirm({ open: true, title: 'Reject Cancellation', message: 'Reject this cancellation request?', confirmLabel: 'Reject', confirmDanger: true, action: () => reviewCancellation(selectedOrder.id, false) })}>
                             Reject
                           </ActionBtn>
                         </div>
@@ -893,7 +856,7 @@ export default function OrdersPage() {
           message={confirm.message}
           confirmLabel={confirm.confirmLabel}
           confirmDanger={confirm.confirmDanger}
-          onConfirm={async () => { await confirm.action(); setConfirm(null); }}
+          onConfirm={async () => { if (await confirm.action()) setConfirm(null); }}
           onCancel={() => setConfirm(null)}
         />
       )}
@@ -902,7 +865,7 @@ export default function OrdersPage() {
       {verifyModal.open && verifyModal.order && <Popup title="Verify payment?" message={<>Confirm that the payment of <strong>{formatCurrency(verifyModal.order.total)}</strong> for order #{verifyModal.order.id.slice(0, 8).toUpperCase()} has been received?</>} confirmLabel="Verify payment" onCancel={() => setVerifyModal({ open: false, order: null })} onConfirm={() => verifyPayment(verifyModal.order!.id)} />}
 
       {/* reject payment modal */}
-      {rejectModal.open && rejectModal.order && <Popup title="Reject payment" confirmLabel="Reject payment" danger={true} confirmDisabled={!rejectReason.trim()} onCancel={() => { setRejectModal({ open: false, order: null }); setRejectReason(''); }} onConfirm={() => rejectPayment(rejectModal.order!.id, rejectReason)}>
+      {rejectModal.open && rejectModal.order && <Popup title="Reject payment" confirmLabel="Reject payment" danger={true} confirmDisabled={!rejectReason.trim()} onCancel={() => { setRejectModal({ open: false, order: null }); setRejectReason(''); }} onConfirm={() => rejectPayment(rejectModal.order!.id)}>
 
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 12px' }}>Provide a reason for rejecting this payment.</p>
             <textarea
@@ -914,7 +877,7 @@ export default function OrdersPage() {
       </Popup>}
 
       {/* refund modal */}
-      {refundModal.open && refundModal.order && <Popup title="Process refund" confirmLabel="Process refund" danger={true} confirmDisabled={!refundAmount || !refundReason.trim()} onCancel={() => { setRefundModal({ open: false, order: null }); setRefundAmount(''); setRefundReason(''); }} onConfirm={() => processRefund(refundModal.order!.id, Number(refundAmount), refundReason)}>
+      {refundModal.open && refundModal.order && <Popup title="Process refund" confirmLabel="Process refund" danger={true} confirmDisabled={!refundAmount || !refundReason.trim()} onCancel={() => { setRefundModal({ open: false, order: null }); setRefundAmount(''); setRefundReason(''); }} onConfirm={() => processRefund(refundModal.order!.id, Number(refundAmount))}>
 
             <p style={{ fontSize: '0.9rem', color: '#8C7B6E', margin: '12px 0 16px' }}>
               Original amount: <strong>{formatCurrency(refundModal.order.total)}</strong>
@@ -1005,10 +968,11 @@ function InfoRow({ label, value, bold }: { label: string; value: React.ReactNode
   );
 }
 
-function ActionBtn({ color, onClick, children }: { color: string; onClick: () => void; children: React.ReactNode }) {
+function ActionBtn({ color, onClick, children, disabled }: { color: string; onClick: () => void; children: React.ReactNode; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         padding: '8px 18px', borderRadius: '8px', border: 'none',
         background: color, color: '#fff', fontWeight: 600, fontSize: '0.82rem',

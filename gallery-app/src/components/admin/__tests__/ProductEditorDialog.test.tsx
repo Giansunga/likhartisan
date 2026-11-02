@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductEditorDialog from '../ProductEditorDialog';
 import type { Product } from '../../../types';
@@ -176,4 +176,21 @@ describe('ProductEditorDialog', () => {
     expect(screen.queryByText('Optional packed details')).not.toBeInTheDocument();
   });
 
+});
+
+
+it('disables editor fields during save and preserves dirty fields across background updates', async () => {
+  mocks.variations = [{ id: 'variation-1', dimensions: '4 x 4 in', height: '8 in', product_weight_g: 400, price: 450, stock: 2, measurement_unit: 'in' }];
+  let finish!: () => void;
+  const onSave = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+  const view = render(<ProductEditorDialog product={product} onClose={vi.fn()} onSave={onSave} />);
+  await screen.findByText('Variation 1');
+  fireEvent.change(screen.getByRole('textbox', { name: 'Product Name' }), { target: { value: 'Unsaved title' } });
+  view.rerender(<ProductEditorDialog product={{ ...product, name: 'Background title' }} onClose={vi.fn()} onSave={onSave} />);
+  expect(screen.getByRole('textbox', { name: 'Product Name' })).toHaveValue('Unsaved title');
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+  expect(screen.getByRole('textbox', { name: 'Product Name' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add Variation' })).toBeDisabled();
+  await act(async () => { finish(); });
 });

@@ -5,6 +5,9 @@ import { ADMIN_EMAILS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { PortalRealtimeProvider } from '../../realtime/PortalRealtimeProvider';
 import { signOutWithActivity } from '../../lib/activityApi';
+import PortalRouteBoundary from '../PortalRouteBoundary';
+import type { User } from '@supabase/supabase-js';
+import { getErrorMessage } from '../../lib/portalErrors';
 import '../portal.css';
 import './admin.css';
 
@@ -32,10 +35,16 @@ const SIDEBAR_WIDTH = 232;
 const HEADER_HEIGHT = 72;
 
 export default function AdminLayout() {
+  const { user, loading: authLoading } = useAuth();
+  return <AdminSessionLayout key={user?.id || 'signed-out'} user={user} authLoading={authLoading} />;
+}
+
+function AdminSessionLayout({ user, authLoading }: { user: User | null; authLoading: boolean }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [accessError, setAccessError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const location = useLocation();
-  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
     if (authLoading) return;
@@ -49,19 +58,20 @@ export default function AdminLayout() {
         );
         if (isConfiguredAdmin) { if (active) setIsAdmin(true); return; }
         const { data, error } = await supabase.from('user_roles').select('id').eq('user_id', user.id).eq('role', 'super_admin').maybeSingle();
-        if (active) setIsAdmin(!error && Boolean(data));
+        if (error) throw error;
+        if (active) { setAccessError(''); setIsAdmin(Boolean(data)); }
       } catch (e) {
         console.error('Admin access check error:', e);
-        if (active) setIsAdmin(false);
+        if (active) { setIsAdmin(false); setAccessError(getErrorMessage(e, 'Your access could not be verified. Please try again.')); }
       } finally {
         if (active) setLoading(false);
       }
     }
     void checkAdminAccess();
     return () => { active = false; };
-  }, [authLoading, user]);
+  }, [attempt, authLoading, user]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div style={{ background: '#FAF7F2', fontFamily: 'var(--font-sans)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: '#77716B', fontSize: '0.95rem' }}>Loading...</div>
@@ -69,6 +79,7 @@ export default function AdminLayout() {
     );
   }
 
+  if (accessError) return <section role="alert" style={{ padding: 24 }}><h2>Unable to verify admin access</h2><p>{accessError}</p><button type="button" onClick={() => { setAccessError(''); setLoading(true); setAttempt(value => value + 1); }}>Try again</button></section>;
   if (!isAdmin) return <Navigate to="/" replace />;
 
   function isActiveRoute(to: string, exact?: boolean) {
@@ -82,7 +93,6 @@ export default function AdminLayout() {
     { key: 'system', label: 'SYSTEM' },
   ];
 
-  let lastSection = '';
 
   return (
     <PortalRealtimeProvider topics={['admin:portal']}>
@@ -111,9 +121,8 @@ export default function AdminLayout() {
         }}>
           {/* Nav sections */}
           <nav style={{ flex: 1, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {navLinks.map((link) => {
-              if (link.section !== lastSection) {
-                lastSection = link.section;
+            {navLinks.map((link, index) => {
+              if (link.section !== navLinks[index - 1]?.section) {
                 const section = sections.find(s => s.key === link.section);
                 return (
                   <div key={`section-${link.section}`}>
@@ -148,7 +157,7 @@ export default function AdminLayout() {
               Back to Store
             </Link>
             <button
-              onClick={async () => { await signOutWithActivity(); window.location.href = '/'; }}
+              onClick={() => { void signOutWithActivity().then(() => { window.location.href = '/'; }).catch(error => setAccessError(getErrorMessage(error, 'Sign out failed. Please try again.'))); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '10px 12px', border: 'none', background: 'transparent',
@@ -172,7 +181,7 @@ export default function AdminLayout() {
           flex: 1, padding: 0, background: '#FAF7F2',
           minWidth: 0, marginLeft: `${SIDEBAR_WIDTH}px`, height: `calc(100vh - ${HEADER_HEIGHT}px)`, overflow: 'hidden',
         }}>
-          <div className="admin-route-workspace"><Outlet /></div>
+          <div className="admin-route-workspace"><PortalRouteBoundary><Outlet /></PortalRouteBoundary></div>
         </main>
       </div>
     </div>

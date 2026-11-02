@@ -1,6 +1,7 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import AssetImage from '../../components/AssetImage';
 import { confirmAction } from '../../lib/popups';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 
@@ -37,28 +38,35 @@ export default function ArtisanManagePage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const sequence = useRef(0);
+  const mutationPending = useRef(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const coverInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-  usePortalRealtimeRefresh(['artisans', 'shops', 'products'], fetchData);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
+    const request = ++sequence.current;
     setLoading(true);
+    try {
     const [artRes, shopRes] = await Promise.all([
       supabase.from('artisans').select('*').order('created_at', { ascending: false }),
       supabase.from('shops').select('id, name').order('name'),
     ]);
+    if (artRes.error || shopRes.error) throw artRes.error || shopRes.error;
+    if (request !== sequence.current) return;
     if (shopRes.data) setShops(shopRes.data);
     if (artRes.data) {
-      const shopMap = new Map((shopRes.data || []).map((s: any) => [s.id, s.name]));
-      setArtisans(artRes.data.map((a: any) => ({ ...a, shop_name: shopMap.get(a.shop_id) || '' })));
+      const shopMap = new Map((shopRes.data || []).map((s: ShopOption) => [s.id, s.name]));
+      setArtisans(artRes.data.map((a: Artisan) => ({ ...a, shop_name: shopMap.get(a.shop_id) || '' })));
     }
-    setLoading(false);
-  }
+    setLoadError('');
+    } catch (cause) { if (request === sequence.current) setLoadError(getErrorMessage(cause, 'Artisans could not be loaded.')); }
+    finally { if (request === sequence.current) setLoading(false); }
+  }, []);
+  const invalidate = useCallback(() => { sequence.current++; }, []);
+  useEffect(() => { let active = true; queueMicrotask(() => { if (active) void fetchData(); }); return () => { active = false; invalidate(); }; }, [fetchData, invalidate]);
+  usePortalRealtimeRefresh(['artisans', 'shops', 'products'], fetchData);
 
   const filtered = artisans.filter(a => {
     const q = search.toLowerCase();
@@ -103,6 +111,8 @@ export default function ArtisanManagePage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (mutationPending.current) return;
+    mutationPending.current = true;
     setSaving(true);
     setError('');
 
@@ -122,32 +132,43 @@ export default function ArtisanManagePage() {
       };
 
       if (editId) {
-        const { error: updateErr } = await supabase.from('artisans').update(row).eq('id', editId);
+        const { data: saved, error: updateErr } = await supabase.from('artisans').update(row).eq('id', editId).select('id').single();
+        if (!updateErr && !saved) throw new Error('The saved artisan could not be confirmed.');
         if (updateErr) throw updateErr;
       } else {
-        const { error: insertErr } = await supabase.from('artisans').insert(row);
+        const { data: saved, error: insertErr } = await supabase.from('artisans').insert(row).select('id').single();
+        if (!insertErr && !saved) throw new Error('The saved artisan could not be confirmed.');
         if (insertErr) throw insertErr;
       }
 
       setShowModal(false);
       fetchData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to save'));
     } finally {
+      mutationPending.current = false;
       setSaving(false);
     }
   }
 
   async function handleDelete(id: string) {
     if (!await confirmAction('Delete this artisan?')) return;
-    await supabase.from('artisans').delete().eq('id', id);
-    fetchData();
+    if (mutationPending.current) return;
+    mutationPending.current = true;
+    try {
+      const { data, error } = await supabase.from('artisans').delete().eq('id', id).select('id').single();
+      if (error) throw error;
+      if (!data) throw new Error('This artisan could not be deleted. Reload and try again.');
+      await fetchData();
+    } catch (cause) { setLoadError(getErrorMessage(cause, 'The artisan could not be deleted.')); }
+    finally { mutationPending.current = false; }
   }
 
   function handleCoverClick() { coverInputRef.current?.click(); }
 
   return (
     <div>
+      {loadError && <p role="alert">{loadError}<button type="button" onClick={() => void fetchData()}>Try again</button></p>}
       <div className="portal-action-bar">
         <button onClick={openCreate}
           className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition-colors flex items-center gap-2">

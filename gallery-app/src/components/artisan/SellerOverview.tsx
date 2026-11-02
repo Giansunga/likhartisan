@@ -1,5 +1,7 @@
+import { getErrorMessage } from '../../lib/portalErrors';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import AssetImage from '../AssetImage';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -82,33 +84,39 @@ export default function SellerOverview() {
   const [range, setRange] = useState(() => getDatePreset('month'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const sequence = useRef(0);
 
   const fetchOverview = useCallback(async () => {
+    const request = ++sequence.current;
     setLoading(true);
+    try {
     setError('');
     const [ordersResult, conversationsResult] = await Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
       supabase.from('conversations').select('id, shop_id, buyer_id, buyer_name, last_message, last_message_at, artisan_unread').eq('shop_id', shop.id).order('last_message_at', { ascending: false }).limit(5),
     ]);
-    if (ordersResult.error) {
-      setError(ordersResult.error.message);
-    } else {
-      setOrders((ordersResult.data || []) as ArtisanOrder[]);
-    }
-    if (!conversationsResult.error) setConversations((conversationsResult.data || []) as ArtisanConversationSummary[]);
-    setLoading(false);
+    if (ordersResult.error || conversationsResult.error) throw ordersResult.error || conversationsResult.error;
+    if (request !== sequence.current) return;
+    setOrders((ordersResult.data || []) as ArtisanOrder[]);
+    setConversations((conversationsResult.data || []) as ArtisanConversationSummary[]);
+    } catch (cause) { if (request === sequence.current) setError(getErrorMessage(cause, 'Overview could not be loaded.')); }
+    finally { if (request === sequence.current) setLoading(false); }
   }, [shop.id]);
 
+  const invalidateOverview = useCallback(() => { sequence.current++; }, []);
   useEffect(() => {
     queueMicrotask(() => { void fetchOverview(); });
     const interval = window.setInterval(() => { void fetchOverview(); }, 45_000);
     const handleFocus = () => { void fetchOverview(); };
     window.addEventListener('focus', handleFocus);
     return () => {
+      invalidateOverview();
       window.clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [fetchOverview]);
+  }, [fetchOverview, invalidateOverview]);
+
+  usePortalRealtimeRefresh(['orders', 'conversations'], fetchOverview);
 
   const shopOrders = useMemo(() => filterShopOrders(orders, shop.id, shop.name), [orders, shop.id, shop.name]);
   const rangedOrders = useMemo(() => shopOrders.filter(order => inDateRange(order, range)), [shopOrders, range]);

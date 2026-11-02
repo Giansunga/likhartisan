@@ -1,26 +1,28 @@
+import { createSessionAccessManager } from './authSession';
 import { API_BASE } from './api';
 import { activityFiltersToParams, getActivityDateRange } from './activityLog';
 import { supabase } from './supabase';
 import type { ActivityFilters } from '../types/activity';
 
-async function accessToken() {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
-}
+const accessToken = createSessionAccessManager(supabase.auth, () => undefined);
 
 export async function recordSecurityActivity(event: 'auth.signed_in' | 'auth.signed_out' | 'auth.password_changed' | 'auth.password_reset') {
+  try {
   const token = await accessToken();
   if (!token) return;
   await fetch(`${API_BASE}/api/activity/security`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ event }),
-  }).catch(() => undefined);
+    signal: AbortSignal.timeout(3000),
+  });
+  } catch { /* Activity recording must not prevent authentication or sign out. */ }
 }
 
 export async function signOutWithActivity() {
   await recordSecurityActivity('auth.signed_out');
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
 }
 
 export async function exportActivityLog(filters: ActivityFilters) {

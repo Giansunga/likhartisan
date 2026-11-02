@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../lib/portalErrors';
 import AssetImage from '../AssetImage';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -37,7 +38,11 @@ export default function ShopProfilePanel() {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const editVersion = useRef(0);
+  const refreshSequence = useRef(0);
+  const savePending = useRef(false);
   const objectUrls = useRef<string[]>([]);
+  const invalidateRefresh = useCallback(() => { refreshSequence.current++; }, []);
 
   const validation = validateShopProfile(draft);
   const completion = getShopProfileCompletion(draft);
@@ -55,28 +60,38 @@ export default function ShopProfilePanel() {
   }, [isDirty]);
 
   useEffect(() => () => {
+    invalidateRefresh();
     objectUrls.current.forEach(url => URL.revokeObjectURL(url));
-  }, []);
+  }, [invalidateRefresh]);
 
   const refreshShop = useCallback(async () => {
-    const { data, error } = await supabase.from('shops').select('*').eq('id', shop.id).single();
-    if (error || !data) return;
-    const updatedShop = data as ArtisanShop;
-    setShop(updatedShop);
-    if (!isDirty) {
-      const nextDraft = makeShopProfileDraft(updatedShop);
-      setSaved(nextDraft);
-      setDraft(nextDraft);
-    }
+    if (savePending.current) return;
+    const version = editVersion.current;
+    const request = ++refreshSequence.current;
+    try {
+      const { data, error } = await supabase.from('shops').select('*').eq('id', shop.id).single();
+      if (error) throw error;
+      if (!data) throw new Error('Shop profile could not be found.');
+      if (request !== refreshSequence.current) return;
+      const updatedShop = data as ArtisanShop;
+      setShop(updatedShop);
+      if (!isDirty && version === editVersion.current && !savePending.current) {
+        const nextDraft = makeShopProfileDraft(updatedShop);
+        setSaved(nextDraft);
+        setDraft(nextDraft);
+      }
+    } catch (cause) { if (request === refreshSequence.current) setFeedback({ tone: 'error', text: getErrorMessage(cause, 'The profile could not be refreshed.') }); }
   }, [isDirty, setShop, shop.id]);
   usePortalRealtimeRefresh(['shops'], refreshShop);
 
   function updateField(field: 'name' | 'description' | 'about' | 'location', value: string) {
+    editVersion.current++;
     setDraft(current => ({ ...current, [field]: value }));
     setFeedback(null);
   }
 
   function selectImage(kind: MediaKind, event: ChangeEvent<HTMLInputElement>) {
+    editVersion.current++;
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -97,6 +112,7 @@ export default function ShopProfilePanel() {
   }
 
   function removeImage(kind: MediaKind) {
+    editVersion.current++;
     if (kind === 'profile') {
       setProfileFile(null);
       setDraft(current => ({ ...current, image: '' }));
@@ -108,6 +124,7 @@ export default function ShopProfilePanel() {
   }
 
   function discardChanges() {
+    editVersion.current++;
     setDraft(saved);
     setProfileFile(null);
     setCoverFile(null);
@@ -123,7 +140,10 @@ export default function ShopProfilePanel() {
   }
 
   async function saveProfile() {
-    if (hasErrors || !isDirty || saving) return;
+    if (hasErrors || !isDirty || savePending.current) return;
+    savePending.current = true;
+    const savedVersion = editVersion.current;
+    refreshSequence.current++;
     setSaving(true);
     setFeedback(null);
     try {
@@ -154,18 +174,27 @@ export default function ShopProfilePanel() {
         ({ data, error } = await supabase.from('shops').update(payload).eq('id', shop.id).select('*').single());
       }
       if (error) throw error;
+      if (!data) throw new Error('The saved shop could not be confirmed. Reload before retrying.');
       const updatedShop = data as ArtisanShop;
       const nextDraft = makeShopProfileDraft(updatedShop);
       setShop(updatedShop);
       setSaved(nextDraft);
-      setDraft(nextDraft);
-      setProfileFile(null);
-      setCoverFile(null);
-      setFeedback({ tone: 'success', text: 'Your shop profile is live and up to date.' });
+      setDraft(current => {
+        if (savedVersion === editVersion.current) return nextDraft;
+        const next = { ...current };
+        for (const field of Object.keys(nextDraft) as (keyof ShopProfileDraft)[]) {
+          if (current[field] === draft[field]) next[field] = nextDraft[field];
+        }
+        return next;
+      });
+      setProfileFile(current => current === profileFile ? null : current);
+      setCoverFile(current => current === coverFile ? null : current);
+      setFeedback({ tone: 'success', text: savedVersion === editVersion.current ? 'Your shop profile is live and up to date.' : 'Your saved changes are live. You still have newer unsaved changes.' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'The profile could not be saved.';
+      const message = getErrorMessage(error, 'The profile could not be saved.');
       setFeedback({ tone: 'error', text: `${message} Your entered changes are still here.` });
     } finally {
+      savePending.current = false;
       setSaving(false);
     }
   }

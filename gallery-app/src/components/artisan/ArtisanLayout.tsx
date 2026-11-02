@@ -16,6 +16,8 @@ import {
 import { signOutWithActivity } from '../../lib/activityApi';
 import ArtisanProvider from './ArtisanContext';
 import { useArtisanPortal } from './artisanContextValue';
+import PortalRouteBoundary from '../PortalRouteBoundary';
+import { getErrorMessage } from '../../lib/portalErrors';
 import '../portal.css';
 import './artisan.css';
 
@@ -33,11 +35,12 @@ const navItems = [
 function ArtisanShell() {
   const { shop } = useArtisanPortal();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const navigate = useNavigate();
 
   async function logout() {
-    await signOutWithActivity();
-    navigate('/', { replace: true });
+    try { await signOutWithActivity(); navigate('/', { replace: true }); }
+    catch (error) { setLogoutError(getErrorMessage(error, 'Sign out failed. Please try again.')); }
   }
 
   return (
@@ -60,7 +63,7 @@ function ArtisanShell() {
           <button className="is-danger" onClick={() => void logout()}><LogOut size={18} /> Logout</button>
         </div>
       </aside>
-      <main className="seller-main"><Outlet /></main>
+      <main className="seller-main">{logoutError && <p role="alert">{logoutError}</p>}<PortalRouteBoundary><Outlet /></PortalRouteBoundary></main>
     </div>
   );
 }

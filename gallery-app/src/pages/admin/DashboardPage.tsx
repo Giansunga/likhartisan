@@ -1,8 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { normalizeProductCategory } from '../../lib/utils';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
+import { getErrorMessage } from '../../lib/portalErrors';
+import type { OrderItem } from '../../types';
 import StatCard from '../../components/admin/dashboard/StatCard';
 import RevenueChart from '../../components/admin/dashboard/RevenueChart';
 import OrderStatusChart from '../../components/admin/dashboard/OrderStatusChart';
@@ -23,7 +26,23 @@ const DATE_RANGE_OPTIONS: { key: DateRangeKey; label: string }[] = [
   { key: 'all', label: 'All Time' },
 ];
 
-function isPaidOrder(o: any) {
+interface DashboardOrder {
+  id: string; user_name: string; total: number; status: string; delivery_status?: string;
+  payment_status?: string; created_at: string; items?: OrderItem[];
+}
+interface DashboardProduct {
+  id: string; name: string; image: string; shop_name: string; category: string;
+  status: string; created_at: string; price: number;
+}
+interface DashboardShop { id: string; name: string; created_at: string }
+interface DashboardData { orders: DashboardOrder[]; products: DashboardProduct[]; shops: DashboardShop[] }
+
+function amount(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function isPaidOrder(o: DashboardOrder) {
   return o.payment_status === 'paid' || o.status === 'paid' || o.status === 'completed';
 }
 
@@ -75,14 +94,14 @@ function rollingMonths(n: number) {
   return items;
 }
 
-function buildRevenueData(orders: any[], period: RevenuePeriod) {
+function buildRevenueData(orders: DashboardOrder[], period: RevenuePeriod) {
   const paidOrders = orders.filter(isPaidOrder);
   if (period === 'monthly') {
     const months = rollingMonths(12);
     const map: Record<string, number> = {};
-    paidOrders.forEach((o: any) => {
+    paidOrders.forEach((o: DashboardOrder) => {
       const key = monthKeyOf(new Date(o.created_at));
-      map[key] = (map[key] || 0) + (o.total || 0);
+      map[key] = (map[key] || 0) + amount(o.total);
     });
     return months.map(m => ({ label: m.label, fullLabel: m.fullLabel, value: map[m.key] || 0, key: m.key, year: m.year }));
   }
@@ -104,7 +123,7 @@ function buildRevenueData(orders: any[], period: RevenuePeriod) {
     return quarters.map(q => ({
       label: q.label,
       fullLabel: q.fullLabel,
-      value: paidOrders.filter((o: any) => inRange(o.created_at, q.start, q.end)).reduce((s: number, o: any) => s + (o.total || 0), 0),
+      value: paidOrders.filter((o: DashboardOrder) => inRange(o.created_at, q.start, q.end)).reduce((s: number, o: DashboardOrder) => s + amount(o.total), 0),
       key: q.label,
       year: q.start.getFullYear(),
     }));
@@ -115,7 +134,7 @@ function buildRevenueData(orders: any[], period: RevenuePeriod) {
   return years.map(y => ({
     label: String(y),
     fullLabel: String(y),
-    value: paidOrders.filter((o: any) => new Date(o.created_at).getFullYear() === y).reduce((s: number, o: any) => s + (o.total || 0), 0),
+    value: paidOrders.filter((o: DashboardOrder) => new Date(o.created_at).getFullYear() === y).reduce((s: number, o: DashboardOrder) => s + amount(o.total), 0),
     key: String(y),
     year: y,
   }));
@@ -130,157 +149,125 @@ export default function DashboardPage() {
   const isTablet = useMediaQuery('(max-width: 1100px)');
   const [dateRange, setDateRange] = useState<DateRangeKey>('all');
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>('monthly');
-  const [revenue, setRevenue] = useState(0);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [activeProducts, setActiveProducts] = useState(0);
-  const [activeShops, setActiveShops] = useState(0);
-  const [orderStatus, setOrderStatus] = useState<{ name: string; value: number; color: string }[]>([]);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [recentProducts, setRecentProducts] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [activeUsers, setActiveUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [revenueTrend, setRevenueTrend] = useState(0);
-  const [ordersTrend, setOrdersTrend] = useState(0);
-  const [productsTrend, setProductsTrend] = useState(0);
-  const [shopsTrend, setShopsTrend] = useState(0);
-  const [prevPeriodLabel, setPrevPeriodLabel] = useState('');
-  const [allOrders, setAllOrders] = useState<any[]>([]);
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [allShops, setAllShops] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [activeUsersError, setActiveUsersError] = useState('');
+  const requestRef = useRef({ sequence: 0 });
+  const usersRequestRef = useRef({ sequence: 0 });
 
   const { start, end } = useMemo(() => getDateRange(dateRange), [dateRange]);
 
-  const filteredOrders = useMemo(() => allOrders.filter((o: any) => inRange(o.created_at, start, end)), [allOrders, start, end]);
-  const filteredProducts = useMemo(() => allProducts.filter((p: any) => inRange(p.created_at, start, end)), [allProducts, start, end]);
-  const filteredShops = useMemo(() => allShops.filter((s: any) => inRange(s.created_at, start, end)), [allShops, start, end]);
-
+  const filteredOrders = useMemo(() => dashboard?.orders.filter(o => inRange(o.created_at, start, end)) || [], [dashboard, start, end]);
+  const filteredProducts = useMemo(() => dashboard?.products.filter(p => inRange(p.created_at, start, end)) || [], [dashboard, start, end]);
+  const filteredShops = useMemo(() => dashboard?.shops.filter(s => inRange(s.created_at, start, end)) || [], [dashboard, start, end]);
   const revenueChartData = useMemo(() => buildRevenueData(filteredOrders, revenuePeriod), [filteredOrders, revenuePeriod]);
-
-  useEffect(() => {
-    fetchDashboard();
-    const interval = window.setInterval(fetchDashboard, 45_000);
-    const handleFocus = () => { void fetchDashboard(); };
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []);
-
-  useEffect(() => {
-    fetchActiveUsers();
-    const interval = setInterval(fetchActiveUsers, 30000);
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    deriveStats(filteredOrders, filteredProducts, filteredShops);
-  }, [filteredOrders, filteredProducts, filteredShops]);
-
-  async function fetchActiveUsers() {
-    try {
-      const { data, error } = await supabase.rpc('count_active_users');
-      if (error) return;
-      setActiveUsers(Number(data) || 0);
-    } catch {
-      /* ignore transient errors */
-    }
-  }
-
-  async function fetchDashboard() {
-    try {
-      setUpdatedAt(new Date());
-      const [productsRes, ordersRes, shopsRes, variationsRes] = await Promise.all([
-        supabase.from('products').select('id, name, image, shop_name, category, views, created_at, status').order('created_at', { ascending: false }),
-        supabase.from('orders').select('id, user_name, total, status, delivery_status, payment_status, created_at, items').order('created_at', { ascending: false }),
-        supabase.from('shops').select('id, name, created_at'),
-        supabase.from('product_variations').select('product_id, price'),
-      ]);
-
-      const products = productsRes.data || [];
-      const orders = ordersRes.data || [];
-      const shops = shopsRes.data || [];
-      const variations = variationsRes.data || [];
-
-      const productPrices: Record<string, number> = {};
-      variations.forEach((v: any) => {
-        const price = Number(v.price) || 0;
-        if (!productPrices[v.product_id] || price < productPrices[v.product_id]) {
-          productPrices[v.product_id] = price;
-        }
-      });
-
-      setAllOrders(orders);
-      setAllProducts(products.map(p => ({
-        id: p.id,
-        name: p.name,
-        image: p.image,
-        price: productPrices[p.id] || 0,
-        shop_name: p.shop_name,
-        category: normalizeProductCategory(p.category),
-        status: p.status,
-        created_at: p.created_at,
-      })));
-      setAllShops(shops);
-    } catch (e) {
-      console.error('Failed to fetch dashboard data:', e);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function deriveStats(orders: any[], products: any[], shops: any[]) {
-    const totalRevenue = orders.filter(isPaidOrder).reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+  const { revenue, totalOrders, activeProducts, activeShops, orderStatus, recentOrders, recentProducts,
+    revenueTrend, ordersTrend, productsTrend, shopsTrend, prevPeriodLabel } = useMemo(() => {
+    const orders = filteredOrders;
+    const products = filteredProducts;
+    const shops = filteredShops;
     const statusCounts: Record<string, number> = { pending: 0, preparing: 0, shipped: 0, delivered: 0, cancelled: 0 };
-    orders.forEach((o: any) => {
-      const s = o.delivery_status || o.status || 'pending';
-      if (s in statusCounts) statusCounts[s]++;
-      else statusCounts.pending++;
-    });
-
-    setRevenue(totalRevenue);
-    setTotalOrders(orders.length);
-    setActiveProducts(products.filter((p: any) => p.status === 'active').length);
-    setActiveShops(shops.length);
-    setOrderStatus([
-      { name: 'Pending', value: statusCounts.pending, color: '#F59E0B' },
-      { name: 'Preparing', value: statusCounts.preparing, color: '#3B82F6' },
-      { name: 'Shipped', value: statusCounts.shipped, color: '#8B5CF6' },
-      { name: 'Delivered', value: statusCounts.delivered, color: '#10B981' },
-      { name: 'Cancelled', value: statusCounts.cancelled, color: '#EF4444' },
-    ]);
-    setRecentOrders(orders.slice(0, 5));
-    setRecentProducts(products.slice(0, 5));
-    computeTrends(orders, products, shops);
-  }
-
-  function computeTrends(orders: any[], products: any[], shops: any[]) {
+    for (const order of orders) {
+      const status = order.delivery_status || order.status || 'pending';
+      statusCounts[status in statusCounts ? status : 'pending']++;
+    }
     const now = new Date();
     const currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevEnd = currentStart;
-
-    const curRevenue = orders.filter(isPaidOrder).filter(o => inRange(o.created_at, currentStart, currentEnd)).reduce((s: number, o: any) => s + (o.total || 0), 0);
-    const prevRevenue = orders.filter(isPaidOrder).filter(o => inRange(o.created_at, prevStart, prevEnd)).reduce((s: number, o: any) => s + (o.total || 0), 0);
-    const curOrders = orders.filter((o: any) => inRange(o.created_at, currentStart, currentEnd)).length;
-    const prevOrders = orders.filter((o: any) => inRange(o.created_at, prevStart, prevEnd)).length;
-    const curProducts = products.filter((p: any) => p.status === 'active' && inRange(p.created_at, currentStart, currentEnd)).length;
-    const prevProducts = products.filter((p: any) => p.status === 'active' && inRange(p.created_at, prevStart, prevEnd)).length;
-    const curShops = shops.filter((s: any) => inRange(s.created_at, currentStart, currentEnd)).length;
-    const prevShops = shops.filter((s: any) => inRange(s.created_at, prevStart, prevEnd)).length;
-
     const pct = (cur: number, prev: number) => prev > 0 ? ((cur - prev) / prev) * 100 : (cur > 0 ? 100 : 0);
+    const currentOrders = orders.filter(o => inRange(o.created_at, currentStart, currentEnd));
+    const previousOrders = orders.filter(o => inRange(o.created_at, prevStart, prevEnd));
+    const revenueOf = (items: DashboardOrder[]) => items.filter(isPaidOrder).reduce((sum, o) => sum + amount(o.total), 0);
+    const productCount = (from: Date, to: Date) => products.filter(p => p.status === 'active' && inRange(p.created_at, from, to)).length;
+    const shopCount = (from: Date, to: Date) => shops.filter(s => inRange(s.created_at, from, to)).length;
+    return {
+      revenue: revenueOf(orders), totalOrders: orders.length,
+      activeProducts: products.filter(p => p.status === 'active').length, activeShops: shops.length,
+      orderStatus: [
+        { name: 'Pending', value: statusCounts.pending, color: '#F59E0B' },
+        { name: 'Preparing', value: statusCounts.preparing, color: '#3B82F6' },
+        { name: 'Shipped', value: statusCounts.shipped, color: '#8B5CF6' },
+        { name: 'Delivered', value: statusCounts.delivered, color: '#10B981' },
+        { name: 'Cancelled', value: statusCounts.cancelled, color: '#EF4444' },
+      ],
+      recentOrders: orders.slice(0, 5), recentProducts: products.slice(0, 5),
+      revenueTrend: pct(revenueOf(currentOrders), revenueOf(previousOrders)),
+      ordersTrend: pct(currentOrders.length, previousOrders.length),
+      productsTrend: pct(productCount(currentStart, currentEnd), productCount(prevStart, prevEnd)),
+      shopsTrend: pct(shopCount(currentStart, currentEnd), shopCount(prevStart, prevEnd)),
+      prevPeriodLabel: `${MONTH_SHORT[prevStart.getMonth()]} ${prevStart.getFullYear()}`,
+    };
+  }, [filteredOrders, filteredProducts, filteredShops]);
 
-    setRevenueTrend(pct(curRevenue, prevRevenue));
-    setOrdersTrend(pct(curOrders, prevOrders));
-    setProductsTrend(pct(curProducts, prevProducts));
-    setShopsTrend(pct(curShops, prevShops));
-    setPrevPeriodLabel(`${MONTH_SHORT[prevStart.getMonth()]} ${prevStart.getFullYear()}`);
-  }
+  const fetchActiveUsers = useCallback(async () => {
+    const request = ++usersRequestRef.current.sequence;
+    try {
+      const { data, error } = await supabase.rpc('count_active_users');
+      if (error) throw error;
+      if (data == null || !Number.isFinite(Number(data)) || Number(data) < 0) throw new Error('The active user count is unavailable.');
+      if (request !== usersRequestRef.current.sequence) return;
+      setActiveUsers(Number(data));
+      setActiveUsersError('');
+    } catch (error) {
+      if (request === usersRequestRef.current.sequence) setActiveUsersError(getErrorMessage(error, 'The active user count could not be loaded.'));
+    }
+  }, []);
+
+  const fetchDashboard = useCallback(async () => {
+    const request = ++requestRef.current.sequence;
+    try {
+      const [productsRes, ordersRes, shopsRes, variationsRes] = await Promise.all([
+        supabase.from('products').select('id, name, image, shop_name, category, views, created_at, status, price').order('created_at', { ascending: false }),
+        supabase.from('orders').select('id, user_name, total, status, delivery_status, payment_status, created_at, items').order('created_at', { ascending: false }),
+        supabase.from('shops').select('id, name, created_at'),
+        supabase.from('product_variations').select('product_id, price'),
+      ]);
+      const failure = [productsRes, ordersRes, shopsRes, variationsRes].find(result => result.error)?.error;
+      if (failure) throw failure;
+      if (request !== requestRef.current.sequence) return;
+      const prices: Record<string, number> = {};
+      for (const variation of variationsRes.data || []) {
+        if (variation.price == null || !Number.isFinite(Number(variation.price))) continue;
+        const price = Number(variation.price);
+        if (!(variation.product_id in prices) || price < prices[variation.product_id]) prices[variation.product_id] = price;
+      }
+      setDashboard({
+        orders: (ordersRes.data || []).map(order => ({ ...order, total: amount(order.total) })) as DashboardOrder[],
+        products: (productsRes.data || []).map(product => ({
+          ...product, price: prices[product.id] ?? amount(product.price), category: normalizeProductCategory(product.category),
+        })) as DashboardProduct[],
+        shops: (shopsRes.data || []) as DashboardShop[],
+      });
+      setUpdatedAt(new Date());
+      setLoadError('');
+    } catch (error) {
+      if (request === requestRef.current.sequence) setLoadError(getErrorMessage(error, 'Dashboard data could not be loaded.'));
+    } finally {
+      if (request === requestRef.current.sequence) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const requests = requestRef.current;
+    queueMicrotask(() => { if (active) void fetchDashboard(); });
+    const interval = window.setInterval(() => { void fetchDashboard(); }, 45_000);
+    return () => { active = false; ++requests.sequence; window.clearInterval(interval); };
+  }, [fetchDashboard]);
+  usePortalRealtimeRefresh(['products', 'product_variations', 'orders', 'shops'], fetchDashboard);
+
+  useEffect(() => {
+    let active = true;
+    const requests = usersRequestRef.current;
+    queueMicrotask(() => { if (active) void fetchActiveUsers(); });
+    const interval = window.setInterval(() => { void fetchActiveUsers(); }, 30_000);
+    return () => { active = false; ++requests.sequence; window.clearInterval(interval); };
+  }, [fetchActiveUsers]);
 
   if (loading) {
     return (
@@ -290,8 +277,12 @@ export default function DashboardPage() {
     );
   }
 
+  if (!dashboard) return <section role="alert" style={{ padding: 24 }}><p>{loadError || 'Dashboard data is unavailable.'}</p><button type="button" onClick={() => void fetchDashboard()}>Try again</button></section>;
+
   return (
     <div>
+      {loadError && <div role="alert"><p>{loadError} Showing the last successful update.</p><button type="button" onClick={() => void fetchDashboard()}>Try again</button></div>}
+      {activeUsersError && <div role="alert"><p>{activeUsersError}</p><button type="button" onClick={() => void fetchActiveUsers()}>Retry active users</button></div>}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="portal-action-bar">
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
@@ -358,8 +349,8 @@ export default function DashboardPage() {
         <StatCard
           index={4}
           label="ACTIVE USERS"
-          value={String(activeUsers)}
-          sub="Live count"
+          value={activeUsers === null ? '\u2014' : String(activeUsers)}
+          sub={activeUsersError ? activeUsers === null ? 'Unavailable' : 'Last successful count' : 'Live count'}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="#934308" strokeWidth="2" style={{ width: '18px', height: '18px' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
         />
       </div>

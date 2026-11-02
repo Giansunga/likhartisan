@@ -25,6 +25,8 @@ import { useArtisanPortal } from './artisanContextValue';
 import { filterConversations, groupMessages, parseMessageContent, type ConversationFilter } from './messageUtils';
 import { usePortalRealtimeRefresh } from '../../realtime/usePortalRealtimeRefresh';
 import { API_BASE } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { getErrorMessage } from '../../lib/portalErrors';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -43,7 +45,8 @@ function ConversationSkeleton() {
 }
 
 export default function SellerMessages() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { getAccessToken } = useAuth();
   const { shop, userId, buyerActiveMap, loadingMessages, setLoadingMessages } = useArtisanPortal();
   const [conversations, setConversations] = useState<ArtisanConversationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -59,6 +62,22 @@ export default function SellerMessages() {
   const [deleteTarget, setDeleteTarget] = useState<ArtisanConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const messageAreaRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(true);
+  const conversationRequest = useRef(0);
+  const messageRequest = useRef(0);
+  const currentConversation = useRef<string | null>(null);
+  const sendingRef = useRef(false);
+  const deletingRef = useRef(false);
+  const drafts = useRef(new Map<string, { text: string; image: File | null }>());
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      conversationRequest.current += 1;
+      messageRequest.current += 1;
+    };
+  }, []);
 
   const selected = conversations.find(conversation => conversation.id === selectedId) || null;
   const visibleConversations = useMemo(() => filterConversations(conversations, search, filter), [conversations, filter, search]);
@@ -66,16 +85,11 @@ export default function SellerMessages() {
   const latestDesignMessages = useMemo(() => latestDesignMessageIds(messages), [messages]);
   const unreadTotal = conversations.reduce((sum, conversation) => sum + (conversation.artisan_unread || 0), 0);
 
-  useEffect(() => {
-    const requestedConversation = searchParams.get('conversation');
-    if (!requestedConversation || !conversations.length || selectedId === requestedConversation) return;
-    const match = conversations.find(conversation => conversation.id === requestedConversation);
-    if (match) queueMicrotask(() => chooseConversation(match));
-  }, [conversations, searchParams, selectedId]);
+
 
   const loadConversations = useCallback(async (silent = false) => {
-    setError('');
-    if (!silent) setLoadingMessages(true);
+    const request = ++conversationRequest.current;
+    if (!silent) { setError(''); setLoadingMessages(true); }
     try {
       const { data, error: conversationError } = await supabase
         .from('conversations')
@@ -83,30 +97,37 @@ export default function SellerMessages() {
         .eq('shop_id', shop.id)
         .order('last_message_at', { ascending: false });
       if (conversationError) throw conversationError;
+      if (!mounted.current || request !== conversationRequest.current) return;
       const rows = (data || []) as ArtisanConversationSummary[];
       setConversations(rows.map(row => ({
         ...row,
         buyer_name: row.buyer_name?.trim() || FALLBACK_BUYER_NAME,
       })));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Conversations could not be loaded.');
+      if (mounted.current && request === conversationRequest.current) setError(getErrorMessage(loadError, 'Conversations could not be loaded.'));
     } finally {
-      if (!silent) setLoadingMessages(false);
+      if (mounted.current && request === conversationRequest.current) setLoadingMessages(false);
     }
   }, [setLoadingMessages, shop.id]);
 
   useEffect(() => { queueMicrotask(() => { void loadConversations(); }); }, [loadConversations]);
 
   const loadMessages = useCallback(async () => {
-    if (!selectedId) { setMessages([]); return; }
-    const { data, error: messageError } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', selectedId)
-      .order('created_at', { ascending: true });
-    if (messageError) setError(messageError.message);
-    else setMessages((data || []) as ArtisanMessage[]);
-    setMessagesLoading(false);
+    const request = ++messageRequest.current;
+    if (!selectedId || selectedId !== currentConversation.current) return;
+    try {
+      const { data, error: messageError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedId)
+        .order('created_at', { ascending: true });
+      if (messageError) throw messageError;
+      if (mounted.current && request === messageRequest.current && selectedId === currentConversation.current) setMessages((data || []) as ArtisanMessage[]);
+    } catch (messageError) {
+      if (mounted.current && request === messageRequest.current && selectedId === currentConversation.current) setError(getErrorMessage(messageError, 'Messages could not be loaded.'));
+    } finally {
+      if (mounted.current && request === messageRequest.current && selectedId === currentConversation.current) setMessagesLoading(false);
+    }
   }, [selectedId]);
 
   useEffect(() => { queueMicrotask(() => { void loadMessages(); }); }, [loadMessages]);
@@ -121,19 +142,50 @@ export default function SellerMessages() {
 
   useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
 
-  function chooseConversation(conversation: ArtisanConversationSummary) {
+  const chooseConversation = useCallback((conversation: ArtisanConversationSummary) => {
+    if (sendingRef.current || deletingRef.current || currentConversation.current === conversation.id) return;
+    if (currentConversation.current) drafts.current.set(currentConversation.current, { text: draft, image: pendingImage });
+    const nextDraft = drafts.current.get(conversation.id);
+    setDraft(nextDraft?.text || '');
+    setPendingImage(nextDraft?.image || null);
+    setImagePreview(nextDraft?.image ? URL.createObjectURL(nextDraft.image) : null);
+    currentConversation.current = conversation.id;
+    messageRequest.current += 1;
+    if (searchParams.has('conversation')) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('conversation');
+      setSearchParams(params, { replace: true });
+    }
     setSelectedId(conversation.id);
     setMessages([]);
     setMessagesLoading(true);
     setError('');
     if (conversation.artisan_unread) {
-      setConversations(current => current.map(item => item.id === conversation.id ? { ...item, artisan_unread: 0 } : item));
-      void supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', conversation.id).select('id').maybeSingle()
-        .then(({ error: readError }) => { if (readError) setError(readError.message); });
+      void (async () => {
+        try {
+          const { data, error: readError } = await supabase.from('conversations').update({ artisan_unread: 0 }).eq('id', conversation.id).eq('shop_id', shop.id).select('id').maybeSingle();
+          if (readError) throw readError;
+          if (!data) throw new Error('Conversation could not be marked as read.');
+          if (mounted.current) setConversations(current => current.map(item => item.id === conversation.id ? { ...item, artisan_unread: 0 } : item));
+        } catch (readError) {
+          if (mounted.current) setError(getErrorMessage(readError, 'Conversation could not be marked as read.'));
+        }
+      })();
     }
-  }
+  }, [draft, pendingImage, searchParams, setSearchParams, shop.id]);
+
+  useEffect(() => {
+    const requestedConversation = searchParams.get('conversation');
+    if (!requestedConversation || !conversations.length || selectedId === requestedConversation) return;
+    const match = conversations.find(conversation => conversation.id === requestedConversation);
+    if (match) queueMicrotask(() => chooseConversation(match));
+  }, [chooseConversation, conversations, searchParams, selectedId]);
 
   function closeConversation() {
+    if (sendingRef.current || deletingRef.current) return;
+    if (currentConversation.current) drafts.current.set(currentConversation.current, { text: draft, image: pendingImage });
+    currentConversation.current = null;
+    messageRequest.current += 1;
     setSelectedId(null);
     setMessages([]);
     setMessagesLoading(false);
@@ -159,7 +211,8 @@ export default function SellerMessages() {
 
   async function sendMessage() {
     const text = draft.trim();
-    if ((!text && !pendingImage) || !selected || sending) return;
+    if ((!text && !pendingImage) || !selected || sendingRef.current || deletingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     setError('');
     try {
@@ -173,29 +226,44 @@ export default function SellerMessages() {
       }
       const { data, error: insertError } = await supabase.from('messages').insert({ conversation_id: selected.id, sender_id: userId, text, image_url: imageUrl }).select('*').single();
       if (insertError) throw insertError;
+      if (!data?.id) throw new Error('The message could not be confirmed. Refresh the conversation before trying again.');
+      messageRequest.current += 1;
+      setMessages(current => current.some(message => message.id === data.id) ? current : [...current, data as ArtisanMessage]);
+      setMessagesLoading(false);
+      drafts.current.delete(selected.id);
+      setDraft('');
+      clearAttachment();
       const now = new Date().toISOString();
       const preview = text || 'Image attachment';
       const nextBuyerUnread = (selected.buyer_unread || 0) + 1;
-      const { error: conversationError } = await supabase.from('conversations').update({ last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread }).eq('id', selected.id).select('id').single();
-      setMessages(current => current.some(message => message.id === data.id) ? current : [...current, data as ArtisanMessage]);
-      setConversations(current => current.map(conversation => conversation.id === selected.id ? { ...conversation, last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread } : conversation));
+      const warnings: string[] = [];
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        await fetch(`${API_BASE}/api/notifications`, {
+        const { data: updated, error: conversationError } = await supabase.from('conversations').update({ last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread }).eq('id', selected.id).eq('shop_id', shop.id).select('id').single();
+        if (conversationError) throw conversationError;
+        if (!updated) throw new Error('Conversation was not updated.');
+        setConversations(current => current.map(conversation => conversation.id === selected.id ? { ...conversation, last_message: preview, last_message_at: now, buyer_unread: nextBuyerUnread } : conversation));
+      } catch {
+        warnings.push('the inbox preview could not be refreshed');
+      }
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error('Please sign in again.');
+        const notificationResponse = await fetch(`${API_BASE}/api/notifications`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ type: 'message', title: 'New Message', message: `${shop.name}: ${preview.substring(0, 80)}`, conversation_id: selected.id }),
         });
-      } catch (notificationError) {
-        console.error('Failed to create buyer message notification:', notificationError);
+        if (!notificationResponse.ok) throw new Error('Buyer notification failed.');
+      } catch {
+        warnings.push('the buyer notification could not be sent');
       }
-      setDraft('');
-      clearAttachment();
-      if (conversationError) setError('Your message was sent, but the inbox preview could not be refreshed.');
-      await supabase.from('shops').update({ last_seen_at: now }).eq('id', shop.id);
+      // Presence is secondary to the confirmed message and must never make it look unsent.
+      try { await supabase.from('shops').update({ last_seen_at: now }).eq('id', shop.id); } catch { /* presence will refresh on the next connection */ }
+      if (warnings.length) setError(`Your message was sent, but ${warnings.join(' and ')}. Do not resend it.`);
     } catch (sendError) {
-      setError(`${sendError instanceof Error ? sendError.message : 'Message could not be sent.'} Your draft is still here.`);
+      setError(`${getErrorMessage(sendError, 'Message could not be sent.')} Your draft is still here.`);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -208,20 +276,32 @@ export default function SellerMessages() {
   }
 
   async function deleteConversation() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deletingRef.current || sendingRef.current) return;
+    deletingRef.current = true;
     setDeleting(true);
     setError('');
     try {
-      const { error: messagesError } = await supabase.from('messages').delete().eq('conversation_id', deleteTarget.id);
-      if (messagesError) throw messagesError;
-      const { error: conversationError } = await supabase.from('conversations').delete().eq('id', deleteTarget.id);
+      // The database cascades the messages only after this parent delete succeeds.
+      const { data, error: conversationError } = await supabase.from('conversations').delete().eq('id', deleteTarget.id).eq('shop_id', shop.id).select('id').maybeSingle();
       if (conversationError) throw conversationError;
+      if (!data) throw new Error('Conversation could not be deleted. Refresh and try again.');
+      conversationRequest.current += 1;
+      drafts.current.delete(deleteTarget.id);
       setConversations(current => current.filter(conversation => conversation.id !== deleteTarget.id));
-      if (selectedId === deleteTarget.id) closeConversation();
+      if (currentConversation.current === deleteTarget.id) {
+        currentConversation.current = null;
+        messageRequest.current += 1;
+        setSelectedId(null);
+        setMessages([]);
+        setMessagesLoading(false);
+        setDraft('');
+        clearAttachment();
+      }
       setDeleteTarget(null);
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Conversation could not be deleted.');
+      setError(getErrorMessage(deleteError, 'Conversation could not be deleted.'));
     } finally {
+      deletingRef.current = false;
       setDeleting(false);
     }
   }
@@ -241,12 +321,12 @@ export default function SellerMessages() {
               const active = selectedId === conversation.id;
               const online = Boolean(conversation.buyer_id && buyerActiveMap[conversation.buyer_id]);
               return <div className={`seller-conversation ${active ? 'is-active' : ''} ${conversation.artisan_unread ? 'is-unread' : ''}`} key={conversation.id}>
-                <button type="button" className="seller-conversation__select" onClick={() => chooseConversation(conversation)} aria-pressed={active}>
+                <button type="button" className="seller-conversation__select" disabled={sending || deleting} onClick={() => chooseConversation(conversation)} aria-pressed={active}>
                   <div className="seller-message-avatar-wrap"><BuyerAvatar conversation={conversation} /><i className={online ? 'is-online' : ''} aria-label={online ? 'Online' : 'Offline'} /></div>
                   <div className="seller-conversation__copy"><div><strong>{conversation.buyer_name || FALLBACK_BUYER_NAME}</strong><time>{formatTime(conversation.last_message_at || '')}</time></div><p>{getChatMessagePreview(conversation.last_message) || 'Start the conversation'}</p></div>
                   {conversation.artisan_unread ? <b className="seller-conversation__badge">{conversation.artisan_unread > 99 ? '99+' : conversation.artisan_unread}</b> : null}
                 </button>
-                <button type="button" className="seller-conversation__menu" onClick={() => setDeleteTarget(conversation)} aria-label={`Delete conversation with ${conversation.buyer_name || FALLBACK_BUYER_NAME}`}><Trash2 size={15} /></button>
+                <button type="button" className="seller-conversation__menu" disabled={sending || deleting} onClick={() => setDeleteTarget(conversation)} aria-label={`Delete conversation with ${conversation.buyer_name || FALLBACK_BUYER_NAME}`}><Trash2 size={15} /></button>
               </div>;
             }) : <div className="seller-inbox-empty"><MessageCircle size={34} /><strong>{search || filter === 'unread' ? 'No matching conversations' : 'Your inbox is ready'}</strong><p>{search || filter === 'unread' ? 'Try another search or view all conversations.' : 'New customer messages will appear here.'}</p></div>}
           </div>
@@ -255,10 +335,10 @@ export default function SellerMessages() {
         <section className="seller-chat" aria-label={selected ? `Conversation with ${selected.buyer_name || FALLBACK_BUYER_NAME}` : 'Conversation'}>
           {selected ? <>
             <header className="seller-chat__header">
-              <button className="seller-chat__back" type="button" onClick={closeConversation} aria-label="Back to conversations"><ArrowLeft size={19} /></button>
+              <button className="seller-chat__back" type="button" disabled={sending || deleting} onClick={closeConversation} aria-label="Back to conversations"><ArrowLeft size={19} /></button>
               <div className="seller-message-avatar-wrap"><BuyerAvatar conversation={selected} /><i className={selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'is-online' : ''} /></div>
               <div><strong>{selected.buyer_name || FALLBACK_BUYER_NAME}</strong><span>{selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'Active now' : 'Customer'}</span></div>
-              <button className="seller-chat__delete" type="button" onClick={() => setDeleteTarget(selected)} aria-label="Delete this conversation"><Trash2 size={17} /></button>
+              <button className="seller-chat__delete" type="button" disabled={sending || deleting} onClick={() => setDeleteTarget(selected)} aria-label="Delete this conversation"><Trash2 size={17} /></button>
             </header>
             <div className="seller-chat__messages" ref={messageAreaRef}>
               {messagesLoading ? <div className="seller-chat-loading"><LoaderCircle className="seller-spin" /> Loading messages…</div> : messages.length ? <div className="seller-chat__message-list">{groupedMessages.map((group, groupIndex) => {
@@ -286,15 +366,15 @@ export default function SellerMessages() {
               })}</div> : <div className="seller-chat-empty"><BuyerAvatar conversation={selected} size="large" /><strong>Start the conversation</strong><p>Reply to {selected.buyer_name || FALLBACK_BUYER_NAME} below.</p></div>}
             </div>
             <footer className="seller-composer">
-              {imagePreview ? <div className="seller-composer__attachment"><AssetImage src={imagePreview} alt="Attachment preview" /><span><strong>{pendingImage?.name}</strong><small>{pendingImage ? `${(pendingImage.size / 1024 / 1024).toFixed(1)} MB` : ''}</small></span><button type="button" onClick={clearAttachment} aria-label="Remove attachment"><X size={16} /></button></div> : null}
-              <div className="seller-composer__row"><label className="seller-composer__attach" aria-label="Attach an image"><Paperclip size={18} /><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={pickImage} /></label><textarea rows={1} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Write a message…" aria-label="Message" /><button className="seller-composer__send" type="button" disabled={(!draft.trim() && !pendingImage) || sending} onClick={() => void sendMessage()} aria-label="Send message">{sending ? <LoaderCircle className="seller-spin" size={18} /> : <Send size={18} />}</button></div>
+              {imagePreview ? <div className="seller-composer__attachment"><AssetImage src={imagePreview} alt="Attachment preview" /><span><strong>{pendingImage?.name}</strong><small>{pendingImage ? `${(pendingImage.size / 1024 / 1024).toFixed(1)} MB` : ''}</small></span><button type="button" onClick={clearAttachment} disabled={sending} aria-label="Remove attachment"><X size={16} /></button></div> : null}
+              <div className="seller-composer__row"><label className="seller-composer__attach" aria-label="Attach an image"><Paperclip size={18} /><input type="file" disabled={sending} accept="image/jpeg,image/png,image/webp,image/gif" onChange={pickImage} /></label><textarea rows={1} disabled={sending} value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Write a message…" aria-label="Message" /><button className="seller-composer__send" type="button" disabled={(!draft.trim() && !pendingImage) || sending} onClick={() => void sendMessage()} aria-label="Send message">{sending ? <LoaderCircle className="seller-spin" size={18} /> : <Send size={18} />}</button></div>
               <small>Enter to send · Shift + Enter for a new line</small>
             </footer>
           </> : <div className="seller-chat-placeholder"><div><MessageCircle size={31} /></div><strong>Select a conversation</strong><p>Choose a customer from your inbox to view and reply to their messages.</p></div>}
         </section>
 
         <aside className="seller-buyer-panel" aria-label="Customer details">
-          {selected ? <><div className="seller-buyer-panel__identity"><BuyerAvatar conversation={selected} size="large" /><strong>{selected.buyer_name || FALLBACK_BUYER_NAME}</strong><span><i className={selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'is-online' : ''} />{selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'Active now' : 'Offline'}</span></div><div className="seller-buyer-panel__card"><h3>Conversation details</h3><dl><div><dt>Started</dt><dd>{selected.created_at ? new Date(selected.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not available'}</dd></div><div><dt>Messages</dt><dd>{messages.length}</dd></div><div><dt>Status</dt><dd>{selected.artisan_unread ? 'Unread' : 'Up to date'}</dd></div></dl></div><button className="seller-buyer-panel__danger" type="button" onClick={() => setDeleteTarget(selected)}><Trash2 size={16} /> Delete conversation</button></> : <div className="seller-buyer-placeholder"><UserRound size={30} /><p>Customer details appear when you select a conversation.</p></div>}
+          {selected ? <><div className="seller-buyer-panel__identity"><BuyerAvatar conversation={selected} size="large" /><strong>{selected.buyer_name || FALLBACK_BUYER_NAME}</strong><span><i className={selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'is-online' : ''} />{selected.buyer_id && buyerActiveMap[selected.buyer_id] ? 'Active now' : 'Offline'}</span></div><div className="seller-buyer-panel__card"><h3>Conversation details</h3><dl><div><dt>Started</dt><dd>{selected.created_at ? new Date(selected.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not available'}</dd></div><div><dt>Messages</dt><dd>{messages.length}</dd></div><div><dt>Status</dt><dd>{selected.artisan_unread ? 'Unread' : 'Up to date'}</dd></div></dl></div><button className="seller-buyer-panel__danger" type="button" onClick={() => setDeleteTarget(selected)} disabled={sending || deleting}><Trash2 size={16} /> Delete conversation</button></> : <div className="seller-buyer-placeholder"><UserRound size={30} /><p>Customer details appear when you select a conversation.</p></div>}
         </aside>
       </div>
 

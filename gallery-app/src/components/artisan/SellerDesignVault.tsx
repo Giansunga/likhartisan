@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { getErrorMessage } from '../../lib/portalErrors';
+import { useMemo, useRef, useState } from 'react';
 import { Archive, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -16,6 +17,7 @@ export default function SellerDesignVault() {
   const { products, productPrices, loadingProducts, setProducts } = useArtisanPortal();
   const [filters, setFilters] = useState(initialFilters);
   const [restoreTarget, setRestoreTarget] = useState<ArtisanProduct | null>(null);
+  const restorePending = useRef(false);
   const [restoring, setRestoring] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const archived = useMemo(() => products.filter(product => product.status === 'archived'), [products]);
@@ -23,16 +25,20 @@ export default function SellerDesignVault() {
   const visible = useMemo(() => filterAndSortListings(archived, filters, productPrices), [archived, filters, productPrices]);
 
   async function restoreListing() {
-    if (!restoreTarget) return;
+    if (!restoreTarget || restorePending.current) return;
+    restorePending.current = true;
     setRestoring(true);
+    try {
     const { data, error } = await supabase.from('products').update({ status: 'active' }).eq('id', restoreTarget.id).select('*').single();
-    if (error) setFeedback({ tone: 'error', text: error.message });
-    else {
+    if (error) throw error;
+    if (!data) throw new Error('This listing could not be restored. Reload and try again.');
+    {
       setProducts(current => current.map(product => product.id === restoreTarget.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : product));
       setFeedback({ tone: 'success', text: `${restoreTarget.name} is active and visible in My Listings.` });
       setRestoreTarget(null);
     }
-    setRestoring(false);
+    } catch (cause) { setFeedback({ tone: 'error', text: getErrorMessage(cause, 'Listing could not be restored. Please try again.') }); }
+    finally { restorePending.current = false; setRestoring(false); }
   }
 
   return <div className="seller-listing-page seller-vault-page">

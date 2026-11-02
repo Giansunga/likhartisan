@@ -1,16 +1,24 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PortalRealtimeProvider } from '../../../realtime/PortalRealtimeProvider';
 import SellerMessages from '../SellerMessages';
 
 vi.mock('../../chat/DesignMessageCard', () => ({ default: ({ data, isLatestForRequest }: { data: Record<string, unknown>; isLatestForRequest?: boolean }) => <div data-testid={String(data.message)} data-latest={String(isLatestForRequest)}>{String(data.message)}</div> }));
 
+interface Query { table: string; operation: string; filters: Record<string, unknown>; payload?: Record<string, unknown> }
+interface QueryResult { data: unknown; error: { message: string } | null }
+
 const mocks = vi.hoisted(() => ({
+  query: vi.fn<(query: Query) => Promise<QueryResult> | QueryResult | undefined>(),
+  setLoadingMessages: vi.fn(),
+  getAccessToken: vi.fn(async () => 'seller-token'),
   conversations: [] as Array<Record<string, unknown>>,
   messages: [] as Array<Record<string, unknown>>,
   broadcast: null as null | ((message: unknown) => void),
 }));
+
+vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ getAccessToken: mocks.getAccessToken }) }));
 
 vi.mock('../artisanContextValue', () => ({
   useArtisanPortal: () => ({
@@ -18,7 +26,7 @@ vi.mock('../artisanContextValue', () => ({
     userId: 'seller-1',
     buyerActiveMap: {},
     loadingMessages: false,
-    setLoadingMessages: vi.fn(),
+    setLoadingMessages: mocks.setLoadingMessages,
   }),
 }));
 
@@ -40,13 +48,28 @@ vi.mock('../../../lib/supabase', () => ({
     }),
     removeChannel: vi.fn(async () => undefined),
     from: vi.fn((table: string) => {
+      const query: Query = { table, operation: 'select', filters: {} };
+      const execute = async (): Promise<QueryResult> => {
+        const override = mocks.query({ ...query, filters: { ...query.filters } });
+        if (override) return override;
+        if (query.operation === 'insert') {
+          const message = { ...query.payload, id: 'sent-message', created_at: '2026-10-01T01:00:00Z' };
+          mocks.messages.push(message);
+          return { data: message, error: null };
+        }
+        if (query.operation !== 'select') return { data: { id: query.filters.id }, error: null };
+        return { data: table === 'conversations' ? mocks.conversations : mocks.messages, error: null };
+      };
       const builder = {
         select: vi.fn(() => builder),
-        eq: vi.fn(() => builder),
-        order: vi.fn(async () => ({
-          data: table === 'conversations' ? mocks.conversations : mocks.messages,
-          error: null,
-        })),
+        eq: vi.fn((key: string, value: unknown) => { query.filters[key] = value; return builder; }),
+        update: vi.fn((payload: Record<string, unknown>) => { query.operation = 'update'; query.payload = payload; return builder; }),
+        insert: vi.fn((payload: Record<string, unknown>) => { query.operation = 'insert'; query.payload = payload; return builder; }),
+        delete: vi.fn(() => { query.operation = 'delete'; return builder; }),
+        order: vi.fn(execute),
+        single: vi.fn(execute),
+        maybeSingle: vi.fn(execute),
+        then: (resolve: (value: QueryResult) => unknown, reject?: (reason: unknown) => unknown) => execute().then(resolve, reject),
       };
       return builder;
     }),
@@ -78,12 +101,18 @@ function renderMessages() {
   );
 }
 
-describe('SellerMessages buyer identity', () => {
+describe('SellerMessages buyer identity and recovery', () => {
+  beforeEach(() => {
+    mocks.query.mockReset();
+    mocks.getAccessToken.mockResolvedValue('seller-token');
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+  });
   afterEach(() => {
     mocks.conversations = [];
     mocks.messages = [];
     mocks.broadcast = null;
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('shows the saved account name throughout the open seller conversation', async () => {
@@ -154,5 +183,110 @@ describe('SellerMessages buyer identity', () => {
     expect(await screen.findByTestId('Approved design')).toHaveAttribute('data-latest', 'true');
     expect(screen.getByTestId('Second quote')).toHaveAttribute('data-latest', 'false');
     expect(screen.getByTestId('Other design')).toHaveAttribute('data-latest', 'true');
+  });
+
+  it('treats a thrown preview update as secondary after a confirmed send', async () => {
+    mocks.conversations = [conversation('Maria Santos')];
+    mocks.query.mockImplementation(query => {
+      if (query.table === 'conversations' && query.operation === 'update') return Promise.reject(new Error('Preview offline'));
+    });
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    await waitFor(() => expect(screen.queryByText('Loading messages…')).not.toBeInTheDocument());
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Confirmed reply' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(await screen.findByText(/Your message was sent, but the inbox preview/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    expect(mocks.query.mock.calls.filter(([query]) => query.operation === 'insert')).toHaveLength(1);
+    expect(mocks.getAccessToken).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/notifications'), expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer seller-token' }) }));
+  });
+
+  it('shows failed notification delivery as partial success without restoring the sent draft', async () => {
+    mocks.conversations = [conversation('Maria Santos')];
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })));
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Already sent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(await screen.findByText(/Your message was sent, but the buyer notification/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    expect(within(screen.getByRole('region', { name: 'Conversation with Maria Santos' })).getByText('Already sent')).toBeInTheDocument();
+  });
+
+  it('releases the message loader after a rejected request', async () => {
+    mocks.conversations = [conversation('Maria Santos')];
+    mocks.query.mockImplementation(query => {
+      if (query.table === 'messages' && query.operation === 'select') return Promise.reject(new Error('Message network unavailable'));
+    });
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    expect(await screen.findByText('Message network unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Loading messages…')).not.toBeInTheDocument();
+  });
+
+  it('ignores an old conversation response after selecting another customer', async () => {
+    mocks.conversations = [conversation('Maria Santos'), conversation('Juan Cruz', { id: 'conversation-2' })];
+    let finishFirst: ((value: QueryResult) => void) | undefined;
+    mocks.query.mockImplementation(query => {
+      if (query.table !== 'messages') return;
+      if (query.filters.conversation_id === 'conversation-1') return new Promise(resolve => { finishFirst = resolve; });
+      return { data: [{ id: 'new-message', sender_id: 'buyer-2', text: 'Juan current message', created_at: '2026-10-01T01:00:00Z' }], error: null };
+    });
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    await waitFor(() => expect(finishFirst).toBeDefined());
+    fireEvent.click(screen.getByText('Juan Cruz').closest('button')!);
+    expect(await screen.findByText('Juan current message')).toBeInTheDocument();
+    await act(async () => { finishFirst?.({ data: [{ id: 'old-message', sender_id: 'buyer-1', text: 'Maria stale message', created_at: '2026-10-01T01:00:00Z' }], error: null }); });
+    expect(screen.queryByText('Maria stale message')).not.toBeInTheDocument();
+    expect(screen.getByText('Juan current message')).toBeInTheDocument();
+  });
+
+  it('keeps separate drafts when changing customers', async () => {
+    mocks.conversations = [conversation('Maria Santos'), conversation('Juan Cruz', { id: 'conversation-2' })];
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Draft for Maria' } });
+    fireEvent.click(screen.getByText('Juan Cruz').closest('button')!);
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'Draft for Juan' } });
+    fireEvent.click(screen.getByText('Maria Santos').closest('button')!);
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Draft for Maria');
+    await waitFor(() => expect(screen.queryByText('Loading messages…')).not.toBeInTheDocument());
+  });
+
+  it('blocks switching and editing while a message send is in progress', async () => {
+    mocks.conversations = [conversation('Maria Santos'), conversation('Juan Cruz', { id: 'conversation-2' })];
+    let finishSend: ((value: QueryResult) => void) | undefined;
+    mocks.query.mockImplementation(query => {
+      if (query.operation === 'insert') return new Promise(resolve => { finishSend = resolve; });
+    });
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message' }), { target: { value: 'In progress' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(screen.getByText('Juan Cruz').closest('button')).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled();
+    await act(async () => { finishSend?.({ data: { id: 'confirmed', sender_id: 'seller-1', text: 'In progress', created_at: '2026-10-01T01:00:00Z' }, error: null }); });
+    await waitFor(() => expect(screen.getByText('Juan Cruz').closest('button')).not.toBeDisabled());
+  });
+
+  it.each([
+    { data: null, error: { message: 'Delete denied' }, expected: 'Delete denied' },
+    { data: null, error: null, expected: 'Conversation could not be deleted. Refresh and try again.' },
+  ])('preserves a conversation after denied or zero-row parent deletion: $expected', async result => {
+    mocks.conversations = [conversation('Maria Santos')];
+    mocks.query.mockImplementation(query => query.operation === 'delete' ? result : undefined);
+    renderMessages();
+    fireEvent.click((await screen.findByText('Maria Santos')).closest('button')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this conversation' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete conversation?' })).getByRole('button', { name: 'Delete conversation' }));
+    expect(await screen.findByText(result.expected)).toBeInTheDocument();
+    expect(screen.getAllByText('Maria Santos').length).toBeGreaterThan(1);
+    const deletes = mocks.query.mock.calls.map(([query]) => query).filter(query => query.operation === 'delete');
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]).toMatchObject({ table: 'conversations', filters: { id: 'conversation-1', shop_id: 'shop-1' } });
   });
 });

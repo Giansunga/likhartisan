@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider, useTheme } from '../ThemeContext';
 
@@ -19,11 +19,11 @@ vi.mock('../../lib/supabase', () => ({
 }));
 
 function ThemeHarness() {
-  const { currentTheme, setTheme } = useTheme();
+  const { currentTheme, setTheme, error } = useTheme();
 
   return (
     <div>
-      <span>{currentTheme}</span>
+      <span>{currentTheme}</span>{error && <p role="alert">{error}</p>}
       <button onClick={() => setTheme('christmas')}>Use Christmas</button>
       <button onClick={() => setTheme('valentines')}>Use Valentine</button>
     </div>
@@ -108,5 +108,30 @@ describe('ThemeProvider', () => {
     await screen.findByText('default');
     expect(document.documentElement).not.toHaveClass('theme-christmas');
     expect(document.documentElement).not.toHaveClass('theme-valentines');
+  });
+});
+
+
+describe('theme save recovery', () => {
+  it('rolls back a failed save and shows a retryable error', async () => {
+    supabaseMocks.single.mockResolvedValue({ data: { theme_name: 'default', auto_detect: false }, error: null });
+    supabaseMocks.upsert.mockResolvedValueOnce({ error: { message: 'Permission denied' } });
+    render(<ThemeProvider><ThemeHarness /></ThemeProvider>);
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Use Christmas' }));
+    await screen.findByRole('alert');
+    expect(screen.getByText('default')).toBeInTheDocument();
+    expect(document.documentElement).not.toHaveClass('theme-christmas');
+  });
+  it('does not let an old read overwrite a confirmed theme save', async () => {
+    let finish!: (result: unknown) => void;
+    supabaseMocks.single.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    supabaseMocks.upsert.mockResolvedValue({ error: null });
+    render(<ThemeProvider><ThemeHarness /></ThemeProvider>);
+    await act(async () => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Use Christmas' }));
+    await act(async () => {});
+    await act(async () => { finish({ data: { theme_name: 'default', auto_detect: false }, error: null }); });
+    expect(screen.getByText('christmas')).toBeInTheDocument();
   });
 });
