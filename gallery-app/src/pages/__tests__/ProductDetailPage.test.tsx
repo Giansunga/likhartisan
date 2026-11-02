@@ -83,6 +83,31 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it.each(['inactive', 'draft', 'archived'])('keeps a %s product preview available without allowing purchases', async (status) => {
+    mocks.products[0].status = status;
+    mocks.user = { id: 'buyer' };
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
+    expect(screen.getByText('This product is currently unavailable.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Buy Now' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Buy Now' }));
+    const { getCart } = await import('../../data/store');
+    expect(getCart()).toEqual([]);
+    expect(screen.queryByTestId('location')).not.toBeInTheDocument();
+  });
+
+  it('disables mobile purchase controls for an inactive product', async () => {
+    mocks.products[0].status = 'inactive';
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    for (const button of screen.getAllByRole('button', { name: /Add to Cart|Buy Now/ })) {
+      expect(button).toBeDisabled();
+    }
+  });
   it('preloads the gateway image while preserving the source URL in the cart', async () => {
     const source = 'https://pub-0cc6e7109e7e48a183d54d0426453a6a.r2.dev/products/preload.jpg';
     mocks.products[0].image = source;

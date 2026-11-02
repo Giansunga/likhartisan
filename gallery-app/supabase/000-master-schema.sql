@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS products (
   technique TEXT DEFAULT 'Handcrafted & Kiln-Fired',
   shop_id UUID REFERENCES shops(id) ON DELETE CASCADE,
   shop_name TEXT NOT NULL,
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived', 'draft')),
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived', 'draft')),
   views INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

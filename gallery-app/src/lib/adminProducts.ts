@@ -6,7 +6,7 @@ export const DEFAULT_PRODUCT_FILTERS: ProductAdminFilters = { q: '', shop: '', c
 
 const INVENTORY_FILTERS: InventoryFilter[] = ['all', 'low', 'out'];
 const SORTS: ProductSort[] = ['newest', 'oldest', 'name', 'price_low', 'price_high', 'stock_low', 'stock_high', 'views'];
-const STATUSES: ProductAdminFilters['status'][] = ['all', 'active', 'archived', 'draft'];
+const STATUSES: ProductAdminFilters['status'][] = ['all', 'active', 'inactive', 'archived', 'draft'];
 
 export function inventoryCondition(stock: number): Exclude<InventoryFilter, 'all'> | 'healthy' {
   if (stock <= 0) return 'out';

@@ -11,6 +11,11 @@ const product: Product = {
 };
 
 describe('ProductTable', () => {
+  it('labels paused products as Inactive', () => {
+    render(<ProductTable products={[{ ...product, status: 'inactive' }]} onEdit={vi.fn()} onArchive={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getAllByText('Inactive').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+  });
   it('renders inventory and exposes edit plus menu actions', () => {
     const handlers = { onEdit: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn() };
     render(<ProductTable products={[product]} {...handlers} />);

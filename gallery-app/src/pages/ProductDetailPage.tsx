@@ -328,7 +328,8 @@ export default function ProductDetailPage() {
   const quantity = Math.min(selectedQuantity, Math.max(1, availableStock));
   const remainingCartStock = Math.max(0, availableStock - cartQuantity);
   const cartAtStockLimit = availableStock > 0 && cartQuantity >= availableStock;
-  const buyDisabled = availableStock === 0 || (variations.length > 0 && !selectedVariation);
+  const productUnavailable = product.status !== 'active';
+  const buyDisabled = productUnavailable || availableStock === 0 || (variations.length > 0 && !selectedVariation);
   const addDisabled = buyDisabled || quantity > remainingCartStock;
   const hasValue = (value: string | undefined) => Boolean(value?.trim() && value.trim().toLowerCase() !== 'n/a');
   const dimensions = selectedVariation ? selectedVariation.dimensions : product.dimensions;
@@ -538,7 +539,8 @@ export default function ProductDetailPage() {
               </details>}
 
               <div className="pdp-purchase">
-                {availableStock === 0 && <p className="pdp-stock pdp-stock--empty" role="status">This item is currently out of stock.</p>}
+                {productUnavailable && <p className="pdp-stock pdp-stock--empty" role="status">This product is currently unavailable.</p>}
+                {!productUnavailable && availableStock === 0 && <p className="pdp-stock pdp-stock--empty" role="status">This item is currently out of stock.</p>}
                 {availableStock > 0 && availableStock <= 3 && <p className="pdp-stock" role="status">Only {availableStock} left in stock.</p>}
                 {cartAtStockLimit && <p className="pdp-stock" role="status">Your cart already contains all {availableStock} available.</p>}
                 <div className="pdp-actions">

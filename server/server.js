@@ -72,8 +72,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 });
 app.locals.supabase = supabase;
 
-const PRODUCT_SELECT_WITH_SHIPPING = 'id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit, product_weight_g, packaging_weight_g, shipping_weight_g, shipping_length_in, shipping_width_in, shipping_height_in';
-const PRODUCT_SELECT_LEGACY = 'id, name, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit';
+const PRODUCT_SELECT_WITH_SHIPPING = 'id, name, status, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit, product_weight_g, packaging_weight_g, shipping_weight_g, shipping_length_in, shipping_width_in, shipping_height_in';
+const PRODUCT_SELECT_LEGACY = 'id, name, status, price, image, shop_id, shop_name, stock, dimensions, height, opening_diameter, measurement_unit';
 const VARIATION_SELECT_WITH_SHIPPING = 'id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit, weight_kg, product_weight_g, packaging_weight_g, shipping_weight_g, shipping_length_in, shipping_width_in, shipping_height_in';
 const VARIATION_SELECT_LEGACY = 'id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit, weight_kg';
 const schemaColumnError = (error) => Boolean(
@@ -262,6 +262,13 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
     for (const { data: product, error: productError } of productResults) {
       if (productError || !product) {
         return res.status(400).json({ error: `Product not found: ${productError?.message || 'unknown'}` });
+      }
+      if (product.status !== 'active') {
+        return res.status(409).json({
+          error: `${product.name} is currently unavailable. Remove it from your cart before continuing.`,
+          code: 'ERR_PRODUCT_UNAVAILABLE',
+          productId: product.id,
+        });
       }
       productMap.set(product.id, product);
     }
@@ -903,24 +910,29 @@ app.get('/api/admin/users', async (req, res) => {
 
 if (SENTRY_ENABLED) Sentry.setupExpressErrorHandler(app);
 
-const server = app.listen(PORT, () => {
-  console.log(`LikhArtisan server running on port ${PORT}`);
-  console.log(`Frontend URL: ${FRONTEND_URL}`);
-});
+export { app };
 
-// Graceful shutdown
-async function shutdown(signal) {
-  console.log(`[shutdown] Received ${signal} — closing server...`);
-  server.close(() => {
-    console.log('[shutdown] Server closed');
-    process.exit(0);
+// Import the real routes for tests without opening a production listener.
+if (process.env.NODE_ENV !== 'test') {
+  const server = app.listen(PORT, () => {
+    console.log(`LikhArtisan server running on port ${PORT}`);
+    console.log(`Frontend URL: ${FRONTEND_URL}`);
   });
-  // Force-exit if connections don't drain in time
-  setTimeout(() => {
-    console.error('[shutdown] Forcing exit after timeout');
-    process.exit(1);
-  }, 10000).unref();
-}
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+  // Graceful shutdown
+  async function shutdown(signal) {
+    console.log(`[shutdown] Received ${signal} — closing server...`);
+    server.close(() => {
+      console.log('[shutdown] Server closed');
+      process.exit(0);
+    });
+    // Force-exit if connections don't drain in time
+    setTimeout(() => {
+      console.error('[shutdown] Forcing exit after timeout');
+      process.exit(1);
+    }, 10000).unref();
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}

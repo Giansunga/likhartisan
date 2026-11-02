@@ -1,6 +1,6 @@
 import AddProductDialog from '../products/AddProductDialog';
 import { ARTISAN_PRODUCT_PATHS } from '../products/productCreationPaths';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, CircleOff, Package, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { normalizeProductCategory } from '../../lib/utils';
@@ -38,6 +38,8 @@ export default function SellerListings() {
   const [saving, setSaving] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<ArtisanProduct | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const pendingActions = useRef(new Set<string>());
+  const [pendingProductIds, setPendingProductIds] = useState(new Set<string>());
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const currentProducts = useMemo(() => products.filter(product => product.status !== 'archived'), [products]);
@@ -46,6 +48,7 @@ export default function SellerListings() {
   const counts = getListingCounts(products);
 
   async function openEdit(product: ArtisanProduct) {
+    if (pendingActions.current.has(product.id)) return;
     setEditing(product);
     setMaterials(product.materials || '');
     setTechnique(product.technique || '');
@@ -95,25 +98,51 @@ export default function SellerListings() {
     } finally { setSaving(false); }
   }
 
+  function beginProductAction(id: string) {
+    if (pendingActions.current.has(id)) return false;
+    pendingActions.current.add(id);
+    setPendingProductIds(new Set(pendingActions.current));
+    return true;
+  }
+
+  function finishProductAction(id: string) {
+    pendingActions.current.delete(id);
+    setPendingProductIds(new Set(pendingActions.current));
+  }
+
   async function updateStatus(product: ArtisanProduct, status: 'active' | 'inactive') {
+    if (!beginProductAction(product.id)) return;
     setFeedback(null);
-    const { data, error } = await supabase.from('products').update({ status }).eq('id', product.id).select('*').single();
-    if (error) { setFeedback({ tone: 'error', text: error.message }); return; }
-    setProducts(current => current.map(item => item.id === product.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : item));
-    setFeedback({ tone: 'success', text: `${product.name} is now ${status}.` });
+    try {
+      const { data, error } = await supabase.from('products').update({ status }).eq('id', product.id).select('*').single();
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('Listing could not be updated. Please try again.');
+      setProducts(current => current.map(item => item.id === product.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : item));
+      setFeedback({ tone: 'success', text: `${product.name} is now ${status}.` });
+    } catch (error) {
+      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Listing could not be updated. Please try again.' });
+    } finally {
+      finishProductAction(product.id);
+    }
   }
 
   async function archiveListing() {
-    if (!archiveTarget) return;
+    if (!archiveTarget || !beginProductAction(archiveTarget.id)) return;
     setArchiving(true);
-    const { data, error } = await supabase.from('products').update({ status: 'archived' }).eq('id', archiveTarget.id).select('*').single();
-    if (error) setFeedback({ tone: 'error', text: error.message });
-    else {
+    setFeedback(null);
+    try {
+      const { data, error } = await supabase.from('products').update({ status: 'archived' }).eq('id', archiveTarget.id).select('*').single();
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('Listing could not be archived. Please try again.');
       setProducts(current => current.map(product => product.id === archiveTarget.id ? { ...(data as ArtisanProduct), category: normalizeProductCategory(data.category) } : product));
       setFeedback({ tone: 'success', text: `${archiveTarget.name} moved to Design Vault.` });
       setArchiveTarget(null);
+    } catch (error) {
+      setFeedback({ tone: 'error', text: error instanceof Error ? error.message : 'Listing could not be archived. Please try again.' });
+    } finally {
+      finishProductAction(archiveTarget.id);
+      setArchiving(false);
     }
-    setArchiving(false);
   }
 
   return <div className="seller-listing-page">
@@ -128,7 +157,7 @@ export default function SellerListings() {
       <div className="is-danger"><Archive /><span>Out of stock<strong>{counts.outOfStock}</strong></span></div>
     </div>
     <SellerListingToolbar filters={filters} categories={categories} resultCount={visible.length} onChange={setFilters} />
-    {loadingProducts ? <div className="seller-product-skeleton">{[1,2,3,4].map(item => <div key={item} />)}</div> : visible.length ? <div className="seller-product-list">{visible.map(product => <SellerListingCard key={product.id} product={product} price={productPrices[product.id] ?? product.price ?? 0} onEdit={openEdit} onArchive={setArchiveTarget} onToggleStatus={item => void updateStatus(item, item.status === 'active' ? 'inactive' : 'active')} />)}</div> : <div className="seller-empty-panel"><Package size={34} /><h2>No listings match this view</h2><p>{products.length ? "Change or clear the filters to see more products." : "Add your first product to get started."}</p>{!products.length && <button type="button" className="seller-button seller-button--primary" onClick={() => setAddProductOpen(true)}>Add Product</button>}</div>}
+    {loadingProducts ? <div className="seller-product-skeleton">{[1,2,3,4].map(item => <div key={item} />)}</div> : visible.length ? <div className="seller-product-list">{visible.map(product => <SellerListingCard key={product.id} product={product} busy={pendingProductIds.has(product.id)} price={productPrices[product.id] ?? product.price ?? 0} onEdit={openEdit} onArchive={setArchiveTarget} onToggleStatus={item => void updateStatus(item, item.status === 'active' ? 'inactive' : 'active')} />)}</div> : <div className="seller-empty-panel"><Package size={34} /><h2>No listings match this view</h2><p>{products.length ? "Change or clear the filters to see more products." : "Add your first product to get started."}</p>{!products.length && <button type="button" className="seller-button seller-button--primary" onClick={() => setAddProductOpen(true)}>Add Product</button>}</div>}
 
     <SellerOverlay open={Boolean(editing)} title={editing ? `Edit ${editing.name}` : 'Edit listing'} description="Update materials, production details, pricing, and variation inventory." onClose={() => setEditing(null)} busy={saving} footer={<><button className="seller-button seller-button--secondary" onClick={() => setEditing(null)} disabled={saving}>Cancel</button><button className="seller-button seller-button--primary" onClick={() => void saveListing()} disabled={saving || editLoading}>{saving ? 'Saving…' : 'Save changes'}</button></>}>
       {editLoading ? <div className="seller-edit-loading">Loading listing details…</div> : <div className="seller-listing-editor">

@@ -9,6 +9,14 @@ const products: Product[] = [
 ];
 
 describe('admin product utilities', () => {
+  it('round-trips and filters inactive products separately from drafts and archives', () => {
+    const inactive: Product = { ...products[0], id: 'paused', status: 'inactive' };
+    const draft: Product = { ...products[0], id: 'draft', status: 'draft' };
+    const filters = productFiltersFromSearch(new URLSearchParams('status=inactive'));
+    expect(filters.status).toBe('inactive');
+    expect(mergeProductFilters(new URLSearchParams(), filters).get('status')).toBe('inactive');
+    expect(filterAndSortProducts([...products, inactive, draft], filters)).toEqual([inactive]);
+  });
   it('uses consistent inventory definitions and summary counts', () => {
     expect(inventoryCondition(0)).toBe('out');
     expect(inventoryCondition(3)).toBe('low');

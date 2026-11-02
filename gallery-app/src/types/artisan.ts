@@ -1,3 +1,5 @@
+import type { ProductStatus } from '.';
+
 export type SellerSection =
   | 'overview'
   | 'orders'
@@ -38,7 +40,7 @@ export interface ArtisanProduct {
   technique?: string;
   shop_id: string;
   shop_name: string;
-  status: string;
+  status: ProductStatus;
   views: number;
   created_at: string;
   updated_at?: string;

@@ -55,6 +55,8 @@ export interface ProductReview {
   createdAt: string;
 }
 
+export type ProductStatus = 'active' | 'inactive' | 'archived' | 'draft';
+
 export interface Product {
   tags?: string[];
   featuredArtisanId?: string;
@@ -75,7 +77,7 @@ export interface Product {
   technique: string;
   shopId: string;
   shopName: string;
-  status: 'active' | 'archived' | 'draft';
+  status: ProductStatus;
   views: number;
   ratingAvg: number;
   ratingCount: number;

@@ -27,9 +27,9 @@ export default function SellerListingCard({ product, price, archived, busy, onEd
       <div className="seller-product-row__actions">
         <Link to={`/product/${product.id}`} target="_blank" aria-label={`Preview ${product.name}`}><ExternalLink size={16} /></Link>
         {archived ? <button type="button" disabled={busy} onClick={() => onRestore?.(product)}><RotateCcw size={16} /> Restore</button> : <>
-          <button type="button" onClick={() => onEdit?.(product)}><Pencil size={16} /> Edit</button>
-          <button type="button" className="seller-product-row__status-action" onClick={() => onToggleStatus?.(product)}>{product.status === 'active' ? 'Deactivate' : 'Activate'}</button>
-          <button type="button" className="is-danger" onClick={() => onArchive?.(product)}><Archive size={16} /> Archive</button>
+          <button type="button" disabled={busy} onClick={() => onEdit?.(product)}><Pencil size={16} /> Edit</button>
+          <button type="button" disabled={busy} className="seller-product-row__status-action" onClick={() => onToggleStatus?.(product)}>{busy ? 'Saving…' : product.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+          <button type="button" disabled={busy} className="is-danger" onClick={() => onArchive?.(product)}><Archive size={16} /> Archive</button>
         </>}
       </div>
     </article>
