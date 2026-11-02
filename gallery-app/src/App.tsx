@@ -38,7 +38,6 @@ import {
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
-const ChatbotPage = lazy(() => import('./pages/ChatbotPage'));
 const FreeformPage = lazy(() => import('./pages/FreeformPage'));
 const AssetCheckPage = lazy(() => import('./pages/AssetCheckPage'));
 // Admin lazy pages
@@ -113,7 +112,7 @@ function AppShell() {
             <Route path="verify-email" element={<Navigate to="/?auth=verify" replace />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
-            <Route path="likhai" element={<ChatbotPage />} />
+            <Route path="likhai" element={<Navigate to="/" replace />} />
             <Route path="freeform" element={<FreeformPage />} />
             <Route path="asset-check" element={<AssetCheckPage />} />
           </Route>
