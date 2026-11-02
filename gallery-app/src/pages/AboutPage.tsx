@@ -1,7 +1,7 @@
 import AssetImage from '../components/AssetImage';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, Box, HandHeart, Palette, Search } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SITE_URL } from '../config';
 import { supabase } from '../lib/supabase';
@@ -23,7 +23,6 @@ const platformSteps = [
     description: 'Browse pottery listed by participating shops and makers in Santo Tomas.',
     link: '/gallery',
     label: 'Explore the gallery',
-    icon: Search,
   },
   {
     number: '02',
@@ -31,7 +30,6 @@ const platformSteps = [
     description: 'Review product information and inspect available pieces through interactive 3D viewing.',
     link: '/gallery',
     label: 'View pottery',
-    icon: Box,
   },
   {
     number: '03',
@@ -39,7 +37,6 @@ const platformSteps = [
     description: 'Use the design studio to explore forms, finishes, decoration, and attachments.',
     link: '/freeform',
     label: 'Open the design studio',
-    icon: Palette,
   },
   {
     number: '04',
@@ -47,7 +44,6 @@ const platformSteps = [
     description: 'Choose a participating shop or send a design request for a custom conversation.',
     link: '/shops',
     label: 'Find a shop',
-    icon: HandHeart,
   },
 ];
 
@@ -229,7 +225,6 @@ export default function AboutPage() {
 
             <div className="about-steps">
               {platformSteps.map((step, index) => {
-                const Icon = step.icon;
                 return (
                   <motion.article
                     key={step.number}
@@ -239,10 +234,6 @@ export default function AboutPage() {
                     transition={{ duration: prefersReducedMotion ? 0 : 0.5, delay: prefersReducedMotion ? 0 : index * 0.08 }}
                     className="about-step"
                   >
-                    <div className="about-step__topline">
-                      <span>{step.number}</span>
-                      <Icon aria-hidden="true" />
-                    </div>
                     <h3>{step.title}</h3>
                     <p>{step.description}</p>
                     <Link to={step.link}>
@@ -336,7 +327,6 @@ export default function AboutPage() {
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: prefersReducedMotion ? 0 : 0.48, delay: prefersReducedMotion ? 0 : index * 0.08 }}
                 >
-                  <span>{commitment.number}</span>
                   <h3>{commitment.title}</h3>
                   <p>{commitment.description}</p>
                 </motion.article>

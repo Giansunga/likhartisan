@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, RefreshCw, Store } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import ShopClosingSection from '../components/shop/ShopClosingSection';
 import ShopHero from '../components/shop/ShopHero';
 import ShopMakersSection from '../components/shop/ShopMakersSection';
 import ShopProductsSection from '../components/shop/ShopProductsSection';
@@ -285,7 +284,6 @@ export default function ShopPage() {
       <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} availability={storefront.productAvailability} ratings={storefront.productRatings} />
       <ShopStorySection shop={shop} membershipYear={membershipYear} />
       <ShopMakersSection shop={{ id: shop.id, name: shop.name }} artisans={storefront.artisans} artisanCount={storefront.artisanCount} />
-      <ShopClosingSection shopName={shop.name} messagePending={messagePending} onMessage={() => void handleMessageShop()} />
     </main>
   );
 }

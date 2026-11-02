@@ -142,7 +142,7 @@ export default function HomePage() {
 
     <HomeReviewRail reviews={reviews} />
 
-    <section id="home-about" data-home-section tabIndex={-1} className="home-section home-chapters" aria-labelledby="home-chapters-title"><div className="home-container"><div className="home-section-heading home-section-heading--split"><div><span>Inside the story</span><h2 id="home-chapters-title">Continue reading in <em>About</em></h2></div><p>Three short chapters connect the place, its practice, and the digital tools built around it.</p></div><ol className="home-chapter-grid">{EDITORIAL_CHAPTERS.map(chapter => <li key={chapter.number}><Link to={chapter.href}><span className="home-chapter__number">{chapter.number}</span><small>{chapter.kicker}</small><h3>{chapter.title}</h3><p>{chapter.excerpt}</p><i>Read chapter <ArrowRight aria-hidden="true" /></i></Link></li>)}</ol></div></section>
+    <section id="home-about" data-home-section tabIndex={-1} className="home-section home-chapters" aria-labelledby="home-chapters-title"><div className="home-container"><div className="home-section-heading home-section-heading--split"><div><span>Inside the story</span><h2 id="home-chapters-title">Continue reading in <em>About</em></h2></div></div><ol className="home-chapter-grid">{EDITORIAL_CHAPTERS.map(chapter => <li key={chapter.number}><Link to={chapter.href}><small>{chapter.kicker}</small><h3>{chapter.title}</h3><p>{chapter.excerpt}</p><i>Read chapter <ArrowRight aria-hidden="true" /></i></Link></li>)}</ol></div></section>
 
   </div>;
 }

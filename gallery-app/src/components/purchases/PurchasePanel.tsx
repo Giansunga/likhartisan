@@ -206,12 +206,12 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
       setAddingReorder(false);
     }
   }
-  const primary = (order: PurchaseSummary) => order.status === 'to-pay' ? <button className="purchase-btn primary" onClick={() => void pay(order)}>Pay now</button> : order.status === 'to-receive' ? <button className="purchase-btn primary" onClick={() => setConfirm({ order, action: 'receive' })}>Confirm received</button> : order.status === 'completed' ? <button className="purchase-btn primary" disabled={mutation === order.id} onClick={() => void reorder(order)}>{mutation === order.id ? 'Checking…' : 'Buy again'}</button> : <button className="purchase-btn primary" onClick={() => void toggle(order.id)}>View details</button>;
+  const primary = (order: PurchaseSummary) => order.status === 'to-pay' ? <button className="purchase-btn primary" onClick={() => void pay(order)}>Pay now</button> : order.status === 'to-receive' ? <button className="purchase-btn primary" onClick={() => setConfirm({ order, action: 'receive' })}>Confirm received</button> : order.status === 'completed' ? <button className="purchase-btn primary" disabled={mutation === order.id} onClick={() => void reorder(order)}>{mutation === order.id ? 'Checking…' : 'Buy again'}</button> : null;
   const visibleOrders = linkedOrderId && details[linkedOrderId] && !data.orders.some(order => order.id === linkedOrderId)
     ? [details[linkedOrderId], ...data.orders]
     : data.orders;
   return <section className="purchase-center" aria-labelledby="purchase-title">
-    <header className="purchase-header"><div><h1 id="purchase-title">My Purchases</h1><p>{data.statusCounts.all || 0} order{data.statusCounts.all === 1 ? '' : 's'} in your purchase history</p></div>{refreshing && <span role="status">Updating…</span>}</header>
+    <header className="purchase-header"><div><h1 id="purchase-title">My Purchases</h1></div>{refreshing && <span role="status">Updating…</span>}</header>
     <form className="purchase-filters" onSubmit={event => { event.preventDefault(); update({ q: draftQ.trim() || null, page: null, order: null }); }}>
       <div className="purchase-search"><input value={draftQ} onChange={event => setDraftQ(event.target.value)} placeholder="Search order, product, shop, or tracking" aria-label="Search purchases" /><button className="purchase-btn primary">Search</button></div>
     </form>
