@@ -512,7 +512,7 @@ export default function FreeformViewer({
           }}
         />
       )}
-      <ModelLoadSurface source={modelFile} fallbackSrc={fallbackSrc} fallbackAlt={fallbackAlt}>
+      <ModelLoadSurface source={modelFile} fallbackSrc={fallbackSrc} fallbackAlt={fallbackAlt} showFallbackImage={false}>
         <Canvas
           key={modelFile}
           camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}

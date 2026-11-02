@@ -16,13 +16,14 @@ interface Props {
   children: ReactNode;
   fallbackSrc?: string;
   fallbackAlt?: string;
+  showFallbackImage?: boolean;
 }
 
 export default function ModelLoadSurface(props: Props) {
   return <Surface key={props.source} {...props} />;
 }
 
-function Surface({ source, children, fallbackSrc, fallbackAlt }: Props) {
+function Surface({ source, children, fallbackSrc, fallbackAlt, showFallbackImage = true }: Props) {
   const state = useSyncExternalStore(listener => subscribeModel(source, listener), () => modelState(source));
   const [version, setVersion] = useState(0);
   useEffect(() => retainModel(source, () => useLoader.clear(PublicGLTFLoader, source)), [source]);
@@ -36,7 +37,7 @@ function Surface({ source, children, fallbackSrc, fallbackAlt }: Props) {
   const loadingLabel = state.phase === 'preparing' ? 'Preparing 3D model…' : state.phase === 'retrying' ? 'Retrying download…' : 'Loading 3D model…';
   return <div className="model-load-surface">
     <Fragment key={version}><ModelBoundary source={source}>{children}</ModelBoundary></Fragment>
-    {state.phase !== 'ready' && <ModelImageFallback src={fallbackSrc} alt={fallbackAlt} />}
+    {showFallbackImage && state.phase !== 'ready' && <ModelImageFallback src={fallbackSrc} alt={fallbackAlt} />}
     {state.phase !== 'ready' && <div className={`model-load-status${error ? ' model-load-status--error' : ''}`} role="status" aria-live="polite">
       {error ? <div className="model-load-card">
         <div><strong>3D model unavailable</strong><span>Check your connection, then try again.</span></div>
