@@ -73,7 +73,8 @@ const LEGACY_PATTERN_CATEGORIES: Record<string, PatternCategory> = {
 };
 
 export function getPatternsByCategory(category: PatternCategory) {
-  return PATTERNS.filter((pattern) => (pattern.category || LEGACY_PATTERN_CATEGORIES[pattern.id]) === category);
+  // Retain the retired motif for saved designs, but omit it from new choices.
+  return PATTERNS.filter((pattern) => pattern.id !== 'floral-orchid' && (pattern.category || LEGACY_PATTERN_CATEGORIES[pattern.id]) === category);
 }
 
 export function getPatternCategory(patternId: string): PatternCategory | undefined {
