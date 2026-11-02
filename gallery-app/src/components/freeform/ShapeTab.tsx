@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useControlDraft } from './useControlDraft';
+import { useState } from 'react';
 import { DEFAULT_SHAPE_PARAMS_IN, formatInches, type ShapeParamsInches } from '../../lib/measurements';
 
 type ShapeParams = ShapeParamsInches;
@@ -15,7 +16,7 @@ const SLIDERS: {
   { key: 'bodyWidth', label: 'Body Width', description: 'Widest part / mid-part', min: 2, max: 16 },
   { key: 'neckWidth', label: 'Neck Width', description: 'Narrow neck opening', min: 1, max: 12 },
   { key: 'rimSize', label: 'Rim Size', description: 'Mouth rim / flare diameter', min: 1, max: 10 },
-  { key: 'curvature', label: 'Curvature', description: 'Base bulge -- low = straight, high = curved', min: 0, max: 100 },
+  { key: 'curvature', label: 'Curvature', description: 'Body curve — low = straighter, high = fuller', min: 0, max: 100 },
 ];
 
 const DEFAULTS: ShapeParams = DEFAULT_SHAPE_PARAMS_IN;
@@ -31,50 +32,22 @@ export default function ShapeTab({
   onChange: (params: ShapeParams) => void;
   onInteractionChange?: (active: boolean) => void;
 }) {
-  const [draftParams, setDraftParams] = useState(shapeParams);
-  const draftRef = useRef(shapeParams);
-  const frameRef = useRef<number | null>(null);
-  const interactingRef = useRef(false);
-
-  useEffect(() => {
-    if (interactingRef.current) return;
-    draftRef.current = shapeParams;
-    setDraftParams(shapeParams);
-  }, [shapeParams]);
-
-  useEffect(() => () => {
-    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-  }, []);
-
-  function beginInteraction() {
-    if (interactingRef.current) return;
-    interactingRef.current = true;
-    onInteractionChange?.(true);
-  }
-
-  function flushChange() {
-    if (frameRef.current !== null) {
-      cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-    }
-    onChange(draftRef.current);
-  }
-
-  function endInteraction() {
-    flushChange();
-    interactingRef.current = false;
-    onInteractionChange?.(false);
-  }
-
-  function handleChange(key: ShapeControlKey, value: number) {
-    const next = { ...draftRef.current, [key]: value };
-    draftRef.current = next;
-    setDraftParams(next);
-    if (frameRef.current !== null) return;
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = null;
-      onChange(draftRef.current);
-    });
+  const controls = useControlDraft(shapeParams, onChange, onInteractionChange);
+  const draftParams = controls.draft;
+  const baselineShape = baseShape || DEFAULTS;
+  // A saved outlier extends the range once; dragging never changes its endpoints.
+  const baselineKey = JSON.stringify(baselineShape);
+  const makeRanges = () => Object.fromEntries(SLIDERS.map(({ key, min, max }) => [key,
+    key === 'curvature' ? { min, max } : {
+      min: Math.min(Math.max(0.01, baselineShape[key] * 0.5), shapeParams[key]),
+      max: Math.max(baselineShape[key] * 1.5, shapeParams[key]),
+    },
+  ]));
+  const [rangeState, setRangeState] = useState(() => ({ key: baselineKey, ranges: makeRanges() }));
+  let ranges = rangeState.ranges;
+  if (rangeState.key !== baselineKey) {
+    ranges = makeRanges();
+    setRangeState({ key: baselineKey, ranges });
   }
 
   return (
@@ -85,9 +58,9 @@ export default function ShapeTab({
         {SLIDERS.map((s) => {
           const val = draftParams[s.key];
           const baseline = baseShape?.[s.key] ?? DEFAULTS[s.key];
-          const min = s.key === 'curvature' ? s.min : Math.min(Math.max(0.01, baseline * 0.5), val);
-          const max = s.key === 'curvature' ? s.max : Math.max(baseline * 1.5, val);
-          const pct = ((val - min) / (max - min)) * 100;
+          const min = ranges[s.key].min;
+          const max = ranges[s.key].max;
+          const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
           const change = val - baseline;
           return (
             <div key={s.key}>
@@ -102,15 +75,14 @@ export default function ShapeTab({
                 max={max}
                 value={val}
                 aria-label={s.label}
-                onPointerDown={beginInteraction}
-                onPointerUp={endInteraction}
-                onPointerCancel={endInteraction}
-                onKeyDown={beginInteraction}
-                onKeyUp={endInteraction}
-                onBlur={() => {
-                  if (interactingRef.current) endInteraction();
-                }}
-                onChange={(e) => handleChange(s.key, Number(e.target.value))}
+                onPointerDown={controls.begin}
+                onPointerUp={controls.end}
+                onPointerCancel={controls.end}
+                onKeyDown={(event) => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) controls.begin(); }}
+                onKeyUp={controls.end}
+                onBlur={controls.end}
+                onChange={(e) => controls.update({ ...controls.draftRef.current, [s.key]: Number(e.target.value) })}
+                aria-valuetext={s.key === 'curvature' ? `${val}% curvature` : formatInches(val)}
                 step={s.key === 'curvature' ? 1 : 0.1}
                 className="freeform-tab-slider"
                 style={{
@@ -122,15 +94,7 @@ export default function ShapeTab({
         })}
       </div>
 
-      <button onClick={() => {
-        if (frameRef.current !== null) {
-          cancelAnimationFrame(frameRef.current);
-          frameRef.current = null;
-        }
-        draftRef.current = { ...(baseShape || DEFAULTS) };
-        setDraftParams(draftRef.current);
-        onChange(draftRef.current);
-      }} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
+      <button onClick={() => controls.reset({ ...baselineShape })} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
         Reset Shape
       </button>
     </div>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FreeformPage from '../FreeformPage';
@@ -6,6 +6,7 @@ import FreeformPage from '../FreeformPage';
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({ data: { conversation_id: 'conversation-1' }, error: null })),
   user: { id: 'buyer-1' },
+  analysis: null as null | ((status: 'ready' | 'error', invalid?: boolean, stale?: boolean) => void),
 }));
 
 const originalAttachment = vi.hoisted(() => ({
@@ -52,10 +53,22 @@ vi.mock('../../lib/supabase', () => {
   };
   return { supabase: { from, rpc: mocks.rpc } };
 });
-vi.mock('../../components/freeform/FreeformViewer', () => ({ default: ({ modelFile, shapeParams, materialParams, decorationParams, attachmentParams }: {
+vi.mock('../../components/freeform/FreeformViewer', () => ({ default: ({ modelFile, shapeParams, materialParams, decorationParams, attachmentParams, onAttachmentAnalysis }: {
   modelFile: string; shapeParams: { height: number }; materialParams: { finish: string; color: string };
-  decorationParams: { patternId: string }; attachmentParams: unknown[];
-}) => <div data-testid="freeform-viewer">{JSON.stringify({ modelFile, height: shapeParams.height, material: materialParams, pattern: decorationParams.patternId, attachments: attachmentParams.length })}</div> }));
+  decorationParams: { patternId: string }; attachmentParams: import('../../components/freeform/attachments').AttachmentSelection[];
+  onAttachmentAnalysis?: (analysis: import('../../components/freeform/attachmentValidation').AttachmentAnalysis) => void;
+}) => {
+  mocks.analysis = (status, invalid = false, stale = false) => onAttachmentAnalysis?.({
+    revision: stale ? 'old' : JSON.stringify([modelFile, shapeParams, attachmentParams]),
+    status, sockets: [], attachments: attachmentParams,
+    placements: invalid ? { 'bamboo-left:auto-handle-left': { status: 'invalid', reason: 'No safe socket. Adjust or remove the attachment.',
+      transform: attachmentParams[0].placements[0].transform, limits: null } } : {},
+    limits: {}, message: status === 'error' ? 'Analysis failed.' : '',
+  });
+  return <div data-testid="freeform-viewer">{JSON.stringify({ modelFile, height: shapeParams.height, material: materialParams, pattern: decorationParams.patternId, attachments: attachmentParams.length })}</div>;
+} }));
+vi.mock('../../components/freeform/useAttachmentCatalog', () => ({ useAttachmentCatalog: () => ({ status: 'ready',
+  assets: [{ recipe: { key: 'bamboo-loop', version: 1 } }], error: '', retry: () => {} }) }));
 vi.mock('../../components/freeform/ModelTab', () => ({ default: () => <div>Model choices</div> }));
 vi.mock('../../components/freeform/ShapeTab', () => ({ default: () => <div>Shape choices</div> }));
 vi.mock('../../components/freeform/MaterialTab', () => ({ default: () => <div>Material choices</div> }));
@@ -77,8 +90,29 @@ vi.mock('../../components/freeform/SendDesignRequestModal', () => ({
 describe('buyer revision', () => {
   beforeEach(() => {
     mocks.rpc.mockClear();
+    mocks.analysis = null;
     window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('blocks unchecked, stale, invalid, and failed attachments on Review without opening their tab', async () => {
+    render(<MemoryRouter initialEntries={['/freeform?revise=1&requestId=request-1']}><FreeformPage /></MemoryRouter>);
+    const save = await screen.findByRole('button', { name: 'Save Design' });
+    const send = screen.getByRole('button', { name: 'Send to Shop' });
+    expect(save).toBeDisabled();
+    expect(send).toBeDisabled();
+    act(() => mocks.analysis?.('ready', false, true));
+    expect(send).toBeDisabled();
+    act(() => mocks.analysis?.('ready', true));
+    expect(screen.getByText(/No safe socket/)).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    act(() => mocks.analysis?.('error'));
+    expect(screen.getByRole('button', { name: 'Retry attachment check' })).toBeInTheDocument();
+    expect(send).toBeDisabled();
+    act(() => mocks.analysis?.('ready'));
+    expect(save).toBeEnabled();
+    expect(send).toBeEnabled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it('lets the buyer change attachments, advance, and send the same request back to its shop', async () => {

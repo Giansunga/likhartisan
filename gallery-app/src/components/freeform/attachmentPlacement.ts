@@ -3,6 +3,7 @@ import { MeshBVH } from 'three-mesh-bvh';
 import type { GeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import {
   DEFAULT_ATTACHMENT_TRANSFORM,
+  getDefaultAttachmentTransform,
   type AttachmentFamily,
   type AttachmentPlacementTransform,
   type AttachmentSocketSnapshot,
@@ -287,7 +288,7 @@ export function resolveAttachmentMount(
   const position = lower.position.clone().add(upper.position).multiplyScalar(0.5).addScaledVector(outward, offsetDistance);
   // A saved transform can predate the live limits. Seat its rotated contact
   // points against the shaped pot instead of letting either lug hover.
-  const contactHalfSpan = recipe.envelope.contactRadius * baseMount.scale * 0.12;
+  const contactHalfSpan = recipe.envelope.contactRadius * baseMount.scale * transform.thicknessMultiplier * 0.12;
   const boxCenter = resolved.box.getCenter(new THREE.Vector3());
   const verticalScale = THREE.MathUtils.clamp(contactDistance / contactSpan, baseMount.scale * 0.85, baseMount.scale * 1.25);
   let seatCorrection = 0;
@@ -345,7 +346,7 @@ export function isAttachmentPlacementSafe(scene: THREE.Object3D, socket: Generat
   if (!edgesSafe || recipe.family !== 'handle' || !recipe.mountContactY) return edgesSafe;
   const mount = resolveAttachmentMount(scene, socket, recipe, clamped, resolved.box);
   if (!mount) return false;
-  if (mount.seatCorrection > recipe.envelope.contactRadius * mount.scale * 0.08) return false;
+  if (mount.seatCorrection > recipe.envelope.contactRadius * mount.scale * clamped.thicknessMultiplier * 0.08) return false;
   const boxCenter = resolved.box.getCenter(new THREE.Vector3());
   return recipe.mountContactY.every((contactY) => {
     const contact = new THREE.Vector3(0, contactY * mount.verticalScale, 0).applyQuaternion(mount.quaternion).add(mount.position);
@@ -354,8 +355,8 @@ export function isAttachmentPlacementSafe(scene: THREE.Object3D, socket: Generat
     const surface = resolveAttachmentPoint(scene, height, azimuth, resolved.box);
     if (!surface) return false;
     const gap = contact.clone().sub(surface.position).dot(surface.normal);
-    return gap <= recipe.envelope.contactRadius * mount.scale * 0.18
-      && gap >= -recipe.envelope.contactRadius * mount.scale * 1.5;
+    return gap <= recipe.envelope.contactRadius * mount.scale * clamped.thicknessMultiplier * 0.18
+      && gap >= -recipe.envelope.contactRadius * mount.scale * clamped.thicknessMultiplier * 1.5;
   });
 }
 
@@ -405,6 +406,54 @@ export function probeContinuousSafeRange(currentValue: number, hardRange: Transf
   return { ...hardRange, min: probe(hardRange.min), max: probe(hardRange.max) };
 }
 
+export type AttachmentTransformResult = {
+  status: 'valid' | 'adjusted' | 'invalid';
+  transform: AttachmentPlacementTransform;
+  limits: AttachmentTransformLimits | null;
+  reason: string;
+};
+
+export function attachmentTransformsEqual(a: AttachmentPlacementTransform, b: AttachmentPlacementTransform) {
+  return (Object.keys(DEFAULT_ATTACHMENT_TRANSFORM) as Array<keyof AttachmentPlacementTransform>)
+    .every(key => Math.abs(a[key] - b[key]) < 0.000001);
+}
+
+export function validateAttachmentTransform(
+  scene: THREE.Object3D,
+  recipe: GeneratedAttachmentRecipe,
+  socket: GeneratedAttachmentSocket,
+  transform: AttachmentPlacementTransform,
+  extraSafetyCheck: (candidate: AttachmentPlacementTransform, box: THREE.Box3) => boolean = () => true,
+  knownBox?: THREE.Box3,
+): AttachmentTransformResult {
+  const hardLimits = getSocketTransformLimits(recipe, socket);
+  if (!hardLimits) return { status: 'invalid', transform, limits: null, reason: 'This attachment does not fit this socket.' };
+  if (!knownBox) scene.updateMatrixWorld(true);
+  const box = knownBox || new THREE.Box3().setFromObject(scene);
+  if (box.isEmpty()) return { status: 'invalid', transform, limits: null, reason: 'The model surface is unavailable.' };
+  let current = clampAttachmentTransform(transform, hardLimits);
+  const isSafe = (candidate: AttachmentPlacementTransform) => isAttachmentPlacementSafe(scene, socket, recipe, candidate, box) && extraSafetyCheck(candidate, box);
+  if (!isSafe(current)) {
+    const fallbackCandidates = [
+      clampAttachmentTransform({ ...getDefaultAttachmentTransform(recipe.family), scaleMultiplier: current.scaleMultiplier, thicknessMultiplier: current.thicknessMultiplier }, hardLimits),
+      clampAttachmentTransform({ ...getDefaultAttachmentTransform(recipe.family), scaleMultiplier: hardLimits.scaleMultiplier.min }, hardLimits),
+    ];
+    const fallback = fallbackCandidates.find(isSafe);
+    if (!fallback) return { status: 'invalid', transform, limits: hardLimits, reason: 'No safe placement is available. Adjust or remove this attachment.' };
+    current = fallback;
+  }
+  const limits = recipe.family !== 'handle' ? hardLimits : {
+    ...hardLimits,
+    surfaceOffsetRatio: probeContinuousSafeRange(current.surfaceOffsetRatio, hardLimits.surfaceOffsetRatio,
+      (value) => isSafe({ ...current, surfaceOffsetRatio: value })),
+    twistDegrees: probeContinuousSafeRange(current.twistDegrees, hardLimits.twistDegrees,
+      (value) => isSafe({ ...current, twistDegrees: value })),
+  };
+  const changed = !attachmentTransformsEqual(current, transform);
+  return { status: changed ? 'adjusted' : 'valid', transform: current, limits,
+    reason: changed ? 'Moved to the nearest available safe placement.' : '' };
+}
+
 export function getLiveAttachmentTransformLimits(
   scene: THREE.Object3D,
   recipe: GeneratedAttachmentRecipe,
@@ -413,33 +462,8 @@ export function getLiveAttachmentTransformLimits(
   extraSafetyCheck: (candidate: AttachmentPlacementTransform, box: THREE.Box3) => boolean = () => true,
   knownBox?: THREE.Box3,
 ) {
-  const hardLimits = getSocketTransformLimits(recipe, socket);
-  if (!hardLimits) return null;
-  if (!knownBox) scene.updateMatrixWorld(true);
-  const box = knownBox || new THREE.Box3().setFromObject(scene);
-  if (box.isEmpty()) return null;
-  let current = clampAttachmentTransform(transform, hardLimits);
-  const isSafe = (candidate: AttachmentPlacementTransform) => isAttachmentPlacementSafe(scene, socket, recipe, candidate, box) && extraSafetyCheck(candidate, box);
-  if (!isSafe(current)) {
-    const fallbackCandidates = [
-      clampAttachmentTransform({ ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: current.scaleMultiplier, thicknessMultiplier: current.thicknessMultiplier }, hardLimits),
-      clampAttachmentTransform({ ...DEFAULT_ATTACHMENT_TRANSFORM, scaleMultiplier: hardLimits.scaleMultiplier.min }, hardLimits),
-    ];
-    const fallback = fallbackCandidates.find(isSafe);
-    if (!fallback) return null;
-    current = fallback;
-  }
-  // The socket analyzer already derives conservative, deformation-aware ranges.
-  // Validate only the value the shopper actually chose here; eagerly probing every
-  // unused slider position makes a paired attachment perform hundreds of raycasts.
-  if (recipe.family !== 'handle') return hardLimits;
-  return {
-    ...hardLimits,
-    surfaceOffsetRatio: probeContinuousSafeRange(current.surfaceOffsetRatio, hardLimits.surfaceOffsetRatio,
-      (value) => isSafe({ ...current, surfaceOffsetRatio: value })),
-    twistDegrees: probeContinuousSafeRange(current.twistDegrees, hardLimits.twistDegrees,
-      (value) => isSafe({ ...current, twistDegrees: value })),
-  };
+  const result = validateAttachmentTransform(scene, recipe, socket, transform, extraSafetyCheck, knownBox);
+  return result.status === 'invalid' ? null : result.limits;
 }
 
 export function getAttachmentMountTransform(normal: THREE.Vector3, maxDimension: number, recipe: GeneratedAttachmentRecipe, transform: AttachmentPlacementTransform = DEFAULT_ATTACHMENT_TRANSFORM) {
@@ -456,7 +480,7 @@ export function getAttachmentMountTransform(normal: THREE.Vector3, maxDimension:
   // that plane slightly below the live surface so the lugs read as joined clay
   // instead of hovering, while retaining the shopper's outward-offset control.
   const seatingInsetRatio = recipe.family === 'handle'
-    ? Math.min(recipe.envelope.contactRadius * recipe.scaleRatio * transform.scaleMultiplier * 0.4, 0.014)
+    ? Math.min(recipe.envelope.contactRadius * recipe.scaleRatio * transform.scaleMultiplier * transform.thicknessMultiplier * 0.4, 0.014)
     : 0;
   return {
     offset: outward.clone().multiplyScalar(maxDimension * (transform.surfaceOffsetRatio - seatingInsetRatio)),

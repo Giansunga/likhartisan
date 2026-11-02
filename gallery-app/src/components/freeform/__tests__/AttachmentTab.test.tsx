@@ -31,6 +31,52 @@ const sockets: GeneratedAttachmentSocket[] = [
 ];
 
 describe('AttachmentTab guided workflow', () => {
+  it('retains saved attachments on catalog failure and exposes retry without deleting them', async () => {
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find(item => item.key === 'bamboo-loop')!;
+    const selection = createAttachmentSelection({ recipe, shopId: null, priceAdjustment: 100, productionDaysAdjustment: 1 }, sockets);
+    const onChange = vi.fn(), retry = vi.fn();
+    render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={[selection]}
+      onChange={onChange} catalog={{ status: 'error', assets: [], error: 'Offline. Your attachments are retained.', retry }} />);
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry attachments' }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('advances each keyboard control by its actual step instead of rounding back to the same value', async () => {
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find(item => item.key === 'bamboo-loop')!;
+    const selection = createAttachmentSelection({ recipe, shopId: null, priceAdjustment: 0, productionDaysAdjustment: 0 }, sockets);
+    let latest = [selection];
+    function Harness() {
+      const [value, setValue] = useState([selection]);
+      return <AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={value}
+        onChange={next => { latest = next; setValue(next); }} />;
+    }
+    render(<Harness />);
+    const slider = screen.getByRole('slider', { name: 'Scale' });
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+    fireEvent.keyUp(slider, { key: 'ArrowRight' });
+    expect(latest[0].placements.map(p => p.transform.scaleMultiplier)).toEqual([1.05, 1.05]);
+    const horizontal = screen.getByRole('slider', { name: 'Horizontal Position' });
+    fireEvent.keyDown(horizontal, { key: 'ArrowRight' });
+    fireEvent.keyUp(horizontal, { key: 'ArrowRight' });
+    expect(latest[0].placements.map(p => p.transform.horizontalDegrees)).toEqual([1, -1]);
+  });
+
+  it('disables linked controls with no shared range while retaining individual adjustment tabs', async () => {
+    const recipe = GENERATED_ATTACHMENT_RECIPES.find(item => item.key === 'bamboo-loop')!;
+    const selection = createAttachmentSelection({ recipe, shopId: null, priceAdjustment: 100, productionDaysAdjustment: 1 }, sockets);
+    const left = getSocketTransformLimits(recipe, sockets[0])!;
+    const right = getSocketTransformLimits(recipe, sockets[1])!;
+    render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={[selection]} onChange={() => {}}
+      placementLimits={{ [attachmentPlacementKey(selection.id, 'left')]: { ...left, scaleMultiplier: { min: .5, max: .6, step: .05 } },
+        [attachmentPlacementKey(selection.id, 'right')]: { ...right, scaleMultiplier: { min: 1, max: 1.2, step: .05 } } }} />);
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+    expect(screen.getByText(/no shared safe range/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Left' }));
+    expect(screen.getByRole('slider', { name: 'Scale' })).toBeInTheDocument();
+  });
+
   it('advances through selection and placement, then exposes independent controls', async () => {
     const onChange = vi.fn();
     const { rerender } = render(<AttachmentTab shopId={null} modelId="model-1" sockets={sockets} modelHeightIn={10} value={[]} onChange={onChange} />);
@@ -76,7 +122,7 @@ describe('AttachmentTab guided workflow', () => {
 
     fireEvent.change(screen.getByLabelText('Handle Thickness'), { target: { value: '1.25' } });
     await waitFor(() => expect(screen.getByText('125%')).toBeInTheDocument());
-    expect(onChange.mock.calls.some(([next]) => next[0].placements.every((placement: AttachmentSelection['placements'][number]) => placement.transform.thicknessMultiplier === 1.25))).toBe(true);
+    await waitFor(() => expect(onChange.mock.calls.some(([next]) => next[0].placements.every((placement: AttachmentSelection['placements'][number]) => placement.transform.thicknessMultiplier === 1.25))).toBe(true));
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset Adjustments' }));
     await waitFor(() => expect(screen.getAllByText('100%').length).toBeGreaterThanOrEqual(2));
@@ -84,7 +130,7 @@ describe('AttachmentTab guided workflow', () => {
 
     fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '45' } });
     await waitFor(() => expect(screen.getByText('45°')).toBeInTheDocument());
-    expect(onChange.mock.calls.some(([next]) => next[0].placements.some((placement: AttachmentSelection['placements'][number]) => placement.transform.twistDegrees === 45))).toBe(true);
+    await waitFor(() => expect(onChange.mock.calls.some(([next]) => next[0].placements.some((placement: AttachmentSelection['placements'][number]) => placement.transform.twistDegrees === 45))).toBe(true));
 
     const adjustmentCard = screen.getByRole('button', { name: /Bamboo Loop.*Left.*Right/ });
     fireEvent.click(adjustmentCard);
@@ -107,27 +153,27 @@ describe('AttachmentTab guided workflow', () => {
     await waitFor(() => expect(screen.queryByText(/Analyzing compatible attachments/)).not.toBeInTheDocument());
     expect(screen.getByRole('tab', { name: 'Linked' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.change(screen.getByLabelText('Horizontal Position'), { target: { value: '10' } });
-    expect(latest[0].placements.map((item) => item.transform.horizontalDegrees)).toEqual([10, -10]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.horizontalDegrees)).toEqual([10, -10]));
     fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '40' } });
-    expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, -40]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, -40]));
     fireEvent.change(screen.getByLabelText('Vertical Position'), { target: { value: '-0.02' } });
-    expect(latest[0].placements.map((item) => item.transform.verticalRatio)).toEqual([-0.02, -0.02]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.verticalRatio)).toEqual([-0.02, -0.02]));
     fireEvent.change(screen.getByLabelText('Scale'), { target: { value: '0.75' } });
-    expect(latest[0].placements.map((item) => item.transform.scaleMultiplier)).toEqual([0.75, 0.75]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.scaleMultiplier)).toEqual([0.75, 0.75]));
 
     fireEvent.click(screen.getByRole('tab', { name: 'Right' }));
-    expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, -40]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, -40]));
     fireEvent.change(screen.getByLabelText('Rotation'), { target: { value: '25' } });
-    expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, 25]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([40, 25]));
     fireEvent.change(screen.getByLabelText('Handle Thickness'), { target: { value: '1.25' } });
-    expect(latest[0].placements.map((item) => item.transform.thicknessMultiplier)).toEqual([1.25, 1.25]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.thicknessMultiplier)).toEqual([1.25, 1.25]));
     fireEvent.click(screen.getByRole('button', { name: 'Reset Adjustments' }));
     expect(latest[0].placements[0].transform.twistDegrees).toBe(40);
     expect(latest[0].placements[1].transform.twistDegrees).toBe(0);
-    expect(latest[0].placements.map((item) => item.transform.thicknessMultiplier)).toEqual([1, 1]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.thicknessMultiplier)).toEqual([1, 1]));
     fireEvent.click(screen.getByRole('tab', { name: 'Linked' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset Adjustments' }));
-    expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([0, 0]);
+    await waitFor(() => expect(latest[0].placements.map((item) => item.transform.twistDegrees)).toEqual([0, 0]));
   });
 
   it('restricts linked controls to the safe range shared by both sockets', async () => {

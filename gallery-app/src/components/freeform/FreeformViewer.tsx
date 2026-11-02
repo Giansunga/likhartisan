@@ -7,13 +7,11 @@ import ModelLoadSurface from '../ModelLoadSurface';
 import * as THREE from 'three';
 import { createPatternSvg, DEFAULT_DECORATION, type DecorationParams } from './decor';
 import { getDecorationProjection } from './decorationProjection';
-import { clonePatternGeometry, computePatternNormals, updateExteriorPatternMask } from './exteriorPatternMask';
+import { clonePatternGeometry, updateExteriorPatternMask } from './exteriorPatternMask';
 import { type AttachmentPlacement, type AttachmentSelection, type GeneratedAttachmentSocket } from './attachments';
 import {
   analyzeAttachmentSockets,
   attachmentPlacementKey,
-  attachmentPlacementsCollide,
-  getLiveAttachmentTransformLimits,
   resolveAttachmentMount,
   resolveAttachmentPoint,
   prepareAttachmentSurface,
@@ -25,100 +23,12 @@ import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensure
 import type { MaterialParams } from './materials';
 import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
-import { getSectionAnchors, sectionScale } from './calibrateModel';
-import { isUneditedShape, restoreSourceGeometry } from './shapeGeometry';
+import { getSectionAnchors } from './calibrateModel';
+import { applyShapeGeometry, getShapeHeightScale, getGeometrySnapshot, getBoundsFromSnapshots, cacheProfileCoefficients, type GeometrySnapshot, type ModelBounds, type ShapeParams } from './shapeGeometry';
+import { attachmentDesignRevision, validateAttachmentDesign, type AttachmentAnalysis } from './attachmentValidation';
 import { captureException } from '../../lib/sentry';
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
 type OrbitControlsApi = { target?: THREE.Vector3; update?: () => void; reset?: () => void; saveState?: () => void };
-
-type GeometrySnapshot = { localPositions: Float32Array; localNormals: Float32Array | null; rootPositions: Float32Array; profileCoefficients: Float32Array; rootToLocal: THREE.Matrix4 };
-type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-function normalizeParam(value: number, midpoint: number): number {
-  return THREE.MathUtils.clamp((value - midpoint) / midpoint, -1, 1);
-}
-
-
-function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnapshot | null {
-  const geometry = mesh.geometry;
-  const position = geometry.attributes.position;
-  if (!position) return null;
-
-  root.updateWorldMatrix(true, true);
-  mesh.updateWorldMatrix(true, false);
-
-  const rootInverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
-  const localToRoot = new THREE.Matrix4().multiplyMatrices(rootInverse, mesh.matrixWorld);
-  const rootToLocal = new THREE.Matrix4().multiplyMatrices(
-    new THREE.Matrix4().copy(mesh.matrixWorld).invert(),
-    root.matrixWorld
-  );
-
-  const localPositions = position.array.slice() as Float32Array;
-  const rootPositions = new Float32Array(localPositions.length);
-  const vertex = new THREE.Vector3();
-
-  for (let i = 0; i < position.count; i++) {
-    vertex.set(localPositions[i * 3], localPositions[i * 3 + 1], localPositions[i * 3 + 2]);
-    vertex.applyMatrix4(localToRoot);
-    rootPositions[i * 3] = vertex.x;
-    rootPositions[i * 3 + 1] = vertex.y;
-    rootPositions[i * 3 + 2] = vertex.z;
-  }
-
-  const normal = geometry.attributes.normal;
-  return { localPositions, localNormals: normal ? normal.array.slice() as Float32Array : null, rootPositions, profileCoefficients: new Float32Array(position.count * 4), rootToLocal };
-}
-
-function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBounds {
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-
-  for (const snapshot of snapshots) {
-    for (let i = 0; i < snapshot.rootPositions.length; i += 3) {
-      const x = snapshot.rootPositions[i];
-      const y = snapshot.rootPositions[i + 1];
-      const z = snapshot.rootPositions[i + 2];
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
-    }
-  }
-
-  return {
-    minY,
-    rangeY: maxY - minY || 1,
-    centerX: (minX + maxX) / 2,
-    centerY: (minY + maxY) / 2,
-    centerZ: (minZ + maxZ) / 2,
-  };
-}
-
-function cacheProfileCoefficients(snapshot: GeometrySnapshot, bounds: ModelBounds) {
-  const { minY, rangeY } = bounds;
-  const { rootPositions, profileCoefficients } = snapshot;
-  const strength = 0.45;
-  for (let vertexIndex = 0; vertexIndex < rootPositions.length / 3; vertexIndex++) {
-    const t = Math.max(0, Math.min(1, (rootPositions[vertexIndex * 3 + 1] - minY) / rangeY));
-    const baseInfluence = 1 - smoothstep(0.06, 0.3, t);
-    const bodyInfluence = smoothstep(0.1, 0.35, t) * (1 - smoothstep(0.55, 0.75, t));
-    const shoulderInfluence = smoothstep(0.5, 0.7, t) * (1 - smoothstep(0.7, 0.88, t));
-    const neckInfluence = smoothstep(0.6, 0.8, t) * (1 - smoothstep(0.85, 0.96, t));
-    const rimInfluence = smoothstep(0.82, 1.0, t);
-    const coefficientIndex = vertexIndex * 4;
-    profileCoefficients[coefficientIndex] = strength * (baseInfluence * 0.7 + bodyInfluence + shoulderInfluence * 0.5);
-    profileCoefficients[coefficientIndex + 1] = strength * (shoulderInfluence * 0.5 + neckInfluence);
-    profileCoefficients[coefficientIndex + 2] = strength * rimInfluence;
-    profileCoefficients[coefficientIndex + 3] = Math.sin(t * Math.PI) * 0.16 - shoulderInfluence * 0.08;
-  }
-}
 
 class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?: () => void }, { hasError: boolean }> {
   state = { hasError: false };
@@ -127,7 +37,7 @@ class AttachmentErrorBoundary extends Component<{ children: ReactNode; onError?:
   render() { return this.state.hasError ? null : this.props.children; }
 }
 
-function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, shapeKey, material }: { attachment: AttachmentSelection; placement: AttachmentPlacement; liveSocketsRef: RefObject<GeneratedAttachmentSocket[]>; baseScene: THREE.Group; shapeKey: string; material: MaterialParams }) {
+function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, shapeKey, material, analysisRef, revision }: { attachment: AttachmentSelection; placement: AttachmentPlacement; liveSocketsRef: RefObject<GeneratedAttachmentSocket[]>; baseScene: THREE.Group; shapeKey: string; material: MaterialParams; analysisRef: RefObject<AttachmentAnalysis | null>; revision: string }) {
   const groupRef = useRef<THREE.Group>(null);
   const placementKeyRef = useRef('');
   const recipe = getGeneratedAttachmentRecipe(attachment.recipeKey, attachment.recipeVersion);
@@ -147,21 +57,29 @@ function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, sha
   }, [attachmentScene, materialColor, materialFinish]);
 
   useFrame(() => {
-    if (!groupRef.current || !recipe) return;
-    const { socket: savedSocket, transform } = placement;
+    if (!groupRef.current) return;
+    const result = analysisRef.current?.placements[attachmentPlacementKey(attachment.id, placement.socket.id)];
+    if (!recipe || analysisRef.current?.status === 'error' || result?.status === 'invalid') {
+      groupRef.current.visible = false;
+      return;
+    }
+    const { socket: savedSocket } = placement;
+    // Read-only request previews must use the same accepted fallback as the editor.
+    const transform = result && analysisRef.current?.revision === revision ? result.transform : placement.transform;
     const currentSocket = liveSocketsRef.current?.find((candidate) => candidate.id === savedSocket.id);
     const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
     const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${transform.thicknessMultiplier}|${recipe.key}|${recipe.version}`;
-    if (placementKeyRef.current === placementKey) return;
+    if (placementKeyRef.current === placementKey && groupRef.current.visible) return;
     const mount = resolveAttachmentMount(baseScene, socket, recipe, transform);
-    if (!mount) return;
+    if (!mount) { groupRef.current.visible = false; return; }
+    groupRef.current.visible = true;
     groupRef.current.position.copy(mount.position);
     groupRef.current.quaternion.copy(mount.quaternion);
     groupRef.current.scale.set(mount.scale, mount.verticalScale, mount.scale);
     placementKeyRef.current = placementKey;
   });
 
-  return <group ref={groupRef}><primitive object={attachmentScene} /></group>;
+  return <group ref={groupRef} visible={false}><primitive object={attachmentScene} /></group>;
 }
 
 function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: GeneratedAttachmentSocket; baseScene: THREE.Group; selected: boolean }) {
@@ -172,7 +90,8 @@ function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: Gener
     const key = `${getAttachmentSurfaceRevision(baseScene)}|${socket.height}|${socket.azimuth}`;
     if (resolvedKey.current === key) return;
     const resolved = resolveAttachmentPoint(baseScene, socket.height, socket.azimuth);
-    if (!resolved) return;
+    if (!resolved) { groupRef.current.visible = false; return; }
+    groupRef.current.visible = true;
     groupRef.current.position.copy(resolved.position).addScaledVector(resolved.normal, resolved.maxDimension * 0.025);
     groupRef.current.scale.setScalar(Math.max(resolved.maxDimension * 0.025, 0.015));
     resolvedKey.current = key;
@@ -202,6 +121,8 @@ function Scene({
   onSocketsChange,
   onAttachmentLimitsChange,
   pauseAttachmentAnalysis = false,
+  onAttachmentAnalysis,
+  analysisAttempt = 0,
   showAttachmentSockets = true,
   previewMode = false,
 }: {
@@ -218,6 +139,8 @@ function Scene({
   onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
   onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
   pauseAttachmentAnalysis?: boolean;
+  onAttachmentAnalysis?: (analysis: AttachmentAnalysis) => void;
+  analysisAttempt?: number;
   showAttachmentSockets?: boolean;
   previewMode?: boolean;
 }) {
@@ -228,8 +151,11 @@ function Scene({
   const morphChecked = useRef(false);
   const analyzedShapeRef = useRef('');
   const analyzedPlacementRef = useRef('');
+  const analysisRef = useRef<AttachmentAnalysis | null>(null);
+  const acceptedShapeRef = useRef('');
   const liveSocketsRef = useRef<GeneratedAttachmentSocket[]>([]);
   const appliedShapeRef = useRef('');
+  const preparedShapeRef = useRef('');
   const appliedAppearanceRef = useRef('');
   const geometrySnapshotsRef = useRef<Map<THREE.BufferGeometry, GeometrySnapshot>>(new Map());
   const modelBoundsRef = useRef<ModelBounds>({ minY: 0, rangeY: 1, centerX: 0, centerY: 0, centerZ: 0 });
@@ -246,6 +172,7 @@ function Scene({
       rimSize: inchesToCm(shapeParams.rimSize),
     }
     : shapeParams;
+  const designRevision = attachmentDesignRevision(modelFile, shapeParams, attachmentParams);
 
   const scene = useMemo(() => {
     const clonedScene = gltf.scene.clone(true);
@@ -349,31 +276,18 @@ function Scene({
     }
 
     const relativeBaseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
-    const baselineFactor = shapeParams.unit === 'in' ? 2.54 : 1;
-    const isBaseShape = isUneditedShape(shapeParams);
     const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${relativeBaseline ? Object.values(relativeBaseline).join('|') : 'legacy'}`;
     const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
     const shapeChanged = appliedShapeRef.current !== shapeKey;
     const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
-    const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / (relativeBaseline ? relativeBaseline.height * baselineFactor : 25), 0.35, 1.8);
-    const bodyDelta = normalizeParam(geometryShapeParams.bodyWidth, relativeBaseline ? relativeBaseline.bodyWidth * baselineFactor : 20);
-    const neckDelta = normalizeParam(geometryShapeParams.neckWidth, relativeBaseline ? relativeBaseline.neckWidth * baselineFactor : 15);
-    const rimDelta = normalizeParam(geometryShapeParams.rimSize, relativeBaseline ? relativeBaseline.rimSize * baselineFactor : 12);
-    const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
-    const relativeAnchors = relativeBaseline ? ([
-      [sectionAnchorsRef.current.body, geometryShapeParams.bodyWidth / (relativeBaseline.bodyWidth * baselineFactor)],
-      [sectionAnchorsRef.current.neck, geometryShapeParams.neckWidth / (relativeBaseline.neckWidth * baselineFactor)],
-      [sectionAnchorsRef.current.rim, geometryShapeParams.rimSize / (relativeBaseline.rimSize * baselineFactor)],
-    ] as [number, number][]).sort((a, b) => a[0] - b[0]) : null;
-    const { minY, rangeY, centerX, centerY, centerZ } = modelBoundsRef.current;
+    const hScale = getShapeHeightScale(shapeParams);
+    const { minY, rangeY, centerY } = modelBoundsRef.current;
     const decorProjection = getDecorationProjection(
       { minY, rangeY, centerY },
       hScale,
       geometryShapeParams.bodyWidth,
       decorationParams.scale,
     );
-    const rootVertex = new THREE.Vector3();
-    const localVertex = new THREE.Vector3();
 
     if (shapeChanged || appearanceChanged) scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
@@ -383,51 +297,7 @@ function Scene({
         const snapshot = geometrySnapshotsRef.current.get(mesh.geometry);
         if (!snapshot) return;
 
-        const pos = mesh.geometry.attributes.position;
-        const arr = pos.array as Float32Array;
-        const count = pos.count;
-        const { localPositions, localNormals, rootPositions, profileCoefficients, rootToLocal } = snapshot;
-
-        if (isBaseShape) {
-          // A zero-edit model must retain its uploaded vertices and normals exactly.
-          // Restore from the immutable snapshot only after an actual shape edit.
-          if (appliedShapeRef.current) restoreSourceGeometry(mesh.geometry, localPositions, localNormals);
-        } else {
-
-        for (let i = 0; i < count; i++) {
-          const ox = rootPositions[i * 3];
-          const oy = rootPositions[i * 3 + 1];
-          const oz = rootPositions[i * 3 + 2];
-          const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
-
-          const coefficientIndex = i * 4;
-          const scaleXZ = THREE.MathUtils.clamp(relativeAnchors
-            ? sectionScale(t, relativeAnchors)
-              + profileCoefficients[coefficientIndex + 3] * curvatureDelta
-            : 1
-              + profileCoefficients[coefficientIndex] * bodyDelta
-              + profileCoefficients[coefficientIndex + 1] * neckDelta
-              + profileCoefficients[coefficientIndex + 2] * rimDelta
-              + profileCoefficients[coefficientIndex + 3] * curvatureDelta,
-          0.25, 1.8);
-
-          rootVertex.set(
-            centerX + (ox - centerX) * scaleXZ,
-            centerY + (oy - centerY) * hScale,
-            centerZ + (oz - centerZ) * scaleXZ
-          );
-          localVertex.copy(rootVertex).applyMatrix4(rootToLocal);
-
-          arr[i * 3] = localVertex.x;
-          arr[i * 3 + 1] = localVertex.y;
-          arr[i * 3 + 2] = localVertex.z;
-        }
-
-        pos.needsUpdate = true;
-        computePatternNormals(mesh.geometry);
-        mesh.geometry.computeBoundingBox();
-        mesh.geometry.computeBoundingSphere();
-        }
+        applyShapeGeometry(mesh.geometry, snapshot, modelBoundsRef.current, shapeParams, sectionAnchorsRef.current);
       }
 
       if ((appearanceChanged || shapeChanged) && mesh.material) {
@@ -498,46 +368,45 @@ function Scene({
       // Shape controls scale each horizontal section radially by a positive
       // factor, preserving which surface is first along every horizontal ray.
       updateExteriorPatternMask(scene, Boolean(appliedShapeRef.current));
-      prepareAttachmentSurface(scene);
+      if (attachmentParams.length && pauseAttachmentAnalysis) {
+        prepareAttachmentSurface(scene);
+        preparedShapeRef.current = shapeKey;
+      }
       appliedShapeRef.current = shapeKey;
     }
     if (appearanceChanged) appliedAppearanceRef.current = appearanceKey;
 
-    const analyzedShape = shapeKey;
-    let liveSockets = liveSocketsRef.current.length ? liveSocketsRef.current : attachmentSockets;
-    if ((attachmentParams.length > 0 || (!pauseAttachmentAnalysis && (onSocketsChange || onAttachmentLimitsChange))) && analyzedShapeRef.current !== analyzedShape) {
-      scene.updateMatrixWorld(true);
-      analyzedShapeRef.current = analyzedShape;
-      liveSockets = analyzeAttachmentSockets(scene);
-      liveSocketsRef.current = liveSockets;
-      if (!pauseAttachmentAnalysis) onSocketsChange?.(liveSockets);
-      analyzedPlacementRef.current = '';
+    const revision = designRevision;
+    const needsSockets = Boolean(attachmentParams.length || onSocketsChange || onAttachmentLimitsChange);
+    const analysisKey = `${revision}|${analysisAttempt}|${needsSockets}`;
+    if (!pauseAttachmentAnalysis && analyzedPlacementRef.current !== analysisKey
+      && (attachmentParams.length || onAttachmentAnalysis || onSocketsChange || onAttachmentLimitsChange)) {
+      analyzedPlacementRef.current = analysisKey;
+      try {
+        if (needsSockets && preparedShapeRef.current !== shapeKey) {
+          prepareAttachmentSurface(scene);
+          preparedShapeRef.current = shapeKey;
+        }
+        if (needsSockets && analyzedShapeRef.current !== shapeKey) {
+          liveSocketsRef.current = analyzeAttachmentSockets(scene);
+          analyzedShapeRef.current = shapeKey;
+        }
+        const previous = acceptedShapeRef.current === shapeKey ? analysisRef.current?.attachments : undefined;
+        const analysis = validateAttachmentDesign(scene, liveSocketsRef.current, attachmentParams, revision, previous);
+        analysisRef.current = analysis;
+        acceptedShapeRef.current = shapeKey;
+        onSocketsChange?.(analysis.sockets);
+        onAttachmentLimitsChange?.(analysis.limits);
+        onAttachmentAnalysis?.(analysis);
+      } catch (error) {
+        captureException(error);
+        const analysis: AttachmentAnalysis = { revision, status: 'error', sockets: [], attachments: attachmentParams,
+          placements: {}, limits: {}, message: 'Attachment analysis failed. Your selections are retained. Please retry.' };
+        analysisRef.current = analysis;
+        onAttachmentAnalysis?.(analysis);
+      }
     }
-    const placementAnalysisKey = `${analyzedShape}|${attachmentParams.flatMap((selection) => selection.placements.map((placement) => `${selection.id}:${placement.socket.id}:${Object.values(placement.transform).join(',')}`)).join('|')}`;
-    if (!pauseAttachmentAnalysis && onAttachmentLimitsChange && analyzedPlacementRef.current !== placementAnalysisKey) {
-      analyzedPlacementRef.current = placementAnalysisKey;
-      const socketsById = new Map(liveSockets.map((socket) => [socket.id, socket]));
-      const instances = attachmentParams.flatMap((selection) => {
-        const recipe = getGeneratedAttachmentRecipe(selection.recipeKey, selection.recipeVersion);
-        return recipe ? selection.placements.map((placement) => ({ selection, placement, recipe, socket: socketsById.get(placement.socket.id) })) : [];
-      }).filter((instance) => instance.socket);
-      const limitMap: AttachmentPlacementLimitMap = {};
-      scene.updateMatrixWorld(true);
-      const placementBox = new THREE.Box3().setFromObject(scene);
-      instances.forEach((instance) => {
-        const socket = instance.socket!;
-        limitMap[attachmentPlacementKey(instance.selection.id, socket.id)] = getLiveAttachmentTransformLimits(scene, instance.recipe, socket, instance.placement.transform, (candidate, box) => instances.every((other) => {
-          if (other === instance || !other.socket) return true;
-          return !attachmentPlacementsCollide(
-            scene,
-            { socket, recipe: instance.recipe, transform: candidate },
-            { socket: other.socket, recipe: other.recipe, transform: other.placement.transform },
-            box,
-          );
-        }), placementBox);
-      });
-      onAttachmentLimitsChange(limitMap);
-    }
+
   });
 
   return (
@@ -546,7 +415,7 @@ function Scene({
       {showAttachmentSockets && attachmentSockets.map((socket) => <AttachmentSocketMarker key={socket.id} socket={socket} baseScene={scene} selected={selectedSocketIds.includes(socket.id)} />)}
       {attachmentParams.flatMap((attachment) => attachment.placements.map((placement) => (
           <AttachmentErrorBoundary key={`${attachment.recipeKey}-${attachment.recipeVersion}-${placement.socket.id}`} onError={() => onAttachmentError?.(attachment)}>
-          <AttachmentModel attachment={attachment} placement={placement} liveSocketsRef={liveSocketsRef} material={materialParams} baseScene={scene} shapeKey={`${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${shapeParams.geometryMode || ''}|${Object.values(shapeParams.baseline || {}).join('|')}`} />
+          <AttachmentModel attachment={attachment} placement={placement} liveSocketsRef={liveSocketsRef} material={materialParams} baseScene={scene} analysisRef={analysisRef} revision={designRevision} shapeKey={`${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${shapeParams.geometryMode || ''}|${Object.values(shapeParams.baseline || {}).join('|')}`} />
         </AttachmentErrorBoundary>
       )))}
     </group>
@@ -570,6 +439,8 @@ export default function FreeformViewer({
   onSocketsChange,
   onAttachmentLimitsChange,
   pauseAttachmentAnalysis = false,
+  onAttachmentAnalysis,
+  analysisAttempt = 0,
   showAttachmentSockets = true,
   preview = false,
 }: {
@@ -588,6 +459,8 @@ export default function FreeformViewer({
   onSocketsChange?: (sockets: GeneratedAttachmentSocket[]) => void;
   onAttachmentLimitsChange?: (limits: AttachmentPlacementLimitMap) => void;
   pauseAttachmentAnalysis?: boolean;
+  onAttachmentAnalysis?: (analysis: AttachmentAnalysis) => void;
+  analysisAttempt?: number;
   showAttachmentSockets?: boolean;
   preview?: boolean;
 }) {
@@ -671,6 +544,8 @@ export default function FreeformViewer({
               onSocketsChange={onSocketsChange}
               onAttachmentLimitsChange={onAttachmentLimitsChange}
               pauseAttachmentAnalysis={pauseAttachmentAnalysis}
+              onAttachmentAnalysis={onAttachmentAnalysis}
+              analysisAttempt={analysisAttempt}
               showAttachmentSockets={showAttachmentSockets}
               previewMode={preview}
             />

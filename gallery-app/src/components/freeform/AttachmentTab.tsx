@@ -1,12 +1,12 @@
 import AssetImage from '../AssetImage';
-import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import { useAttachmentCatalog, type AttachmentCatalog } from './useAttachmentCatalog';
+import { useControlDraft } from './useControlDraft';
 import {
   ATTACHMENT_FAMILIES,
   createAttachmentSelection,
   getDefaultAttachmentTransform,
   recipeFitsSocket,
-  resolveCatalogAssets,
   selectedSocketIds,
   updateHandleThickness,
   updateAttachmentPlacement,
@@ -14,10 +14,7 @@ import {
   type AttachmentFamily,
   type AttachmentPlacementTransform,
   type AttachmentSelection,
-  type CatalogSettingsRecord,
-  type GeneratedAttachmentAsset,
   type GeneratedAttachmentSocket,
-  type ShopOverrideRecord,
 } from './attachments';
 import {
   attachmentPlacementKey,
@@ -27,7 +24,7 @@ import {
   type AttachmentTransformLimits,
   type TransformRange,
 } from './attachmentPlacement';
-import { GENERATED_ATTACHMENT_RECIPES, getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
+import { getGeneratedAttachmentRecipe } from './generatedAttachmentCatalog';
 import PanelSection from './PanelSection';
 import { formatInches } from '../../lib/measurements';
 
@@ -61,100 +58,41 @@ const CONTROL_CONFIG: Array<{ key: ControlKey; label: string }> = [
   { key: 'thicknessMultiplier', label: 'Handle Thickness' },
 ];
 
-function formatControlValue(key: ControlKey, value: number, modelHeightIn: number) {
+function formatControlValue(key: ControlKey, value: number, modelHeightIn: number, surfaceScaleIn: number) {
   if (key === 'horizontalDegrees' || key === 'twistDegrees') return `${Math.round(value)}°`;
-  if (key === 'verticalRatio' || key === 'surfaceOffsetRatio') return formatInches(value * modelHeightIn, 1);
+  if (key === 'verticalRatio') return formatInches(value * modelHeightIn, 1);
+  if (key === 'surfaceOffsetRatio') return formatInches(value * surfaceScaleIn, 1);
   return `${Math.round(value * 100)}%`;
 }
 
-function rangesEqualTransform(a: AttachmentPlacementTransform, b: AttachmentPlacementTransform) {
-  return CONTROL_CONFIG.every(({ key }) => Math.abs(a[key] - b[key]) < 0.000001);
-}
-
-export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn, value, placementLimits, onChange, onCompatibilityWarning }: {
+export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn, surfaceScaleIn = modelHeightIn, value: committedValue, placementLimits, onChange, catalog: providedCatalog, issues = {}, onInteractionChange }: {
   shopId: string | null;
   modelId: string | null;
   sockets: GeneratedAttachmentSocket[];
   modelHeightIn: number;
+  surfaceScaleIn?: number;
   value: AttachmentSelection[];
   placementLimits?: AttachmentPlacementLimitMap;
   onChange: (attachments: AttachmentSelection[]) => void;
   onCompatibilityWarning?: (message: string) => void;
+  catalog?: AttachmentCatalog;
+  issues?: Record<string, string>;
+  onInteractionChange?: (active: boolean) => void;
 }) {
+  const controls = useControlDraft(committedValue, onChange, onInteractionChange);
+  const value = controls.draft;
+  const localCatalog = useAttachmentCatalog(shopId, !providedCatalog && Boolean(modelId));
+  const catalog = providedCatalog || localCatalog;
+  const { assets, error } = catalog;
+  const loading = catalog.status === 'pending';
   const loadedSelection = value.at(-1);
   const loadedRecipe = getGeneratedAttachmentRecipe(loadedSelection?.recipeKey || '', loadedSelection?.recipeVersion);
-  const [assets, setAssets] = useState<GeneratedAttachmentAsset[]>([]);
   const [activeFamily, setActiveFamily] = useState<AttachmentFamily>(() => loadedRecipe?.family || 'handle');
   const [selectedRecipeKey, setSelectedRecipeKey] = useState(() => loadedSelection?.recipeKey || '');
   const [activeStage, setActiveStage] = useState<AttachmentStage>(() => value.length ? 3 : 1);
   const [activePlacementBySelection, setActivePlacementBySelection] = useState<Record<string, string>>({});
   const [pairEditModeBySelection, setPairEditModeBySelection] = useState<Record<string, PairEditMode>>({});
   const [expandedSelectionId, setExpandedSelectionId] = useState(() => loadedSelection?.id || '');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    async function load() {
-      if (!modelId) { setAssets([]); setLoading(false); return; }
-      setLoading(true);
-      setError('');
-      const settingsPromise = supabase.from('generated_attachment_catalog_settings').select('*').eq('active', true).order('recipe_key');
-      const overridesPromise = shopId
-        ? supabase.from('generated_attachment_shop_overrides').select('*').eq('shop_id', shopId)
-        : Promise.resolve({ data: [] as ShopOverrideRecord[], error: null });
-      const [settingsResult, overridesResult] = await Promise.all([settingsPromise, overridesPromise]);
-      if (!alive) return;
-      const loadError = settingsResult.error || overridesResult.error;
-      if (loadError) {
-        setError('Generated attachments could not be loaded.');
-        setAssets([]);
-      } else {
-        setAssets(resolveCatalogAssets(
-          GENERATED_ATTACHMENT_RECIPES,
-          (settingsResult.data || []) as CatalogSettingsRecord[],
-          (overridesResult.data || []) as ShopOverrideRecord[],
-          shopId,
-        ));
-      }
-      setLoading(false);
-    }
-    void load();
-    return () => { alive = false; };
-  }, [modelId, shopId]);
-
-  useEffect(() => {
-    if (loading || !sockets.length || !value.length) return;
-    const socketsById = new Map(sockets.map((socket) => [socket.id, socket]));
-    const assetsByKey = new Map(assets.map((asset) => [asset.recipe.key, asset]));
-    let removed = false;
-    let clamped = false;
-    const next = value.reduce<AttachmentSelection[]>((selections, selection) => {
-      const asset = assetsByKey.get(selection.recipeKey);
-      if (!asset || selection.recipeVersion !== asset.recipe.version) { removed = true; return selections; }
-      const placements = selection.placements.reduce<AttachmentSelection['placements']>((placementResult, placement) => {
-        const socket = socketsById.get(placement.socket.id);
-        const limitKey = attachmentPlacementKey(selection.id, placement.socket.id);
-        const hasMeasuredLimits = placementLimits ? Object.prototype.hasOwnProperty.call(placementLimits, limitKey) : false;
-        const limits = socket ? (hasMeasuredLimits ? placementLimits![limitKey] : getSocketTransformLimits(asset.recipe, socket)) : null;
-        if (!socket || !limits) { removed = true; return placementResult; }
-        const safeTransform = clampAttachmentTransform(placement.transform, limits);
-        if (!rangesEqualTransform(safeTransform, placement.transform)) clamped = true;
-        placementResult.push({ ...placement, transform: safeTransform });
-        return placementResult;
-      }, []);
-      if (!placements.length) { removed = true; return selections; }
-      selections.push({ ...selection, placements });
-      return selections;
-    }, []);
-    const changed = removed || clamped || JSON.stringify(next) !== JSON.stringify(value);
-    if (changed) {
-      onChange(next);
-      if (removed) onCompatibilityWarning?.('An attachment was removed because its socket is no longer safe for this shape.');
-      else if (clamped) onCompatibilityWarning?.('An attachment adjustment was clamped to the nearest safe position.');
-    }
-  }, [assets, loading, onChange, onCompatibilityWarning, placementLimits, sockets, value]);
-
   const familySockets = sockets.filter((socket) => socket.family === activeFamily);
   const familyAssets = assets.filter((asset) => asset.recipe.family === activeFamily && familySockets.some((socket) => recipeFitsSocket(asset.recipe, socket)));
   const selectedAsset = familyAssets.find((asset) => asset.recipe.key === selectedRecipeKey);
@@ -182,7 +120,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
   function place(socketsToUse: GeneratedAttachmentSocket[]) {
     if (!selectedAsset) return;
     const nextSelection = createAttachmentSelection(selectedAsset, socketsToUse);
-    onChange(upsertAttachmentSelection(value, nextSelection));
+    controls.reset(upsertAttachmentSelection(controls.draftRef.current, nextSelection));
     setActivePlacementBySelection((current) => ({ ...current, [nextSelection.id]: nextSelection.placements[0].socket.id }));
     setExpandedSelectionId(nextSelection.id);
     setActiveStage(3);
@@ -198,29 +136,30 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
 
   function removeSelection(selectionId: string) {
     const next = value.filter((item) => item.id !== selectionId);
-    onChange(next);
+    controls.reset(next);
     if (!next.length) setActiveStage(selectedAsset ? 2 : 1);
     setExpandedSelectionId((current) => current === selectionId ? next.at(-1)?.id || '' : current);
   }
 
   function updateControl(selection: AttachmentSelection, socketId: string, key: ControlKey, rawValue: number, limits: AttachmentTransformLimits) {
+    selection = controls.draftRef.current.find(item => item.id === selection.id) || selection;
     const placement = selection.placements.find((candidate) => candidate.socket.id === socketId);
     if (!placement) return;
     const step = limits[key].step;
     const snappedValue = Math.round(rawValue / step) * step;
     const nextTransform = clampAttachmentTransform({ ...placement.transform, [key]: snappedValue }, limits);
     if (key === 'thicknessMultiplier') {
-      onChange(updateHandleThickness(value, selection.id, nextTransform.thicknessMultiplier));
+      controls.update(updateHandleThickness(controls.draftRef.current, selection.id, nextTransform.thicknessMultiplier));
       return;
     }
     const isPair = selection.family === 'handle' && selection.placements.length === 2
       && !!selection.placements[0].socket.pairGroup
       && selection.placements[0].socket.pairGroup === selection.placements[1].socket.pairGroup;
     if (!isPair || (pairEditModeBySelection[selection.id] || 'linked') !== 'linked') {
-      onChange(updateAttachmentPlacement(value, selection.id, socketId, nextTransform));
+      controls.update(updateAttachmentPlacement(controls.draftRef.current, selection.id, socketId, nextTransform));
       return;
     }
-    let next = value;
+    let next = controls.draftRef.current;
     for (const candidate of selection.placements) {
       const candidateSocket = sockets.find((socket) => socket.id === candidate.socket.id);
       const candidateKey = attachmentPlacementKey(selection.id, candidate.socket.id);
@@ -231,15 +170,29 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
       next = updateAttachmentPlacement(next, selection.id, candidate.socket.id,
         clampAttachmentTransform({ ...candidate.transform, [key]: candidateValue }, candidateLimits));
     }
-    onChange(next);
+    controls.update(next);
   }
 
   function renderControl(selection: AttachmentSelection, socketId: string, transform: AttachmentPlacementTransform, limits: AttachmentTransformLimits, key: ControlKey, label: string) {
     const range = limits[key] as TransformRange;
     const inputId = `attachment-${selection.id}-${socketId}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '-');
     return <div className="attachment-offset-control" key={key}>
-      <span><label htmlFor={inputId}><strong>{label}</strong></label><output htmlFor={inputId}>{formatControlValue(key, transform[key], modelHeightIn)}</output></span>
-      <input id={inputId} aria-label={label} type="range" min={range.min} max={range.max} step={key === 'thicknessMultiplier' ? range.step : 'any'} value={transform[key]} onChange={(event) => updateControl(selection, socketId, key, Number(event.target.value), limits)} />
+      <span><label htmlFor={inputId}><strong>{label}</strong></label><output htmlFor={inputId}>{formatControlValue(key, transform[key], modelHeightIn, surfaceScaleIn)}</output></span>
+      <input id={inputId} aria-label={label} type="range" min={range.min} max={range.max} step={key === 'thicknessMultiplier' ? range.step : 'any'} value={transform[key]} disabled={range.min >= range.max}
+        aria-valuetext={formatControlValue(key, transform[key], modelHeightIn, surfaceScaleIn)}
+        onPointerDown={controls.begin} onPointerUp={controls.end} onPointerCancel={controls.end}
+        onKeyDown={(event) => {
+          const directions: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageDown: -10, PageUp: 10 };
+          if (!(event.key in directions) && event.key !== 'Home' && event.key !== 'End') return;
+          // Native step="any" keyboard increments can be smaller than our snapped
+          // step and round straight back to the same value. Apply the real step.
+          event.preventDefault();
+          controls.begin();
+          const next = event.key === 'Home' ? range.min : event.key === 'End' ? range.max
+            : transform[key] + directions[event.key] * range.step;
+          updateControl(selection, socketId, key, next, limits);
+        }}
+        onKeyUp={controls.end} onBlur={controls.end} onChange={(event) => updateControl(selection, socketId, key, Number(event.target.value), limits)} />
     </div>;
   }
 
@@ -248,7 +201,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
     <div className="guided-panel-list">
       <PanelSection number={1} title="Choose Attachment" summary={selectedAsset?.recipe.name || 'Select a 3D detail'} expanded={visibleStage === 1} completed={Boolean(selectedAsset)} onToggle={() => setActiveStage(1)} regionId="attachment-choose-section">
         <div className="attachment-filter" role="tablist" aria-label="Attachment families">{ATTACHMENT_FAMILIES.map((family) => <button type="button" role="tab" aria-selected={activeFamily === family.id} className={activeFamily === family.id ? 'active' : ''} key={family.id} onClick={() => { setActiveFamily(family.id); setSelectedRecipeKey(''); setActiveStage(1); }}>{family.label}</button>)}</div>
-        {loading ? <p className="attachment-empty">Analyzing compatible attachments…</p> : error ? <p className="attachment-empty attachment-error">{error}</p> : familySockets.length === 0 ? <p className="attachment-empty">This shape has no safe {ATTACHMENT_FAMILIES.find((family) => family.id === activeFamily)?.label.toLowerCase()} sockets.</p> : familyAssets.length === 0 ? <p className="attachment-empty">No configured recipe fits this shape safely.</p> : <div className="attachment-grid">{familyAssets.map((asset) => {
+        {loading ? <p className="attachment-empty">Analyzing compatible attachments…</p> : error ? <div role="alert" className="attachment-empty attachment-error">{error}<button type="button" onClick={catalog.retry}>Retry attachments</button></div> : familySockets.length === 0 ? <p className="attachment-empty">This shape has no safe {ATTACHMENT_FAMILIES.find((family) => family.id === activeFamily)?.label.toLowerCase()} sockets.</p> : familyAssets.length === 0 ? <p className="attachment-empty">No configured recipe fits this shape safely.</p> : <div className="attachment-grid">{familyAssets.map((asset) => {
           const selected = selectedAsset?.recipe.key === asset.recipe.key;
           return <button type="button" key={asset.recipe.key} aria-pressed={selected} className={`attachment-card ${selected ? 'selected' : ''}`} onClick={() => { setSelectedRecipeKey(asset.recipe.key); setActiveStage(2); }}><AssetImage src={asset.recipe.thumbnail} alt="" /><span>{asset.recipe.name}</span><small>₱{asset.priceAdjustment.toLocaleString()} each</small></button>;
         })}</div>}
@@ -262,6 +215,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
         </> : <button type="button" aria-pressed={isSocketChoiceSelected(group.sockets)} className={isSocketChoiceSelected(group.sockets) ? 'selected' : ''} onClick={() => place(group.sockets)}>Place</button>}</div></div>)}</div>
       </PanelSection>
 
+      {error && value.length > 0 && <div role="alert" className="attachment-empty attachment-error">{error}<button type="button" onClick={catalog.retry}>Retry attachments</button></div>}
       <PanelSection number={3} title="Adjust Placement" summary={value.length ? `${value.length} selected attachment${value.length === 1 ? '' : 's'}` : 'Place an attachment first'} expanded={visibleStage === 3} completed={value.length > 0} disabled={!value.length} onToggle={() => setActiveStage(3)} regionId="attachment-adjust-section">
         <div className="attachment-selected-list">{value.map((selection) => {
           const recipe = getGeneratedAttachmentRecipe(selection.recipeKey, selection.recipeVersion);
@@ -280,7 +234,9 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
           const partnerKey = partner && attachmentPlacementKey(selection.id, partner.socket.id);
           const hasPartnerLimits = partnerKey && placementLimits ? Object.prototype.hasOwnProperty.call(placementLimits, partnerKey) : false;
           const partnerLimits = recipe && partnerSocket ? (hasPartnerLimits ? placementLimits![partnerKey!] : getSocketTransformLimits(recipe, partnerSocket)) : null;
-          const limits = pairMode === 'linked' ? (activeLimits && partnerLimits ? linkedLimits(activeLimits, partnerLimits) : null) : activeLimits;
+          const proposedLimits = pairMode === 'linked' ? (activeLimits && partnerLimits ? linkedLimits(activeLimits, partnerLimits) : null) : activeLimits;
+          const limits = proposedLimits && CONTROL_CONFIG.every(({ key }) => proposedLimits[key].min <= proposedLimits[key].max) ? proposedLimits : null;
+          const selectionIssues = selection.placements.map(p => issues[attachmentPlacementKey(selection.id, p.socket.id)]).filter(Boolean);
           const adjustmentExpanded = expandedSelectionId === selection.id;
           const adjustmentRegionId = `attachment-adjust-${selection.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
           return <article className={`attachment-selected attachment-adjust-card${adjustmentExpanded ? ' expanded' : ''}`} key={selection.id}>
@@ -288,6 +244,7 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
               <button type="button" className="attachment-adjust-toggle" aria-expanded={adjustmentExpanded} aria-controls={adjustmentRegionId} onClick={() => setExpandedSelectionId(adjustmentExpanded ? '' : selection.id)}><span><strong>{selection.name}</strong><small>{selection.placements.map((placement) => placement.socket.name).join(' + ')}</small></span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg></button>
               <button type="button" onClick={() => removeSelection(selection.id)}>Remove</button>
             </div>
+            {selectionIssues.length > 0 && <p role="alert" className="attachment-empty attachment-error">{[...new Set(selectionIssues)].join(' ')}</p>}
             <div id={adjustmentRegionId} hidden={!adjustmentExpanded}>
               {isPair ? <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} editing mode`}>{[{ id: 'linked', name: 'Linked' }, ...selection.placements.map((placement) => ({ id: placement.socket.id, name: placement.socket.name }))].map((mode) => <button type="button" role="tab" aria-selected={mode.id === pairMode} className={mode.id === pairMode ? 'active' : ''} key={mode.id} onClick={() => setPairEditModeBySelection((current) => ({ ...current, [selection.id]: mode.id }))}>{mode.name}</button>)}</div>
                 : selection.placements.length > 1 && <div className="attachment-instance-tabs" role="tablist" aria-label={`${selection.name} instances`}>{selection.placements.map((placement) => <button type="button" role="tab" aria-selected={placement.socket.id === activePlacement.socket.id} className={placement.socket.id === activePlacement.socket.id ? 'active' : ''} key={placement.socket.id} onClick={() => setActivePlacementBySelection((current) => ({ ...current, [selection.id]: placement.socket.id }))}>{placement.socket.name}</button>)}</div>}
@@ -300,8 +257,8 @@ export default function AttachmentTab({ shopId, modelId, sockets, modelHeightIn,
                   const placementLimitsForSocket = recipe && socket ? (measured ? placementLimits![key] : getSocketTransformLimits(recipe, socket)) : null;
                   return placementLimitsForSocket ? updateAttachmentPlacement(current, selection.id, placement.socket.id, clampAttachmentTransform(getDefaultAttachmentTransform(placement.socket.family), placementLimitsForSocket)) : current;
                 }, value);
-                onChange(selection.family === 'handle' ? updateHandleThickness(reset, selection.id, 1) : reset);
-              }}>Reset Adjustments</button></div> : <p className="attachment-empty">This placement is unavailable for the current shape.</p>}
+                controls.reset(selection.family === 'handle' ? updateHandleThickness(reset, selection.id, 1) : reset);
+              }}>Reset Adjustments</button></div> : <p className="attachment-empty">These controls have no shared safe range. Edit an individual placement, change the shape, or remove this attachment.</p>}
             </div>
           </article>;
         })}</div>

@@ -1,0 +1,79 @@
+[
+  {
+    "model": "Bottle Teracotta Vase",
+    "bytes": 6961320,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 96,
+    "valid": 96,
+    "invalid": 0,
+    "controlMedianMs": 1.2445999999999913,
+    "controlP95Ms": 3.8355000000001382
+  },
+  {
+    "model": "Mini Terracotta Bowl",
+    "bytes": 4284292,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 72,
+    "valid": 38,
+    "invalid": 58,
+    "controlMedianMs": 0.12440000000060536,
+    "controlP95Ms": 2.3048999999991793
+  },
+  {
+    "model": "Wave Pot",
+    "bytes": 5525624,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 66,
+    "valid": 61,
+    "invalid": 35,
+    "controlMedianMs": 1.6181999999971595,
+    "controlP95Ms": 3.821700000000419
+  },
+  {
+    "model": "Tall Cylinder Planter",
+    "bytes": 6080060,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 76,
+    "valid": 76,
+    "invalid": 20,
+    "controlMedianMs": 1.108700000000681,
+    "controlP95Ms": 2.0939999999973224
+  },
+  {
+    "model": "Rounded Garden Planter",
+    "bytes": 5787972,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 76,
+    "valid": 60,
+    "invalid": 36,
+    "controlMedianMs": 0.9382000000041444,
+    "controlP95Ms": 2.0907999999981257
+  },
+  {
+    "model": "Large Tapered Square Planter",
+    "bytes": 3514656,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 74,
+    "valid": 74,
+    "invalid": 22,
+    "controlMedianMs": 2.606599999999162,
+    "controlP95Ms": 5.175999999999476
+  },
+  {
+    "model": "Banded Terracotta Vase",
+    "bytes": 20558436,
+    "shapeCases": 12,
+    "recipes": 8,
+    "checks": 92,
+    "valid": 92,
+    "invalid": 4,
+    "controlMedianMs": 1.4939999999987776,
+    "controlP95Ms": 3.502599999999802
+  }
+]

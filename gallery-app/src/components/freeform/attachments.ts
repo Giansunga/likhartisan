@@ -162,7 +162,11 @@ export function selectedSocketIds(selections: AttachmentSelection[]) {
 
 export function upsertAttachmentSelection(selections: AttachmentSelection[], next: AttachmentSelection) {
   const nextSocketIds = new Set(next.placements.map((placement) => placement.socket.id));
-  return [...selections.filter((selection) => !selection.placements.some((placement) => nextSocketIds.has(placement.socket.id))), next];
+  const remaining = selections.flatMap((selection) => {
+    const placements = selection.placements.filter((placement) => !nextSocketIds.has(placement.socket.id));
+    return placements.length ? [{ ...selection, placements }] : [];
+  });
+  return [...remaining, next];
 }
 
 export function updateAttachmentPlacement(selections: AttachmentSelection[], selectionId: string, socketId: string, transform: AttachmentPlacementTransform) {

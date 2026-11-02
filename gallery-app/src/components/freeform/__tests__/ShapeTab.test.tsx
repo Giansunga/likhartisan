@@ -86,4 +86,41 @@ describe('ShapeTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset Shape' }));
     expect(onChange).toHaveBeenCalledWith(base);
   });
+
+  it.each(['pointerup', 'pointercancel', 'blur'])('commits a drag ending on window %s', (event) => {
+    const onChange = vi.fn();
+    const interaction = vi.fn();
+    render(<ShapeTab shapeParams={initialShape} onChange={onChange} onInteractionChange={interaction} />);
+    const height = screen.getByRole('slider', { name: 'Height' });
+    fireEvent.pointerDown(height);
+    fireEvent.change(height, { target: { value: '11' } });
+    fireEvent(window, new Event(event));
+    expect(onChange).toHaveBeenLastCalledWith({ ...initialShape, height: 11 });
+    expect(interaction.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('commits queued edits when a panel unmounts and does not replay cancelled frames', () => {
+    const onChange = vi.fn();
+    const interaction = vi.fn();
+    const { unmount } = render(<ShapeTab shapeParams={initialShape} onChange={onChange} onInteractionChange={interaction} />);
+    fireEvent.pointerDown(screen.getByRole('slider', { name: 'Height' }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Height' }), { target: { value: '11' } });
+    unmount();
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...initialShape, height: 11 });
+    expect(interaction).toHaveBeenLastCalledWith(false);
+    expect(queuedFrame).toBeNull();
+  });
+
+  it('keeps saved outlier ranges stable while editing and updates them for a different baseline', () => {
+    const base = shapeFromModelBase({ height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 4 });
+    const { rerender } = render(<ShapeTab shapeParams={{ ...base, height: 19 }} baseShape={base} onChange={vi.fn()} />);
+    const height = screen.getByRole('slider', { name: 'Height' });
+    expect(height).toHaveAttribute('max', '19');
+    rerender(<ShapeTab shapeParams={{ ...base, height: 18 }} baseShape={base} onChange={vi.fn()} />);
+    expect(height).toHaveAttribute('max', '19');
+    const next = shapeFromModelBase({ height: 20, bodyWidth: 8, neckWidth: 5, rimSize: 4 });
+    rerender(<ShapeTab shapeParams={next} baseShape={next} onChange={vi.fn()} />);
+    expect(height).toHaveAttribute('min', '10');
+    expect(height).toHaveAttribute('max', '30');
+  });
 });

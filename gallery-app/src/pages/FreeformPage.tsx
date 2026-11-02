@@ -1,6 +1,6 @@
 import { useUnsavedProgress } from '../hooks/useUnsavedProgress';
 import { confirmAction } from '../lib/popups';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,9 @@ import ShapeTab from '../components/freeform/ShapeTab';
 import MaterialTab from '../components/freeform/MaterialTab';
 import DecorTab from '../components/freeform/DecorTab';
 import AttachmentTab from '../components/freeform/AttachmentTab';
+import { useAttachmentCatalog } from '../components/freeform/useAttachmentCatalog';
+import { attachmentDesignRevision, type AttachmentAnalysis } from '../components/freeform/attachmentValidation';
+import { attachmentPlacementKey } from '../components/freeform/attachmentPlacement';
 
 import ModelThumb from '../components/freeform/ModelThumb';
 import ShopSelectModal from '../components/freeform/ShopSelectModal';
@@ -103,6 +106,53 @@ export default function FreeformPage() {
   const [shopSelectOpen, setShopSelectOpen] = useState(false);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [selectedShopName, setSelectedShopName] = useState('');
+
+  const [controlInteraction, setControlInteraction] = useState(false);
+  const [attachmentAnalysis, setAttachmentAnalysis] = useState<AttachmentAnalysis | null>(null);
+  const [analysisAttempt, setAnalysisAttempt] = useState(0);
+  const catalog = useAttachmentCatalog(selectedShopId, Boolean(selectedModel) && (activeStep === 'attachment' || attachmentParams.length > 0));
+  const attachmentRevision = attachmentDesignRevision(selectedModel, shapeParams, attachmentParams);
+  const noticeRef = useRef('');
+  const handleAttachmentAnalysis = useCallback((analysis: AttachmentAnalysis) => {
+    if (analysis.revision !== attachmentRevision) return;
+    setAttachmentAnalysis(analysis);
+    setAttachmentSockets(analysis.sockets);
+    setAttachmentPlacementLimits(analysis.limits);
+    if (JSON.stringify(analysis.attachments) !== JSON.stringify(attachmentParams)) setAttachmentParams(analysis.attachments);
+    if (analysis.message && analysis.message !== noticeRef.current) toast.info(analysis.message);
+    noticeRef.current = analysis.message;
+  }, [attachmentRevision, attachmentParams]);
+  const attachmentIssues: Record<string, string> = {};
+  if (attachmentAnalysis?.revision === attachmentRevision) {
+    for (const [key, result] of Object.entries(attachmentAnalysis.placements)) {
+      if (result.status === 'invalid') attachmentIssues[key] = result.reason;
+    }
+  }
+  if (catalog.status === 'ready') {
+    for (const attachment of attachmentParams) {
+      const asset = catalog.assets.find(asset => asset.recipe.key === attachment.recipeKey && asset.recipe.version === attachment.recipeVersion);
+      if (!asset || (attachment.shopId && attachment.shopId !== selectedShopId)) {
+        for (const placement of attachment.placements) attachmentIssues[attachmentPlacementKey(attachment.id, placement.socket.id)] =
+          'This attachment is unavailable at the selected shop. Remove it or choose a different attachment.';
+      }
+    }
+  }
+  const attachmentCheckPending = attachmentParams.length > 0 && (controlInteraction || catalog.status === 'pending'
+    || attachmentAnalysis?.revision !== attachmentRevision);
+  const attachmentCheckError = attachmentParams.length > 0 && (catalog.status === 'error' || attachmentAnalysis?.status === 'error');
+  const attachmentsReady = !attachmentCheckPending && !attachmentCheckError && Object.keys(attachmentIssues).length === 0;
+  const attachmentNotice = attachmentCheckError ? (catalog.error || attachmentAnalysis?.message || 'Attachment analysis failed. Please retry.')
+    : attachmentCheckPending ? 'Checking attachments for this design…'
+      : !attachmentsReady ? 'Some attachments need attention. Adjust or remove them before saving or sending.' : '';
+  function requireAttachmentsReady() {
+    if (selectedModel && !hasValidDesign(selectedModel, shapeParams, materialParams)) {
+      toast.info('The design has invalid shape measurements. Reset the shape before saving or sending.');
+      return false;
+    }
+    if (attachmentsReady && !controlInteraction) return true;
+    toast.info(attachmentNotice || 'Finish adjusting the design before saving or sending.');
+    return false;
+  }
 
   /* Modals */
   const [showShopModal, setShowShopModal] = useState(false);
@@ -500,6 +550,7 @@ function applyDesign(design: {
   /* ─── Save design ─── */
 
   function openSaveModal() {
+    if (!requireAttachmentsReady()) return;
     if (!selectedModel) {
       toast.error('Please select a model before saving.');
       setActiveStep('model');
@@ -510,6 +561,7 @@ function applyDesign(design: {
   }
 
   async function handleSaveDesign() {
+    if (!requireAttachmentsReady()) return;
     if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
       return;
@@ -556,6 +608,7 @@ function applyDesign(design: {
   /* ─── Send to shop ─── */
 
   async function handleCheckout() {
+    if (!requireAttachmentsReady()) return;
     if (!isReviewStep) return;
     if (!isDesignValid) {
       toast.error('Complete the required design selections before sending to a shop.');
@@ -591,6 +644,7 @@ function applyDesign(design: {
   }
 
   async function handleSubmitToShop(quantity: number, buyerNote: string) {
+    if (!requireAttachmentsReady()) return;
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
     if (!user || !isValidDesignRequestQuantity(quantity)) {
@@ -638,7 +692,7 @@ function applyDesign(design: {
   } : null;
   const estimatedPrice = estimate?.price ?? 0;
   const estimatedDays = estimate?.productionDays ?? 0;
-  const isDesignValid = Boolean(modelBase || (revisionMode && revisionEstimate)) && hasValidDesign(selectedModel, shapeParams, materialParams);
+  const isDesignValid = Boolean(modelBase || (revisionMode && revisionEstimate)) && hasValidDesign(selectedModel, shapeParams, materialParams) && attachmentsReady && !controlInteraction;
   const canAdvanceToNext = !isReviewStep && isDesignValid && canGoTo(stepIndex + 1);
   const requestSnapshot: DesignRequestSnapshotV1 = createDesignRequestSnapshot({
     model: { id: selectedModelId, name: modelName, file: selectedModel, thumbnail: modelThumbnail, category: modelCategory },
@@ -744,6 +798,13 @@ function applyDesign(design: {
 
             <div className="freeform-sidebar-scroll">
               <div ref={controlsContentRef} className="freeform-tab-section" tabIndex={-1}>
+      {attachmentNotice && <div className="freeform-attachment-status" role={attachmentCheckPending ? 'status' : 'alert'}>
+        <p>{attachmentNotice}</p>
+        {[...new Set(Object.values(attachmentIssues))].map(reason => <p key={reason}>{reason}</p>)}
+        {!attachmentCheckPending && <button type="button" onClick={() => setActiveStep('attachment')}>Adjust attachments</button>}
+        {attachmentCheckError && <button type="button" onClick={() => { catalog.retry(); setAnalysisAttempt(value => value + 1); }}>Retry attachment check</button>}
+      </div>}
+
 {activeStep === 'model' && (selectedShopId ? (
                   <ModelTab selectedModel={selectedModel} shopId={selectedShopId} onSelect={(f, n, c, t, id, base) => selectModel(f, n, c, t, id, true, base)} />
                 ) : (
@@ -755,11 +816,11 @@ function applyDesign(design: {
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={modelBase ? shapeFromModelBase(modelBase) : shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : DEFAULT_SHAPE} onChange={setShapeParams} />}
+                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : modelBase ? shapeFromModelBase(modelBase) : DEFAULT_SHAPE} onChange={setShapeParams} onInteractionChange={setControlInteraction} />}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (
-                  <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightIn={shapeParams.height} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} onCompatibilityWarning={(message) => toast.info(message)} />
+                  <AttachmentTab shopId={selectedShopId} modelId={selectedModelId} sockets={attachmentSockets} modelHeightIn={shapeParams.height} surfaceScaleIn={shapeParams.height * (attachmentAnalysis?.maxDimensionToHeight || 1)} value={attachmentParams} placementLimits={attachmentPlacementLimits} onChange={setAttachmentParams} catalog={catalog} issues={attachmentIssues} onInteractionChange={setControlInteraction} />
                 )}
                 {activeStep === 'review' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', paddingTop: '80px' }}>
@@ -767,10 +828,10 @@ function applyDesign(design: {
                       <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="1.5" style={{ width: '40px', height: '40px', margin: '0 auto 12px' }}>
                         <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                       </svg>
-                      <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>Design Complete</p>
+                      <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-dark)', marginBottom: '4px' }}>{attachmentsReady ? 'Design Complete' : 'Attachments need attention'}</p>
                       <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Review your choices and save or share with a shop.</p>
                     </div>
-                    <button onClick={openSaveModal} className="freeform-save-btn" style={{ width: '100%', marginBottom: '16px' }}>
+                    <button onClick={openSaveModal} disabled={!attachmentsReady || controlInteraction} className="freeform-save-btn" style={{ width: '100%', marginBottom: '16px' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '18px', height: '18px' }}>
                         <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
                       </svg>
@@ -813,10 +874,10 @@ function applyDesign(design: {
               attachmentSockets={attachmentSockets}
               showAttachmentSockets={activeStep === 'attachment' && showAttachmentSockets}
               selectedSocketIds={[...selectedSocketIds(attachmentParams)]}
-              // Socket and collision analysis is intentionally lazy. Running it
-              // after every shape-slider release blocks the next interaction.
-              onSocketsChange={activeStep === 'attachment' ? setAttachmentSockets : undefined}
-              onAttachmentLimitsChange={activeStep === 'attachment' ? setAttachmentPlacementLimits : undefined}
+               onSocketsChange={activeStep === 'attachment' ? setAttachmentSockets : undefined}
+               onAttachmentAnalysis={handleAttachmentAnalysis}
+               analysisAttempt={analysisAttempt}
+               pauseAttachmentAnalysis={controlInteraction}
               onMorphDetected={() => {}}
               onControlsReady={handleControlsReady}
               onAttachmentError={(attachment) => toast.error(`${attachment.name} could not be loaded. The rest of your design is still available.`)}
@@ -1205,7 +1266,7 @@ function applyDesign(design: {
               <button onClick={() => setSaveModalOpen(false)} className="freeform-tab-btn-outline" style={{ flex: 1 }}>Cancel</button>
               <button
                 onClick={handleSaveDesign}
-                disabled={!designName.trim() || saving}
+                disabled={!designName.trim() || saving || !attachmentsReady || controlInteraction}
                 className="freeform-save-btn"
                 style={{ flex: 1, marginBottom: 0, opacity: !designName.trim() || saving ? 0.5 : 1 }}
               >
@@ -1215,6 +1276,7 @@ function applyDesign(design: {
           </div>
         </div>
       )}
+
 
       <SendDesignRequestModal
         key={`${revisionRequestId ?? "new"}:${revisionQuantity}:${revisionNote}`}
@@ -1237,12 +1299,7 @@ function applyDesign(design: {
       {!revisionMode && <ShopSelectModal
         open={shopSelectOpen}
         onSelect={(id, name) => {
-          if (selectedShopId !== id && attachmentParams.length) {
-            const compatibleAttachments = attachmentParams.filter((attachment) => !attachment.shopId || attachment.shopId === id);
-            if (compatibleAttachments.length !== attachmentParams.length) {
-              setAttachmentParams(compatibleAttachments);
-              toast.info('Attachments unavailable at the new shop were removed.');
-            }
+          if (selectedShopId !== id) {
             setAttachmentSockets([]);
             setAttachmentPlacementLimits({});
           }

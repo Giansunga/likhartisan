@@ -2207,3 +2207,24 @@ body:has(.freeform-page) .likhai-dock {
 
 .freeform-summary-field-text { min-width: 0; }
 .freeform-summary-field-label { white-space: normal; overflow-wrap: anywhere; }
+
+/* Compatibility notices remain visible in every design step. */
+.freeform-attachment-status {
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--primary-color);
+  border-radius: 10px;
+  color: var(--text-dark);
+  background: var(--bg-tertiary);
+  font-size: 0.8rem;
+}
+.freeform-attachment-status p { margin: 0 0 8px; }
+.freeform-attachment-status button, .attachment-error button {
+  margin: 4px 8px 0 0;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.attachment-offset-control input:disabled { opacity: 0.45; cursor: not-allowed; }

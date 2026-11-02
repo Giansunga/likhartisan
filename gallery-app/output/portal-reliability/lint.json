@@ -1,0 +1,433 @@
+[
+  {
+    "file": "\\output\\pattern-check\\attachment-performance.test.ts",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 18,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\output\\pattern-check\\preview.tsx",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 6,
+        "rule": "react-refresh/only-export-components",
+        "message": "Fast refresh only works when a file has exports. Move your component(s) to a separate file."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\AuthModal.tsx",
+    "errors": 2,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 70,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 78,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\freeform\\SaveTab.tsx",
+    "errors": 2,
+    "warnings": 1,
+    "messages": [
+      {
+        "line": 11,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 12,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 36,
+        "rule": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\freeform\\ShopSelectModal.tsx",
+    "errors": 4,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 26,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 27,
+        "rule": "react-hooks/immutability",
+        "message": "Error: Cannot access variable before it is declared"
+      },
+      {
+        "line": 56,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 74,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\Navbar.tsx",
+    "errors": 2,
+    "warnings": 1,
+    "messages": [
+      {
+        "line": 78,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 106,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 132,
+        "rule": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\UShapeReviewScroller.tsx",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 92,
+        "rule": "react-hooks/refs",
+        "message": "Error: Cannot access refs during render"
+      }
+    ]
+  },
+  {
+    "file": "\\src\\components\\__tests__\\NavbarNotifications.test.tsx",
+    "errors": 2,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 13,
+        "rule": "@typescript-eslint/no-unused-vars",
+        "message": "'_width' is defined but never used."
+      },
+      {
+        "line": 162,
+        "rule": "@typescript-eslint/no-unused-vars",
+        "message": "'_width' is defined but never used."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\contexts\\ThemeContext.tsx",
+    "errors": 2,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 22,
+        "rule": "react-refresh/only-export-components",
+        "message": "Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components."
+      },
+      {
+        "line": 134,
+        "rule": "react-refresh/only-export-components",
+        "message": "Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\hooks\\useMediaQuery.ts",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 12,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      }
+    ]
+  },
+  {
+    "file": "\\src\\hooks\\useSupabaseRealtime.ts",
+    "errors": 22,
+    "warnings": 1,
+    "messages": [
+      {
+        "line": 6,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 6,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 7,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 7,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 8,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 8,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 11,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 12,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 12,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 13,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 14,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 15,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 15,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 16,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 17,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 17,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 29,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 42,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 55,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 57,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 67,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 69,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 104,
+        "rule": "react-hooks/exhaustive-deps",
+        "message": "React Hook useEffect has missing dependencies: 'handlers' and 'user'. Either include them or remove the dependency array."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\lib\\csvExport.ts",
+    "errors": 3,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 4,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 4,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 7,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\lib\\utils.ts",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 57,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\pages\\admin\\ProductListPage.tsx",
+    "errors": 3,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 160,
+        "rule": "preserve-caught-error",
+        "message": "There is no `cause` attached to the symptom error being thrown."
+      },
+      {
+        "line": 161,
+        "rule": "preserve-caught-error",
+        "message": "There is no `cause` attached to the symptom error being thrown."
+      },
+      {
+        "line": 162,
+        "rule": "preserve-caught-error",
+        "message": "There is no `cause` attached to the symptom error being thrown."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\pages\\DashboardPage.tsx",
+    "errors": 6,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 90,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 102,
+        "rule": "react-hooks/set-state-in-effect",
+        "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+      },
+      {
+        "line": 119,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 120,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 137,
+        "rule": "prefer-const",
+        "message": "'imageUrls' is never reassigned. Use 'const' instead."
+      },
+      {
+        "line": 166,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\pages\\FreeformPage.tsx",
+    "errors": 0,
+    "warnings": 2,
+    "messages": [
+      {
+        "line": 130,
+        "rule": "react-hooks/exhaustive-deps",
+        "message": "React Hook useEffect contains a call to 'setCleanDesign'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [currentDesign] as a second argument to the useEffect Hook."
+      },
+      {
+        "line": 133,
+        "rule": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')."
+      }
+    ]
+  },
+  {
+    "file": "\\src\\pages\\__tests__\\ShopPage.test.tsx",
+    "errors": 2,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 22,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      },
+      {
+        "line": 61,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  },
+  {
+    "file": "\\vite.config.ts",
+    "errors": 1,
+    "warnings": 0,
+    "messages": [
+      {
+        "line": 10,
+        "rule": "@typescript-eslint/no-explicit-any",
+        "message": "Unexpected any. Specify a different type."
+      }
+    ]
+  }
+]

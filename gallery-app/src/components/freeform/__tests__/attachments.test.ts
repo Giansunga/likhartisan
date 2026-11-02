@@ -68,6 +68,16 @@ describe('generated attachment selections', () => {
     expect([...selectedSocketIds(result)].sort()).toEqual(['left', 'right']);
   });
 
+  it('replaces one side of a pair without removing its partner or charging twice', () => {
+    const pair = createAttachmentSelection(asset, [left, right]);
+    const replacement = createAttachmentSelection({ ...asset, recipe: square, priceAdjustment: 120 }, [left]);
+    const result = upsertAttachmentSelection([pair], replacement);
+    expect(result[0].placements.map(p => p.socket.id)).toEqual(['right']);
+    expect(result[1].placements.map(p => p.socket.id)).toEqual(['left']);
+    expect(attachmentTotals(result).price).toBe(220);
+    expect(pair.placements).toHaveLength(2);
+  });
+
   it('updates one side of a paired handle independently', () => {
     const selection = createAttachmentSelection(asset, [left, right]);
     const next = updateAttachmentPlacement([selection], selection.id, 'left', { ...DEFAULT_ATTACHMENT_TRANSFORM, twistDegrees: 40 });
