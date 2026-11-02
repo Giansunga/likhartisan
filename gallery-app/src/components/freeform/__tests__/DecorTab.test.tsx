@@ -15,7 +15,8 @@ describe('DecorTab guided workflow', () => {
     const { rerender } = render(<DecorTab decoration={DEFAULT_DECORATION} onChange={onChange} />);
     const sampaguita = screen.getAllByRole('button', { name: /Sampaguita/ });
     expect(sampaguita).toHaveLength(1);
-    expect(sampaguita[0]).toHaveAccessibleDescription('Star-like blossoms');
+    expect(sampaguita[0]).toHaveAccessibleName('Sampaguita');
+    expect(screen.queryByText('Star-like blossoms')).not.toBeInTheDocument();
     expect(screen.queryByText('Paired sampaguita blossoms')).not.toBeInTheDocument();
     fireEvent.click(sampaguita[0]);
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ patternId: 'floral-sampaguita' }));
