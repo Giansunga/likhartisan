@@ -19,7 +19,7 @@ vi.mock('framer-motion', async () => {
     React.createElement('div', { ref, className: props.className, style: props.style, 'aria-hidden': props['aria-hidden'] }, props.children));
   return { motion: { section: Block, div: Block }, useScroll: () => ({ scrollYProgress: progress }), useTransform: () => '#fff', useMotionValueEvent: () => {} };
 });
-vi.mock('../FreeformViewer', () => ({ default: ({ modelFile }: { modelFile: string }) => <div>3D: {modelFile}</div> }));
+vi.mock('../FreeformViewer', () => ({ default: ({ modelFile, fallbackSrc }: { modelFile: string; fallbackSrc?: string }) => <div data-testid="featured-viewer" data-fallback-src={fallbackSrc}>3D: {modelFile}</div> }));
 vi.mock('../../../lib/supabase', () => ({ supabase: { from(table: string) {
   if (table === 'landing_3d_feature') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: state.setting, error: state.settingError }) }) }) };
   return { select: () => ({
@@ -61,9 +61,10 @@ describe('landing featured 3D preview', () => {
     const feature = createLandingFeature(model);
     feature.stages.details.material.color = '#123456';
     state.setting = { model_id: model.id, visual_keyframes: feature };
-    state.selected = model;
+    state.selected = { ...model, thumbnail: '/featured-vase.jpg' };
     renderSection();
     expect(await screen.findByText('3D: https://example.com/featured.glb')).toBeInTheDocument();
+    expect(screen.getByTestId('featured-viewer')).toHaveAttribute('data-fallback-src', '/featured-vase.jpg');
     expect(state.fallbackCalls).toBe(0);
     fireEvent.click(screen.getByText('Open Design Studio').closest('button')!);
     const destination = JSON.parse(screen.getByTestId('destination').textContent || '{}');

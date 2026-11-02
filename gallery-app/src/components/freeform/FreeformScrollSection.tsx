@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import ModelImageFallback from '../ModelImageFallback';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useMotionValueEvent } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
@@ -405,17 +406,12 @@ export default function FreeformScrollSection() {
               style={{ background: 'transparent' }}
             >
                 {freeformVisible && previewModel ? (
-                  <Suspense fallback={
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-10 h-10 border-2 border-[#D4C8BB] border-t-[#823E0B] rounded-full animate-spin" />
-                        <span className="text-[0.82rem] opacity-70">Loading 3D preview...</span>
-                      </div>
-                    </div>
-                  }>
+                  <Suspense fallback={<ModelImageFallback src={previewModelMeta?.thumbnail} alt={previewModelMeta?.name || 'Design model preview'} />}>
                     <FreeformViewer
                       preview
                       modelFile={previewModel}
+                      fallbackSrc={previewModelMeta?.thumbnail}
+                      fallbackAlt={previewModelMeta?.name || 'Design model preview'}
                       shapeParams={scrollShape}
                       materialParams={{ finish: scrollFinish, color: previewColor }}
                       decorationParams={scrollDecoration}

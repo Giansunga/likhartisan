@@ -386,7 +386,7 @@ function applyDesign(design: {
           navModel?.file_url || navState.modelUrl,
           navState.modelName || 'Selected Model',
           navState.modelCategory || 'Vase',
-          navState.modelThumbnail || '',
+          navModel.thumbnail || navState.modelThumbnail || '',
           navModel?.id || navState.modelId || null,
           true,
           navBase,
@@ -804,6 +804,8 @@ function applyDesign(design: {
           <div className="freeform-viewer-canvas freeform-viewer">
             <FreeformViewer
               modelFile={selectedModel}
+              fallbackSrc={modelThumbnail}
+              fallbackAlt={modelName || 'Selected model preview'}
               shapeParams={shapeParams}
               materialParams={materialParams}
               decorationParams={decorationParams}

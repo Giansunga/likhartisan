@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import ModelImageFallback from '../../components/ModelImageFallback';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { createLandingFeature, isEligibleLandingModel, normalizeLandingLook, parseLandingFeature, type LandingFeature, type LandingLook, type LandingModel, type LandingStages } from '../../lib/landing3dFeature';
@@ -183,8 +184,8 @@ export default function Featured3DPage() {
         </section>
         <aside className="featured-admin__preview" aria-label={`${TABS.find((entry) => entry.key === tab)?.label} 3D preview`}>
           <div className="featured-admin__canvas">
-            <Suspense fallback={<div className="featured-admin-empty">Loading 3D preview...</div>}>
-              <FreeformViewer key={model.id} preview modelFile={model.file_url} shapeParams={look.shape} materialParams={look.material} decorationParams={look.decoration} attachmentParams={look.attachments} showAttachmentSockets={tab === 'details'} onSocketsChange={setSockets} onAttachmentLimitsChange={setPlacementLimits} onMorphDetected={() => {}} onAttachmentError={() => setError('An attachment could not be displayed. Choose a different detail.')} />
+            <Suspense fallback={<ModelImageFallback src={model.thumbnail || undefined} alt={model.name} />}>
+              <FreeformViewer key={model.id} fallbackSrc={model.thumbnail || undefined} fallbackAlt={model.name} preview modelFile={model.file_url} shapeParams={look.shape} materialParams={look.material} decorationParams={look.decoration} attachmentParams={look.attachments} showAttachmentSockets={tab === 'details'} onSocketsChange={setSockets} onAttachmentLimitsChange={setPlacementLimits} onMorphDetected={() => {}} onAttachmentError={() => setError('An attachment could not be displayed. Choose a different detail.')} />
             </Suspense>
           </div>
           <p>Preview of the {tab === 'finish' ? finishLook === 'finishOne' ? 'first finish' : 'second finish' : tab} stage. Scroll timing and page text remain on the public page.</p>

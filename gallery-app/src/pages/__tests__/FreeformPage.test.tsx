@@ -12,7 +12,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: {
-        id: 'model-1', status: 'active', file_url: '/models/vase.glb', base_height_in: 10, base_body_width_in: 8,
+        id: 'model-1', status: 'active', file_url: '/models/vase.glb', thumbnail: '/models/vase.jpg', base_height_in: 10, base_body_width_in: 8,
         base_neck_width_in: 5, base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5,
       } })) })),
     })),
@@ -20,7 +20,7 @@ vi.mock('../../lib/supabase', () => ({
 }));
 
 vi.mock('../../components/freeform/FreeformViewer', () => ({
-  default: () => <div data-testid="freeform-viewer" />,
+  default: ({ fallbackSrc }: { fallbackSrc?: string }) => <div data-testid="freeform-viewer" data-fallback-src={fallbackSrc} />,
 }));
 
 vi.mock('../../components/freeform/ModelTab', () => ({
@@ -63,6 +63,10 @@ vi.mock('../../components/freeform/SendDesignRequestModal', () => ({
 }));
 
 describe('FreeformPage send-to-shop flow', () => {
+  it('passes the selected model photo to the viewer even when navigation omitted its thumbnail', async () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: { modelUrl: '/models/vase.glb', modelName: 'Test Vase' } }]}><FreeformPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-fallback-src', '/models/vase.jpg'));
+  });
   function expectNextActionEnabled() {
     const nextButtons = screen.getAllByRole('button', { name: 'Next' });
     expect(nextButtons.length).toBeGreaterThan(0);

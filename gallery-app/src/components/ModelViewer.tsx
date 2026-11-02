@@ -152,7 +152,7 @@ function StudioLighting({ fit, enabled }: { fit: ViewerFit; enabled: boolean }) 
   );
 }
 
-export default function ModelViewer({ url }: { url: string }) {
+export default function ModelViewer({ url, fallbackSrc, fallbackAlt }: { url: string; fallbackSrc?: string; fallbackAlt?: string }) {
   const [studioEnabled, setStudioEnabled] = useState(() => readStudioPreference(globalThis.localStorage));
   const [fit, setFit] = useState<ViewerFit>(DEFAULT_FIT);
   const [interacting, setInteracting] = useState(false);
@@ -184,7 +184,7 @@ export default function ModelViewer({ url }: { url: string }) {
         <span>Studio</span>
       </button>
 
-      <ModelLoadSurface source={url}>
+      <ModelLoadSurface source={url} fallbackSrc={fallbackSrc} fallbackAlt={fallbackAlt}>
       <Canvas
         key={url}
         camera={{ position: [3, 2, 5], fov: CAMERA_FOV }}

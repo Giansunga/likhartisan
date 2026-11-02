@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
+import ModelImageFallback from '../ModelImageFallback';
 import {
-  Box, ClipboardList, LoaderCircle, MousePointer2, Palette, Puzzle, RotateCcw, Ruler,
+  Box, ClipboardList, MousePointer2, Palette, Puzzle, RotateCcw, Ruler,
 } from 'lucide-react';
 import { getPattern, getPatternCategory, PATTERN_CATEGORIES } from '../freeform/decor';
 import { getFinishDefinition } from '../freeform/materials';
@@ -95,9 +96,11 @@ export default function SellerDesignDetails({
         <button type="button" onClick={resetView} disabled={!viewerControls} aria-label="Reset 3D view"><RotateCcw /> Reset view</button>
       </div>
       <div className="seller-design-workspace__viewer" aria-label="Interactive 3D design">
-        <Suspense fallback={<div className="seller-request-viewer__loading"><LoaderCircle className="seller-spin" /> Loading 3D preview…</div>}>
+        <Suspense fallback={<ModelImageFallback src={current.model.thumbnail} alt={current.model.name} />}>
           <FreeformViewer
             modelFile={current.model.file}
+            fallbackSrc={current.model.thumbnail}
+            fallbackAlt={current.model.name}
             shapeParams={current.shape}
             materialParams={current.material}
             decorationParams={current.decoration}

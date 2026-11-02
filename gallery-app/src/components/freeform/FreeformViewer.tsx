@@ -556,6 +556,8 @@ function Scene({
 
 export default function FreeformViewer({
   modelFile,
+  fallbackSrc,
+  fallbackAlt,
   shapeParams,
   materialParams,
   decorationParams = DEFAULT_DECORATION,
@@ -572,6 +574,8 @@ export default function FreeformViewer({
   preview = false,
 }: {
   modelFile: string;
+  fallbackSrc?: string;
+  fallbackAlt?: string;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
   decorationParams?: DecorationParams;
@@ -635,7 +639,7 @@ export default function FreeformViewer({
           }}
         />
       )}
-      <ModelLoadSurface source={modelFile}>
+      <ModelLoadSurface source={modelFile} fallbackSrc={fallbackSrc} fallbackAlt={fallbackAlt}>
         <Canvas
           key={modelFile}
           camera={{ position: [3, 1.5, 5], fov: preview ? 40 : 45 }}

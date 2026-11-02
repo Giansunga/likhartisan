@@ -6,9 +6,11 @@ export default function AssetImage({ src, onError, ...props }: ImgHTMLAttributes
   return <ImageSource key={src} src={src} onError={onError} {...props} />;
 }
 
-function ImageSource({ src, onError, ...props }: ImgHTMLAttributes<HTMLImageElement>) {
+function ImageSource({ src, srcSet, onError, ...props }: ImgHTMLAttributes<HTMLImageElement>) {
   const [failed, setFailed] = useState(false);
-  return <img {...props} src={failed || !src ? '/images/media-unavailable.svg' : resolveAssetUrl(src)} onError={event => {
+  const source = src?.trim();
+  const showFallback = failed || !source;
+  return <img {...props} srcSet={showFallback ? undefined : srcSet} src={showFallback ? '/images/media-unavailable.svg' : resolveAssetUrl(source)} onError={event => {
     if (!failed) { setFailed(true); onError?.(event); }
   }} />;
 }

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { updateModelState } from '../../lib/publicModelLoader';
 import ModelLoadSurface from '../ModelLoadSurface';
@@ -26,13 +26,52 @@ it('clears the failed model and remounts its boundary on explicit Retry', () => 
     if (fail) throw new Error('Simulated model error');
     return <div>Model ready</div>;
   }
-  render(<ModelLoadSurface source={source}><TestScene /></ModelLoadSurface>);
+  render(<ModelLoadSurface source={source} fallbackSrc="/retry-photo.jpg" fallbackAlt="Vase preview"><TestScene /></ModelLoadSurface>);
   expect(screen.getByText('3D model unavailable')).toBeInTheDocument();
+  expect(screen.getByAltText('Vase preview')).toHaveAttribute('src', '/retry-photo.jpg');
   fail = false;
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   expect(clear).toHaveBeenCalledWith(expect.any(Function), source);
   expect(screen.getByText('Model ready')).toBeInTheDocument();
   expect(screen.queryByText('3D model unavailable')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  expect(screen.queryByAltText('Vase preview')).not.toBeInTheDocument();
+  consoleError.mockRestore();
+});
+
+it('shows the model thumbnail through loading, retrying, preparation and failure, then reveals the ready model', () => {
+  const source = '/models/photo-fallback.glb';
+  updateModelState(source, { phase: 'loading', loaded: 0 });
+  render(<ModelLoadSurface source={source} fallbackSrc="/model-photo.jpg" fallbackAlt="Model photo"><div>Interactive model</div></ModelLoadSurface>);
+  for (const phase of ['loading', 'retrying', 'preparing', 'error'] as const) {
+    act(() => updateModelState(source, { phase, loaded: 0 }));
+    expect(screen.getByAltText('Model photo')).toHaveAttribute('src', '/model-photo.jpg');
+  }
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  act(() => updateModelState(source, { phase: 'ready', loaded: 1 }));
+  expect(screen.queryByAltText('Model photo')).not.toBeInTheDocument();
+  expect(screen.getByText('Interactive model')).toBeInTheDocument();
+});
+
+it('uses a local placeholder when the thumbnail is missing or fails', () => {
+  const source = '/models/missing-photo.glb';
+  const { rerender } = render(<ModelLoadSurface source={source}><div>Scene</div></ModelLoadSurface>);
+  expect(screen.getByAltText('Model preview')).toHaveAttribute('src', '/images/media-unavailable.svg');
+  rerender(<ModelLoadSurface source={source} fallbackSrc="/broken-photo.jpg"><div>Scene</div></ModelLoadSurface>);
+  const photo = screen.getByAltText('Model preview');
+  fireEvent.error(photo);
+  expect(photo).toHaveAttribute('src', '/images/media-unavailable.svg');
+});
+
+it('resets a failed boundary and its photo when the selected model changes', () => {
+  const source = '/models/old-selection.glb';
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  function BrokenScene(): never { throw new Error('Simulated WebGL failure'); }
+  const { rerender } = render(<ModelLoadSurface source={source} fallbackSrc="/old.jpg"><BrokenScene /></ModelLoadSurface>);
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  rerender(<ModelLoadSurface source="/models/new-selection.glb" fallbackSrc="/new.jpg"><div>New model</div></ModelLoadSurface>);
+  expect(screen.getByAltText('Model preview')).toHaveAttribute('src', '/new.jpg');
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  expect(screen.getByText('New model')).toBeInTheDocument();
   consoleError.mockRestore();
 });

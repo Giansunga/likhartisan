@@ -275,15 +275,7 @@ export default function ModelManagePage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-cream-secondary flex-shrink-0 border border-cream-tertiary">
-                        {m.thumbnail ? (
-                          <AssetImage src={m.thumbnail} alt={m.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" strokeWidth="1.5" className="w-6 h-6">
-                              <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0022 16z" />
-                            </svg>
-                          </div>
-                        )}
+                        <AssetImage src={m.thumbnail} alt={m.name} className="w-full h-full object-cover" />
                       </div>
                       <div className="font-semibold text-sm text-brown-dark">{m.name}</div>
                     </div>

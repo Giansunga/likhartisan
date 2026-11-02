@@ -65,7 +65,7 @@ export default function SendDesignRequestModal({
             <header className="freeform-request-heading"><Send size={24} /><div><h2 id="send-request-title">{revisionMode ? 'Send revised design' : 'Send design to shop'}</h2><p>Review the immutable design snapshot before {revisionMode ? 'submitting this revision' : 'requesting a quote'}.</p></div></header>
             <div className="freeform-request-layout">
               <div className="freeform-request-preview" aria-label="3D design preview">
-                <FreeformViewer modelFile={snapshot.model.file} shapeParams={snapshot.shape} materialParams={snapshot.material} decorationParams={snapshot.decoration} attachmentParams={snapshot.attachments} showAttachmentSockets={false} onMorphDetected={() => {}} preview />
+                <FreeformViewer fallbackSrc={snapshot.model.thumbnail} fallbackAlt={snapshot.model.name} modelFile={snapshot.model.file} shapeParams={snapshot.shape} materialParams={snapshot.material} decorationParams={snapshot.decoration} attachmentParams={snapshot.attachments} showAttachmentSockets={false} onMorphDetected={() => {}} preview />
               </div>
               <div className="freeform-request-form">
                 <div className="freeform-request-selected-shop"><span className="freeform-request-shop-avatar">{shop.image ? <AssetImage src={shop.image} alt="" /> : shop.name.slice(0, 1)}</span><span><small>{revisionMode ? 'REVISION FOR' : 'SENDING TO'}</small><strong>{shop.name}</strong></span>{revisionMode ? null : <button type="button" onClick={() => setChangingShop(true)}>Change</button>}</div>

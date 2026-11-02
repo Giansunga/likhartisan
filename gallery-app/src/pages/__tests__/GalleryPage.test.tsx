@@ -38,6 +38,17 @@ function product(id: string, stock: number, price = 100) {
 }
 
 describe('GalleryPage', () => {
+  it('keeps missing and broken product images visible through the local fallback', async () => {
+    mocks.order.mockResolvedValue({ data: [
+      { ...product('Missing photo', 5), image: '' },
+      { ...product('Broken photo', 5), image: '/broken-gallery.jpg' },
+    ], error: null });
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    expect(await screen.findByAltText('Missing photo')).toHaveAttribute('src', '/images/media-unavailable.svg');
+    const image = screen.getByAltText('Broken photo');
+    fireEvent.error(image);
+    expect(image).toHaveAttribute('src', '/images/media-unavailable.svg');
+  });
   function ReturnControls() {
     const navigate = useNavigate();
     return <><button onClick={() => navigate(-1)}>Return with Back</button><Link to="/gallery">Gallery breadcrumb</Link></>;

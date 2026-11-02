@@ -40,7 +40,7 @@ export default function ShopProductsSection({ shopId, shopName, products, produc
               return (
                 <Link className="shop-product-card" to={`/product/${product.id}`} key={product.id}>
                   <div className="shop-product-card__image">
-                    {product.image ? <AssetImage src={product.image} alt={product.name} loading="lazy" /> : <PackageOpen aria-hidden="true" />}
+                    <AssetImage src={product.image} alt={product.name} loading="lazy" />
                     {product.category ? <span>{product.category}</span> : null}
                   </div>
                   <div className="shop-product-card__body">

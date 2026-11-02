@@ -1,5 +1,6 @@
 import { resolveAssetUrl } from '../lib/assetDelivery';
 import AssetImage from '../components/AssetImage';
+import ModelImageFallback from '../components/ModelImageFallback';
 import { Component, useState, useEffect, useMemo, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { addToCart, getCart, onCartUpdate } from '../data/store';
@@ -487,8 +488,8 @@ export default function ProductDetailPage() {
                 </button>
                 {product.model3d ? (
                   <ProductMediaErrorBoundary key={product.model3d} fallback={<AssetImage src={product.image} alt={product.name} id="viewer-main-img" />}>
-                    <Suspense fallback={<div className="pdp-media-loading" role="status"><span className="pdp-spinner" />Loading 3D model…</div>}>
-                      <ModelViewer url={product.model3d} />
+                    <Suspense fallback={<ModelImageFallback src={product.image} alt={product.name} />}>
+                      <ModelViewer url={product.model3d} fallbackSrc={product.image} fallbackAlt={product.name} />
                     </Suspense>
                   </ProductMediaErrorBoundary>
                 ) : <AssetImage src={product.image} alt={product.name} id="viewer-main-img" />}

@@ -1,6 +1,7 @@
 import { Component, Fragment, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useLoader } from '@react-three/fiber';
 import { PublicGLTFLoader, modelState, retainModel, subscribeModel, updateModelState } from '../lib/publicModelLoader';
+import ModelImageFallback from './ModelImageFallback';
 import './model-loading.css';
 
 class ModelBoundary extends Component<{ children: ReactNode; source: string }, { failed: boolean }> {
@@ -10,11 +11,18 @@ class ModelBoundary extends Component<{ children: ReactNode; source: string }, {
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export default function ModelLoadSurface({ source, children }: { source: string; children: ReactNode }) {
-  return <Surface key={source} source={source}>{children}</Surface>;
+interface Props {
+  source: string;
+  children: ReactNode;
+  fallbackSrc?: string;
+  fallbackAlt?: string;
 }
 
-function Surface({ source, children }: { source: string; children: ReactNode }) {
+export default function ModelLoadSurface(props: Props) {
+  return <Surface key={props.source} {...props} />;
+}
+
+function Surface({ source, children, fallbackSrc, fallbackAlt }: Props) {
   const state = useSyncExternalStore(listener => subscribeModel(source, listener), () => modelState(source));
   const [version, setVersion] = useState(0);
   useEffect(() => retainModel(source, () => useLoader.clear(PublicGLTFLoader, source)), [source]);
@@ -28,6 +36,7 @@ function Surface({ source, children }: { source: string; children: ReactNode }) 
   const loadingLabel = state.phase === 'preparing' ? 'Preparing 3D model…' : state.phase === 'retrying' ? 'Retrying download…' : 'Loading 3D model…';
   return <div className="model-load-surface">
     <Fragment key={version}><ModelBoundary source={source}>{children}</ModelBoundary></Fragment>
+    {state.phase !== 'ready' && <ModelImageFallback src={fallbackSrc} alt={fallbackAlt} />}
     {state.phase !== 'ready' && <div className={`model-load-status${error ? ' model-load-status--error' : ''}`} role="status" aria-live="polite">
       {error ? <div className="model-load-card">
         <div><strong>3D model unavailable</strong><span>Check your connection, then try again.</span></div>
