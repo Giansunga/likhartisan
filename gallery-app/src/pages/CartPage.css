@@ -57,11 +57,6 @@
   line-height: .98;
 }
 
-.cart-header p {
-  margin: 8px 0 0;
-  color: var(--text-light);
-  font-size: .94rem;
-}
 
 .cart-layout {
   display: grid;

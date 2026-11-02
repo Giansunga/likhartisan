@@ -440,8 +440,6 @@ export default function CheckoutPage() {
     <main className="checkout-page" id="main-content">
       <div className="checkout-shell">
         <CheckoutHeader
-          itemCount={itemCount}
-          shopName={items[0]?.shopName || 'Artisan shop'}
           isBuyNow={Boolean(buyNowItem)}
           onBack={() => buyNowItem ? navigate(-1) : navigate('/cart')}
         />

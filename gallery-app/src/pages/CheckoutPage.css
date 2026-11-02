@@ -58,11 +58,6 @@
   line-height: .98;
 }
 
-.checkout-header p {
-  margin: 9px 0 0;
-  color: var(--text-light);
-  font-size: .93rem;
-}
 
 .checkout-steps {
   display: flex;
@@ -154,19 +149,6 @@
   gap: 12px;
 }
 
-.checkout-section-number {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 31px;
-  width: 31px;
-  height: 31px;
-  border: 1px solid #ead8c8;
-  border-radius: 50%;
-  color: var(--accent-color);
-  background: #fff8f1;
-  font-size: .68rem;
-  font-weight: 850;
-}
 
 .checkout-card h2,
 .checkout-review h2,
@@ -703,21 +685,7 @@
   color: var(--text-light);
 }
 
-.checkout-assurances {
-  display: grid;
-  gap: 8px;
-  padding: 14px 20px;
-  border-top: 1px solid #eee7e0;
-  color: #6f6155;
-  background: #fdfbf8;
-  font-size: .69rem;
-}
 
-.checkout-assurances span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
 
 .checkout-dialog-backdrop {
   position: fixed;

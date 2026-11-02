@@ -11,7 +11,6 @@ import {
   Navigation,
   PackageCheck,
   Pencil,
-  ShieldCheck,
   Store,
   Truck,
   UserRound,
@@ -22,13 +21,11 @@ import { fmt } from '../../lib/utils';
 export type CheckoutDeliveryOption = 'pickup' | 'courier';
 
 interface CheckoutHeaderProps {
-  itemCount: number;
-  shopName: string;
   isBuyNow: boolean;
   onBack: () => void;
 }
 
-export function CheckoutHeader({ itemCount, shopName, isBuyNow, onBack }: CheckoutHeaderProps) {
+export function CheckoutHeader({ isBuyNow, onBack }: CheckoutHeaderProps) {
   return (
     <header className="checkout-header">
       <button type="button" className="checkout-back" onClick={onBack}>
@@ -38,7 +35,6 @@ export function CheckoutHeader({ itemCount, shopName, isBuyNow, onBack }: Checko
       <div className="checkout-header__row">
         <div>
           <h1>Review and pay</h1>
-          <p>{itemCount} {itemCount === 1 ? 'piece' : 'pieces'} from {shopName}</p>
         </div>
         <ol className="checkout-steps" aria-label="Checkout progress">
           <li className="checkout-step checkout-step--complete"><Check size={14} aria-hidden="true" /><span>Cart</span></li>
@@ -55,7 +51,7 @@ interface ContactCardProps {
 }
 export function ContactCard({ name, phone, address, requiresAddress, onEditProfile }: ContactCardProps) {
   return <section className="checkout-card checkout-contact" aria-labelledby="checkout-contact-title">
-    <div className="checkout-card__heading"><div><span className="checkout-section-number">01</span><div>
+    <div className="checkout-card__heading"><div><div>
       <h2 id="checkout-contact-title">Contact details</h2><p>Saved in your Profile for order updates and delivery.</p>
     </div></div><button type="button" className="checkout-text-button" onClick={onEditProfile}><Pencil size={14} aria-hidden="true" /> Edit in Profile</button></div>
     <div className="checkout-contact__summary"><span className="checkout-icon-tile"><UserRound size={20} aria-hidden="true" /></span><div>
@@ -96,7 +92,7 @@ export function DeliveryCard({
     <section className="checkout-card" aria-labelledby="checkout-delivery-title">
       <div className="checkout-card__heading">
         <div>
-          <span className="checkout-section-number">02</span>
+
           <div>
             <h2 id="checkout-delivery-title">Delivery method</h2>
             <p>Choose how you want to receive this artisan order.</p>
@@ -169,7 +165,7 @@ export function LocationCard({ hasDropoff, children }: LocationCardProps) {
     <section className="checkout-card checkout-location" aria-labelledby="checkout-location-title">
       <div className="checkout-card__heading">
         <div>
-          <span className="checkout-section-number">03</span>
+
           <div>
             <h2 id="checkout-location-title">Saved delivery pin</h2>
             <p>View your saved delivery location. Update your address or pin in Profile.</p>
@@ -258,10 +254,6 @@ export function OrderReview({
         </button>
         {disabledReason ? <p className="checkout-disabled-reason" role="status">{disabledReason}</p> : null}
         <p className="checkout-security"><LockKeyhole size={13} aria-hidden="true" /> Payment is encrypted and completed through PayMongo.</p>
-      </div>
-      <div className="checkout-assurances">
-        <span><ShieldCheck size={16} aria-hidden="true" /> Server-verified price and stock</span>
-        <span><PackageCheck size={16} aria-hidden="true" /> Only these items will be purchased</span>
       </div>
     </aside>
   );

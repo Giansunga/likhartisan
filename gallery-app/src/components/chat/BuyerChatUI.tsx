@@ -404,6 +404,10 @@ export function BuyerNewConversationDialog({ open, shops, search, getActivity, o
   }, [open, onClose]);
 
   if (!open) return null;
+  const visibleShops = shops.filter(shop => {
+    const name = shop.name?.trim();
+    return name && name.toLowerCase() !== 'unknown shop';
+  });
 
   return (
     <div className="buyer-new-chat" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -418,7 +422,7 @@ export function BuyerNewConversationDialog({ open, shops, search, getActivity, o
           <input autoFocus type="search" placeholder="Search shops" value={search} onChange={event => onSearchChange(event.target.value)} />
         </label>
         <div className="buyer-new-chat__list">
-          {shops.length === 0 ? <p className="buyer-new-chat__empty">No shops match your search.</p> : shops.map(shop => {
+          {visibleShops.length === 0 ? <p className="buyer-new-chat__empty">No shops match your search.</p> : visibleShops.map(shop => {
             const activity = getActivity(shop.id);
             return (
               <button type="button" key={shop.id} onClick={() => onSelect(shop)}>

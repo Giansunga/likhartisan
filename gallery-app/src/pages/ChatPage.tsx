@@ -244,7 +244,7 @@ export default function ChatPage() {
     if (isMobile) setMobileShowChat(true);
   }
 
-  const filteredShops = shops.filter(s => s.name.toLowerCase().includes(shopSearch.toLowerCase()) || s.description?.toLowerCase().includes(shopSearch.toLowerCase()));
+  const filteredShops = shops.filter(s => (s.name || '').toLowerCase().includes(shopSearch.toLowerCase()) || s.description?.toLowerCase().includes(shopSearch.toLowerCase()));
   const filteredConvs = conversations.filter(c => c.shop_name?.toLowerCase().includes(convSearch.toLowerCase()));
 
   function getShopActiveStatus(shopId: string): { active: boolean; text: string } {

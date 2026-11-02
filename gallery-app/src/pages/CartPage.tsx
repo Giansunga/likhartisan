@@ -529,7 +529,6 @@ export default function CartPage() {
           </button>
           <div>
             <h1>Shopping cart</h1>
-            <p>{items.reduce((sum, item) => sum + item.qty, 0)} pieces from {groups.length} {groups.length === 1 ? 'artisan' : 'artisans'}</p>
           </div>
         </header>
 
