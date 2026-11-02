@@ -3084,7 +3084,10 @@ body {
   min-height: 360px;
   display: flex;
   flex-direction: column;
-  padding: 28px clamp(22px, 2.3vw, 36px) 32px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px clamp(22px, 2.3vw, 36px);
   border-right: 1px solid rgba(69, 43, 27, 0.2);
   transition: background-color 220ms ease, transform 220ms ease;
 }
@@ -3118,7 +3121,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: auto;
+  margin-top: 0;
   color: var(--about-clay);
   font-size: 0.82rem;
   font-weight: 700;
@@ -3468,7 +3471,7 @@ body {
   .about-step,
   .about-step:first-child {
     min-height: auto;
-    padding: 26px 4px 30px;
+    padding: 28px 4px;
     border-right: 0;
     border-left: 0;
     border-bottom: 1px solid rgba(69, 43, 27, 0.2);

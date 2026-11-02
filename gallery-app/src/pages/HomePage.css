@@ -50,12 +50,12 @@
 .home-chapters .home-section-heading h2 em { color: #e89b61; }
 .home-chapter-grid { display: grid; grid-template-columns: repeat(3,1fr); margin: 0; padding: 0; border-top: 1px solid rgba(255,255,255,.2); border-bottom: 1px solid rgba(255,255,255,.2); list-style: none; }
 .home-chapter-grid li + li { border-left: 1px solid rgba(255,255,255,.2); }
-.home-chapter-grid a { min-height: 330px; display: flex; flex-direction: column; padding: 28px clamp(22px,3vw,42px) 32px; color: inherit; text-decoration: none; transition: background-color 200ms ease,transform 200ms ease; }
+.home-chapter-grid a { min-height: 330px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px clamp(22px,3vw,42px); color: inherit; text-decoration: none; transition: background-color 200ms ease,transform 200ms ease; }
 .home-chapter-grid a:hover { background: rgba(255,255,255,.055); transform: translateY(-4px); }
 .home-chapter-grid small { color: rgba(255,248,242,.5); font-size: .66rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .home-chapter-grid h3 { margin: 10px 0 0; color: #fff8f2; font-family: var(--font-serif); font-size: clamp(1.55rem,2.4vw,2.15rem); font-weight: 500; line-height: 1.1; }
 .home-chapter-grid p { margin: 15px 0 28px; color: rgba(255,248,242,.65); font-size: .82rem; }
-.home-chapter-grid i { display: inline-flex; align-items: center; gap: 8px; margin-top: auto; color: #f2c39f; font-size: .72rem; font-style: normal; font-weight: 800; }
+.home-chapter-grid i { display: inline-flex; align-items: center; gap: 8px; margin-top: 0; color: #f2c39f; font-size: .72rem; font-style: normal; font-weight: 800; }
 .home-chapter-grid i svg { width: 15px; }
 
 /* Shared headings */
@@ -186,7 +186,7 @@
   .home-section-heading--split > p { margin: 0; }
   .home-chapter-grid { grid-template-columns: 1fr; border-bottom: 0; }
   .home-chapter-grid li + li { border-top: 1px solid rgba(255,255,255,.2); border-left: 0; }
-  .home-chapter-grid a { min-height: 0; padding: 26px 4px 30px; }
+  .home-chapter-grid a { min-height: 0; padding: 28px 4px; }
   .home-collection-grid { display: flex; gap: 14px; overflow-x: auto; margin-inline: -16px; padding: 0 16px 14px; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .home-collection-grid::-webkit-scrollbar { display: none; }
   .home-collection-card,.home-collection-card--1,.home-collection-card--4 { width: 76vw; min-width: 76vw; height: 350px; grid-column: auto; grid-row: auto; scroll-snap-align: start; }

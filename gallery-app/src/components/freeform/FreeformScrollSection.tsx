@@ -305,7 +305,7 @@ export default function FreeformScrollSection() {
               style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption freeform-landing-caption--intro freeform-landing-intro-slide absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2"
             >
-              <p className="freeform-landing-caption__kicker">Design Studio · Live 3D preview</p>
+              <p className="freeform-landing-caption__kicker">Design Studio</p>
               <h2 className="freeform-landing-caption__title">
                 Start with a form. <span>Make it yours.</span>
               </h2>
@@ -323,7 +323,7 @@ export default function FreeformScrollSection() {
               style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <p className="freeform-landing-caption__kicker">01 · Shape</p>
+              <p className="freeform-landing-caption__kicker">Shape</p>
               <h2 className="freeform-landing-caption__title">
                 Shape the <span>silhouette.</span>
               </h2>
@@ -341,7 +341,7 @@ export default function FreeformScrollSection() {
               style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <p className="freeform-landing-caption__kicker">02 · Finish</p>
+              <p className="freeform-landing-caption__kicker">Finish</p>
               <h2 className="freeform-landing-caption__title">
                 Choose the <span>surface.</span>
               </h2>
@@ -359,7 +359,7 @@ export default function FreeformScrollSection() {
               style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-none"
             >
-              <p className="freeform-landing-caption__kicker">03 · Decorate</p>
+              <p className="freeform-landing-caption__kicker">Decorate</p>
               <h2 className="freeform-landing-caption__title">
                 Give it a <span>signature.</span>
               </h2>
@@ -377,7 +377,7 @@ export default function FreeformScrollSection() {
               style={{ willChange: 'opacity, transform' }}
               className="freeform-landing-caption absolute inset-x-5 sm:inset-x-6 lg:inset-x-12 top-1/2 -translate-y-1/2 pointer-events-auto"
             >
-              <p className="freeform-landing-caption__kicker">04 · Details</p>
+              <p className="freeform-landing-caption__kicker">Details</p>
               <h2 className="freeform-landing-caption__title">
                 Complete the <span>form.</span>
               </h2>
