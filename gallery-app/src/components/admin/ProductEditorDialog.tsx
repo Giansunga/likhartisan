@@ -149,7 +149,7 @@ function ProductEditorForId({ product, onClose, onSave }: Omit<ProductEditorDial
   return <div className="product-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}>
     <section ref={dialogRef} className="product-editor" role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} onKeyDown={(event) => trapFocus(event, requestClose)}>
       <header className="product-editor__header"><div><h2 id="product-editor-title">Edit Product</h2><p>Update {product.name}’s catalog details, media, pricing, and stock.</p></div><button className="product-editor__close" data-autofocus type="button" aria-label="Close product editor" onClick={requestClose} disabled={saving}><X aria-hidden="true" /></button></header>
-      <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><div className="product-editor__body">
+      <div className="product-editor__scroll"><fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}><div className="product-editor__body">
         <section className="product-editor__section product-editor__details">
           <h3>Product Specifications</h3>
           <div className="product-editor__fields">
@@ -189,7 +189,7 @@ function ProductEditorForId({ product, onClose, onSave }: Omit<ProductEditorDial
         </section>
       </div>
       {errors.save && <div className="product-editor__error" role="alert"><AlertCircle aria-hidden="true" />{errors.save}</div>}
-      </fieldset>
+      </fieldset></div>
       {variationLoadError && <p role="alert">{variationLoadError}<button type="button" onClick={() => { setVariationLoading(true); setLoadAttempt(value => value + 1); }}>Retry loading variations</button></p>}
       <footer className="product-editor__footer"><button type="button" className="product-editor__cancel" onClick={requestClose} disabled={saving}>Cancel</button><button type="button" className="product-editor__save" onClick={() => void submit()} disabled={saving || variationLoading || Boolean(variationLoadError)}>{saving ? 'Saving changes…' : 'Save changes'}</button></footer>
     </section>

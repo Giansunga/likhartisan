@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   order: vi.fn(),
   variations: vi.fn(),
   reviews: vi.fn(),
+  artisans: vi.fn(),
   user: null as null | { id: string },
   signalFetch: vi.fn(),
   soldCounts: vi.fn(),
@@ -31,7 +32,7 @@ vi.mock('../../lib/supabase', () => ({
     from: vi.fn((table: string) => table === 'user_product_signals' ? { select: () => ({ eq: () => ({ gte: () => ({ order: () => ({ limit: mocks.signalFetch }) }) }) }), insert: async () => ({ data: null, error: null }) } : ({
       select: vi.fn(() => table === 'products'
         ? { order: mocks.order }
-        : { in: table === 'product_variations' ? mocks.variations : mocks.reviews }),
+        : { in: table === 'product_variations' ? mocks.variations : table === 'artisans' ? mocks.artisans : mocks.reviews }),
     })),
   },
 }));
@@ -45,6 +46,40 @@ function GalleryPage() {
 }
 
 describe('GalleryPage', () => {
+  it.each([false, true])('scrolls to results after pagination and respects reduced motion: %s', async reduced => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: reduced, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList);
+    mocks.order.mockResolvedValue({ data: Array.from({ length: 30 }, (_, i) => product(`Vase ${i}`, 5)), error: null });
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Next page' });
+    vi.mocked(window.scrollTo).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(screen.getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page');
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: expect.any(Number), behavior: reduced ? 'instant' : 'smooth' });
+    expect(screen.getByRole('banner', { name: 'Gallery results' })).toHaveFocus();
+    vi.mocked(window.scrollTo).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous page' }));
+    expect(window.scrollTo).toHaveBeenCalledTimes(1);
+  });
+  it('finds an artisan’s products through the shared search and restores them after Back', async () => {
+    mocks.order.mockResolvedValue({ data: [
+      { ...product('Handmade bowl', 5), shop_id: 'shop-1', featured_artisan_id: 'artisan-1' },
+      { ...product('Other bowl', 5), shop_id: 'shop-2', featured_artisan_id: 'artisan-2' },
+    ], error: null });
+    mocks.artisans.mockResolvedValue({ data: [{ id: 'artisan-1', shop_id: 'shop-1', name: 'José Mercado' }, { id: 'artisan-2', shop_id: 'shop-2', name: 'Other Maker' }], error: null });
+    const { container } = render(<MemoryRouter initialEntries={['/gallery?q=Jose%20Mercado']}><Routes>
+      <Route path="/gallery" element={<GalleryPage />} />
+      <Route path="/product/:id" element={<ReturnControls />} />
+    </Routes></MemoryRouter>);
+    await waitFor(() => expect(container.querySelectorAll('[data-gallery-product]')).toHaveLength(1));
+    expect(screen.getByAltText('Handmade bowl')).toBeInTheDocument();
+    expect(screen.queryByAltText('Other bowl')).not.toBeInTheDocument();
+    fireEvent.click(container.querySelector('[data-gallery-product]')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Return with Back' }));
+    expect(await screen.findByAltText('Handmade bowl')).toBeInTheDocument();
+    expect(mocks.artisans).toHaveBeenCalledTimes(1);
+  });
   it('keeps missing and broken product images visible through the local fallback', async () => {
     mocks.order.mockResolvedValue({ data: [
       { ...product('Missing photo', 5), image: '' },
@@ -98,6 +133,7 @@ describe('GalleryPage', () => {
     mocks.signalFetch.mockResolvedValue({ data: [], error: null });
     mocks.order.mockResolvedValue({ data: [], error: null });
     mocks.variations.mockResolvedValue({ data: [], error: null });
+    mocks.artisans.mockResolvedValue({ data: [], error: null });
     mocks.reviews.mockResolvedValue({ data: [], error: null });
     mocks.soldCounts.mockResolvedValue({ data: [], error: null });
     window.matchMedia = vi.fn().mockReturnValue({

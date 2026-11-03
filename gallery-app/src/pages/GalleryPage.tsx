@@ -75,6 +75,21 @@ function GalleryView({ owner }: { owner: string }) {
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(restored?.page ?? 1);
+  const resultsHeadingRef = useRef<HTMLElement>(null);
+  const paginationScrollPending = useRef(false);
+  useLayoutEffect(() => {
+    if (!paginationScrollPending.current) return;
+    paginationScrollPending.current = false;
+    const heading = resultsHeadingRef.current;
+    if (!heading) return;
+    const toolbar = heading.parentElement?.querySelector('.gallery-toolbar');
+    const offset = toolbar?.getBoundingClientRect().bottom ?? 0;
+    heading.focus({ preventScroll: true });
+    window.scrollTo({
+      top: Math.max(0, window.scrollY + heading.getBoundingClientRect().top - offset - 12),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    });
+  }, [page]);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   const [shopFilter, setShopFilter] = useState(() => new URLSearchParams(restored?.urlSearch ?? searchParams.toString()).get('shop'));
   
@@ -160,7 +175,7 @@ function GalleryView({ owner }: { owner: string }) {
       try {
         const { data, error } = await supabase
           .from('products')
-      .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at')
+      .select('id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, featured_artisan_id, status, views, created_at, updated_at')
           .order('created_at', { ascending: false });
 
         if (!active) return;
@@ -170,7 +185,23 @@ function GalleryView({ owner }: { owner: string }) {
         }
 
         if (data) {
-          const products = data.map(mapSupabaseProduct);
+          let products: Product[] = data.map(mapSupabaseProduct);
+          const artisanIds = [...new Set(products.map(product => product.featuredArtisanId).filter((id): id is string => Boolean(id)))];
+          if (artisanIds.length) {
+            try {
+              const { data: artisans, error: artisanError } = await supabase.from('artisans').select('id, shop_id, name').in('id', artisanIds);
+              if (!active) return;
+              if (artisanError) throw artisanError;
+              const byId = new Map((artisans ?? []).map(artisan => [artisan.id, artisan]));
+              products = products.map(product => {
+                const artisan = product.featuredArtisanId ? byId.get(product.featuredArtisanId) : undefined;
+                return artisan?.shop_id === product.shopId ? { ...product, featuredArtisanName: artisan.name } : product;
+              });
+            } catch (error) {
+              console.error('Gallery artisan search fetch error:', error);
+            }
+          }
+          if (!active) return;
           setAllProducts(products);
           setCatalogReady(true);
 
@@ -510,7 +541,7 @@ function GalleryView({ owner }: { owner: string }) {
         </div>
       </section>
 
-      <header className="listing-container gallery-results-heading">
+      <header ref={resultsHeadingRef} tabIndex={-1} aria-label="Gallery results" className="listing-container gallery-results-heading">
         <h1 className="listing-title">Gallery</h1>
         <div className="gallery-results-context"><span id="control-active-title">{shopFilter ? `${shopFilterName || 'Shop'} Collection` : activeCategory || 'All Crafts'}</span>
           {shopFilter && <button type="button" className="gallery-shop-filter-clear" onClick={clearShopFilter}>Clear shop filter</button>}
@@ -604,7 +635,11 @@ function GalleryView({ owner }: { owner: string }) {
             totalPages={totalPages}
             total={filteredProducts.length}
             pageSize={PAGE_SIZE}
-            onPageChange={setPage}
+            onPageChange={nextPage => {
+              if (nextPage === page) return;
+              paginationScrollPending.current = true;
+              setPage(nextPage);
+            }}
           />
         </div>
       </section>

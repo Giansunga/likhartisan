@@ -95,6 +95,8 @@ describe('product detail presentation and shopping controls', () => {
     expect(sizeRow).toHaveTextContent('Select size');
     expect(sizeRow.querySelector('[role="status"]')).toHaveTextContent('1 in stock');
     expect(container.querySelector('.pdp-craft')).not.toHaveAttribute('open');
+    expect(container.querySelector('.pdp-selected-size')).toBeNull();
+    expect(container.querySelector('.pdp-craft-content')).not.toHaveTextContent('Stock');
     fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
     expect(sizeRow.querySelector('[role="status"]')).toHaveTextContent('8 in stock');
     expect(title.querySelector('.pdp-price')).toHaveTextContent('₱2,600.00');
@@ -230,18 +232,18 @@ describe('product detail presentation and shopping controls', () => {
     expect(mobile.getByRole('button', { name: 'Buy Now' })).toBeEnabled();
   });
 
-  it('shows selected-size inventory in craft details without subtracting cart quantity', async () => {
+  it('shows inventory only beside size selection without subtracting cart quantity', async () => {
     const { container } = renderProduct();
     await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
-    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (1)');
+    expect(container.querySelector('.pdp-stock-badge')).toHaveTextContent('1 in stock');
     const sizes = screen.getByRole('group', { name: 'Select size' });
     fireEvent.click(within(sizes).getByRole('button', { name: /32.*18/ }));
-    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (8)');
+    expect(container.querySelector('.pdp-stock-badge')).toHaveTextContent('8 in stock');
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
-    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('In Stock (8)');
+    expect(container.querySelector('.pdp-stock-badge')).toHaveTextContent('8 in stock');
     fireEvent.click(within(sizes).getByRole('button', { name: /40.*20/ }));
-    expect(container.querySelector('.pdp-stock-detail')).toHaveTextContent('Out of stock');
-    expect(container.querySelector('.pdp-stock-detail--empty')).toBeInTheDocument();
+    expect(container.querySelector('.pdp-stock-badge')).toHaveTextContent('Out of stock');
+    expect(container.querySelector('.pdp-stock-badge--empty')).toBeInTheDocument();
   });
 
   it.each([false, true])('hides guest favorites and preserves signed-in favorites with the model fallback: %s', async fail => {
@@ -354,7 +356,7 @@ describe('product detail presentation and shopping controls', () => {
     expect(container.querySelector('.pdp-price')).toHaveTextContent('₱75.00');
     expect(screen.queryByRole('group', { name: 'Select size' })).not.toBeInTheDocument();
     expect(container.querySelector('.pdp-spec-tiles')).not.toBeInTheDocument();
-    expect(container.querySelector('.pdp-craft')).toHaveTextContent('Out of stock');
+    expect(container.querySelector('.pdp-stock-badge')).toHaveTextContent('Out of stock');
     expect(screen.queryByRole('heading', { name: 'A***t' })).not.toBeInTheDocument();
     expect(container.querySelector('.pdp-reviews')).toHaveTextContent('No reviews yet.');
     expect(screen.getByRole('button', { name: 'Buy Now' })).toBeDisabled();

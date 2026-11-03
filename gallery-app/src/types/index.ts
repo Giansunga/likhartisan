@@ -60,6 +60,7 @@ export type ProductStatus = 'active' | 'inactive' | 'archived' | 'draft';
 export interface Product {
   tags?: string[];
   featuredArtisanId?: string;
+  featuredArtisanName?: string;
   id: string;
   name: string;
   description: string;

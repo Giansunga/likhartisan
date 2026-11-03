@@ -37,6 +37,14 @@ function product(id: string, overrides: Partial<Product> = {}): Product {
   };
 }
 
+it('finds products by their featured artisan name with normalized spelling', () => {
+  const piece = product('jar', { featuredArtisanName: 'José Mercado' });
+  expect(productMatchesSearch(piece, 'JOSE MERCADO')).toBe(true);
+  expect(productMatchesSearch(piece, 'Mercado')).toBe(true);
+  expect(productMatchesSearch(piece, 'unrelated')).toBe(false);
+  expect(productMatchesSearch(product('plain'), 'Mercado')).toBe(false);
+});
+
 function signal(overrides: Partial<UserProductSignal> = {}): UserProductSignal {
   return {
     user_id: 'user-1',

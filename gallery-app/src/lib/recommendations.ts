@@ -90,6 +90,7 @@ export function searchRelevance(product: Product, query: string): number {
     { value: normalized(product.technique), weight: 2 },
     { value: normalized(product.description), weight: 1.5 },
     { value: normalized(product.shopName), weight: 1 },
+    { value: normalized(product.featuredArtisanName), weight: 2 },
   ];
 
   let score = 0;

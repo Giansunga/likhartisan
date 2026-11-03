@@ -347,7 +347,6 @@ export default function ProductDetailPage() {
   ].filter(spec => spec.value);
   const stickyVisible = !isMobile && stickyProductId === product.id;
   const stockNeedsSize = variations.length > 0 && !selectedVariation;
-  const stockDescription = stockNeedsSize ? 'Select a size to view stock' : availableStock > 0 ? `In Stock (${availableStock})` : 'Out of stock';
 
   const handleAddToCart = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!user) { requestShoppingSignIn(window.location.pathname); return; }
@@ -513,7 +512,7 @@ export default function ProductDetailPage() {
 
               <div className="pdp-selection">
                 <div className="pdp-size-row">
-                  <div className="pdp-size-caption"><span>{variations.length > 0 ? 'Select size' : product.category}</span>{sizeLabel && <span className="pdp-selected-size">{sizeLabel}</span>}</div>
+                  <div className="pdp-size-caption"><span>{variations.length > 0 ? 'Select size' : product.category}</span></div>
                   <span className={`pdp-stock-badge${productUnavailable || (!stockNeedsSize && availableStock === 0) ? ' pdp-stock-badge--empty' : stockNeedsSize ? ' pdp-stock-badge--pending' : ''}`} role="status">{productUnavailable ? 'Unavailable' : stockNeedsSize ? 'Select size for stock' : availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}</span>
                 </div>
                 {variations.length > 0 && (
@@ -539,7 +538,6 @@ export default function ProductDetailPage() {
                     { label: 'Opening diameter', value: hasValue(openingDiameter) ? openingDiameter : '' },
                     { label: 'Technique', value: hasValue(product.technique) ? product.technique : '' },
                   ].filter(spec => spec.value).map(spec => <div key={spec.label}><dt>{spec.label}</dt><dd>{spec.value}</dd></div>)}
-                    <div className="pdp-stock-detail"><dt>Stock</dt><dd className={stockNeedsSize ? undefined : availableStock > 0 ? 'pdp-stock-detail--available' : 'pdp-stock-detail--empty'}>{!stockNeedsSize && <span className="pdp-stock-dot" aria-hidden="true" />}{stockDescription}</dd></div>
                   </dl>
                 </div>
               </details>}
