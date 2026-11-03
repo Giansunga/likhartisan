@@ -184,6 +184,7 @@ export interface CartItem {
 export type CartLineKey = string;
 
 export interface CartCheckoutDraft {
+  ownerUserId: string;
   version: 1;
   source: 'cart';
   shopId: string;

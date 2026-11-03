@@ -14,7 +14,6 @@ import { API_BASE } from '../lib/api';
 import {
   getCartLineKey,
   getCartShopKey,
-  markCartCheckoutAuthPending,
   writeCartCheckoutDraft,
 } from '../lib/cartCheckout';
 import {
@@ -130,12 +129,13 @@ function initialShopSelection(items: CartItem[]): { shopKey: string | null; line
 export default function CartPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const returnSelection = (location.state as ProfileReturn['state'])?.cartSelection;
   const { user } = useAuth();
+  const returnState = location.state as ProfileReturn['state'];
+  const returnSelection = returnState?.ownerUserId === user?.id ? returnState?.cartSelection : undefined;
   const { isLoaded: mapsLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
   });
-  const [items, setItems] = useState<CartItem[]>(getCart);
+  const [items, setItems] = useState<CartItem[]>(() => getCart(user?.id));
   const [initialSelection] = useState(() => returnSelection ? { shopKey: returnSelection.shopKey, lineKeys: new Set(returnSelection.lineKeys) } : initialShopSelection(items));
   const [activeShopKey, setActiveShopKey] = useState<string | null>(initialSelection.shopKey);
   const [selected, setSelected] = useState<Set<string>>(initialSelection.lineKeys);
@@ -236,7 +236,7 @@ export default function CartPage() {
         setShopCoordinates(Object.fromEntries(shopRows.map(shop => [shop.id, shopLocationCoordinates(shop)])));
         setValidationStatus('ready');
         if (cartChanged) {
-          setCart(revisedItems);
+          setCart(user?.id, revisedItems);
           setItems(revisedItems);
           if (quantityAdjusted) toast.info('Cart quantities were adjusted to match available stock.');
         }
@@ -316,7 +316,7 @@ export default function CartPage() {
   }
 
   function commitItems(nextItems: CartItem[]) {
-    setCart(nextItems);
+    setCart(user?.id, nextItems);
     setItems(nextItems);
     invalidateEstimate();
     if (resolvedActiveShopKey && nextItems.some(item => getCartShopKey(item) === resolvedActiveShopKey)) return;
@@ -486,6 +486,7 @@ export default function CartPage() {
     if (!resolvedActiveShopKey || selectedItems.length === 0) return;
     const draft: CartCheckoutDraft = {
       version: 1,
+      ownerUserId: user!.id,
       source: 'cart',
       shopId: resolvedActiveShopKey,
       lineKeys: selectedItems.map(getCartLineKey),
@@ -505,12 +506,12 @@ export default function CartPage() {
         },
       } : {}),
     };
-    writeCartCheckoutDraft(draft);
+    writeCartCheckoutDraft(user!.id, draft);
     if (user) {
-      navigate('/checkout', { state: { checkoutDraft: draft } });
+      navigate('/checkout', { state: { ownerUserId: user!.id, checkoutDraft: draft } });
       return;
     }
-    markCartCheckoutAuthPending();
+
     window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
   }
 
@@ -573,7 +574,7 @@ export default function CartPage() {
               name={user?.user_metadata?.name} phone={user?.user_metadata?.phone} signedIn={Boolean(user)}
               onEditProfile={() => {
                 if (!user) { window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } })); return; }
-                const state = { cartSelection: { shopKey: resolvedActiveShopKey, lineKeys: [...effectiveSelected], deliveryOption } };
+                const state = { ownerUserId: user.id, cartSelection: { shopKey: resolvedActiveShopKey, lineKeys: [...effectiveSelected], deliveryOption } };
                 navigate('/cart', { replace: true, state });
                 navigate('/dashboard?tab=account', { state: { profileReturn: { pathname: '/cart', state } } });
               }}

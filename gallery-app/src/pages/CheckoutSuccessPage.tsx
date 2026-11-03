@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { clearCart, removeCartLines } from '../data/store';
+import { removeCartLines } from '../data/store';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -28,6 +28,7 @@ export default function CheckoutSuccessPage() {
     if (authLoading) return;
     if (finishedRef.current) return;
 
+    let cancelled = false;
     function scheduleRetry(fn: () => void, delay: number) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(fn, delay);
@@ -47,13 +48,13 @@ export default function CheckoutSuccessPage() {
 
         const refParam = searchParams.get('ref');
         const orderId = searchParams.get('order_id') ||
-          localStorage.getItem('likhartisan_checkout_order_id') ||
-          sessionStorage.getItem('likhartisan_checkout_order_id') || '';
+          localStorage.getItem(`likhartisan_checkout_order_id:${user?.id}`) ||
+          sessionStorage.getItem(`likhartisan_checkout_order_id:${user?.id}`) || '';
         let checkoutSessionId = searchParams.get('session_id') || '';
         if (!checkoutSessionId || !checkoutSessionId.startsWith('cs_')) {
           checkoutSessionId =
-            localStorage.getItem('likhartisan_checkout_session_id') ||
-            sessionStorage.getItem('likhartisan_checkout_session_id') ||
+            localStorage.getItem(`likhartisan_checkout_session_id:${user?.id}`) ||
+            sessionStorage.getItem(`likhartisan_checkout_session_id:${user?.id}`) ||
             '';
         }
 
@@ -82,6 +83,7 @@ export default function CheckoutSuccessPage() {
         });
 
         const result = await res.json();
+        if (cancelled) return;
         console.log(`[CheckoutSuccess] Response: ${res.status}`, result);
 
         // Success — payment confirmed and order updated
@@ -90,19 +92,19 @@ export default function CheckoutSuccessPage() {
           // Buy Now keeps the real cart intact. Cart checkout removes only the
           // purchased draft lines so pieces from other artisans remain saved.
           const purchaseKey = orderId || checkoutSessionId;
-          const isBuyNow = sessionStorage.getItem('lk_buy_now') === '1';
+          const isBuyNow = sessionStorage.getItem(`lk_buy_now:${user?.id}`) === '1';
           if (!isBuyNow) {
-            const purchasedLineKeys = readPendingPurchase(purchaseKey);
-            if (purchasedLineKeys.length > 0) removeCartLines(purchasedLineKeys);
-            else clearCart(); // Backward compatibility for sessions created before scoped drafts.
-            clearPendingPurchase(purchaseKey);
-            clearCartCheckoutDraft();
+            const purchasedLineKeys = readPendingPurchase(user.id, purchaseKey);
+            if (purchasedLineKeys.length > 0) removeCartLines(user.id, purchasedLineKeys);
+
+            clearPendingPurchase(user.id, purchaseKey);
+            clearCartCheckoutDraft(user.id);
           }
-          sessionStorage.removeItem('lk_buy_now');
-          localStorage.removeItem('likhartisan_checkout_order_id');
-          sessionStorage.removeItem('likhartisan_checkout_order_id');
-          localStorage.removeItem('likhartisan_checkout_session_id');
-          sessionStorage.removeItem('likhartisan_checkout_session_id');
+          sessionStorage.removeItem(`lk_buy_now:${user?.id}`);
+          localStorage.removeItem(`likhartisan_checkout_order_id:${user?.id}`);
+          sessionStorage.removeItem(`likhartisan_checkout_order_id:${user?.id}`);
+          localStorage.removeItem(`likhartisan_checkout_session_id:${user?.id}`);
+          sessionStorage.removeItem(`likhartisan_checkout_session_id:${user?.id}`);
           setStatus('success');
           setMessage('Payment confirmed!');
           return;
@@ -134,6 +136,7 @@ export default function CheckoutSuccessPage() {
     scheduleRetry(confirmPayment, 1500);
 
     return () => {
+      cancelled = true;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [authLoading, user, searchParams]);

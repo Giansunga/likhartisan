@@ -4,13 +4,13 @@ import './Navbar.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { getCartCount, onCartUpdate } from '../data/store';
+import { useCart } from '../hooks/useCart';
 import { supabase } from '../lib/supabase';
 import { signOutWithActivity } from '../lib/activityApi';
 import { ADMIN_EMAILS, SHOP_EMAILS } from '../lib/constants';
 import AuthModal from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
-import { consumeCartCheckoutAuthPending } from '../lib/cartCheckout';
+import { shoppingDestination, clearShoppingDestination } from '../lib/shoppingAuth';
 import { getAuthDestination } from '../lib/authDestination';
 import type { User } from '@supabase/supabase-js';
 import NotificationDropdown from './notifications/NotificationDropdown';
@@ -48,6 +48,7 @@ export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
   const closeAuthModal = useCallback(() => {
     setAuthOpen(false);
+    clearShoppingDestination();
     if (routeAuthView) navigate('/', { replace: true });
   }, [navigate, routeAuthView]);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -66,11 +67,13 @@ export default function Navbar() {
   const navigationRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
-  const [cartCount, setCartCount] = useState(getCartCount);
+
   const [hasShopRole, setHasShopRole] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const cartCount = useCart(user?.id).reduce((sum, item) => sum + item.qty, 0);
   const loggedIn = !!user;
+  useEffect(() => { const destination = shoppingDestination(); if (!authLoading && !user && destination && location.pathname !== destination) clearShoppingDestination(); }, [location.pathname, authLoading, user]);
   const notificationContext: NotificationContext = 'buyer';
   const notificationData = useNotifications(isArtisanDashboard ? undefined : user?.id, notificationContext, 10);
 
@@ -91,16 +94,12 @@ export default function Navbar() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [showNavigation, showProfileDropdown, showNotifications]);
 
+  const handledSignIn = useRef<string | null>(null);
   useEffect(() => {
-    if (!user) return;
-    const draft = consumeCartCheckoutAuthPending();
-    if (draft) navigate('/checkout', { state: { checkoutDraft: draft } });
-  }, [navigate, user]);
-
-  useEffect(() => {
-    const unsubscribe = onCartUpdate(() => setCartCount(getCartCount()));
-    return unsubscribe;
-  }, []);
+    if (!user) { handledSignIn.current = null; return; }
+    const destination = shoppingDestination();
+    if (destination) { clearShoppingDestination(); handledSignIn.current = user.id; navigate(destination, { replace: true }); }
+  }, [user, navigate]);
 
   useEffect(() => {
     setUserEmail(user?.email ?? null);
@@ -160,7 +159,11 @@ export default function Navbar() {
   }, []);
 
   async function handleAuthChange(user: User) {
-    navigate(await getAuthDestination(user), { replace: true });
+    const destination = shoppingDestination();
+    if (destination) { clearShoppingDestination(); handledSignIn.current = user.id; navigate(destination, { replace: true }); return; }
+    if (handledSignIn.current === user.id) return;
+    const fallback = await getAuthDestination(user);
+    if (handledSignIn.current !== user.id) navigate(fallback, { replace: true });
   }
 
   async function handleLogout() {
@@ -246,7 +249,7 @@ export default function Navbar() {
 
           {/* Action icons */}
           <div className="navbar-actions">
-            <CartAction count={cartCount} isMobile={isMobile} />
+            <CartAction count={user && !authLoading ? cartCount : 0} isMobile={isMobile} />
             {loggedIn ? (
               <>
                 <div ref={notifDropdownRef} className="relative">

@@ -75,7 +75,7 @@ describe('product checkout', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { buyNowItem: item, deliveryOption: 'courier' } }]}>
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { ownerUserId: 'buyer-1', buyNowItem: item, deliveryOption: 'courier' } }]}>
       <Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes>
     </MemoryRouter>);
 
@@ -96,10 +96,10 @@ describe('product checkout', () => {
   });
 
   it('ignores stale cart destination overrides and only quotes saved profile coordinates', async () => {
-    localStorage.setItem('lk_cart', JSON.stringify([item]));
+    localStorage.setItem('lk_cart:buyer-1', JSON.stringify([item]));
     const fetchMock = vi.fn(async (...args: [string, RequestInit]) => { void args; return { ok: true, json: async () => quote('85.00') }; });
     vi.stubGlobal('fetch', fetchMock);
-    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { checkoutDraft: { version: 1, source: 'cart', shopId: item.shopId, lineKeys: [getCartLineKey(item)], deliveryOption: 'courier', destination: { address: 'Stale cart address', coordinates: { lat: 1, lng: 2 } } } } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { ownerUserId: 'buyer-1', checkoutDraft: { version: 1, ownerUserId: 'buyer-1', source: 'cart', shopId: item.shopId, lineKeys: [getCartLineKey(item)], deliveryOption: 'courier', destination: { address: 'Stale cart address', coordinates: { lat: 1, lng: 2 } } } } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes></MemoryRouter>);
     await screen.findByText('Courier fee confirmed for this checkout:');
     expect(screen.getByText('San Fernando, Pampanga')).toBeInTheDocument();
     expect(screen.queryByText('Stale cart address')).not.toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('product checkout', () => {
   it('preserves Buy Now quantity and delivery method through Profile and requests a fresh quote', async () => {
     const fetchMock = vi.fn(async (...args: [string, RequestInit]) => { void args; return { ok: true, json: async () => quote('85.00') }; });
     vi.stubGlobal('fetch', fetchMock);
-    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { buyNowItem: { ...item, qty: 3, variationId: 'v1', variation: 'Large' }, deliveryOption: 'courier' } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /><Route path="/dashboard" element={<ProfileStub />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { ownerUserId: 'buyer-1', buyNowItem: { ...item, qty: 3, variationId: 'v1', variation: 'Large' }, deliveryOption: 'courier' } }]}><Routes><Route path="/checkout" element={<CheckoutPage />} /><Route path="/dashboard" element={<ProfileStub />} /></Routes></MemoryRouter>);
     await screen.findByText('Courier fee confirmed for this checkout:');
     fireEvent.click(screen.getByRole('button', { name: 'Edit in Profile' }));
     fireEvent.click(screen.getByRole('button', { name: 'Return to checkout' }));
@@ -132,7 +132,7 @@ describe('product checkout', () => {
       throw new Error(`Unexpected request: ${url}`);
     }));
 
-    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { buyNowItem: item, deliveryOption: 'pickup' } }]}>
+    render(<MemoryRouter initialEntries={[{ pathname: '/checkout', state: { ownerUserId: 'buyer-1', buyNowItem: item, deliveryOption: 'pickup' } }]}>
       <Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes>
     </MemoryRouter>);
 

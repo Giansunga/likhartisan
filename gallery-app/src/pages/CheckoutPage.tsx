@@ -30,6 +30,7 @@ import './CheckoutPage.css';
 const DEFAULT_PICKUP_ADDRESS = 'Santo Tomas, Pampanga, Philippines';
 
 interface CheckoutRouteState {
+  ownerUserId: string;
   buyNowItem?: CartItem;
   checkoutDraft?: CartCheckoutDraft;
   deliveryOption?: CheckoutDeliveryOption;
@@ -85,15 +86,16 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const routeState = location.state as CheckoutRouteState | null;
+  const candidate = location.state as CheckoutRouteState | null;
+  const routeState = candidate?.ownerUserId === user?.id ? candidate : null;
   const buyNowItem = routeState?.buyNowItem;
   const [cartDraft] = useState<CartCheckoutDraft | null>(() => (
-    buyNowItem ? null : routeState?.checkoutDraft || readCartCheckoutDraft()
+    buyNowItem ? null : (routeState?.checkoutDraft && routeState.checkoutDraft.ownerUserId === user?.id ? routeState.checkoutDraft : readCartCheckoutDraft(user!.id))
   ));
   const [items] = useState<CartItem[]>(() => (
     buyNowItem
       ? [buyNowItem]
-      : resolveCartDraftItems(getCart(), routeState?.checkoutDraft || readCartCheckoutDraft())
+      : resolveCartDraftItems(getCart(user?.id), (routeState?.checkoutDraft && routeState.checkoutDraft.ownerUserId === user?.id ? routeState.checkoutDraft : readCartCheckoutDraft(user!.id)))
   ));
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '' });
 
@@ -124,6 +126,7 @@ export default function CheckoutPage() {
   const mapRef = useRef<google.maps.Map | null>(null);
   const quoteRequestSequence = useRef(0);
   const quoteAbortController = useRef<AbortController | null>(null);
+  useEffect(() => () => { quoteRequestSequence.current += 1; quoteAbortController.current?.abort(); }, []);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [mapReady, setMapReady] = useState(false);
 
@@ -347,6 +350,7 @@ export default function CheckoutPage() {
 
   function editProfile() {
     const state = {
+      ownerUserId: user!.id,
       ...(buyNowItem ? { buyNowItem } : { checkoutDraft: cartDraft || undefined }), deliveryOption: deliveryOption || undefined,
     };
     navigate('/checkout', { replace: true, state });
@@ -419,10 +423,10 @@ export default function CheckoutPage() {
       if (!response.ok) throw new Error(data.error?.message || data.error || 'Payment could not be prepared');
 
       if (!data.orderId) throw new Error('Payment order was not created. Please try again.');
-      localStorage.setItem('likhartisan_checkout_order_id', data.orderId);
-      sessionStorage.setItem('likhartisan_checkout_order_id', data.orderId);
-      if (buyNowItem) sessionStorage.setItem('lk_buy_now', '1');
-      else savePendingPurchase(data.orderId, cartDraft?.lineKeys || items.map(getCartLineKey));
+      localStorage.setItem(`likhartisan_checkout_order_id:${user?.id}`, data.orderId);
+      sessionStorage.setItem(`likhartisan_checkout_order_id:${user?.id}`, data.orderId);
+      if (buyNowItem) sessionStorage.setItem(`lk_buy_now:${user?.id}`, '1');
+      else savePendingPurchase(user!.id, data.orderId, cartDraft?.lineKeys || items.map(getCartLineKey));
       window.location.assign(data.checkoutUrl);
     } catch (error) {
       console.error('Checkout error:', error);

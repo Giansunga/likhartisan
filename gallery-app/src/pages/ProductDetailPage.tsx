@@ -1,9 +1,11 @@
+import { useCart } from '../hooks/useCart';
+import { requestShoppingSignIn } from '../lib/shoppingAuth';
 import { resolveAssetUrl } from '../lib/assetDelivery';
 import AssetImage from '../components/AssetImage';
 import ModelImageFallback from '../components/ModelImageFallback';
 import { Component, useState, useEffect, useMemo, useRef, Suspense, lazy, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { addToCart, getCart, onCartUpdate } from '../data/store';
+import { addToCart, getCart } from '../data/store';
 import { toast } from '../lib/popups';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -81,7 +83,7 @@ export default function ProductDetailPage() {
   const [askSuccess, setAskSuccess] = useState(false);
   const [askMessage, setAskMessage] = useState('');
   const [askSending, setAskSending] = useState(false);
-  const [cart, setCart] = useState(getCart);
+  const cart = useCart(user?.id);
   const productSectionRef = useRef<HTMLDivElement>(null);
   const [stickyProductId, setStickyProductId] = useState<string | null>(null);
   const productRating = useMemo(() => {
@@ -108,7 +110,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => () => cancelCartAnimation(), [id]);
 
-  useEffect(() => onCartUpdate(() => setCart(getCart())), []);
+
 
   useEffect(() => {
     const section = productSectionRef.current;
@@ -348,15 +350,15 @@ export default function ProductDetailPage() {
   const stockDescription = stockNeedsSize ? 'Select a size to view stock' : availableStock > 0 ? `In Stock (${availableStock})` : 'Out of stock';
 
   const handleAddToCart = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!user) { requestShoppingSignIn(window.location.pathname); return; }
     if (buyDisabled) return;
     // Recheck the current cart in case another control changed it before rendering.
-    const currentQuantity = getCart().find(item => item.productId === product.id && (item.variationId ?? '') === cartVariationId)?.qty ?? 0;
+    const currentQuantity = getCart(user?.id).find(item => item.productId === product.id && (item.variationId ?? '') === cartVariationId)?.qty ?? 0;
     if (quantity > Math.max(0, availableStock - currentQuantity)) {
-      setCart(getCart());
       toast.info(`You can add ${Math.max(0, availableStock - currentQuantity)} more.`);
       return;
     }
-    const result = addToCart({
+    const result = addToCart(user?.id, {
       productId: product.id,
       productName: product.name,
       price: displayPrice,
@@ -394,7 +396,7 @@ export default function ProductDetailPage() {
       variationId: selectedVariation?.id || '',
       variation: selectedVariation ? formatVariation(selectedVariation) : '',
     };
-    navigate('/checkout', { state: { buyNowItem: singleItem } });
+    navigate('/checkout', { state: { ownerUserId: user.id, buyNowItem: singleItem } });
   };
 
   const handleChatNow = async () => {

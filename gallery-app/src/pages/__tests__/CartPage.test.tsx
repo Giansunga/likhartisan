@@ -51,10 +51,10 @@ function ProfileStub() {
 
 describe('CartPage guest shop flow', () => {
   beforeEach(() => {
-    mocks.user = null;
+    mocks.user = { id: 'buyer', user_metadata: {} };
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('lk_cart', JSON.stringify(cart));
+    localStorage.setItem('lk_cart:buyer', JSON.stringify(cart));
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       quotationId: 'quote-1',
       priceBreakdown: { total: '150' },
@@ -75,7 +75,7 @@ describe('CartPage guest shop flow', () => {
     expect(second.checked).toBe(true);
   });
 
-  it('creates a selected-line draft and requests sign-in only at checkout', async () => {
+  it('creates a selected-line draft for the signed-in buyer', async () => {
     const authListener = vi.fn();
     window.addEventListener('open-auth', authListener);
     render(<MemoryRouter><CartPage /></MemoryRouter>);
@@ -83,8 +83,8 @@ describe('CartPage guest shop flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Checkout 1 item' }));
 
-    expect(authListener).toHaveBeenCalledOnce();
-    expect(readCartCheckoutDraft()?.lineKeys).toHaveLength(1);
+    expect(authListener).not.toHaveBeenCalled();
+    expect(readCartCheckoutDraft('buyer')?.lineKeys).toHaveLength(1);
     window.removeEventListener('open-auth', authListener);
   });
 
@@ -107,7 +107,7 @@ describe('CartPage guest shop flow', () => {
 
   it('restores the selected shop, variation, quantity and courier choice after Profile', async () => {
     mocks.user = { id: 'buyer', user_metadata: { address: 'Old profile address', address_lat: 15, address_lng: 120 } };
-    localStorage.setItem('lk_cart', JSON.stringify([cart[0], { ...cart[1], qty: 2 }]));
+    localStorage.setItem('lk_cart:buyer', JSON.stringify([cart[0], { ...cart[1], qty: 2 }]));
     render(<MemoryRouter initialEntries={['/cart']}><Routes><Route path="/cart" element={<CartPage />} /><Route path="/dashboard" element={<ProfileStub />} /></Routes></MemoryRouter>);
     await screen.findByText('Sun Jar');
     fireEvent.click(screen.getByLabelText('Select Sun Jar'));

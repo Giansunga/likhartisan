@@ -91,16 +91,16 @@ describe('PurchasePanel Buy again', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buy again' }));
     expect(await screen.findByRole('dialog', { name: 'Buy again' })).toBeInTheDocument();
     expect(screen.getByText('₱320.00 each')).toBeInTheDocument();
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer-1')).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
 
-    expect(getCart()).toEqual([vase]);
+    expect(getCart('buyer-1')).toEqual([vase]);
     expect(screen.getByTestId('path')).toHaveTextContent('/cart');
     expect(toast.success).toHaveBeenCalledWith('1 item added to your cart.');
   });
 
   it('adds multiple items and increases an existing cart line', async () => {
-    setCart([{ ...vase, qty: 2 }]);
+    setCart('buyer-1', [{ ...vase, qty: 2 }]);
     fixtures.purchaseApi.mockResolvedValue({ available: [vase, bowl], unavailable: [] });
     renderPanel('/dashboard?tab=purchases');
 
@@ -108,7 +108,7 @@ describe('PurchasePanel Buy again', () => {
     await screen.findByRole('dialog', { name: 'Buy again' });
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
 
-    expect(getCart()).toEqual([{ ...vase, qty: 3 }, bowl]);
+    expect(getCart('buyer-1')).toEqual([{ ...vase, qty: 3 }, bowl]);
     expect(toast.success).toHaveBeenCalledWith('3 items added to your cart.');
   });
 
@@ -121,7 +121,7 @@ describe('PurchasePanel Buy again', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer-1')).toEqual([]);
   });
 
   it('shows a close-only modal when no items are available', async () => {
@@ -132,7 +132,7 @@ describe('PurchasePanel Buy again', () => {
     expect(await screen.findByText('None of these items are currently available.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add to cart' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer-1')).toEqual([]);
   });
 
   it('reports a reorder-plan failure without opening the modal', async () => {
@@ -142,7 +142,7 @@ describe('PurchasePanel Buy again', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buy again' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Purchase service is temporarily unavailable'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer-1')).toEqual([]);
   });
 
   it('keeps the modal open when no cart quantity was added', async () => {
@@ -155,7 +155,7 @@ describe('PurchasePanel Buy again', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('We couldn’t add these items to your cart. Please try again.');
     expect(screen.getByTestId('path')).toHaveTextContent('/dashboard');
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer-1')).toEqual([]);
     expect(toast.success).not.toHaveBeenCalled();
   });
 });

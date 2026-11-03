@@ -1,3 +1,4 @@
+import ShoppingAccess from './components/ShoppingAccess';
 import { ADMIN_PRODUCT_PATHS, ARTISAN_PRODUCT_PATHS } from './components/products/productCreationPaths';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
@@ -100,8 +101,8 @@ function AppShell() {
             <Route path="artisans" element={<ArtisansPage />} />
             <Route path="shops" element={<ShopsPage />} />
             <Route path="shop/:id" element={<ShopPage />} />
-            <Route path="cart" element={<CartPage />} />
-            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="cart" element={<ShoppingAccess><CartPage /></ShoppingAccess>} />
+            <Route path="checkout" element={<ShoppingAccess><CheckoutPage /></ShoppingAccess>} />
             <Route path="checkout/success" element={<CheckoutSuccessPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="about" element={<AboutPage />} />

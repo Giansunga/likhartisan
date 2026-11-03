@@ -147,7 +147,7 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
         const response = await fetch(`${API_BASE}/api/session/${order.checkoutSessionId}`, { headers: { Authorization: `Bearer ${authSession.access_token}` } });
         const paymentSession = await response.json();
         if (response.ok && paymentSession.checkout_url) {
-          localStorage.setItem('likhartisan_checkout_session_id', order.checkoutSessionId);
+          localStorage.setItem(`likhartisan_checkout_session_id:${user?.id}`, order.checkoutSessionId);
           localStorage.setItem('likhartisan_order_id', order.id);
           window.location.assign(paymentSession.checkout_url);
           return;
@@ -159,7 +159,7 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
       });
       const result = await response.json() as { checkoutUrl?: string; checkoutSessionId?: string; error?: string };
       if (!response.ok || !result.checkoutUrl || !result.checkoutSessionId) throw new Error(result.error || 'Payment is temporarily unavailable.');
-      localStorage.setItem('likhartisan_checkout_session_id', result.checkoutSessionId);
+      localStorage.setItem(`likhartisan_checkout_session_id:${user?.id}`, result.checkoutSessionId);
       localStorage.setItem('likhartisan_order_id', order.id);
       window.location.assign(result.checkoutUrl);
     } catch (error) {
@@ -182,14 +182,14 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
     }
   }
   function confirmReorder() {
-    if (!reorderPlan?.available.length || addingReorderRef.current) return;
+    if (!user || !reorderPlan?.available.length || addingReorderRef.current) return;
     addingReorderRef.current = true;
     setAddingReorder(true);
     setReorderError('');
     try {
-      const before = getCart();
-      for (const item of reorderPlan.available) addToCart(item);
-      const after = getCart();
+      const before = getCart(user?.id);
+      for (const item of reorderPlan.available) addToCart(user?.id, item);
+      const after = getCart(user?.id);
       const previousQuantities = new Map(before.map(item => [getCartLineKey(item), item.qty]));
       const addedQuantity = after.reduce((total, item) => total + Math.max(0, item.qty - (previousQuantities.get(getCartLineKey(item)) || 0)), 0);
       if (!addedQuantity) {

@@ -1,3 +1,4 @@
+import { shoppingDestination, clearShoppingDestination } from '../lib/shoppingAuth';
 import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
@@ -26,7 +27,9 @@ export default function SignInPage() {
         setError('Sign in could not be completed. Please try again.');
         return;
       }
-      navigate(await getAuthDestination(data.user), { replace: true });
+      const destination = shoppingDestination() || await getAuthDestination(data.user);
+      clearShoppingDestination();
+      navigate(destination, { replace: true });
     } catch {
       setError('Sign in could not be completed. Please try again.');
     } finally {

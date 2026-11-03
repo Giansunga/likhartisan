@@ -20,7 +20,7 @@ const cart: CartItem[] = [
 
 function draft(overrides: Partial<CartCheckoutDraft> = {}): CartCheckoutDraft {
   return {
-    version: 1,
+    version: 1, ownerUserId: 'buyer',
     source: 'cart',
     shopId: 's1',
     lineKeys: [getCartLineKey(cart[1])],
@@ -45,43 +45,43 @@ describe('cart checkout contract', () => {
 
   it('persists and clears a versioned checkout draft', () => {
     const value = draft({ deliveryOption: 'courier' });
-    writeCartCheckoutDraft(value);
-    expect(readCartCheckoutDraft()).toEqual(value);
-    clearCartCheckoutDraft();
-    expect(readCartCheckoutDraft()).toBeNull();
+    writeCartCheckoutDraft('buyer', value);
+    expect(readCartCheckoutDraft('buyer')).toEqual(value);
+    clearCartCheckoutDraft('buyer');
+    expect(readCartCheckoutDraft('buyer')).toBeNull();
   });
 
   it('associates purchased line keys with the server-created order', () => {
     const keys = cart.slice(0, 2).map(getCartLineKey);
-    savePendingPurchase('order_test', keys);
-    expect(readPendingPurchase('order_test')).toEqual(keys);
-    clearPendingPurchase('order_test');
-    expect(readPendingPurchase('order_test')).toEqual([]);
+    savePendingPurchase('buyer', 'order_test', keys);
+    expect(readPendingPurchase('buyer', 'order_test')).toEqual(keys);
+    clearPendingPurchase('buyer', 'order_test');
+    expect(readPendingPurchase('buyer', 'order_test')).toEqual([]);
   });
 
   it('removes only purchased lines and preserves the rest of the cart', () => {
-    setCart(cart);
-    removeCartLines([getCartLineKey(cart[1])]);
+    setCart('buyer', cart);
+    removeCartLines('buyer', [getCartLineKey(cart[1])]);
 
-    expect(getCart()).toEqual([cart[0], cart[2]]);
+    expect(getCart('buyer')).toEqual([cart[0], cart[2]]);
   });
 
   it('never adds more than the available stock for a cart line', () => {
     const item = { ...cart[0], qty: 1 };
 
-    expect(addToCart(item, 2)).toMatchObject({ addedQty: 1, quantity: 1, maximum: 2 });
-    expect(addToCart(item, 2)).toMatchObject({ addedQty: 1, quantity: 2, maximum: 2 });
-    expect(addToCart(item, 2)).toMatchObject({ addedQty: 0, quantity: 2, maximum: 2 });
-    expect(getCart()).toEqual([{ ...item, qty: 2 }]);
+    expect(addToCart('buyer', item, 2)).toMatchObject({ addedQty: 1, quantity: 1, maximum: 2 });
+    expect(addToCart('buyer', item, 2)).toMatchObject({ addedQty: 1, quantity: 2, maximum: 2 });
+    expect(addToCart('buyer', item, 2)).toMatchObject({ addedQty: 0, quantity: 2, maximum: 2 });
+    expect(getCart('buyer')).toEqual([{ ...item, qty: 2 }]);
   });
 
   it('keeps variation stock limits independent', () => {
     const first = { ...cart[0], qty: 2 };
     const second = { ...cart[1], qty: 2 };
 
-    addToCart(first, 1);
-    addToCart(second, 3);
+    addToCart('buyer', first, 1);
+    addToCart('buyer', second, 3);
 
-    expect(getCart()).toEqual([{ ...first, qty: 1 }, second]);
+    expect(getCart('buyer')).toEqual([{ ...first, qty: 1 }, second]);
   });
 });

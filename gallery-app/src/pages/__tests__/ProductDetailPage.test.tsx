@@ -60,7 +60,7 @@ function renderProduct() { return render(productTree()); }
 
 beforeEach(() => {
   localStorage.clear();
-  mocks.user = null;
+  mocks.user = { id: 'buyer' };
   mocks.failProducts = false;
   mocks.failModel = false;
   mocks.calls = [];
@@ -95,7 +95,7 @@ describe('product detail presentation and shopping controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
     fireEvent.click(screen.getByRole('button', { name: 'Buy Now' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer')).toEqual([]);
     expect(screen.queryByTestId('location')).not.toBeInTheDocument();
   });
 
@@ -119,7 +119,7 @@ describe('product detail presentation and shopping controls', () => {
       expect(preload).not.toHaveBeenCalledWith(source);
       fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
       const { getCart } = await import('../../data/store');
-      expect(getCart()[0].image).toBe(source);
+      expect(getCart('buyer')[0].image).toBe(source);
     } finally { preload.mockRestore(); }
   });
   it('bounds quantity by selected-size stock, retains it after adding, and resets on size/product changes', async () => {
@@ -135,9 +135,9 @@ describe('product detail presentation and shopping controls', () => {
     expect(stepper.getByRole('button', { name: 'Increase quantity' })).toBeDisabled();
     fireEvent.click(stepper.getByRole('button', { name: 'Decrease quantity' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()).toEqual([]);
+    expect(getCart('buyer')).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
-    expect(getCart()[0]).toMatchObject({ variationId: 'large', qty: 7, price: 2600 });
+    expect(getCart('buyer')[0]).toMatchObject({ variationId: 'large', qty: 7, price: 2600 });
     expect(stepper.getByText('7')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
     expect(screen.getByText('You can add 1 more.')).toBeInTheDocument();
@@ -165,20 +165,21 @@ describe('product detail presentation and shopping controls', () => {
     fireEvent.click(stepper.getByRole('button', { name: 'Increase quantity' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
-    expect(getCart()).toHaveLength(1);
-    expect(getCart()[0].qty).toBe(6);
+    expect(getCart('buyer')).toHaveLength(1);
+    expect(getCart('buyer')[0].qty).toBe(6);
     expect(success).toHaveBeenLastCalledWith('Added 3 items to your cart.');
     expect(animateProductToCart).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
     expect(screen.getByText('You can add 2 more.')).toBeInTheDocument();
     fireEvent.click(stepper.getByRole('button', { name: 'Decrease quantity' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
-    expect(getCart()[0].qty).toBe(8);
+    expect(getCart('buyer')[0].qty).toBe(8);
     expect(screen.getByRole('button', { name: 'Stock Limit Reached' })).toBeDisabled();
     success.mockRestore();
   });
 
   it('preserves the selected quantity through a guest sign-in prompt and passes it to checkout', async () => {
+    mocks.user = null;
     const signIn = vi.fn();
     window.addEventListener('open-auth', signIn);
     const view = renderProduct();
@@ -204,7 +205,7 @@ describe('product detail presentation and shopping controls', () => {
     expect(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByText('2')).toBeInTheDocument();
     fireEvent.click(mobile.getByRole('button', { name: 'Add to Cart' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()[0].qty).toBe(2);
+    expect(getCart('buyer')[0].qty).toBe(2);
     for (let i = 2; i < 7; i++) fireEvent.click(mobile.getByRole('button', { name: 'Increase quantity' }));
     expect(mobile.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
     expect(mobile.getByRole('button', { name: 'Buy Now' })).toBeEnabled();
@@ -249,7 +250,7 @@ describe('product detail presentation and shopping controls', () => {
     expect(container.querySelector('.pdp-spec-tiles')).toHaveTextContent('28 kg');
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()[0]).toMatchObject({ productId: 'jar', variationId: 'large', price: 2600, qty: 1 });
+    expect(getCart('buyer')[0]).toMatchObject({ productId: 'jar', variationId: 'large', price: 2600, qty: 1 });
     fireEvent.click(within(sizes).getByRole('button', { name: /14.*7.5/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Add to Cart' }));
     expect(screen.getByRole('button', { name: 'Stock Limit Reached' })).toBeDisabled();
@@ -280,6 +281,7 @@ describe('product detail presentation and shopping controls', () => {
   });
 
   it('opens sign in for guest buying, chat and questions, without sending a message', async () => {
+    mocks.user = null;
     const signIn = vi.fn();
     window.addEventListener('open-auth', signIn);
     renderProduct();
@@ -311,7 +313,7 @@ describe('product detail presentation and shopping controls', () => {
     expect(within(screen.getByRole('group', { name: 'Purchase quantity' })).getByText('2')).toBeInTheDocument();
     fireEvent.click(within(dock).getByRole('button', { name: 'Add to Cart' }));
     const { getCart } = await import('../../data/store');
-    expect(getCart()[0]).toMatchObject({ variationId: 'large', price: 2600, qty: 2 });
+    expect(getCart('buyer')[0]).toMatchObject({ variationId: 'large', price: 2600, qty: 2 });
     fireEvent.click(within(sizes).getByRole('button', { name: /40.*20/ }));
     expect(within(dock).getByRole('button', { name: 'Buy Now' })).toBeDisabled();
     expect(within(dock).getByRole('button', { name: 'Add to Cart' })).toBeDisabled();

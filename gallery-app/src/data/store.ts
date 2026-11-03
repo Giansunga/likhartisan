@@ -11,16 +11,17 @@ function set<T>(key: string, val: T) {
 }
 
 // ─── Cart ───
-export function getCart(): CartItem[] { return get<CartItem[]>('lk_cart', []); }
-export function setCart(items: CartItem[]) { set('lk_cart', items); emitCartUpdate(); }
+export function getCart(userId: string | null | undefined): CartItem[] { return userId ? get<CartItem[]>(`lk_cart:${userId}`, []) : []; }
+export function setCart(userId: string | null | undefined, items: CartItem[]) { if (!userId) return; set(`lk_cart:${userId}`, items); emitCartUpdate(); }
 export interface AddToCartResult {
   addedQty: number;
   quantity: number;
   maximum: number | null;
 }
 
-export function addToCart(item: CartItem, maximumQuantity?: number): AddToCartResult {
-  const cart = getCart();
+export function addToCart(userId: string | null | undefined, item: CartItem, maximumQuantity?: number): AddToCartResult {
+  if (!userId) return { addedQty: 0, quantity: 0, maximum: null };
+  const cart = getCart(userId);
   const existing = cart.find(i => i.productId === item.productId && i.variationId === item.variationId);
   const requested = Math.max(0, Math.floor(Number(item.qty) || 0));
   const maximum = Number.isFinite(maximumQuantity)
@@ -36,22 +37,22 @@ export function addToCart(item: CartItem, maximumQuantity?: number): AddToCartRe
 
   if (existing) existing.qty = quantity;
   else cart.push({ ...item, qty: quantity });
-  setCart(cart);
+  setCart(userId, cart);
   return { addedQty, quantity, maximum: Number.isFinite(maximum) ? maximum : null };
 }
-export function removeFromCart(productId: string, variationId?: string) {
+export function removeFromCart(userId: string | null | undefined, productId: string, variationId?: string) {
   if (variationId) {
-    setCart(getCart().filter(i => !(i.productId === productId && i.variationId === variationId)));
+    setCart(userId, getCart(userId).filter(i => !(i.productId === productId && i.variationId === variationId)));
   } else {
-    setCart(getCart().filter(i => i.productId !== productId));
+    setCart(userId, getCart(userId).filter(i => i.productId !== productId));
   }
 }
-export function removeCartLines(lineKeys: CartLineKey[]) {
+export function removeCartLines(userId: string | null | undefined, lineKeys: CartLineKey[]) {
   const keys = new Set(lineKeys);
-  setCart(getCart().filter(item => !keys.has(getCartLineKey(item))));
+  setCart(userId, getCart(userId).filter(item => !keys.has(getCartLineKey(item))));
 }
-export function clearCart() { setCart([]); }
-export function getCartCount(): number { return getCart().reduce((s, i) => s + i.qty, 0); }
+export function clearCart(userId: string | null | undefined) { setCart(userId, []); }
+export function getCartCount(userId: string | null | undefined): number { return getCart(userId).reduce((s, i) => s + i.qty, 0); }
 
 function emitCartUpdate() {
   window.dispatchEvent(new CustomEvent(CART_EVENT));

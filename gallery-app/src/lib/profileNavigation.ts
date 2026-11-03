@@ -2,7 +2,7 @@ import type { CartCheckoutDraft, CartItem } from '../types';
 
 export interface ProfileReturn {
   pathname: '/cart' | '/checkout';
-  state?: { buyNowItem?: CartItem; checkoutDraft?: CartCheckoutDraft; deliveryOption?: 'pickup' | 'courier'; cartSelection?: { shopKey: string | null; lineKeys: string[]; deliveryOption: 'pickup' | 'courier' | null } };
+  state?: { ownerUserId?: string; buyNowItem?: CartItem; checkoutDraft?: CartCheckoutDraft; deliveryOption?: 'pickup' | 'courier'; cartSelection?: { shopKey: string | null; lineKeys: string[]; deliveryOption: 'pickup' | 'courier' | null } };
 }
 
 /** Only the two shopping surfaces may be resumed; never follow arbitrary URLs. */
