@@ -501,17 +501,20 @@ export default function ProductDetailPage() {
 
             <div className="pdp-info">
               <div className="pdp-heading">
-                <h1>{product.name}</h1>
+                <div className="pdp-title-row">
+                  <h1>{product.name}</h1>
+                  <div className="pdp-price" aria-live="polite" aria-atomic="true">{variations.length > 0 && !selectedVariation ? 'Select a variation' : fmt(displayPrice)}</div>
+                </div>
                 <div className="pdp-product-rating">
+                  {soldCount > 0 && <span className="pdp-sold">{soldCount} sold</span>}
                   {productRating.count > 0 ? <><span className="pdp-stars" role="img" aria-label={`${fmtRating(productRating.avg)} out of 5 stars`}>{renderStars(productRating.avg, 16)}</span><a href="#product-reviews" aria-label={`Read ${productRating.count} product reviews`}>({fmtRating(productRating.avg)})</a></> : <a href="#product-reviews">No reviews yet</a>}
-                  {soldCount > 0 && <span>{soldCount} sold</span>}
                 </div>
               </div>
 
               <div className="pdp-selection">
-                <div className="pdp-price-row">
+                <div className="pdp-size-row">
                   <div className="pdp-size-caption"><span>{variations.length > 0 ? 'Select size' : product.category}</span>{sizeLabel && <span className="pdp-selected-size">{sizeLabel}</span>}</div>
-                  <div className="pdp-price" aria-live="polite" aria-atomic="true">{variations.length > 0 && !selectedVariation ? 'Select a variation' : fmt(displayPrice)}</div>
+                  <span className={`pdp-stock-badge${productUnavailable || (!stockNeedsSize && availableStock === 0) ? ' pdp-stock-badge--empty' : stockNeedsSize ? ' pdp-stock-badge--pending' : ''}`} role="status">{productUnavailable ? 'Unavailable' : stockNeedsSize ? 'Select size for stock' : availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}</span>
                 </div>
                 {variations.length > 0 && (
                   <div className="pdp-variations" role="group" aria-label="Select size">

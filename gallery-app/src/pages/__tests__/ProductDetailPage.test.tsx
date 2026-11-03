@@ -83,6 +83,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('product detail presentation and shopping controls', () => {
+  it('groups title and price above sold/reviews and keeps size inventory beside the selector', async () => {
+    const { container } = renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    const title = container.querySelector('.pdp-title-row')!;
+    expect(within(title as HTMLElement).getByRole('heading', { level: 1 })).toHaveTextContent('Bigasan Terracotta');
+    expect(title.querySelector('.pdp-price')).toHaveTextContent('₱1,200.00');
+    const rating = container.querySelector('.pdp-product-rating')!;
+    expect(rating.firstElementChild).toHaveTextContent('4 sold');
+    const sizeRow = container.querySelector('.pdp-size-row')!;
+    expect(sizeRow).toHaveTextContent('Select size');
+    expect(sizeRow.querySelector('[role="status"]')).toHaveTextContent('1 in stock');
+    expect(container.querySelector('.pdp-craft')).not.toHaveAttribute('open');
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /32.*18/ }));
+    expect(sizeRow.querySelector('[role="status"]')).toHaveTextContent('8 in stock');
+    expect(title.querySelector('.pdp-price')).toHaveTextContent('₱2,600.00');
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select size' })).getByRole('button', { name: /40.*20/ }));
+    expect(sizeRow.querySelector('[role="status"]')).toHaveTextContent('Out of stock');
+  });
+
   it.each(['inactive', 'draft', 'archived'])('keeps a %s product preview available without allowing purchases', async (status) => {
     mocks.products[0].status = status;
     mocks.user = { id: 'buyer' };
