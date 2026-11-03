@@ -70,7 +70,7 @@ export default function ProfileAddressEditor({ draft, error, disabled, onChange 
       const valid = found && validAddressCoordinates(found.lat, found.lng);
       if (!valid) { setPinMessage('Address could not be located. Refine a pin on the map, or try again. Courier delivery needs a saved pin.'); return; }
       onChange({ ...draft, addressLat: valid.lat, addressLng: valid.lng });
-      setPinMessage('Check the pin, then save your changes.');
+      setPinMessage('Check the pin, then choose Save address.');
     } catch { if (request === sequence.current) setPinMessage('The map service is unavailable. Try again before courier checkout.'); }
     finally { if (request === sequence.current) setLocating(false); }
   }
@@ -79,7 +79,7 @@ export default function ProfileAddressEditor({ draft, error, disabled, onChange 
     if (!point || !complete || disabled) return;
     sequence.current += 1; setLocating(false);
     onChange({ ...draft, addressLat: point.lat, addressLng: point.lng });
-    setPinMessage('Pin updated in your draft. Save changes to use it at checkout.');
+    setPinMessage('Pin updated in your draft. Save address to use it at checkout.');
   }
   return <fieldset className="profile-address-editor" disabled={disabled}>
     <legend className="account-visually-hidden">Delivery address</legend>
@@ -106,7 +106,7 @@ export default function ProfileAddressEditor({ draft, error, disabled, onChange 
     {loadError && <p role="status">Map unavailable. You can save your address; courier delivery needs a saved pin.</p>}
     {coordinates && <p className="profile-address-help">Delivery pin: {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}</p>}
     {isLoaded && (coordinates || complete) && <>
-      <p className="profile-address-help">Click the map or drag the pin to refine delivery. Changes are saved only with Save changes.</p>
+      <p className="profile-address-help">Click the map or drag the pin to refine delivery. Changes are saved only with Save address.</p>
       <GoogleMap mapContainerClassName="profile-address-map" center={coordinates || { lat: 12.8797, lng: 121.774 }} zoom={coordinates ? 16 : 6}
         options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
         onClick={e => { if (e.latLng) refine(e.latLng.lat(), e.latLng.lng()); }}>

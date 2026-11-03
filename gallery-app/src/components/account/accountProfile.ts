@@ -1,7 +1,10 @@
 import type { User } from '@supabase/supabase-js';
 import { readAddressParts, type AddressParts } from '../../lib/profileAddress';
+import { readProfileAddressBook, type SavedProfileAddress } from '../../lib/profileAddressBook';
 
 export interface AccountProfile {
+  addresses?: SavedProfileAddress[];
+  defaultAddressId?: string | null;
   fullName: string;
   email: string;
   phone: string;
@@ -13,6 +16,8 @@ export interface AccountProfile {
 }
 
 export interface AccountProfileDraft {
+  addresses?: SavedProfileAddress[];
+  defaultAddressId?: string | null;
   fullName: string;
   phone: string;
   address: string;
@@ -28,6 +33,8 @@ const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 export function accountProfileFromUser(user: User): AccountProfile {
   const metadata = user.user_metadata || {};
+  const book=readProfileAddressBook(metadata);
+  const active=book.addresses.find(item=>item.id===book.defaultAddressId);
   const addressLat = metadata.address_lat === null || metadata.address_lat === undefined
     ? null
     : Number(metadata.address_lat);
@@ -36,19 +43,21 @@ export function accountProfileFromUser(user: User): AccountProfile {
     : Number(metadata.address_lng);
 
   return {
+    ...book,
     fullName: String(metadata.name || '').trim(),
     email: user.email || '',
     phone: String(metadata.phone || '').trim(),
-    address: String(metadata.address || '').trim(),
-    addressLat: addressLat !== null && Number.isFinite(addressLat) ? addressLat : null,
-    addressLng: addressLng !== null && Number.isFinite(addressLng) ? addressLng : null,
+    address: metadata.address_book_version===1 ? active?.address||'' : String(metadata.address || '').trim(),
+    addressLat: metadata.address_book_version===1 ? active?.addressLat??null : addressLat !== null && Number.isFinite(addressLat) ? addressLat : null,
+    addressLng: metadata.address_book_version===1 ? active?.addressLng??null : addressLng !== null && Number.isFinite(addressLng) ? addressLng : null,
     avatarUrl: String(metadata.avatar_url || ''),
-    addressParts: readAddressParts(metadata.address_parts),
+    addressParts: metadata.address_book_version===1 ? active?.addressParts??null : readAddressParts(metadata.address_parts),
   };
 }
 
 export function profileToDraft(profile: AccountProfile): AccountProfileDraft {
   return {
+    addresses:profile.addresses||[],defaultAddressId:profile.defaultAddressId??null,
     fullName: profile.fullName,
     phone: profile.phone,
     address: profile.address,
@@ -74,7 +83,9 @@ export function isAccountDraftDirty(draft: AccountProfileDraft, profile: Account
     || (draft.address !== profile.address && normalized.address !== profile.address)
     || JSON.stringify(normalized.addressParts ?? null) !== JSON.stringify(profile.addressParts ?? null)
     || (normalized.addressLat !== undefined && normalized.addressLat !== profile.addressLat)
-    || (normalized.addressLng !== undefined && normalized.addressLng !== profile.addressLng);
+    || (normalized.addressLng !== undefined && normalized.addressLng !== profile.addressLng)
+    || (normalized.addresses !== undefined && JSON.stringify(normalized.addresses)!==JSON.stringify(profile.addresses||[]))
+    || (normalized.defaultAddressId !== undefined && normalized.defaultAddressId!==(profile.defaultAddressId??null));
 }
 
 export function validateAccountDraft(draft: AccountProfileDraft): AccountFieldErrors {

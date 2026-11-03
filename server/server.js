@@ -551,6 +551,10 @@ app.post('/api/create-checkout', paymongoLimiter, async (req, res) => {
 
     res.json({ checkoutUrl, orderId, referenceNumber, total: serverTotal });
   } catch (error) {
+    if (['PAYMONGO_AUTHENTICATION_FAILED', 'PAYMONGO_CHECKOUT_FAILED'].includes(error.code)) {
+      console.error('[create-checkout] Payment provider rejected checkout:', error.code);
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     console.error('Server error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -590,7 +594,11 @@ app.post('/api/orders/:orderId/checkout', paymongoLimiter, async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('[custom-checkout] Error:', error.message);
-    return res.status(error.status || 500).json({ error: error.status && error.status < 500 ? error.message : 'Unable to start custom-order checkout' });
+    const paymentFailure = ['PAYMONGO_AUTHENTICATION_FAILED', 'PAYMONGO_CHECKOUT_FAILED'].includes(error.code);
+    return res.status(error.status || 500).json({
+      error: paymentFailure || (error.status && error.status < 500) ? error.message : 'Unable to start custom-order checkout',
+      ...(paymentFailure ? { code: error.code } : {}),
+    });
   }
 });
 

@@ -1,6 +1,6 @@
 import AssetImage from '../AssetImage';
 import { Popup } from '../Popup';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import {
   Camera,
@@ -23,7 +23,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress } from '../../lib/geocoder';
 import PasswordDialog from './PasswordDialog';
-import ProfileAddressEditor from './ProfileAddressEditor';
+import ProfileAddressBook from './ProfileAddressBook';
+import { addressBookMetadata } from '../../lib/profileAddressBook';
 import { validAddressCoordinates } from '../../lib/profileAddress';
 import {
   accountProfileFromUser,
@@ -54,7 +55,11 @@ function AccountPanelContent({ user }: { user: User }) {
   const [showEmail, setShowEmail] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [addressEditorVersion,setAddressEditorVersion]=useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mounted=useRef(true);
+  const saving=useRef(false);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
 
   const dirty = isAccountDraftDirty(draft, savedProfile);
   const completedFields = [draft.fullName, draft.phone, draft.address].filter(value => value.trim()).length;
@@ -66,24 +71,26 @@ function AccountPanelContent({ user }: { user: User }) {
     setSaveMessage('');
   }
 
-  async function saveProfile() {
-    if (saveStatus === 'saving') return;
-    const normalized = normalizeAccountDraft(draft);
+  async function saveProfile(nextDraft=draft):Promise<boolean> {
+    if (saving.current) return false;
+    const normalized = normalizeAccountDraft(nextDraft);
     // A name/phone edit must not normalize or replace a legacy saved address.
-    if (draft.address === savedProfile.address) normalized.address = savedProfile.address;
+    if (nextDraft.address === savedProfile.address) normalized.address = savedProfile.address;
     const nextErrors = validateAccountDraft(normalized);
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       setSaveStatus('error');
       setSaveMessage('Review the highlighted fields.');
-      return;
+      return false;
     }
 
+    saving.current=true;
     setSaveStatus('saving');
     setSaveMessage('Saving your account details…');
     const addressChanged = normalized.address !== savedProfile.address;
     const addressPartsChanged = JSON.stringify(normalized.addressParts ?? null) !== JSON.stringify(savedProfile.addressParts ?? null);
     const pinChanged = normalized.addressLat !== savedProfile.addressLat || normalized.addressLng !== savedProfile.addressLng;
+    const bookChanged=JSON.stringify(normalized.addresses??[])!==JSON.stringify(savedProfile.addresses??[])||normalized.defaultAddressId!==savedProfile.defaultAddressId;
     let addressLat = normalized.addressLat ?? null;
     let addressLng = normalized.addressLng ?? null;
 
@@ -104,11 +111,14 @@ function AccountPanelContent({ user }: { user: User }) {
       }
     }
 
+    if(!mounted.current){saving.current=false;return false;}
     try {
+      const addresses=(normalized.addresses||[]).map(item=>item.id===normalized.defaultAddressId?{...item,address:normalized.address,addressParts:normalized.addressParts??null,addressLat,addressLng}:item);
       const { data, error } = await supabase.auth.updateUser({
         data: {
           name: normalized.fullName,
           phone: normalized.phone,
+          ...(bookChanged || addressChanged || addressPartsChanged || pinChanged ? addressBookMetadata(addresses,normalized.defaultAddressId??null):{}),
           ...(addressChanged || addressPartsChanged || pinChanged ? {
             address: normalized.address, address_lat: addressLat, address_lng: addressLng,
             ...(addressChanged || addressPartsChanged ? { address_parts: normalized.addressParts ?? null } : {}),
@@ -117,15 +127,17 @@ function AccountPanelContent({ user }: { user: User }) {
         },
       });
 
+      if(!mounted.current)return !error;
+
       if (error) {
         setSaveStatus('error');
         setSaveMessage(error.message || 'Could not save your changes.');
-        return;
+        return false;
       }
 
       const nextProfile = data.user
         ? accountProfileFromUser(data.user)
-        : { ...savedProfile, ...normalized, addressLat, addressLng };
+        : { ...savedProfile, ...normalized, addresses, addressLat, addressLng };
       setSavedProfile(nextProfile);
       setDraft(profileToDraft(nextProfile));
       setErrors({});
@@ -134,13 +146,17 @@ function AccountPanelContent({ user }: { user: User }) {
         ? 'Saved. Confirm a delivery pin here in Profile before courier checkout.'
         : 'Your account details are up to date.');
       toast.success('Account details saved.');
+      return true;
     } catch (error) {
+      if(!mounted.current)return false;
       setSaveStatus('error');
       setSaveMessage(error instanceof Error ? error.message : 'Could not save your changes.');
-    }
+      return false;
+    } finally {saving.current=false;}
   }
 
   function discardChanges() {
+    setAddressEditorVersion(version=>version+1);
     setDraft(profileToDraft(savedProfile));
     setErrors({});
     setSaveStatus('idle');
@@ -249,11 +265,10 @@ function AccountPanelContent({ user }: { user: User }) {
         <section className="account-card" aria-labelledby="account-address-title">
           <div className="account-card__heading">
             <span><MapPin size={20} aria-hidden="true" /></span>
-            <div><h2 id="account-address-title">Default delivery address</h2><p>Your saved details are used at cart and checkout.</p></div>
+            <div><h2 id="account-address-title">Delivery addresses</h2><p>Your default address is used at cart and checkout.</p></div>
           </div>
-          <ProfileAddressEditor draft={draft} error={errors.address} disabled={saveStatus === 'saving'} onChange={next => {
-            setDraft(next); setErrors(current => ({ ...current, address: undefined })); setSaveStatus('idle'); setSaveMessage('');
-          }} />
+          <ProfileAddressBook key={addressEditorVersion} draft={draft} disabled={saveStatus === 'saving'} onSave={saveProfile}/>
+          {errors.address&&<p role="alert">{errors.address}</p>}
         </section>
       </div>
 

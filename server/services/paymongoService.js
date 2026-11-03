@@ -128,9 +128,12 @@ export async function createCheckoutSession(attributes, secretKey, fetchImpl = f
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || !body?.data?.id || !body?.data?.attributes?.checkout_url) {
-    const error = new Error('Unable to create checkout session with PayMongo');
-    error.status = response.status >= 500 ? 503 : 400;
-    error.providerErrors = body?.errors;
+    const authenticationFailed = response.status === 401 || response.status === 403;
+    const error = new Error(authenticationFailed
+      ? 'Payments are temporarily unavailable because the payment credentials could not be verified. Please contact support.'
+      : 'Unable to start secure payment. Please try again or contact support.');
+    error.status = 503;
+    error.code = authenticationFailed ? 'PAYMONGO_AUTHENTICATION_FAILED' : 'PAYMONGO_CHECKOUT_FAILED';
     throw error;
   }
   return body.data;

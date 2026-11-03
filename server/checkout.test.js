@@ -38,6 +38,7 @@ before(async () => {
     }
     if (url.href === 'https://api.paymongo.com/v1/checkout_sessions') {
       scenario.paymentRequests.push(JSON.parse(options.body));
+      if (scenario.paymentStatus) return json({ errors: [{ code: 'authentication_invalid', detail: 'provider-private-detail' }] }, scenario.paymentStatus);
       return json({ data: { id: 'session-test', attributes: { checkout_url: 'https://payment.example/session-test' } } });
     }
     if (url.pathname === '/rest/v1/orders') {
@@ -114,4 +115,14 @@ test('allows active products through the legacy query fallback', async () => {
   assert.equal((await checkout()).status, 200);
   assert.equal(scenario.paymentRequests.length, 1);
   assert.equal(scenario.orders.length, 1);
+});
+
+test('reports rejected payment credentials without saving an order or exposing provider details', async () => {
+  scenario.paymentStatus = 401;
+  const response = await checkout();
+  assert.equal(response.status, 503);
+  assert.equal(response.body.code, 'PAYMONGO_AUTHENTICATION_FAILED');
+  assert.match(response.body.error, /credentials could not be verified/);
+  assert.doesNotMatch(JSON.stringify(response.body), /provider-private-detail/);
+  assert.equal(scenario.orders.length, 0);
 });

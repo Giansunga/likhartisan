@@ -1,7 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
-import { inspectCheckoutSession, verifyCheckoutSession, verifyPayMongoSignature } from './paymongoService.js';
+import { createCheckoutSession, inspectCheckoutSession, verifyCheckoutSession, verifyPayMongoSignature } from './paymongoService.js';
+
+for (const status of [401, 403, 422, 500]) {
+  test(`checkout safely reports provider HTTP ${status}`, async () => {
+    await assert.rejects(createCheckoutSession({}, 'sk_live_fixture', async () => new Response(
+      JSON.stringify({ errors: [{ detail: 'private provider data' }] }), { status },
+    )), error => {
+      assert.equal(error.status, 503);
+      assert.equal(error.code, [401, 403].includes(status) ? 'PAYMONGO_AUTHENTICATION_FAILED' : 'PAYMONGO_CHECKOUT_FAILED');
+      assert.doesNotMatch(error.message, /private provider data/);
+      assert.equal(error.providerErrors, undefined);
+      return true;
+    });
+  });
+}
 
 const order = {
   id: '12bf2bc3-7ae6-47cf-8d2f-7ea333d1f5dd',
