@@ -58,8 +58,9 @@ function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, sha
 
   useFrame(() => {
     if (!groupRef.current) return;
+    const surfaceRevision = getAttachmentSurfaceRevision(baseScene);
     const result = analysisRef.current?.placements[attachmentPlacementKey(attachment.id, placement.socket.id)];
-    if (!recipe || analysisRef.current?.status === 'error' || result?.status === 'invalid') {
+    if (!surfaceRevision || !recipe || analysisRef.current?.status === 'error' || result?.status === 'invalid') {
       groupRef.current.visible = false;
       return;
     }
@@ -68,7 +69,7 @@ function AttachmentModel({ attachment, placement, liveSocketsRef, baseScene, sha
     const transform = result && analysisRef.current?.revision === revision ? result.transform : placement.transform;
     const currentSocket = liveSocketsRef.current?.find((candidate) => candidate.id === savedSocket.id);
     const socket = currentSocket ? { ...savedSocket, height: currentSocket.height, azimuth: currentSocket.azimuth } : savedSocket;
-    const placementKey = `${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${transform.thicknessMultiplier}|${recipe.key}|${recipe.version}`;
+    const placementKey = `${surfaceRevision}|${shapeKey}|${socket.id}|${socket.height}|${socket.azimuth}|${transform.horizontalDegrees}|${transform.verticalRatio}|${transform.surfaceOffsetRatio}|${transform.twistDegrees}|${transform.scaleMultiplier}|${transform.thicknessMultiplier}|${recipe.key}|${recipe.version}`;
     if (placementKeyRef.current === placementKey && groupRef.current.visible) return;
     const mount = resolveAttachmentMount(baseScene, socket, recipe, transform);
     if (!mount) { groupRef.current.visible = false; return; }
@@ -107,7 +108,7 @@ function AttachmentSocketMarker({ socket, baseScene, selected }: { socket: Gener
   </group>;
 }
 
-function Scene({
+export function FreeformScene({
   modelFile,
   shapeParams,
   materialParams,
@@ -218,6 +219,8 @@ function Scene({
 
   useEffect(() => () => decorTexture?.dispose(), [decorTexture]);
 
+  // Prepare the shaped pot before attachment callbacks, including read-only
+  // submitted designs that deliberately skip attachment analysis.
   useFrame(() => {
     if (!groupRef.current) return;
 
@@ -407,7 +410,7 @@ function Scene({
       }
     }
 
-  });
+  }, -1);
 
   return (
     <group ref={groupRef}>
@@ -529,7 +532,7 @@ export default function FreeformViewer({
           <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
 
           <Suspense fallback={null}>
-            <Scene
+            <FreeformScene
               key={modelFile}
               modelFile={modelFile}
               shapeParams={shapeParams}
