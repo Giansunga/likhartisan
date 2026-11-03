@@ -91,6 +91,14 @@ describe('PurchasePanel LIKHAI deep links', () => {
     await waitFor(() => expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled());
   });
 
+  it('keeps only the card receipt button when purchase details are expanded',async()=>{
+    const paid={...target,receiptAvailable:true};
+    fixtures.orders=[paid];fixtures.purchaseApi.mockResolvedValue(paid);
+    renderPanel('/dashboard?tab=purchases&order=target-order');
+    expect(await screen.findByText('Order progress')).toBeInTheDocument();
+    expect(screen.getAllByRole('button',{name:'Download Receipt'})).toHaveLength(1);
+  });
+
   it('updates the expanded card when the linked order changes and clears it when closed', async () => {
     fixtures.orders = [target, other];
     renderPanel('/dashboard?tab=purchases&order=target-order', true);

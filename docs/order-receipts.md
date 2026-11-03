@@ -27,6 +27,6 @@ Sample regular/custom/multipage PDFs were generated locally under `output/pdf/re
 
 ## Separately authorized rollout
 
-No production schema changes have been applied. Apply the migration before deploying the API and frontend. Verify a test payment, the downloadable receipt, a repeated verification callback, and buyer isolation. Existing orders are not bulk-backfilled.
+The receipt migration was applied to LikhArtisan2026 on November 3, 2026 to repair downloads after the application was released before its required schema. The reported paid order was successfully captured and rendered as a PDF using the receipt service. For other environments, apply the migration before deploying the API and frontend. Verify a test payment, the downloadable receipt, a repeated verification callback, and buyer isolation. Existing orders are not bulk-backfilled.
 
 Rollback requires removing the frontend/API feature first. Export `order_receipts` if the issued snapshots must be retained, then apply the companion rollback under `supabase/rollback/`. Dropping snapshots loses their frozen historical values; regenerating later can only use whatever remains on the saved orders.
