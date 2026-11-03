@@ -528,9 +528,7 @@ export default function CartPage() {
           <button type="button" className="cart-header__back" onClick={() => navigate('/gallery')}>
             <ArrowLeft size={17} aria-hidden="true" /> Continue shopping
           </button>
-          <div>
-            <h1>Shopping cart</h1>
-          </div>
+          <h1 className="sr-only">Shopping cart</h1>
         </header>
 
         <div className="cart-layout">

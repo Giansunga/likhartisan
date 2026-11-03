@@ -128,7 +128,6 @@
 
 :root:has(#main-navbar.customer-navbar) { --navbar-row-height: 80px; --nav-height: 80px; }
 .navbar-layout .logo img { width: 170px; height: auto; }
-.navbar-desktop-links a { font-size: .95rem; }
 .navbar-product-search { min-width: 0; width: 100%; margin: 0; }
 @media (max-width: 1199px) {
   :root:has(#main-navbar.customer-navbar) { --nav-height: 136px; }

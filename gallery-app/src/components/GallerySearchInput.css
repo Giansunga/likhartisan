@@ -1,6 +1,6 @@
 .gallery-search-input { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; padding: 8px 12px; border: 1px solid #e8e4e0; border-radius: 999px; background: #f9f9fa; color: #8b929f; }
 .gallery-search-input svg { width: 18px; height: 18px; flex-shrink: 0; }
-.gallery-search-input input { min-width: 0; width: 100%; padding: 0; border: 0; outline: none; background: transparent; color: var(--text-dark); font-size: .85rem; }
+.gallery-search-input input { min-width: 0; width: 100%; padding: 0; border: 0; outline: none; background: transparent; color: var(--text-dark); font-size: 1rem; }
 .gallery-search-input:focus-within { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 @media (max-width: 1199px) {
   .gallery-search-input { min-height: 42px; }

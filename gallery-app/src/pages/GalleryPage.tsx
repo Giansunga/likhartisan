@@ -465,7 +465,7 @@ function GalleryView({ owner }: { owner: string }) {
                       display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px',
                       border: '1.5px solid ' + (showFavorites ? 'var(--primary-color)' : '#E8E0D8'),
                       borderRadius: '10px', background: showFavorites ? 'var(--primary-color)' : '#fff',
-                      color: showFavorites ? '#fff' : '#666', fontSize: '0.88rem', fontWeight: 600,
+                      color: showFavorites ? '#fff' : '#666', fontSize: '0.9375rem', fontWeight: 600,
                       cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
                     }}
                   >
@@ -484,7 +484,7 @@ function GalleryView({ owner }: { owner: string }) {
                       title="Delete your saved search and product-click recommendation history"
                       style={{
                         padding: '10px 14px', border: '1.5px solid #E8E0D8', borderRadius: '10px',
-                        background: '#fff', color: '#666', fontSize: '0.8rem', fontWeight: 600,
+                        background: '#fff', color: '#666', fontSize: '0.875rem', fontWeight: 600,
                         cursor: signals.length === 0 || resettingRecommendations ? 'default' : 'pointer',
                         opacity: signals.length === 0 || resettingRecommendations ? 0.5 : 1, whiteSpace: 'nowrap',
                       }}

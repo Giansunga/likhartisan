@@ -28,14 +28,12 @@ interface CheckoutHeaderProps {
 export function CheckoutHeader({ isBuyNow, onBack }: CheckoutHeaderProps) {
   return (
     <header className="checkout-header">
-      <button type="button" className="checkout-back" onClick={onBack}>
-        <ArrowLeft size={17} aria-hidden="true" />
-        {isBuyNow ? 'Back to product' : 'Back to cart'}
-      </button>
+      <h1 className="sr-only">Review and pay</h1>
       <div className="checkout-header__row">
-        <div>
-          <h1>Review and pay</h1>
-        </div>
+        <button type="button" className="checkout-back" onClick={onBack}>
+          <ArrowLeft size={17} aria-hidden="true" />
+          {isBuyNow ? 'Back to product' : 'Back to cart'}
+        </button>
         <ol className="checkout-steps" aria-label="Checkout progress">
           <li className="checkout-step checkout-step--complete"><Check size={14} aria-hidden="true" /><span>Cart</span></li>
           <li className="checkout-step checkout-step--current" aria-current="step"><span>2</span><span>Delivery</span></li>
