@@ -3,9 +3,9 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CartPage from '../CartPage';
 import type { CartItem } from '../../types';
-import { readCartCheckoutDraft } from '../../lib/cartCheckout';
+import { getCartLineKey, readCartCheckoutDraft } from '../../lib/cartCheckout';
 
-const mocks = vi.hoisted(() => ({ user: null as { id: string; user_metadata: { name?: string; phone?: string; address?: string; address_lat?: number | null; address_lng?: number | null } } | null }));
+const mocks = vi.hoisted(() => ({ variants: [] as { id: string; product_id: string; dimensions: string; price: number; stock: number; measurement_unit: 'in' }[], user: null as { id: string; user_metadata: { name?: string; phone?: string; address?: string; address_lat?: number | null; address_lng?: number | null } } | null }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mocks.user, loading: false }),
@@ -31,6 +31,7 @@ vi.mock('../../lib/supabase', () => ({
         in: vi.fn(async () => {
           if (table === 'products') return { data: products, error: null };
           if (table === 'shops') return { data: [{ id: 's1', location: 'Santo Tomas' }, { id: 's2', location: 'San Fernando' }], error: null };
+          if (table === 'product_variations') return { data: mocks.variants, error: null };
           return { data: [], error: null };
         }),
       })),
@@ -52,6 +53,7 @@ function ProfileStub() {
 describe('CartPage guest shop flow', () => {
   beforeEach(() => {
     mocks.user = { id: 'buyer', user_metadata: {} };
+    mocks.variants = [];
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('lk_cart:buyer', JSON.stringify(cart));
@@ -59,6 +61,44 @@ describe('CartPage guest shop flow', () => {
       quotationId: 'quote-1',
       priceBreakdown: { total: '150' },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+  });
+
+  it('switches variants, updates price and selection, and passes the new variant to checkout', async () => {
+    mocks.variants = [
+      { id: 'small', product_id: 'p1', dimensions: '10 × 8 in', price: 900, stock: 4, measurement_unit: 'in' },
+      { id: 'large', product_id: 'p1', dimensions: '20 × 16 in', price: 1400, stock: 2, measurement_unit: 'in' },
+      { id: 'empty', product_id: 'p1', dimensions: '30 × 20 in', price: 2000, stock: 0, measurement_unit: 'in' },
+    ];
+    localStorage.setItem('lk_cart:buyer', JSON.stringify([{ ...cart[0], variationId: 'small', variation: '10 × 8 in' }]));
+    render(<MemoryRouter><CartPage /></MemoryRouter>);
+    const dropdown = await screen.findByRole('combobox', { name: 'Variant for Moon Vase' });
+    await waitFor(() => expect(dropdown).toBeEnabled());
+    expect(screen.getByRole('option', { name: /30.*Out of stock/ })).toBeDisabled();
+    fireEvent.change(dropdown, { target: { value: 'large' } });
+    await waitFor(() => expect(dropdown).toBeEnabled());
+    expect(dropdown).toHaveValue('large');
+    expect(screen.getByLabelText('Select Moon Vase')).toBeChecked();
+    expect(JSON.parse(localStorage.getItem('lk_cart:buyer')!)[0]).toMatchObject({ variationId: 'large', price: 1400, qty: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Checkout 1 item' }));
+    expect(readCartCheckoutDraft('buyer')?.lineKeys).toEqual([getCartLineKey({ productId: 'p1', variationId: 'large' })]);
+  });
+
+  it('merges an existing target variant, caps stock, and preserves its selection', async () => {
+    mocks.variants = [
+      { id: 'small', product_id: 'p1', dimensions: '10 in', price: 900, stock: 4, measurement_unit: 'in' },
+      { id: 'large', product_id: 'p1', dimensions: '20 in', price: 1400, stock: 3, measurement_unit: 'in' },
+    ];
+    localStorage.setItem('lk_cart:buyer', JSON.stringify([
+      { ...cart[0], variationId: 'small', qty: 2 }, { ...cart[0], variationId: 'large', price: 1400, qty: 2 },
+    ]));
+    render(<MemoryRouter><CartPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('combobox')[0]).toBeEnabled());
+    fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'large' } });
+    await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole('combobox')).toBeEnabled());
+    expect(JSON.parse(localStorage.getItem('lk_cart:buyer')!)).toMatchObject([{ variationId: 'large', qty: 3, price: 1400 }]);
+    expect(screen.getByLabelText('Select Moon Vase')).toBeChecked();
+    expect(screen.getByLabelText('Increase quantity of Moon Vase')).toBeDisabled();
   });
 
   it('switches selection exclusively between artisan shops', async () => {

@@ -15,7 +15,7 @@
 }
 
 .cart-shell {
-  width: min(1240px, calc(100% - 48px));
+  width: min(1440px, calc(100% - 64px));
   margin: 0 auto;
 }
 
@@ -54,7 +54,7 @@
 
 .cart-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: 28px;
   align-items: start;
 }
@@ -277,6 +277,43 @@
   color: var(--text-light);
   font-size: .78rem;
 }
+
+.cart-line__variant {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.cart-line__variant > span {
+  color: #826e5d;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cart-line__variant select {
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid #d8c7b7;
+  border-radius: 8px;
+  background: #fffdf9;
+  color: var(--text-dark);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+.cart-line__variant select:focus-visible {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.cart-line__variant select:disabled { opacity: .65; cursor: wait; }
 
 .cart-line__status {
   display: flex;
@@ -717,12 +754,12 @@
 
 @media (max-width: 1040px) {
   .cart-layout {
-    grid-template-columns: minmax(0, 1fr) 330px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
 
   .cart-line {
-    grid-template-columns: 20px 82px minmax(130px, 1fr) auto;
+    grid-template-columns: 20px 82px minmax(0, 1fr) 112px;
   }
 
   .cart-line__image-link {
@@ -731,8 +768,11 @@
   }
 
   .cart-line__price {
-    display: none;
+    grid-column: 4;
   }
+
+  .cart-line__actions { grid-column: 3 / -1; justify-content: flex-end; }
+  .cart-sidebar { position: static; }
 }
 
 @media (max-width: 768px) {
@@ -789,10 +829,12 @@
   }
 
   .cart-line__actions {
-    grid-column: 2 / -1;
+    grid-column: 3;
     justify-content: space-between;
     padding-left: 0;
   }
+
+  .cart-line__price { grid-column: 2; grid-row: 2; text-align: left; }
 
   .cart-line__name {
     font-size: 1.05rem;

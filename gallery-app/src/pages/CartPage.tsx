@@ -22,7 +22,7 @@ import {
   ShopCartGroup,
   type CartLineAvailability,
 } from '../components/cart/CartComponents';
-import { fmt } from '../lib/utils';
+import { fmt, formatVariation } from '../lib/utils';
 import { inchesToCm, normalizeCatalogMeasurement, parseDimensionToInches } from '../lib/measurements';
 import './CartPage.css';
 
@@ -75,6 +75,8 @@ interface VariationCatalogRow {
   stock: number;
   dimensions?: string;
   height?: string;
+  opening_diameter?: string;
+  sort_order?: number;
   measurement_unit?: 'cm' | 'in';
 }
 
@@ -174,7 +176,6 @@ export default function CartPage() {
       setValidationStatus('loading');
 
       const productIds = [...new Set(items.map(item => item.productId))];
-      const variationIds = [...new Set(items.map(item => item.variationId).filter(Boolean) as string[])];
       const shopIds = [...new Set(items.map(item => item.shopId).filter(Boolean) as string[])];
 
       try {
@@ -182,9 +183,7 @@ export default function CartPage() {
           supabase.from('products')
             .select('id, name, price, image, shop_id, shop_name, stock, status, dimensions, height, measurement_unit')
             .in('id', productIds),
-          variationIds.length
-            ? supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height, measurement_unit').in('id', variationIds)
-            : Promise.resolve({ data: [], error: null }),
+          supabase.from('product_variations').select('id, product_id, price, stock, dimensions, height, opening_diameter, measurement_unit, sort_order').in('product_id', productIds),
           shopIds.length
             ? supabase.from('shops').select('*').in('id', shopIds)
             : Promise.resolve({ data: [], error: null }),
@@ -221,6 +220,12 @@ export default function CartPage() {
             stock,
             available,
             priceChanged,
+            variants: variationRows.filter(row => row.product_id === item.productId)
+              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.id.localeCompare(b.id))
+              .map((row, index) => ({ id: row.id,
+                label: formatVariation({ dimensions: row.dimensions, height: row.height, openingDiameter: row.opening_diameter, measurementUnit: row.measurement_unit || 'cm' }) || `Variant ${index + 1}`,
+                price: Number(row.price ?? product?.price ?? item.price), stock: Math.max(0, Number(row.stock) || 0),
+                available: product?.status === 'active' && Number(row.stock) > 0 })),
             dimensions: normalizeCatalogMeasurement(variation?.dimensions || product?.dimensions || '', variation?.measurement_unit || product?.measurement_unit || 'cm'),
             height: normalizeCatalogMeasurement(variation?.height || product?.height || '', variation?.measurement_unit || product?.measurement_unit || 'cm'),
           };
@@ -264,7 +269,7 @@ export default function CartPage() {
 
   const getAvailability = (item: CartItem): CatalogLineState => {
     const state = catalog[getCartLineKey(item)];
-    if (state) return state;
+    if (state) return { ...state, status: validationStatus };
     return {
       status: validationStatus,
       stock: null,
@@ -360,6 +365,33 @@ export default function CartPage() {
     const nextQuantity = item.qty + delta;
     if (nextQuantity < 1 || (info.stock !== null && nextQuantity > info.stock)) return;
     commitItems(items.map(current => getCartLineKey(current) === getCartLineKey(item) ? { ...current, qty: nextQuantity } : current));
+  }
+
+  function changeVariant(item: CartItem, variantId: string) {
+    if (validationStatus !== 'ready' || variantId === item.variationId) return;
+    const variant = getAvailability(item).variants?.find(candidate => candidate.id === variantId);
+    if (!variant?.available) return;
+    const oldKey = getCartLineKey(item);
+    const changed = { ...item, variationId: variant.id, variation: variant.label, price: variant.price };
+    const newKey = getCartLineKey(changed);
+    const existing = items.find(candidate => getCartLineKey(candidate) === newKey);
+    const requestedQuantity = item.qty + (existing?.qty || 0);
+    const qty = Math.min(requestedQuantity, variant.stock);
+    const nextItems = items.flatMap(candidate => {
+      const key = getCartLineKey(candidate);
+      if (key === oldKey) return [{ ...changed, qty }];
+      return key === newKey ? [] : [candidate];
+    });
+    setSelected(current => {
+      const next = new Set(current);
+      const wasSelected = next.has(oldKey) || next.has(newKey);
+      next.delete(oldKey);
+      if (wasSelected) next.add(newKey);
+      return next;
+    });
+    setValidationStatus('loading');
+    commitItems(nextItems);
+    if (qty < requestedQuantity) toast.info(`Quantity adjusted to ${qty} available for this variant.`);
   }
 
   function removeItem(item: CartItem) {
@@ -553,6 +585,7 @@ export default function CartPage() {
                 onToggleItem={toggleItem}
                 onQuantityChange={changeQuantity}
                 onRemove={removeItem}
+                onVariantChange={changeVariant}
               />
             ))}
           </div>

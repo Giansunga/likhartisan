@@ -21,6 +21,7 @@ export interface CartLineAvailability {
   stock: number | null;
   available: boolean;
   priceChanged?: boolean;
+  variants?: { id: string; label: string; stock: number; price: number; available: boolean }[];
 }
 
 interface ShopCartGroupProps {
@@ -34,6 +35,7 @@ interface ShopCartGroupProps {
   onToggleItem: (item: CartItem) => void;
   onQuantityChange: (item: CartItem, delta: number) => void;
   onRemove: (item: CartItem) => void;
+  onVariantChange?: (item: CartItem, variantId: string) => void;
 }
 
 export function ShopCartGroup({
@@ -47,6 +49,7 @@ export function ShopCartGroup({
   onToggleItem,
   onQuantityChange,
   onRemove,
+  onVariantChange,
 }: ShopCartGroupProps) {
   const selectable = items.filter(item => getAvailability(item).available);
   const allSelected = selectable.length > 0 && selectable.every(item => selected.has(getCartLineKey(item)));
@@ -102,7 +105,16 @@ export function ShopCartGroup({
 
               <div className="cart-line__details">
                 <Link to={`/product/${item.productId}`} className="cart-line__name">{item.productName}</Link>
-                {item.variation ? <p className="cart-line__variation">{item.variation}</p> : null}
+                {availability.variants?.length && onVariantChange ? (
+                  <label className="cart-line__variant">
+                    <span>Variant</span>
+                    <select aria-label={`Variant for ${item.productName}`} value={item.variationId || ''}
+                      disabled={availability.status !== 'ready'} onChange={event => onVariantChange(item, event.target.value)}>
+                      {!availability.variants.some(variant => variant.id === item.variationId) && <option value={item.variationId || ''} disabled>{item.variation || 'Select a variant'}</option>}
+                      {availability.variants.map(variant => <option key={variant.id} value={variant.id} disabled={!variant.available}>{variant.label}{variant.stock <= 0 ? ' — Out of stock' : !variant.available ? ' — Unavailable' : ''}</option>)}
+                    </select>
+                  </label>
+                ) : item.variation ? <p className="cart-line__variation">{item.variation}</p> : null}
                 <div className="cart-line__status" aria-live="polite">
                   {availability.status === 'loading' ? <span>Checking availability…</span> : null}
                   {availability.status === 'error' ? <span className="is-warning">Availability check delayed</span> : null}
@@ -110,6 +122,7 @@ export function ShopCartGroup({
                   {availability.status === 'ready' && availability.stock !== null && availability.stock > 0 && availability.stock <= 3 ? (
                     <span className="is-warning">Only {availability.stock} left</span>
                   ) : null}
+                  {availability.status === 'ready' && availability.available && availability.stock !== null && availability.stock > 3 ? <span className="is-updated">{availability.stock} in stock</span> : null}
                   {availability.priceChanged ? <span className="is-updated">Price updated</span> : null}
                 </div>
               </div>
