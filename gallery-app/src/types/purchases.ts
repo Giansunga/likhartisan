@@ -40,6 +40,7 @@ export interface PurchaseSummary {
   total: number;
   status: Exclude<PurchaseStatus, 'all'>;
   paymentStatus: string;
+  receiptAvailable?: boolean;
   deliveryStatus: string;
   deliveryOption: string;
   deliveryProvider: string;

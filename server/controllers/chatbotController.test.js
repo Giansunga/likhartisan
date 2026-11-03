@@ -21,6 +21,12 @@ function responseRecorder() {
   };
 }
 
+test('redacts profanity from AI history without mutating caller messages', () => {
+  const original = [{role:'user',content:'gago'}];
+  assert.deepEqual(normalizeHistory(original,'****'), [{role:'user',content:'****'}]);
+  assert.equal(original[0].content,'gago');
+});
+
 function fakeSupabase({ tokenUser = null, authError = { status: 401, code: 'bad_jwt' }, authThrow = null, returnRows = [], activityRows = [] } = {}) {
   const state = { orderOwner: null, metric: null };
   return {

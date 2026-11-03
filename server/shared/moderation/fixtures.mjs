@@ -1,0 +1,17 @@
+export const fixtures = [
+  ['Hello, thank you po!', 'Hello, thank you po!'],
+  ['FUCK! Shit, puta.', '****! ****, ****.'],
+  ['Putang ina mo!', '****** *** **!'],
+  ['GAGO ka, tangina!', '**** ka, *******!'],
+  ['f.u.c.k and sh1t', '*.*.*.* and ****'],
+  ['f u c k\nGÁGO', '* * * *\n****'],
+  ['fu\u0301ck', '**\u0301**'],
+  ['😡 shit 😡 fuck', '😡 **** 😡 ****'],
+  ['class, assignment, Scunthorpe, cockpit, putative, tanglaw', 'class, assignment, Scunthorpe, cockpit, putative, tanglaw'],
+  ['https://example.com/shit www.fuck.com admin@shit.com', 'https://example.com/shit www.fuck.com admin@shit.com'],
+  ['`fuck` /products/shit order_shit_id', '`fuck` /products/shit order_shit_id'],
+  ['buwisit bwisit pakyu', '******* ****** *****'],
+  ['f@ggot $hit f4ck', '*@**** $*** f4ck'],
+  ['**** and f***', '**** and f***'],
+  ['', ''], [null, null],
+];

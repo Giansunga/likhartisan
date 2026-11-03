@@ -1,3 +1,4 @@
+import { censorSubmittedText, censorMessageRecord } from '../lib/messageModeration';
 import { confirmAction } from '../lib/popups';
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -182,7 +183,7 @@ export default function ChatPage() {
 
   async function sendMessage() {
     if ((!newMessage.trim() && !pendingImage) || !selectedConv || !userId) return;
-    const text = newMessage.trim();
+    const text = censorSubmittedText(newMessage.trim());
     setNewMessage('');
     setUploading(true);
     try {
@@ -303,7 +304,7 @@ export default function ChatPage() {
     const channel = supabase
       .channel(`messages:${selectedConv.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` }, async (payload) => {
-        const newMsg = payload.new as Message;
+        const newMsg = censorMessageRecord('messages', payload.new) as Message;
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
@@ -397,14 +398,14 @@ export default function ChatPage() {
     const channel = supabase
       .channel('conversations-list')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
-        const newConv = payload.new as Conversation;
+        const newConv = censorMessageRecord('conversations', payload.new) as Conversation;
         setConversations(prev => {
           if (prev.some(c => c.id === newConv.id)) return prev;
           return [newConv, ...prev];
         });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations', filter: `buyer_id=eq.${userId}` }, (payload) => {
-        const updated = payload.new as Conversation;
+        const updated = censorMessageRecord('conversations', payload.new) as Conversation;
         setConversations(prev => prev.map(c => c.id === updated.id ? { ...c, last_message: updated.last_message, last_message_at: updated.last_message_at, buyer_unread: updated.buyer_unread } : c));
       })
       .subscribe();

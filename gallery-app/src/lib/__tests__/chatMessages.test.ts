@@ -11,6 +11,13 @@ const productInquiry = {
 };
 
 describe('chat message formatting', () => {
+  it('censors legacy plaintext and wrapped card messages while preserving product metadata', () => {
+    expect(parseChatMessage('gago!').text).toBe('****!');
+    const payload = {...productInquiry, message:'shit', productName:'shit'};
+    const wrapped = '```json\n' + JSON.stringify(payload) + '\n```';
+    expect(parseChatMessage(wrapped)).toMatchObject({ text:'****', product:{productName:'shit'} });
+    expect(getChatMessagePreview(JSON.stringify(payload))).toBe('****');
+  });
   it('finds the newest design message per request without treating ordinary, product or legacy messages as updates', () => {
     const event = (request: string) => JSON.stringify({ type: 'design_request_update', version: 1, request_id: request });
     expect([...latestDesignMessageIds([

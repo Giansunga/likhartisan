@@ -1,3 +1,4 @@
+import { censorSubmittedText } from '../../lib/messageModeration';
 import AssetImage from '../AssetImage';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import {
@@ -210,7 +211,7 @@ export default function SellerMessages() {
   }
 
   async function sendMessage() {
-    const text = draft.trim();
+    const text = censorSubmittedText(draft.trim());
     if ((!text && !pendingImage) || !selected || sendingRef.current || deletingRef.current) return;
     sendingRef.current = true;
     setSending(true);

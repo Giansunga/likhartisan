@@ -1,3 +1,4 @@
+import { censorText, censorSubmittedText } from '../lib/messageModeration';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { LikhAIContext } from './likhai-context';
@@ -8,11 +9,16 @@ import type { LikhAIMessage } from '../types/likhai';
 const STORAGE_KEY = 'likhai:conversation:v1';
 const MAX_MESSAGES = 20;
 type StoredConversation = { identity: string; messages: LikhAIMessage[] };
+function cleanMessage(item: LikhAIMessage): LikhAIMessage {
+  return { ...item, content: censorText(item.content), retryText: censorText(item.retryText),
+    suggestions: item.suggestions?.map(text => censorText(text)),
+    resolution: item.resolution ? { ...item.resolution, label: censorText(item.resolution.label) } : undefined };
+}
 function makeId() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
 function readStored(identity: string): LikhAIMessage[] {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || 'null') as StoredConversation | null;
-    return parsed?.identity === identity && Array.isArray(parsed.messages) ? parsed.messages.slice(-MAX_MESSAGES) : [];
+    return parsed?.identity === identity && Array.isArray(parsed.messages) ? parsed.messages.slice(-MAX_MESSAGES).map(cleanMessage) : [];
   } catch { return []; }
 }
 
@@ -38,7 +44,7 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
     }
   }, [identity]);
   useEffect(() => {
-    if (loadedIdentity === identity) sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ identity, messages: messages.slice(-MAX_MESSAGES) }));
+    if (loadedIdentity === identity) sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ identity, messages: messages.slice(-MAX_MESSAGES).map(cleanMessage) }));
   }, [identity, loadedIdentity, messages]);
   useEffect(() => {
     if (loadingPhase !== 'waking') return undefined;
@@ -56,23 +62,23 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
         signedIn: Boolean(user),
         getAccessToken,
       });
-      const assistantMessage: LikhAIMessage = {
-        id: makeId(), role: 'assistant', content: result.reply, timestamp: new Date().toISOString(),
+      const assistantMessage: LikhAIMessage = cleanMessage({
+        id: makeId(), role: 'assistant', content: censorText(result.reply), timestamp: new Date().toISOString(),
         responseId: result.responseId, groundingStatus: result.groundingStatus, cards: result.cards,
         generationStatus: result.generationStatus,
         actions: result.actions, suggestions: result.suggestions, resolution: result.resolution,
-      };
+      });
       setMessages(current => [
         ...current.filter(item => item.id !== retryAssistantId),
         assistantMessage,
       ].slice(-MAX_MESSAGES));
     } catch (error) {
       const requestError = error instanceof LikhAIRequestError ? error : new LikhAIRequestError('LikhAI is temporarily unavailable. Please try again.', 'provider');
-      const errorMessage: LikhAIMessage = {
+      const errorMessage: LikhAIMessage = cleanMessage({
         id: retryAssistantId || makeId(), role: 'assistant', content: requestError.message, timestamp: new Date().toISOString(), errorKind: requestError.kind,
         retryText: requestError.kind === 'auth' ? undefined : text,
         actions: requestError.kind === 'auth' ? [{ id: 'sign-in', label: 'Sign in again', href: '/signin' }] : [],
-      };
+      });
       setMessages(current => [
         ...current.filter(item => item.id !== retryAssistantId),
         errorMessage,
@@ -85,7 +91,7 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
   }, [getAccessToken, user]);
 
   const sendMessage = useCallback(async (rawText: string) => {
-    const text = rawText.trim();
+    const text = censorSubmittedText(rawText.trim());
     if (!text || pendingRef.current) return;
     pendingRef.current = true;
     const history = visibleMessages.slice(-MAX_MESSAGES);
@@ -97,7 +103,7 @@ export function LikhAIProvider({ children }: { children: ReactNode }) {
   const retryMessage = useCallback(async (messageId: string) => {
     if (pendingRef.current) return;
     const errorMessage = visibleMessages.find(item => item.id === messageId);
-    const text = errorMessage?.retryText?.trim();
+    const text = censorText(errorMessage?.retryText?.trim());
     if (!text) return;
     pendingRef.current = true;
     const history = visibleMessages.filter(item => item.id !== messageId).slice(-MAX_MESSAGES);

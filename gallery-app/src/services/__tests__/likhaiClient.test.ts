@@ -7,6 +7,13 @@ afterEach(() => {
 });
 
 describe('requestLikhAI', () => {
+  it('censors prompt, history, reply and suggestions before transport and display', async () => {
+    const fetchMock = vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(JSON.stringify({reply:'shit', suggestions:['gago'], resolution:{state:'clarify',label:'puta'}}),{status:200}));
+    const result = await requestLikhAI('puta', [{id:'1',role:'user',content:'shit',timestamp:''}]);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body).toMatchObject({message:'****',history:[{content:'****'}]});
+    expect(result).toMatchObject({reply:'****',suggestions:['****'],resolution:{label:'****'}});
+  });
   it('sends the bearer token and prior history without a body user ID', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       responseId: 'response-id', reply: 'Verified reply', intent: 'order', groundingStatus: 'grounded',

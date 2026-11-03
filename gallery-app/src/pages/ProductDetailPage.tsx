@@ -1,3 +1,4 @@
+import { censorSubmittedText } from '../lib/messageModeration';
 import { useCart } from '../hooks/useCart';
 import { requestShoppingSignIn } from '../lib/shoppingAuth';
 import { resolveAssetUrl } from '../lib/assetDelivery';
@@ -137,7 +138,7 @@ export default function ProductDetailPage() {
     if (!user) { toast.error('Please sign in to send a message.'); setAskSending(false); return; }
 
     const uid = user.id;
-    const text = askMessage.trim();
+    const text = censorSubmittedText(askMessage.trim());
     const productPayload = JSON.stringify({
       type: 'product_inquiry',
       productId: product.id,

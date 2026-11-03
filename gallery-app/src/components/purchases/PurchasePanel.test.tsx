@@ -8,6 +8,7 @@ import type { PurchaseDetail, PurchaseSummary } from '../../types/purchases';
 const fixtures = vi.hoisted(() => ({
   orders: [] as PurchaseSummary[],
   purchaseApi: vi.fn(),
+  downloadReceipt: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'buyer-1' }, loading: false }) }));
@@ -17,7 +18,7 @@ vi.mock('../../hooks/usePurchases', () => ({
     loading: false, refreshing: false, error: '', reload: vi.fn(),
   }),
 }));
-vi.mock('../../lib/purchaseApi', () => ({ purchaseApi: fixtures.purchaseApi }));
+vi.mock('../../lib/purchaseApi', () => ({ purchaseApi: fixtures.purchaseApi, downloadPurchaseReceipt: fixtures.downloadReceipt }));
 vi.mock('../../lib/supabase', () => ({ supabase: { auth: { getSession: vi.fn() } } }));
 vi.mock('../../lib/popups', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/popups')>()), toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -43,6 +44,7 @@ function renderPanel(entry: string, controls = false) {
 
 describe('PurchasePanel LIKHAI deep links', () => {
   beforeEach(() => {
+    fixtures.downloadReceipt.mockReset();
     fixtures.purchaseApi.mockReset();
     localStorage.clear();
     fixtures.orders = [other];
@@ -50,6 +52,35 @@ describe('PurchasePanel LIKHAI deep links', () => {
     Object.defineProperty(window, 'requestAnimationFrame', { configurable: true, value: (callback: FrameRequestCallback) => { callback(0); return 1; } });
     Object.defineProperty(window, 'cancelAnimationFrame', { configurable: true, value: vi.fn() });
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  });
+
+  it('downloads a paid receipt and prevents duplicate requests',async()=>{
+    fixtures.orders=[{...target,receiptAvailable:true}];
+    let finish:((value:Blob)=>void)|undefined;
+    fixtures.downloadReceipt.mockImplementation(()=>new Promise<Blob>(resolve=>{finish=resolve;}));
+    const create=vi.fn(()=> 'blob:test');const revoke=vi.fn();
+    Object.defineProperty(URL,'createObjectURL',{configurable:true,value:create});
+    Object.defineProperty(URL,'revokeObjectURL',{configurable:true,value:revoke});
+    const click=vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
+    renderPanel('/dashboard?tab=purchases');
+    fireEvent.click(screen.getByRole('button',{name:'Download Receipt'}));
+    expect(screen.getByRole('button',{name:'Downloading…'})).toBeDisabled();
+    expect(fixtures.downloadReceipt).toHaveBeenCalledTimes(1);
+    finish!(new Blob(['%PDF'],{type:'application/pdf'}));
+    await waitFor(()=>expect(click).toHaveBeenCalled());
+    await waitFor(()=>expect(revoke).toHaveBeenCalledWith('blob:test'),{timeout:2000});
+    click.mockRestore();
+  });
+  it('explains unpaid receipt availability and reports download errors',async()=>{
+    fixtures.orders=[{...target,status:'to-pay',receiptAvailable:false}];
+    const view=renderPanel('/dashboard?tab=purchases');
+    expect(screen.queryByRole('button',{name:'Download Receipt'})).not.toBeInTheDocument();
+    expect(screen.getByText('Receipts become available after verified payment.')).toBeInTheDocument();
+    fixtures.orders=[{...target,receiptAvailable:true}];fixtures.downloadReceipt.mockRejectedValue(new Error('Try later'));
+    view.rerender(<MemoryRouter><PurchasePanel/></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Download Receipt'}));
+    await waitFor(()=>expect(toast.error).toHaveBeenCalledWith('Try later'));
+    expect(screen.getByRole('button',{name:'Download Receipt'})).toBeEnabled();
   });
 
   it('hydrates, expands, and scrolls to a linked order outside the active list', async () => {

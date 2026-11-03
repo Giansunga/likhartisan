@@ -4,7 +4,7 @@ import { getErrorMessage } from './portalErrors';
 
 const sessionAccess = createSessionAccessManager(supabase.auth, () => undefined);
 
-export async function portalRequest<T>(url: string, init: RequestInit = {}, tokenProvider = sessionAccess): Promise<T> {
+export async function portalRequest<T>(url: string, init: RequestInit = {}, tokenProvider = sessionAccess, responseType: 'json' | 'pdf' = 'json'): Promise<T> {
   const method = (init.method || 'GET').toUpperCase();
   const request = async (forceRefresh = false) => {
     const token = await tokenProvider({ forceRefresh });
@@ -13,7 +13,9 @@ export async function portalRequest<T>(url: string, init: RequestInit = {}, toke
     headers.set('Authorization', `Bearer ${token}`);
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     const response = await fetch(url, { ...init, headers });
-    const body: unknown = response.status === 204 ? null : await response.json().catch(() => null);
+    const isPdf = responseType === 'pdf' && response.ok && response.headers.get('content-type')?.split(';')[0] === 'application/pdf';
+    const body: unknown = response.status === 204 ? null : isPdf ? await response.blob() : await response.json().catch(() => null);
+    if(responseType==='pdf' && response.ok && !isPdf) throw new Error('The server did not return a receipt PDF. Please try again.');
     return { response, body };
   };
   let result = await request();

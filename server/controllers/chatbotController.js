@@ -1,3 +1,4 @@
+import { censorText } from '../shared/moderation/index.mjs';
 import crypto from 'crypto';
 import xss from 'xss';
 import { chatWithGroq, GROQ_MODEL } from '../services/groqService.js';
@@ -94,7 +95,7 @@ export function normalizeHistory(history, currentMessage) {
   const normalized = Array.isArray(history)
     ? history.slice(-20).map(item => ({
       role: item?.role === 'user' ? 'user' : 'assistant',
-      content: xss(String(item?.content || '').trim().slice(0, 1000)),
+      content: censorText(xss(String(item?.content || '').trim().slice(0, 1000))),
     })).filter(item => item.content)
     : [];
   const last = normalized.at(-1);
@@ -595,7 +596,7 @@ export async function handleChat(req, res) {
     const authentication = await optionalAuthenticatedUser(req);
     const user = authentication.user;
     authResult = authentication.authResult;
-    const sanitized = xss(message.trim());
+    const sanitized = censorText(xss(message.trim()));
     const { primary, all } = detectIntent(sanitized);
     const grounded = await buildContext(all, sanitized, user);
     const supportGoal = detectSupportGoal(sanitized, primary);
@@ -655,9 +656,9 @@ export async function handleChat(req, res) {
     });
 
     const payload = {
-      responseId, reply: generated.reply, intent: primary, groundingStatus: grounded.groundingStatus,
+      responseId, reply: censorText(generated.reply), intent: primary, groundingStatus: grounded.groundingStatus,
       generationStatus,
-      cards: grounded.cards, actions, suggestions, resolution: support.resolution,
+      cards: grounded.cards, actions, suggestions: suggestions.map(censorText), resolution: support.resolution,
       requiresAuth: grounded.requiresAuth,
     };
     if (process.env.LIKHAI_LEGACY_RESPONSE_CONTRACT === 'true') {
@@ -683,7 +684,7 @@ export async function handleChat(req, res) {
       });
     }
     if (status >= 500 && !['AUTH_VERIFICATION_UNAVAILABLE', 'AUTH_CONFIGURATION_INVALID'].includes(error.code)) {
-      console.error('Chatbot request failed:', error.message);
+      console.error('Chatbot request failed:', error.code || 'request_failed');
     }
     if (status === 401) return res.status(401).json({
       responseId,
@@ -713,7 +714,7 @@ export async function handleFeedback(req, res) {
     if (!data) return res.status(404).json({ error: 'Response not found' });
     return res.json({ ok: true });
   } catch (error) {
-    console.error('LikhAI feedback failed:', error.code || error.message);
+    console.error('LikhAI feedback failed:', error.code || 'feedback_failed');
     return res.status(500).json({ error: 'Could not save feedback' });
   }
 }

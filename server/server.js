@@ -1,3 +1,4 @@
+import { censorText } from './shared/moderation/index.mjs';
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
@@ -782,16 +783,16 @@ app.post('/api/notifications', async (req, res) => {
 
     const { data, error } = await supabase
       .from('notifications')
-      .insert({ ...target, type, title, message, product_image: product_image || '' })
+      .insert({ ...target, type, title: censorText(title), message: censorText(message), product_image: product_image || '' })
       .select()
       .single();
     if (error) {
-      console.error('Notification insert error:', error);
+      console.error('Notification insert error:', error.code || 'insert_failed');
       return res.status(500).json({ error: error.message });
     }
     res.json({ data });
   } catch (e) {
-    console.error('Notification error:', e);
+    console.error('Notification error:', e.code || 'notification_failed');
     res.status(e.status || 500).json({ error: e.status ? e.message : 'Server error' });
   }
 });

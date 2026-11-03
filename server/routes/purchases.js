@@ -5,6 +5,7 @@ import {
   submitReturnRequest,
 } from '../services/purchaseService.js';
 import { updateSellerOrderStatus } from '../services/sellerOrderService.js';
+import { getOrderReceipt, renderOrderReceipt } from '../services/orderReceiptService.js';
 
 function errorResponse(res, error) {
   const status = Number(error?.status) || 500;
@@ -15,6 +16,8 @@ function errorResponse(res, error) {
     RETURN_NOT_ELIGIBLE: 'This order is outside the return window', RETURN_EXISTS: 'This order already has an active return request',
     EVIDENCE_REQUIRED: 'Add at least one supporting image', EVIDENCE_LIMIT: 'A maximum of three images is allowed',
     RETURN_NOT_FOUND: 'Return request not found',
+    RECEIPT_NOT_AVAILABLE: 'Receipts become available after verified payment.',
+    RECEIPT_INVALID_DATA: 'The saved order details could not be reconciled. Please contact support for your receipt.',
     INVALID_DELIVERY_STATUS: 'Invalid delivery status', CUSTOM_ORDER_WORKFLOW: 'Use the custom order workflow',
     ORDER_SHOP_ACCESS_DENIED: 'You cannot update a multi-shop order for another seller',
   };
@@ -40,6 +43,14 @@ export function createPurchasesRouter({ supabase, verifyAuth, requireSuperAdmin 
       if (!detail) return res.status(404).json({ error: 'Order not found', code: 'ORDER_NOT_FOUND' });
       res.json(detail);
     } catch (error) { errorResponse(res, error); }
+  });
+  router.get('/:orderId/receipt', async (req, res) => {
+    try {
+      const receipt = await getOrderReceipt(supabase, req.params.orderId, req.verifiedUserId);
+      const pdf = await renderOrderReceipt(receipt);
+      res.set({ 'Content-Type':'application/pdf', 'Content-Disposition':`attachment; filename="LikhArtisan-Receipt-${receipt.receipt_number}.pdf"`, 'Cache-Control':'private, no-store' });
+      res.send(pdf);
+    } catch(error) { errorResponse(res,error); }
   });
   router.post('/:orderId/cancel', async (req, res) => {
     try { res.json(await cancelBuyerOrder(supabase, req.params.orderId, req.verifiedUserId)); }

@@ -8,7 +8,7 @@ import { addToCart, getCart } from '../../data/store';
 import { usePurchases } from '../../hooks/usePurchases';
 import { API_BASE } from '../../lib/api';
 import { getCartLineKey } from '../../lib/cartCheckout';
-import { purchaseApi } from '../../lib/purchaseApi';
+import { purchaseApi, downloadPurchaseReceipt } from '../../lib/purchaseApi';
 import { parsePurchaseFilters } from '../../lib/purchaseFilters';
 import { supabase } from '../../lib/supabase';
 import { displayVariation } from '../../lib/utils';
@@ -109,6 +109,25 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
   const [reorderError, setReorderError] = useState('');
   const [addingReorder, setAddingReorder] = useState(false);
   const addingReorderRef = useRef(false);
+  const [receiptBusy,setReceiptBusy] = useState<string|null>(null);
+  const receiptPending = useRef(false);
+  const receiptAbort = useRef<AbortController|null>(null);
+  useEffect(()=>()=>receiptAbort.current?.abort(),[user?.id]);
+  async function downloadReceipt(order:PurchaseSummary) {
+    if(receiptPending.current)return;
+    receiptPending.current=true;setReceiptBusy(order.id);
+    const controller=new AbortController();receiptAbort.current=controller;
+    try {
+      const blob=await downloadPurchaseReceipt(order.id,controller.signal);
+      if(controller.signal.aborted)return;
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;link.download=`LikhArtisan-Receipt-LK-${order.id.replaceAll('-','').toUpperCase()}.pdf`;
+      document.body.appendChild(link);
+      try { link.click(); } finally {link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    } catch(error) {if(!controller.signal.aborted)toast.error((error as Error).message);} finally {receiptPending.current=false;setReceiptBusy(null);receiptAbort.current=null;}
+  }
+  const receiptButton=(order:PurchaseSummary)=>order.receiptAvailable?<button className="purchase-btn secondary" disabled={receiptBusy!==null} onClick={()=>void downloadReceipt(order)}>{receiptBusy===order.id?'Downloading…':'Download Receipt'}</button>:null;
   const [returnOrder, setReturnOrder] = useState<PurchaseSummary | null>(null);
   const orderRefs = useRef<Record<string, HTMLElement | null>>({});
   const lastScrolledOrderRef = useRef<string | null>(null);
@@ -220,12 +239,13 @@ export default function PurchasePanel({ reviewedProductIds = EMPTY_REVIEWED_PROD
       const detail = details[order.id]; const isOpen = linkedOrderId === order.id; const shops = order.shops.length > 1 ? 'Multiple shops' : order.shops[0]?.name || 'LikhArtisan Shop';
       return <article className="purchase-card" key={order.id} id={`order-${order.id}`} ref={node => { orderRefs.current[order.id] = node; }}><div className="purchase-card__top"><div><strong>{shops}</strong><span>Order #{order.shortId} · {new Date(order.createdAt).toLocaleDateString()}</span></div><div className={`purchase-status status-${order.status}`}><strong>{TABS.find(tab => tab.key === order.status)?.label}</strong><span>{STATUS_MESSAGE[order.status]}</span></div></div>
         <div className="purchase-card__items">{order.items.slice(0, 2).map(item => <div className="purchase-item" key={item.index}><AssetImage src={item.image} alt="" /><div><strong>{item.productName}</strong><span>{displayVariation(item.dimensions || item.variation || '') || `Quantity: ${item.quantity}`}</span></div><b>{money(item.price * item.quantity)}</b></div>)}{order.items.length > 2 && <p>+{order.items.length - 2} more item{order.items.length > 3 ? 's' : ''}</p>}</div>
-        <div className="purchase-card__footer"><div>Order total <strong>{money(order.total)}</strong></div><div>{primary(order)}<button className="purchase-btn secondary" aria-expanded={isOpen} aria-controls={`detail-${order.id}`} onClick={() => void toggle(order.id)}>{isOpen ? 'Hide details' : 'Details'}</button></div></div>
+        <div className="purchase-card__footer"><div>Order total <strong>{money(order.total)}</strong></div><div>{receiptButton(order)}{primary(order)}<button className="purchase-btn secondary" aria-expanded={isOpen} aria-controls={`detail-${order.id}`} onClick={() => void toggle(order.id)}>{isOpen ? 'Hide details' : 'Details'}</button></div></div>
+        {!order.receiptAvailable && order.status==='to-pay' && <p className="purchase-muted purchase-receipt-note">Receipts become available after verified payment.</p>}
         {isOpen && <div className="purchase-detail" id={`detail-${order.id}`}>{detailLoading === order.id ? <div className="purchase-detail__loading" role="status">Loading authentic tracking history…</div> : detail ? <>
           {detail.returnRequest && <div className="return-status"><strong>Return request: {detail.returnRequest.status.replaceAll('_', ' ')}</strong>{detail.returnRequest.resolution_note && <span>{detail.returnRequest.resolution_note}</span>}</div>}
           <OrderStatusTracker detail={detail} />
           <div className="purchase-detail__grid"><section><h3>Delivery</h3><p><strong>Courier:</strong> {detail.deliveryProvider || (detail.deliveryOption === 'pickup' ? 'Shop pickup' : 'To be assigned')}</p><p><strong>Tracking:</strong> {detail.trackingNumber || 'Not available yet'}</p><p><strong>Estimated delivery:</strong> {detail.estimatedDelivery ? new Date(detail.estimatedDelivery).toLocaleDateString() : 'To be confirmed'}</p></section><section><h3>All items</h3>{detail.items.map(item => <div className="purchase-detail-item" key={item.index}><span>{item.productName} × {item.quantity}</span><strong>{money(item.price * item.quantity)}</strong></div>)}<dl><div><dt>Subtotal</dt><dd>{money(detail.subtotal)}</dd></div><div><dt>Shipping</dt><dd>{money(detail.shippingFee)}</dd></div><div><dt>Total</dt><dd>{money(detail.total)}</dd></div></dl></section></div>
-          <div className="purchase-actions"><button className="purchase-btn secondary" onClick={() => navigate(`/chat?order=${order.id}&shop=${order.shops[0]?.id || ''}`)}>Contact seller</button>{order.status === 'to-pay' && <button className="purchase-btn danger" onClick={() => setConfirm({ order, action: 'cancel' })}>Cancel order</button>}{detail.returnEligibility.eligible && !detail.returnRequest && <button className="purchase-btn secondary" onClick={() => setReturnOrder(order)}>Return / refund</button>}{order.status === 'completed' && order.items.map(item => <button className="purchase-btn secondary" key={item.index} onClick={() => onRate?.(order, item.index, reviewedProductIds.has(item.productId))}>{reviewedProductIds.has(item.productId) ? 'Edit review' : 'Rate item'}</button>)}</div>
+          <div className="purchase-actions">{receiptButton(detail)}<button className="purchase-btn secondary" onClick={() => navigate(`/chat?order=${order.id}&shop=${order.shops[0]?.id || ''}`)}>Contact seller</button>{order.status === 'to-pay' && <button className="purchase-btn danger" onClick={() => setConfirm({ order, action: 'cancel' })}>Cancel order</button>}{detail.returnEligibility.eligible && !detail.returnRequest && <button className="purchase-btn secondary" onClick={() => setReturnOrder(order)}>Return / refund</button>}{order.status === 'completed' && order.items.map(item => <button className="purchase-btn secondary" key={item.index} onClick={() => onRate?.(order, item.index, reviewedProductIds.has(item.productId))}>{reviewedProductIds.has(item.productId) ? 'Edit review' : 'Rate item'}</button>)}</div>
         </> : <button className="purchase-btn secondary" onClick={() => void loadDetail(order.id)}>Retry details</button>}</div>}
       </article>;
     })}</div>}

@@ -1,4 +1,5 @@
 import { isDesignRequestMessage } from '../types/designRequest';
+import { censorText, censorMessagePayload } from './generated/moderation/index.mjs';
 
 export interface ProductInquiryContent {
   productId?: string;
@@ -48,8 +49,8 @@ function optionalString(value: unknown) {
 
 export function parseChatMessage(rawText: string | null | undefined): ParsedChatMessage {
   const normalizedText = typeof rawText === 'string' ? rawText : '';
-  const payload = unwrapJsonObject(normalizedText);
-  if (!payload) return { text: normalizedText };
+  const payload = censorMessagePayload(unwrapJsonObject(normalizedText));
+  if (!payload) return { text: censorText(normalizedText) };
 
   const type = optionalString(payload.type);
   const text = optionalString(payload.message) ?? '';
@@ -73,7 +74,7 @@ export function parseChatMessage(rawText: string | null | undefined): ParsedChat
     };
   }
 
-  return { text: normalizedText };
+  return { text: censorText(normalizedText) };
 }
 
 export function getChatMessagePreview(rawText: string | null | undefined): string {

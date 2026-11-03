@@ -1,3 +1,4 @@
+import { censorMessageRecord } from '../lib/messageModeration';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,8 +69,8 @@ export function useSupabaseRealtime(handlers: UseRealtimeHandlers = {}) {
                 if (!isMountedRef.current) return;
                 const { event, new: newRecord, old: oldRecord } = payload as any;
           
-                if (event === 'INSERT' && handlers.onNotificationInsert) handlers.onNotificationInsert(newRecord);
-                else if (event === 'UPDATE' && handlers.onNotificationUpdate) handlers.onNotificationUpdate(newRecord, oldRecord);
+                if (event === 'INSERT' && handlers.onNotificationInsert) handlers.onNotificationInsert(censorMessageRecord('notifications', newRecord));
+                else if (event === 'UPDATE' && handlers.onNotificationUpdate) handlers.onNotificationUpdate(censorMessageRecord('notifications', newRecord), censorMessageRecord('notifications', oldRecord));
               }
             )
       .on(
@@ -79,8 +80,8 @@ export function useSupabaseRealtime(handlers: UseRealtimeHandlers = {}) {
           if (!isMountedRef.current) return;
           const { new: newRecord, old: oldRecord } = payload;
           
-          if (handlers.onMessageInsert) handlers.onMessageInsert(newRecord);
-          else if (handlers.onMessageUpdate) handlers.onMessageUpdate(newRecord, oldRecord);
+          if (handlers.onMessageInsert) handlers.onMessageInsert(censorMessageRecord('messages', newRecord));
+          else if (handlers.onMessageUpdate) handlers.onMessageUpdate(censorMessageRecord('messages', newRecord), censorMessageRecord('messages', oldRecord));
         }
       )
       .subscribe((status) => {

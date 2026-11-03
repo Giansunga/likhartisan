@@ -1,3 +1,4 @@
+import { censorText } from '../lib/messageModeration';
 import { API_BASE } from '../lib/api';
 import type { LikhAIMessage, LikhAIResponse } from '../types/likhai';
 
@@ -32,7 +33,7 @@ export async function requestLikhAI(
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(options.authRetryCount ? { 'X-LikhAI-Auth-Retry': String(options.authRetryCount) } : {}),
       },
-      body: JSON.stringify({ message, history: history.slice(-20).map(item => ({ role: item.role, content: item.content })) }),
+      body: JSON.stringify({ message: censorText(message), history: history.slice(-20).map(item => ({ role: item.role, content: censorText(item.content) })) }),
       signal: controller.signal,
     });
   } catch (error) {
@@ -60,7 +61,8 @@ export async function requestLikhAI(
         : 'LikhAI is temporarily unavailable. Please try again shortly.';
     throw new LikhAIRequestError(typeof data.error === 'string' ? data.error : fallback, kind, code);
   }
-  return data as LikhAIResponse;
+  return { ...data, reply: censorText(data.reply), suggestions: data.suggestions?.map((text: string) => censorText(text)),
+    resolution: data.resolution ? { ...data.resolution, label: censorText(data.resolution.label) } : undefined } as LikhAIResponse;
 }
 
 export async function submitLikhAIFeedback(responseId: string, rating: 'positive' | 'negative') {

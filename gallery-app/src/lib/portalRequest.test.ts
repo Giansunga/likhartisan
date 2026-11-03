@@ -11,6 +11,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('authenticated portal transport', () => {
+  it('downloads a PDF with the same authentication refresh handling',async()=>{
+    const fetch=vi.fn().mockResolvedValueOnce(new Response('{"error":"Expired"}',{status:401})).mockResolvedValueOnce(new Response('%PDF-test',{headers:{'Content-Type':'application/pdf'}}));
+    vi.stubGlobal('fetch',fetch);
+    const blob=await portalRequest<Blob>('/api/orders/one/receipt',{},undefined,'pdf');
+    expect(blob.type).toBe('application/pdf');expect(fetch).toHaveBeenCalledTimes(2);
+    expect((fetch.mock.calls[1][1].headers as Headers).get('Authorization')).toBe('Bearer refreshed');
+  });
+  it('does not download an HTML error as a receipt',async()=>{
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('<html>Error</html>')));
+    await expect(portalRequest('/receipt',{},undefined,'pdf')).rejects.toThrow('did not return a receipt PDF');
+  });
   it('refreshes a rejected read once and uses the new token', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(new Response('{"error":"Expired"}', { status: 401 })).mockResolvedValueOnce(new Response('{"ok":true}'));
     vi.stubGlobal('fetch', fetch);

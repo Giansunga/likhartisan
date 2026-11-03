@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { normalizeCatalogMeasurement } from './measurements.js';
+import { receiptEligible } from './orderReceiptService.js';
 
 export const PURCHASE_PAGE_SIZE = 10;
 export const PURCHASE_STATUSES = new Set(['all', 'to-pay', 'to-ship', 'to-receive', 'completed', 'return-refund', 'cancelled']);
@@ -92,6 +93,7 @@ export function mapPurchase(order, activeReturn = null) {
     total: Number(order.total) || 0,
     status: buyerOrderStatus(order),
     paymentStatus: order.payment_status || order.status || 'pending',
+    receiptAvailable: receiptEligible(order),
     deliveryStatus: order.delivery_status || 'pending',
     deliveryOption: order.delivery_option || 'pickup',
     deliveryProvider: order.delivery_provider || '',
@@ -131,8 +133,12 @@ export async function listBuyerPurchases(supabase, userId, rawQuery) {
   const returnByOrder = new Map();
   for (const request of returns) if (!returnByOrder.has(request.order_id)) returnByOrder.set(request.order_id, request);
   const total = Number(data?.total) || 0;
+  const receiptIds = rows.filter(row => row.payment_status === 'refunded' || row.status === 'refunded').map(row=>row.id);
+  const receipts = receiptIds.length ? await supabase.from('order_receipts').select('order_id').in('order_id',receiptIds).eq('owner_user_id',userId) : {data:[]};
+  if(receipts.error) throw receipts.error;
+  const issued = new Set((receipts.data??[]).map(row=>row.order_id));
   return {
-    orders: rows.map(row => mapPurchase(row, returnByOrder.get(row.id) ?? null)),
+    orders: rows.map(row => ({...mapPurchase(row, returnByOrder.get(row.id) ?? null),receiptAvailable:receiptEligible(row)||issued.has(row.id)})),
     statusCounts: data?.statusCounts ?? {},
     pagination: { page: input.page, pageSize: PURCHASE_PAGE_SIZE, total, totalPages: Math.ceil(total / PURCHASE_PAGE_SIZE) },
   };
@@ -192,7 +198,13 @@ export async function getBuyerPurchase(supabase, orderId, userId) {
     }));
     returnRequest = { ...returnRequest, order_return_evidence: signed };
   }
-  return { ...mapPurchase(order, returnRequest?.status !== 'draft' ? returnRequest : null), activity, returnEligibility: returnEligibility(order, rawActivity), returnRequest };
+  const purchase = mapPurchase(order, returnRequest?.status !== 'draft' ? returnRequest : null);
+  if(!purchase.receiptAvailable && (order.status==='refunded'||order.payment_status==='refunded')) {
+    const receipt = await supabase.from('order_receipts').select('order_id').eq('order_id',orderId).eq('owner_user_id',userId).maybeSingle();
+    if(receipt.error) throw receipt.error;
+    purchase.receiptAvailable=Boolean(receipt.data);
+  }
+  return { ...purchase, activity, returnEligibility: returnEligibility(order, rawActivity), returnRequest };
 }
 
 export async function cancelBuyerOrder(supabase, orderId, userId) {

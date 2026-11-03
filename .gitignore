@@ -58,3 +58,9 @@ gallery-app/*-check.png
 server/.hermes-tmp.*
 .hermes-tmp.*
 server/.model-reset-backups/
+
+# Disposable receipt verification tools and generated samples
+tmp/receipt-python/
+tmp/receipt-samples.mjs
+tmp/pdfs/
+output/pdf/receipt-*.pdf
