@@ -74,19 +74,21 @@
 .home-impact__stat { min-width: 0; padding-left: clamp(18px,2.3vw,34px); border-left: 1px solid #e2cdbc; text-align: center; }
 .home-impact__stat > span { width: clamp(68px,6vw,84px); height: clamp(68px,6vw,84px); display: grid; margin-inline: auto; place-items: center; border: 1px solid rgba(174,116,72,.12); border-radius: 50%; background: #f3e5d7; color: #8d4a1a; font-family: var(--font-serif); font-size: clamp(1.4rem,2.05vw,1.95rem); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 7px rgba(255,255,255,.22); }
 .home-impact__stat > small { display: block; margin-top: 11px; color: #594438; font-size: .58rem; font-weight: 800; letter-spacing: .11em; line-height: 1.35; text-transform: uppercase; }
-.home-collection-grid { display: grid; grid-template-columns: 1.16fr .84fr .84fr; grid-template-rows: 270px 270px; gap: 14px; }
-.home-collection-card { position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 12px; padding: 26px; color: #fff; text-decoration: none; isolation: isolate; }
+.home-collections .home-section-heading h2 { max-width: 15ch; }
+.home-collection-grid { display: grid; grid-template-columns: 1.46fr 1fr 1fr; grid-template-rows: 1.32fr .55fr 1fr; grid-template-areas: "vases planters jars" "vases decorative decorative" "others decorative decorative"; height: clamp(444px, 42vw, 600px); gap: 16px; }
+.home-collection-card { position: relative; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; border-radius: 16px; padding: 22px; color: #fff; background: #8b4b27; text-decoration: none; isolation: isolate; }
 .home-collection-card::after { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg,rgba(24,14,8,.02) 18%,rgba(27,15,8,.88)); content: ""; }
 .home-collection-card img { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; transition: transform 500ms ease,filter 500ms ease; }
 .home-collection-card:hover img { filter: saturate(1.04); transform: scale(1.045); }
-.home-collection-card b { position: absolute; top: 20px; right: 20px; color: rgba(255,255,255,.78); font-size: .66rem; letter-spacing: .14em; }
 .home-collection-card span { font-family: var(--font-serif); font-size: clamp(1.6rem,2.5vw,2.35rem); font-weight: 520; line-height: 1.04; }
-.home-collection-card small { max-width: 30ch; margin: 8px 0 15px; color: rgba(255,255,255,.84); font-size: .75rem; line-height: 1.5; }
-.home-collection-card i { display: inline-flex; align-items: center; gap: 7px; font-size: .68rem; font-style: normal; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.home-collection-card i { margin-top: 4px; display: inline-flex; align-items: center; gap: 7px; font-size: .68rem; font-style: normal; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .home-collection-card i svg { width: 15px; }
-.home-collection-card--1 { grid-row: span 2; }
-.home-collection-card--4 { grid-column: span 2; }
-.home-text-link--center { margin: 32px auto 0; }
+.home-collection-card--1 { grid-area: vases; }
+.home-collection-card--2 { grid-area: planters; }
+.home-collection-card--3 { grid-area: jars; }
+.home-collection-card--4 { grid-area: decorative; }
+.home-collection-card--5 { grid-area: others; }
+.home-collections-link { margin: 24px 0 0; }
 
 /* Rail controls */
 .home-rail-controls { display: flex; gap: 8px; }
@@ -156,7 +158,6 @@
 @media (max-width: 1050px) {
   .home-editorial-intro__grid { grid-template-columns: minmax(300px,.9fr) minmax(400px,1.1fr); gap: 48px; }
   .home-editorial-intro__photos { min-height: 570px; }
-  .home-collection-grid { grid-template-rows: 240px 240px; }
 }
 
 @media (max-width: 800px) {
@@ -187,9 +188,8 @@
   .home-chapter-grid { grid-template-columns: 1fr; border-bottom: 0; }
   .home-chapter-grid li + li { border-top: 1px solid rgba(255,255,255,.2); border-left: 0; }
   .home-chapter-grid a { min-height: 0; padding: 28px 4px; }
-  .home-collection-grid { display: flex; gap: 14px; overflow-x: auto; margin-inline: -16px; padding: 0 16px 14px; scroll-snap-type: x mandatory; scrollbar-width: none; }
-  .home-collection-grid::-webkit-scrollbar { display: none; }
-  .home-collection-card,.home-collection-card--1,.home-collection-card--4 { width: 76vw; min-width: 76vw; height: 350px; grid-column: auto; grid-row: auto; scroll-snap-align: start; }
+  .home-collection-grid { height: 444px; gap: 14px; }
+  .home-collection-card { padding: 18px; }
   .home-section-heading__actions { width: 100%; justify-content: space-between; }
 }
 
@@ -210,7 +210,7 @@
   .home-shop-tour__caption { font-size: .64rem; line-height: 1.45; }
   .home-rail-controls button { width: 38px; height: 38px; }
   .home-section-heading__actions > .home-text-link { display: none; }
-  .home-collection-card,.home-collection-card--1,.home-collection-card--4 { width: 83vw; min-width: 83vw; height: 320px; }
+  .home-collection-grid { height: auto; grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-rows: 220px 160px 200px 140px; grid-template-areas: "vases vases" "planters jars" "decorative decorative" "others others"; }
   .home-shop-card { width: 85vw; flex-basis: 85vw; }
   .home-shop-card__image { height: 190px; }
   .home-review-card { width: min(320px, 84vw); min-width: min(320px, 84vw); max-width: min(320px, 84vw); flex: 0 0 min(320px, 84vw); min-height: 270px; padding: 22px 18px; }

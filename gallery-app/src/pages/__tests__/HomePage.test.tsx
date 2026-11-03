@@ -100,6 +100,19 @@ describe('HomePage editorial landing page', () => {
     expect(screen.getByTestId('review-rail')).toHaveTextContent('Maria Santos');
   });
 
+  it('shows five compact collection cards with category links and no card numbers or descriptions', () => {
+    const { container } = renderHome();
+    const cards = Array.from(container.querySelectorAll('.home-collection-card'));
+    expect(cards).toHaveLength(5);
+    ['Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others'].forEach((name, index) => {
+      expect(cards[index]).toHaveAttribute('href', `/gallery?category=${encodeURIComponent(name)}`);
+      expect(cards[index]).toHaveTextContent(name);
+      expect(cards[index]).toHaveTextContent('View collection');
+      expect(cards[index].querySelector('b, small')).toBeNull();
+    });
+    expect(screen.getByRole('link', { name: /Browse the full gallery/i })).toHaveAttribute('href', '/gallery');
+  });
+
   it('keeps every section destination mounted while shop data loads', async () => {
     renderHome();
     expect(screen.getByTestId('shop-rail')).toHaveTextContent('Loading shops');
