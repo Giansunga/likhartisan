@@ -3,7 +3,8 @@ import GallerySearchInput from '../../components/GallerySearchInput';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import GalleryPage from '../GalleryPage';
+import ActualGalleryPage from '../GalleryPage';
+import NavbarProductSearch from '../../components/NavbarProductSearch';
 import { clearGallerySnapshot } from '../../lib/gallerySnapshot';
 
 const mocks = vi.hoisted(() => ({
@@ -37,6 +38,10 @@ vi.mock('../../lib/supabase', () => ({
 
 function product(id: string, stock: number, price = 100) {
   return { id, name: id, category: 'Vases', price, stock, image: '/test.webp', status: 'active', shop_name: 'Test Shop' };
+}
+
+function GalleryPage() {
+  return <GallerySearchProvider><NavbarProductSearch /><ActualGalleryPage /></GallerySearchProvider>;
 }
 
 describe('GalleryPage', () => {
@@ -195,7 +200,7 @@ describe('GalleryPage', () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({ matches: query === '(min-width: 1200px)', addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     mocks.order.mockResolvedValue({ data: [product('Moon jar', 1), product('Sun planter', 2)], error: null });
     render(<MemoryRouter initialEntries={['/gallery']}><GallerySearchProvider><HeaderSearch /><Routes>
-      <Route path="/gallery" element={<GalleryPage />} />
+      <Route path="/gallery" element={<ActualGalleryPage />} />
       <Route path="/product/:id" element={<ReturnControls />} />
     </Routes></GallerySearchProvider></MemoryRouter>);
     await screen.findByRole('link', { name: /Moon jar/ });
@@ -208,6 +213,46 @@ describe('GalleryPage', () => {
     expect(await screen.findByRole('searchbox')).toHaveValue('Moon jar');
     expect(screen.queryByRole('link', { name: /Sun planter/ })).not.toBeInTheDocument();
     expect(mocks.order).toHaveBeenCalledOnce();
+  });
+
+  it('initializes an explicit query and preserves category and shop parameters when editing or clearing it', async () => {
+    const rows = [
+      { ...product('Moon jar', 2), shop_id: 'clay' },
+      { ...product('Sun vase', 2), shop_id: 'clay' },
+    ];
+    mocks.order.mockResolvedValue({ data: rows, error: null });
+    render(<MemoryRouter initialEntries={['/gallery?category=Vases&shop=clay&q=Moon']}><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Moon jar/ });
+    expect(screen.getByRole('searchbox')).toHaveValue('Moon');
+    expect(screen.queryByRole('link', { name: /Sun vase/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Sun' } });
+    expect(screen.getByRole('link', { name: /Sun vase/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Moon jar/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vases' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
+    expect(screen.getByRole('link', { name: /Moon jar/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear shop filter' })).toBeInTheDocument();
+  });
+
+  it('does not restore a saved view from a different explicitly submitted query', async () => {
+    mocks.order.mockResolvedValue({ data: [product('Moon jar', 1), product('Sun planter', 2)], error: null });
+    const first = render(<MemoryRouter initialEntries={['/gallery?q=Moon']}><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Moon jar/ });
+    first.unmount();
+    render(<MemoryRouter initialEntries={['/gallery?q=Sun']}><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Sun planter/ });
+    expect(screen.getByRole('searchbox')).toHaveValue('Sun');
+    expect(screen.queryByRole('link', { name: /Moon jar/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps a locally selected category when replacing the query URL', async () => {
+    mocks.order.mockResolvedValue({ data: [product('Moon vase', 1), { ...product('Moon planter', 2), category: 'Planters' }], error: null });
+    render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Moon vase/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Planters' }));
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Moon' } });
+    expect(screen.getByRole('link', { name: /Moon planter/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Moon vase/ })).not.toBeInTheDocument();
   });
 
   it.each(['/gallery?category=Decorative%20Pieces', '/gallery?category=Amphoras'])('keeps existing Amphoras products in Decorative Pieces for %s', async route => {

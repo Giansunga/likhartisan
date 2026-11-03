@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex items-center justify-center px-4 py-12" style={{ minHeight: 'calc(100vh - 80px)' }}>
+    <div className="flex items-center justify-center px-4 py-12" style={{ minHeight: 'calc(100dvh - var(--nav-height))' }}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md">
         <h1 className="font-serif text-3xl font-bold text-brown-dark text-center mb-2">Forgot Password</h1>

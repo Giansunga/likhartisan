@@ -1,7 +1,6 @@
-import { useMediaQuery } from '../hooks/useMediaQuery';
 import AssetImage from '../components/AssetImage';
 import { confirmAction } from '../lib/popups';
-import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -10,7 +9,6 @@ import { mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
 import { useFavorites } from '../hooks/useFavorites';
 import { catalogDisplayPrice, summarizeCatalogVariations } from '../lib/catalogPresentation';
 import Pagination from '../components/Pagination';
-import GallerySearchInput from '../components/GallerySearchInput';
 import { useGallerySearch } from '../contexts/GallerySearchContext';
 import './ListingPages.css';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,12 +49,21 @@ function GalleryView({ owner }: { owner: string }) {
   const [productRatings, setProductRatings] = useState<Record<string, { avg: number; count: number }>>(restored?.productRatings ?? {});
   const [productSoldCounts, setProductSoldCounts] = useState<Record<string, number>>(restored?.productSoldCounts ?? {});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => restored ? restored.activeCategory : searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
-  const [search, setSearch] = useState(restored?.search ?? '');
+  const [search, setSearch] = useState(() => searchParams.has('q') ? searchParams.get('q') || '' : restored?.search ?? '');
+  const changeSearch = useCallback((value: string) => {
+    setSearch(value);
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (value) next.set('q', value);
+      else next.delete('q');
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }, [setSearchParams]);
   const { setBinding } = useGallerySearch();
   useLayoutEffect(() => {
-    setBinding({ value: search, onChange: setSearch });
+    setBinding({ value: search, onChange: changeSearch });
     return () => setBinding(null);
-  }, [search, setBinding]);
+  }, [search, changeSearch, setBinding]);
   const [sort, setSort] = useState(restored?.sort ?? 'recommended');
   const [showFavorites, setShowFavorites] = useState(restored?.showFavorites ?? false);
   const { favorites, toggleFavorite: toggleSavedFavorite } = useFavorites();
@@ -68,7 +75,6 @@ function GalleryView({ owner }: { owner: string }) {
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(restored?.page ?? 1);
-  const isDesktop = useMediaQuery('(min-width: 1200px)');
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   const [shopFilter, setShopFilter] = useState(() => new URLSearchParams(restored?.urlSearch ?? searchParams.toString()).get('shop'));
   
@@ -90,10 +96,14 @@ function GalleryView({ owner }: { owner: string }) {
       return;
     }
     if (urlContext.current === current) return;
+    const previous = new URLSearchParams(urlContext.current);
     urlContext.current = current;
-    setShopFilter(searchParams.get('shop'));
-    const cat = searchParams.get('category');
-    setActiveCategory(cat ? normalizeProductCategory(cat) : null);
+    if (previous.get('shop') !== searchParams.get('shop')) setShopFilter(searchParams.get('shop'));
+    if (previous.get('category') !== searchParams.get('category')) {
+      const cat = searchParams.get('category');
+      setActiveCategory(cat ? normalizeProductCategory(cat) : null);
+    }
+    if (previous.get('q') !== searchParams.get('q')) setSearch(searchParams.get('q') || '');
   }, [searchParams, setSearchParams, restored]);
 
   const filterKey = JSON.stringify([activeCategory, search, sort, showFavorites, shopFilter]);
@@ -425,7 +435,6 @@ function GalleryView({ owner }: { owner: string }) {
             })}
           </div>
           <div className="gallery-toolbar__actions">
-            {!isDesktop && <div className="gallery-toolbar__search"><GallerySearchInput value={search} onChange={setSearch} /></div>}
               {isMobile ? (
                 <button
                   className="gallery-filter-button"
@@ -532,7 +541,7 @@ function GalleryView({ owner }: { owner: string }) {
               </svg>
               <h3>No crafts found</h3>
               <p>Try adjusting your search keywords, clearing active filters, or exploring a different category.</p>
-              <button className="btn-reset-filters" onClick={() => { setActiveCategory(null); setSearch(''); }}>Clear All Filters</button>
+              <button className="btn-reset-filters" onClick={() => { setActiveCategory(null); changeSearch(''); }}>Clear All Filters</button>
             </div>
           ) : (
             <div className="product-grid">

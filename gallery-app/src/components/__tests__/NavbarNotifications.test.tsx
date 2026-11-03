@@ -10,7 +10,7 @@ const openQuoteReview = vi.fn();
 let requestedContext: NotificationContext | undefined;
 let buyerNotifications: NotificationRecord[] = [];
 let userForTest: { id: string; email: string; user_metadata: Record<string, unknown> } | null = { id: 'user-1', email: 'buyer@example.test', user_metadata: {} };
-let resizeViewport = (_width: number) => {};
+let resizeViewport: (width: number) => void = () => {};
 
 const buyerOrder: NotificationRecord = { id: 'buyer-order', user_id: 'user-1', type: 'shipped', title: 'Shipped out', message: 'Order update', order_id: 'order / 1', recipient_context: 'buyer', read: false, created_at: '2026-08-15T08:00:00Z' };
 const artisanMessage: NotificationRecord = { id: 'artisan-message', user_id: 'user-1', type: 'message', title: 'New message', message: 'Buyer replied', conversation_id: 'conversation / 1', recipient_context: 'artisan', read: false, created_at: '2026-08-15T08:00:00Z' };
@@ -67,6 +67,31 @@ describe('Navbar notification routing', () => {
       });
     };
   }
+
+  it.each(['/', '/shops', '/artisans', '/freeform', '/signin', '/update-password', '/dashboard', '/chat', '/cart', '/checkout', '/missing'])('offers product search on customer route %s', (path) => {
+    renderNavbar(path);
+    expect(screen.getAllByRole('searchbox', { name: 'Search artisan crafts' })).toHaveLength(1);
+  });
+
+  it('opens Gallery with the submitted product query and encodes special characters', () => {
+    renderNavbar('/shops');
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'white & gold' } });
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/shops');
+    fireEvent.submit(screen.getByRole('search', { name: 'Search gallery products' }));
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/gallery?q=white+%26+gold');
+  });
+
+  it('keeps a password-recovery session on its page despite a pending shopping destination', () => {
+    sessionStorage.setItem('lk_shopping_auth_return', '/cart');
+    renderNavbar('/update-password');
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/update-password');
+    sessionStorage.removeItem('lk_shopping_auth_return');
+  });
+
+  it('does not add product search to the artisan dashboard', () => {
+    renderNavbar('/artisan-dashboard');
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
 
   it.each([768, 769, 820, 834, 1024, 1194, 1199, 1200, 1280, 1366])('selects the navigation layout at %ipx', (width) => {
     setWidth(width);
@@ -159,7 +184,7 @@ describe('Navbar notification routing', () => {
     requestedContext = undefined;
     buyerNotifications = [buyerOrder];
     userForTest = { id: 'user-1', email: 'buyer@example.test', user_metadata: {} };
-    resizeViewport = (_width: number) => {};
+    resizeViewport = () => {};
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })) });
   });
 

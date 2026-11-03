@@ -25,12 +25,12 @@ export interface GallerySnapshot {
 let snapshot: GallerySnapshot | null = null;
 function context(search: string) {
   const params = new URLSearchParams(search);
-  return JSON.stringify([params.get('category') || '', params.get('shop') || '']);
+  return JSON.stringify([params.get('category') || '', params.get('shop') || '', params.get('q') || '']);
 }
 export function readGallerySnapshot(owner: string, search: string): GallerySnapshot | null {
   if (!snapshot || snapshot.owner !== owner) return null;
   const params = new URLSearchParams(search);
-  return (!params.get('category') && !params.get('shop')) || context(search) === context(snapshot.urlSearch) ? snapshot : null;
+  return (!params.get('category') && !params.get('shop') && !params.has('q')) || context(search) === context(snapshot.urlSearch) ? snapshot : null;
 }
 export function saveGallerySnapshot(next: GallerySnapshot) { snapshot = next; }
 export function clearGallerySnapshot() { snapshot = null; }

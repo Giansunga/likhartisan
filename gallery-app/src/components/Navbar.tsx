@@ -1,5 +1,4 @@
-import { useGallerySearch } from '../contexts/GallerySearchContext';
-import GallerySearchInput from './GallerySearchInput';
+import NavbarProductSearch from './NavbarProductSearch';
 import AssetImage from './AssetImage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './Navbar.css';
@@ -39,13 +38,11 @@ function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
 
 export default function Navbar() {
   const location = useLocation();
-  const { binding: gallerySearch } = useGallerySearch();
-  const isGallery = location.pathname === '/gallery';
   const navigate = useNavigate();
   const openQuoteReview = useQuoteReview();
   const isAdmin = location.pathname.startsWith('/admin');
   const isArtisanDashboard = location.pathname.startsWith('/artisan-dashboard');
-  const isFreeform = location.pathname.startsWith('/freeform');
+  const isRecoveryPage = location.pathname === '/update-password';
   const requestedAuth = new URLSearchParams(location.search).get('auth');
   const routeAuthView = requestedAuth === 'signup' || requestedAuth === 'verify' ? requestedAuth : null;
 
@@ -101,9 +98,10 @@ export default function Navbar() {
   const handledSignIn = useRef<string | null>(null);
   useEffect(() => {
     if (!user) { handledSignIn.current = null; return; }
+    if (isRecoveryPage) return;
     const destination = shoppingDestination();
     if (destination) { clearShoppingDestination(); handledSignIn.current = user.id; navigate(destination, { replace: true }); }
-  }, [user, navigate]);
+  }, [user, navigate, isRecoveryPage]);
 
   useEffect(() => {
     setUserEmail(user?.email ?? null);
@@ -216,7 +214,7 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]" id="main-navbar" aria-label="Main navigation">
+    <nav className={`fixed top-0 left-0 w-full h-[var(--nav-height)] bg-white/95 backdrop-blur-sm z-50 shadow-[var(--shadow-sm)]${isArtisanDashboard ? '' : ' customer-navbar'}`} id="main-navbar" aria-label="Main navigation">
       <div className="christmas-navbar-snowflakes" aria-hidden="true">
         <span>❄</span>
         <span>❄</span>
@@ -230,9 +228,9 @@ export default function Navbar() {
           </Link>
         </div>
       ) : (
-        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} navbar-layout${isGallery ? ' navbar-layout--gallery' : ''} h-full relative`}>
+        <div className="max-w-[var(--container-width)] mx-auto navbar-layout h-full relative">
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
-            <img className="seasonal-wordmark" src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : isTablet ? '38px' : '46px', width: 'auto' }} />
+            <img className="seasonal-wordmark" src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan"  />
           </Link>
 
           {/* Desktop nav links */}
@@ -251,11 +249,7 @@ export default function Navbar() {
             </ul>
           )}
 
-          {isGallery && !isCompact && (
-            <div className="navbar-gallery-search">
-              <GallerySearchInput value={gallerySearch?.value ?? ''} onChange={value => gallerySearch?.onChange(value)} />
-            </div>
-          )}
+          <NavbarProductSearch key={location.pathname} />
           {/* Action icons */}
           <div className="navbar-actions">
             <CartAction count={user && !authLoading ? cartCount : 0} isMobile={isMobile} />

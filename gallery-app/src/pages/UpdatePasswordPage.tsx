@@ -85,7 +85,7 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <main className="reset-page">
+    <div className="reset-page">
       <div className="reset-page__content">
         <Link className="reset-page__brand" to="/" aria-label="LikhArtisan home">
           <img src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" />
@@ -184,6 +184,6 @@ export default function UpdatePasswordPage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

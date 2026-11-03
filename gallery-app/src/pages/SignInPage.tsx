@@ -38,7 +38,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center px-4" style={{ paddingTop: 'var(--nav-height)' }}>
+    <div className="bg-cream flex items-center justify-center px-4 py-6" style={{ minHeight: 'calc(100dvh - var(--nav-height))' }}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md">
         <h1 className="font-serif text-3xl font-bold text-brown-dark text-center mb-2">Welcome Back</h1>

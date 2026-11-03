@@ -16,26 +16,18 @@
 .gallery-results-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-top: 22px; }
 .gallery-results-context { display: flex; align-items: center; gap: 12px; font-size: .88rem; color: var(--text-light); }
 .gallery-toolbar :is(button, select, input):focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
-.gallery-search-input { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; padding: 8px 12px; border: 1px solid #e8e4e0; border-radius: 999px; background: #f9f9fa; color: #8b929f; }
-.gallery-search-input svg { width: 18px; height: 18px; flex-shrink: 0; }
-.gallery-search-input input { min-width: 0; width: 100%; padding: 0; border: 0; outline: none; background: transparent; color: var(--text-dark); font-size: .85rem; }
-.gallery-search-input:focus-within { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 @media (min-width: 769px) and (max-width: 1199px) {
   .gallery-toolbar__inner { flex-wrap: wrap; gap: 10px; }
   .gallery-category-pills { flex-basis: 100%; }
   .gallery-toolbar__actions { width: 100%; }
-  .gallery-toolbar__search { flex: 1; margin-right: auto; max-width: 400px; }
 }
 @media (max-width: 768px) {
   .listing-container { padding-inline: 16px; }
   .listing-page-heading { padding-top: 20px; }
-  .gallery-toolbar__inner { flex-direction: column; align-items: stretch; gap: 10px; padding-block: 10px; }
-  .gallery-category-pills { overflow-x: auto; scrollbar-width: thin; padding-block: 2px 5px; }
+  .gallery-toolbar__inner { flex-direction: row; align-items: center; gap: 10px; padding-block: 10px; }
+  .gallery-category-pills { flex: 1; overflow-x: auto; scrollbar-width: thin; padding-block: 2px 5px; }
   .gallery-category-pill { min-height: 40px; padding-inline: 16px; }
-  .gallery-toolbar__actions { width: 100%; }
-  .gallery-toolbar__search { flex: 1; min-width: 0; }
-  .gallery-search-input { min-height: 42px; }
-  .gallery-search-input input { font-size: 16px; }
+  .gallery-toolbar__actions { width: auto; flex-shrink: 0; }
   .gallery-toolbar .gallery-filter-button { min-height: 42px; }
   .gallery-results-heading { padding-top: 18px; align-items: center; }
   .listing-title { font-size: 1.4rem; }

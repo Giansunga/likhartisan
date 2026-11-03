@@ -111,6 +111,7 @@ function AppShell() {
             <Route path="signin" element={<SignInPage />} />
             <Route path="signup" element={<Navigate to="/?auth=signup" replace />} />
             <Route path="verify-email" element={<Navigate to="/?auth=verify" replace />} />
+            <Route path="update-password" element={<UpdatePasswordPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="likhai" element={<Navigate to="/" replace />} />
@@ -132,7 +133,6 @@ function AppShell() {
               <Route path="*" element={<Navigate to="/artisan-dashboard" replace />} />
             </Route>
           </Route>
-          <Route path="update-password" element={<UpdatePasswordPage />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />

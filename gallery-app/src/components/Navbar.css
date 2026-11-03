@@ -1,9 +1,9 @@
 .navbar-layout {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px) auto;
   align-items: center;
-  gap: 24px;
-  padding-inline: 32px;
+  gap: 20px;
+  padding-inline: 24px;
 }
 
 .navbar-desktop-links {
@@ -13,7 +13,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  gap: clamp(20px, calc(10vw - 100px), 36px);
+  gap: clamp(12px, 1.2vw, 22px);
   white-space: nowrap;
 }
 
@@ -126,10 +126,22 @@
   }
 }
 
-@media (min-width: 1200px) {
-  .navbar-layout--gallery { grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px) auto; gap: 20px; padding-inline: 24px; }
-  .navbar-layout--gallery .logo img { max-width: 170px; height: auto !important; }
-  .navbar-layout--gallery .navbar-desktop-links { gap: clamp(12px, 1.2vw, 22px); }
-  .navbar-layout--gallery .navbar-desktop-links a { font-size: .95rem; }
-  .navbar-gallery-search { min-width: 0; }
+:root:has(#main-navbar.customer-navbar) { --navbar-row-height: 80px; --nav-height: 80px; }
+.navbar-layout .logo img { width: 170px; height: auto; }
+.navbar-desktop-links a { font-size: .95rem; }
+.navbar-product-search { min-width: 0; width: 100%; margin: 0; }
+@media (max-width: 1199px) {
+  :root:has(#main-navbar.customer-navbar) { --nav-height: 136px; }
+  .customer-navbar .navbar-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: var(--navbar-row-height) 56px; column-gap: 16px; row-gap: 0; }
+  .customer-navbar .navbar-layout > .logo { grid-row: 1; grid-column: 1; }
+  .customer-navbar .navbar-layout .logo img { width: 160px; }
+  .customer-navbar .navbar-actions { grid-row: 1; grid-column: 2; }
+  .customer-navbar .navbar-product-search { grid-row: 2; grid-column: 1 / -1; align-self: start; }
+  .customer-navbar .navbar-profile-panel { position: fixed; top: calc(var(--nav-height) + 8px) !important; right: 24px !important; }
+  .customer-navbar .notification-popover { position: fixed; top: calc(var(--nav-height) + 8px); right: 24px; }
+}
+@media (max-width: 768px) {
+  :root:has(#main-navbar.customer-navbar) { --navbar-row-height: 60px; --nav-height: 116px; }
+  .customer-navbar .navbar-layout .logo img { width: 140px; }
+  .customer-navbar .navbar-profile-panel { right: 16px !important; }
 }
