@@ -225,11 +225,16 @@ describe('product detail presentation and shopping controls', () => {
     expect(container.querySelector('.pdp-stock-detail--empty')).toBeInTheDocument();
   });
 
-  it.each([false, true])('keeps guest favorites usable with the model fallback: %s', async fail => {
+  it.each([false, true])('hides guest favorites and preserves signed-in favorites with the model fallback: %s', async fail => {
+    mocks.user = null;
     mocks.products[0].model3d = '/model.glb'; mocks.failModel = fail;
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     localStorage.setItem('likhartisan_favorites', '["existing"]');
-    renderProduct();
+    const view = renderProduct();
+    await screen.findByRole('heading', { name: 'Bigasan Terracotta' });
+    expect(screen.queryByRole('button', { name: 'Add Bigasan Terracotta to favorites' })).not.toBeInTheDocument();
+    mocks.user = { id: 'buyer' };
+    view.rerender(productTree());
     const favorite = await screen.findByRole('button', { name: 'Add Bigasan Terracotta to favorites' });
     fireEvent.click(favorite);
     expect(screen.getByRole('button', { name: 'Remove Bigasan Terracotta from favorites' })).toHaveAttribute('aria-pressed', 'true');

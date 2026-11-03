@@ -241,14 +241,14 @@ function GalleryView({ owner }: { owner: string }) {
     if (shopFilter) {
       list = list.filter(p => p.shopId === shopFilter);
     }
-    if (showFavorites) {
+    if (loggedIn && showFavorites) {
       list = list.filter(p => favorites.includes(p.id));
     }
     if (activeCategory) {
       list = list.filter(p => p.category === activeCategory);
     }
     return list;
-  }, [allProducts, activeCategory, showFavorites, favorites, shopFilter]);
+  }, [allProducts, activeCategory, showFavorites, favorites, shopFilter, loggedIn]);
 
   const shopFilterName = useMemo(
     () => shopFilter ? allProducts.find(product => product.shopId === shopFilter)?.shopName : undefined,
@@ -609,7 +609,7 @@ function GalleryView({ owner }: { owner: string }) {
                 <Link key={p.id} data-gallery-product={p.id} to={`/product/${p.id}`} className="product-card-item group" onClick={() => trackProductClick(p.id)}>
                   <div className="product-img-wrapper">
                     <AssetImage src={p.image} alt={p.name} />
-                    <button
+                    {loggedIn && <button
                       className={`gallery-favorite-icon-button ${favorites.includes(p.id) ? 'active' : ''}`}
                       aria-pressed={favorites.includes(p.id)}
                       aria-label={favorites.includes(p.id) ? `Remove ${p.name} from favorites` : `Add ${p.name} to favorites`}
@@ -629,7 +629,7 @@ function GalleryView({ owner }: { owner: string }) {
                         strokeWidth="2">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                       </svg>
-                    </button>
+                    </button>}
                   </div>
                   <div className="product-details">
                     <div className="product-card-header">

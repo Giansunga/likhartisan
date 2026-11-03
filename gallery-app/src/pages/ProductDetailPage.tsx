@@ -67,7 +67,7 @@ class ProductMediaErrorBoundary extends Component<{ fallback: ReactNode; childre
 export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { favorites, toggleFavorite } = useFavorites();
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<ProductVariation[]>([]);
@@ -483,11 +483,11 @@ export default function ProductDetailPage() {
           <div className="pdp-hero" ref={productSectionRef}>
             <div className="pdp-media">
               <div className="pdp-media-frame" data-product-cart-source>
-                <button type="button" className="pdp-favorite" aria-pressed={favorites.includes(product.id)}
+                {user && !authLoading && <button type="button" className="pdp-favorite" aria-pressed={favorites.includes(product.id)}
                   aria-label={`${favorites.includes(product.id) ? 'Remove' : 'Add'} ${product.name} ${favorites.includes(product.id) ? 'from' : 'to'} favorites`}
                   onClick={() => toggleFavorite(product.id)}>
                   <Heart aria-hidden="true" fill={favorites.includes(product.id) ? 'currentColor' : 'none'} />
-                </button>
+                </button>}
                 {product.model3d ? (
                   <ProductMediaErrorBoundary key={product.model3d} fallback={<AssetImage src={product.image} alt={product.name} id="viewer-main-img" />}>
                     <Suspense fallback={<ModelImageFallback src={product.image} alt={product.name} />}>

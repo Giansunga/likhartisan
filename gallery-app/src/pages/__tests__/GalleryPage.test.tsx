@@ -107,6 +107,7 @@ describe('GalleryPage', () => {
     const overlay = screen.getByText('Sort & Filter').closest('.gallery-filter-overlay') as HTMLElement;
     expect(overlay.parentElement).toBe(document.body);
     expect(overlay).toHaveClass('active');
+    expect(within(overlay).queryByRole('button', { name: /Show Only Favorites/ })).not.toBeInTheDocument();
     const sorting = within(overlay).getByRole('combobox', { name: 'Sort products' });
     fireEvent.change(sorting, { target: { value: 'price-asc' } });
     const results = within(overlay).getByRole('button', { name: /View .* Results/ });
@@ -286,12 +287,18 @@ describe('GalleryPage', () => {
     expect(screen.getByRole('link', { name: /Unavailable/ })).toHaveTextContent('Out of stock');
   });
 
-  it('sorts by the visible sold-out price and exposes persistent guest favorites', async () => {
+  it('hides favorite controls for guests and preserves signed-in favorites', async () => {
     localStorage.clear();
     mocks.order.mockResolvedValue({ data: [product('Sold vase', 0, 300), product('Available vase', 2, 100)], error: null });
     mocks.variations.mockResolvedValue({ data: [{ product_id: 'Sold vase', price: 50, stock: 0 }], error: null });
-    const { container } = render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    const view = render(<MemoryRouter><GalleryPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole('link', { name: /Sold vase/ })).toHaveTextContent('₱50'));
+    expect(screen.queryByRole('button', { name: /Favorites/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add Sold vase to favorites' })).not.toBeInTheDocument();
+    mocks.user = { id: 'buyer' };
+    view.rerender(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Sold vase/ });
+    const container = view.container;
     fireEvent.change(screen.getAllByRole('combobox', { name: 'Sort products' })[0], { target: { value: 'price-asc' } });
     expect(container.querySelector('.product-card-item')).toHaveAttribute('href', '/product/Sold vase');
     fireEvent.click(screen.getByRole('button', { name: 'Add Sold vase to favorites' }));
