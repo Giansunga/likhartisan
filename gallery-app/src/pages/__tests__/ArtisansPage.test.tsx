@@ -14,7 +14,9 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: (table: string) => {
 } } }));
 describe('artisan assigned shops', () => {
   it('links the assigned shop and provides distinct unavailable and unassigned labels', async () => {
-    render(<MemoryRouter><ArtisansPage /></MemoryRouter>);
+    const { container } = render(<MemoryRouter><ArtisansPage /></MemoryRouter>);
+    expect(screen.getByRole('heading', { level: 1, name: 'Artisans' })).toBeInTheDocument();
+    expect(container.querySelector('.gallery-header-banner')).toBeNull();
     expect(await screen.findByRole('link', { name: 'Clay House' })).toHaveAttribute('href', '/shop/shop');
     expect(screen.getByText('No shop assigned')).toBeInTheDocument();
     expect(screen.getByText('Shop unavailable')).toBeInTheDocument();

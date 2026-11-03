@@ -1,3 +1,5 @@
+import { GallerySearchProvider, useGallerySearch } from '../../contexts/GallerySearchContext';
+import GallerySearchInput from '../../components/GallerySearchInput';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -170,67 +172,42 @@ describe('GalleryPage', () => {
     expect(mocks.order).toHaveBeenCalledTimes(3);
   });
 
-  it('uses the category image set for the active seasonal theme', async () => {
-    const { container, rerender } = render(
-      <MemoryRouter>
-        <GalleryPage />
-      </MemoryRouter>,
-    );
+  it('uses accessible category pills without a hero or image tiles', async () => {
+    mocks.order.mockResolvedValue({ data: [product('Vase', 1), { ...product('Planter', 2), category: 'Planters' }], error: null });
+    const { container } = render(<MemoryRouter><GalleryPage /></MemoryRouter>);
+    await screen.findByRole('link', { name: /Vase/ });
+    const categories = screen.getByRole('group', { name: 'Craft categories' });
+    expect(within(categories).getAllByRole('button')).toHaveLength(6);
+    expect(container.querySelector('.gallery-header-banner')).toBeNull();
+    expect(container.querySelector('.category-zoom-grid')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Gallery' })).toBeInTheDocument();
+    fireEvent.click(within(categories).getByRole('button', { name: 'Planters' }));
+    expect(screen.queryByRole('link', { name: /Vase/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Planter/ })).toBeInTheDocument();
+    expect(within(categories).getByRole('button', { name: 'Planters' })).toHaveAttribute('aria-pressed', 'true');
+  });
 
-    await waitFor(() => expect(container.querySelectorAll('.zoom-card-bg')).toHaveLength(6));
-    const christmasImages = [
-      'gallery-thumbnail-all-crafts.jpg',
-      'gallery-thumbnail-vases.jpg',
-      'gallery-thumbnail-planters.jpg',
-      'gallery-thumbnail-jars.jpg',
-      'gallery-thumbnail-decorative-pieces.jpg',
-      'gallery-thumbnail-others.png',
-    ];
-    Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
-      expect(image).toHaveStyle({ backgroundImage: `url(/images/${christmasImages[index]})` });
-    });
-
-    mocks.currentTheme = 'valentines';
-    await act(async () => {
-      rerender(
-        <MemoryRouter>
-          <GalleryPage />
-        </MemoryRouter>,
-      );
-    });
-
-    const valentinesImages = [
-      'gallery-thumbnail-all-crafts.jpg',
-      'gallery-thumbnail-vases.jpg',
-      'gallery-thumbnail-planters.jpg',
-      'gallery-thumbnail-jars.jpg',
-      'gallery-thumbnail-decorative-pieces.jpg',
-      'gallery-thumbnail-others.png',
-    ];
-    Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
-      expect(image).toHaveStyle({ backgroundImage: `url(/images/${valentinesImages[index]})` });
-    });
-
-    mocks.currentTheme = 'default';
-    await act(async () => {
-      rerender(
-        <MemoryRouter>
-          <GalleryPage />
-        </MemoryRouter>,
-      );
-    });
-
-    const standardImages = [
-      'gallery-thumbnail-all-crafts.jpg',
-      'gallery-thumbnail-vases.jpg',
-      'gallery-thumbnail-planters.jpg',
-      'gallery-thumbnail-jars.jpg',
-      'gallery-thumbnail-decorative-pieces.jpg',
-      'gallery-thumbnail-others.png',
-    ];
-    Array.from(container.querySelectorAll('.zoom-card-bg')).forEach((image, index) => {
-      expect(image).toHaveStyle({ backgroundImage: `url(/images/${standardImages[index]})` });
-    });
+  function HeaderSearch() {
+    const { binding } = useGallerySearch();
+    return binding ? <GallerySearchInput value={binding.value} onChange={binding.onChange} /> : null;
+  }
+  it('shares desktop header search and restores it after opening a product and going Back', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({ matches: query === '(min-width: 1200px)', addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    mocks.order.mockResolvedValue({ data: [product('Moon jar', 1), product('Sun planter', 2)], error: null });
+    render(<MemoryRouter initialEntries={['/gallery']}><GallerySearchProvider><HeaderSearch /><Routes>
+      <Route path="/gallery" element={<GalleryPage />} />
+      <Route path="/product/:id" element={<ReturnControls />} />
+    </Routes></GallerySearchProvider></MemoryRouter>);
+    await screen.findByRole('link', { name: /Moon jar/ });
+    expect(screen.getAllByRole('searchbox', { name: 'Search artisan crafts' })).toHaveLength(1);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Moon jar' } });
+    expect(screen.queryByRole('link', { name: /Sun planter/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: /Moon jar/ }));
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Return with Back' }));
+    expect(await screen.findByRole('searchbox')).toHaveValue('Moon jar');
+    expect(screen.queryByRole('link', { name: /Sun planter/ })).not.toBeInTheDocument();
+    expect(mocks.order).toHaveBeenCalledOnce();
   });
 
   it.each(['/gallery?category=Decorative%20Pieces', '/gallery?category=Amphoras'])('keeps existing Amphoras products in Decorative Pieces for %s', async route => {

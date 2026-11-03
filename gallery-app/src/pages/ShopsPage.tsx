@@ -1,3 +1,4 @@
+import './ListingPages.css';
 import AssetImage from '../components/AssetImage';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -28,32 +29,8 @@ export default function ShopsPage() {
   }, []);
 
   return (
-    <div className="seasonal-pattern-page">
-      <header
-        className="gallery-header-banner"
-      >
-        <div className="gallery-banner-bg" style={{ backgroundImage: 'url(/images/shops-hero.PNG)' }} />
-        <div className="gallery-banner-overlay" />
-        <div
-          className="max-w-[var(--container-width)] mx-auto px-6 relative z-[5] w-full"
-          style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}
-        >
-          <div className="gallery-banner-content">
-            <div className="breadcrumbs">
-              <Link to="/">Home</Link>
-              <span className="separator">/</span>
-              <span className="current">Shops</span>
-            </div>
-            <h1 className="gallery-title system-hero-title system-hero-title--banner">Explore Our Shops</h1>
-            <p
-              className="text-[1.2rem] text-white/85 mt-4 max-w-[600px] leading-[1.6]"
-              style={isMobile ? { marginTop: '18px', maxWidth: '34ch' } : undefined}
-            >
-              Discover the local pottery shops of Santo Tomas and their incredible creations.
-            </p>
-          </div>
-        </div>
-      </header>
+    <div className="listing-page">
+      <header className="listing-container listing-page-heading"><h1 className="listing-title">Shops</h1></header>
 
       <section className="artisan-grid-section">
         <div className="max-w-[var(--container-width)] mx-auto px-6">

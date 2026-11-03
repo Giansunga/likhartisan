@@ -1,7 +1,7 @@
-import { assetBackground } from '../lib/assetDelivery';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import AssetImage from '../components/AssetImage';
 import { confirmAction } from '../lib/popups';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigationType, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -10,9 +10,10 @@ import { mapSupabaseProduct, normalizeProductCategory } from '../lib/utils';
 import { useFavorites } from '../hooks/useFavorites';
 import { catalogDisplayPrice, summarizeCatalogVariations } from '../lib/catalogPresentation';
 import Pagination from '../components/Pagination';
-import GalleryHero from '../components/GalleryHero';
+import GallerySearchInput from '../components/GallerySearchInput';
+import { useGallerySearch } from '../contexts/GallerySearchContext';
+import './ListingPages.css';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import {
   createVisitSeed,
   normalizeSearchQuery,
@@ -25,14 +26,7 @@ import { readGallerySnapshot, saveGallerySnapshot, type GallerySnapshot } from '
 
 const PAGE_SIZE = 24;
 
-const categories = [
-  { name: 'All Crafts', bg: '/images/gallery-thumbnail-all-crafts.jpg' },
-  { name: 'Vases', bg: '/images/gallery-thumbnail-vases.jpg' },
-  { name: 'Planters', bg: '/images/gallery-thumbnail-planters.jpg' },
-  { name: 'Jars', bg: '/images/gallery-thumbnail-jars.jpg' },
-  { name: 'Decorative Pieces', bg: '/images/gallery-thumbnail-decorative-pieces.jpg' },
-  { name: 'Others', bg: '/images/gallery-thumbnail-others.png' },
-];
+const categories = ['All Crafts', 'Vases', 'Planters', 'Jars', 'Decorative Pieces', 'Others'];
 
 export default function GalleryPage() {
   const { user, loading } = useAuth();
@@ -42,7 +36,6 @@ export default function GalleryPage() {
 
 function GalleryView({ owner }: { owner: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { currentTheme } = useTheme();
   const navigationType = useNavigationType();
   const [restored] = useState(() => readGallerySnapshot(owner, searchParams.toString()));
   const snapshotRef = useRef<GallerySnapshot | null>(restored);
@@ -59,6 +52,11 @@ function GalleryView({ owner }: { owner: string }) {
   const [productSoldCounts, setProductSoldCounts] = useState<Record<string, number>>(restored?.productSoldCounts ?? {});
   const [activeCategory, setActiveCategory] = useState<string | null>(() => restored ? restored.activeCategory : searchParams.get('category') ? normalizeProductCategory(searchParams.get('category')) : null);
   const [search, setSearch] = useState(restored?.search ?? '');
+  const { setBinding } = useGallerySearch();
+  useLayoutEffect(() => {
+    setBinding({ value: search, onChange: setSearch });
+    return () => setBinding(null);
+  }, [search, setBinding]);
   const [sort, setSort] = useState(restored?.sort ?? 'recommended');
   const [showFavorites, setShowFavorites] = useState(restored?.showFavorites ?? false);
   const { favorites, toggleFavorite: toggleSavedFavorite } = useFavorites();
@@ -70,6 +68,7 @@ function GalleryView({ owner }: { owner: string }) {
   const [designModalOpen, setDesignModalOpen] = useState(false);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(restored?.page ?? 1);
+  const isDesktop = useMediaQuery('(min-width: 1200px)');
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   const [shopFilter, setShopFilter] = useState(() => new URLSearchParams(restored?.urlSearch ?? searchParams.toString()).get('shop'));
   
@@ -417,89 +416,16 @@ function GalleryView({ owner }: { owner: string }) {
 
   return (
     <div className="gallery-page">
-      {/* Banner */}
-      <GalleryHero currentTheme={currentTheme} isMobile={isMobile} />
-
-      {/* Category Filter */}
-      <section className="py-[30px] bg-[var(--bg-primary)] border-b border-cream-secondary">
-        <div className="max-w-[var(--container-width)] mx-auto px-6" style={isMobile ? { paddingLeft: '12px', paddingRight: '12px' } : undefined}>
-          {isMobile ? (
-            <div style={{
-              display: 'flex', overflowX: 'auto', gap: '10px', padding: '4px 0',
-              scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch'
-            }}>
-              <button
-                className={`gallery-mobile-category-pill ${activeCategory === null ? 'active' : ''}`}
-                onClick={() => setActiveCategory(null)}
-                style={{
-                  flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
-                  fontWeight: 600, border: `1.5px solid ${activeCategory === null ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
-                  background: activeCategory === null ? 'var(--primary-color)' : 'var(--white)',
-                  color: activeCategory === null ? 'var(--white)' : 'var(--text-dark)',
-                  cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                }}
-              >
-                All Crafts
-              </button>
-              {categories.filter(c => c.name !== 'All Crafts').map(cat => {
-                const isActive = activeCategory === cat.name;
-                return (
-                  <button
-                    className={`gallery-mobile-category-pill ${isActive ? 'active' : ''}`}
-                    key={cat.name}
-                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
-                    style={{
-                      flexShrink: 0, padding: '10px 20px', borderRadius: '24px', fontSize: '0.88rem',
-                      fontWeight: 600, border: `1.5px solid ${isActive ? 'var(--primary-color)' : 'var(--bg-tertiary)'}`,
-                      background: isActive ? 'var(--primary-color)' : 'var(--white)',
-                      color: isActive ? 'var(--white)' : 'var(--text-dark)',
-                      cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {cat.name}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="category-zoom-grid">
-              {categories.map(cat => (
-                <div key={cat.name}
-                  onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name === 'All Crafts' ? null : cat.name)}
-                  className={`category-zoom-card ${activeCategory === cat.name || (cat.name === 'All Crafts' && activeCategory === null) ? 'active' : ''}`}>
-                  <div
-                    className="zoom-card-bg"
-                    style={{ backgroundImage: assetBackground(cat.bg) }}
-                  />
-                  <div className="zoom-card-overlay" />
-                  <div className="zoom-card-content">
-                    <span className="zoom-card-name">{cat.name}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Control Bar */}
-      <section className="py-[30px] bg-[var(--bg-primary)]">
-        <div className="max-w-[var(--container-width)] mx-auto px-6">
-          <div className="control-bar">
-            <div className="control-title-group">
-              <h2 className="control-section-title" id="control-active-title">
-                {shopFilter ? `${shopFilterName || 'Shop'} Collection` : activeCategory || 'All Crafts'}
-              </h2>
-              {shopFilter ? <button className="gallery-shop-filter-clear" type="button" onClick={clearShopFilter}>Clear shop filter</button> : null}
-            </div>
-
-            <div className="control-action-group">
-              <div className="search-bar-wrapper">
-                <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                </svg>
-                <input type="text" placeholder="Search here..." value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
+      <section className="gallery-toolbar" aria-label="Gallery categories and filters">
+        <div className="listing-container gallery-toolbar__inner">
+          <div className="gallery-category-pills" role="group" aria-label="Craft categories">
+            {categories.map(category => {
+              const selected = category === 'All Crafts' ? activeCategory === null : activeCategory === category;
+              return <button type="button" key={category} aria-pressed={selected} className={`gallery-category-pill${selected ? ' active' : ''}`} onClick={() => setActiveCategory(selected || category === 'All Crafts' ? null : category)}>{category}</button>;
+            })}
+          </div>
+          <div className="gallery-toolbar__actions">
+            {!isDesktop && <div className="gallery-toolbar__search"><GallerySearchInput value={search} onChange={setSearch} /></div>}
               {isMobile ? (
                 <button
                   className="gallery-filter-button"
@@ -571,11 +497,16 @@ function GalleryView({ owner }: { owner: string }) {
                   </div>
                 </>
               )}
-            </div>
           </div>
         </div>
       </section>
 
+      <header className="listing-container gallery-results-heading">
+        <h1 className="listing-title">Gallery</h1>
+        <div className="gallery-results-context"><span id="control-active-title">{shopFilter ? `${shopFilterName || 'Shop'} Collection` : activeCategory || 'All Crafts'}</span>
+          {shopFilter && <button type="button" className="gallery-shop-filter-clear" onClick={clearShopFilter}>Clear shop filter</button>}
+        </div>
+      </header>
       {/* Product Grid */}
       <section className="gallery-products-section" style={{ paddingTop: '20px', paddingBottom: '140px', background: 'var(--bg-primary)' }}>
         <div className="max-w-[var(--container-width)] mx-auto px-6">

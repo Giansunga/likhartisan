@@ -125,3 +125,11 @@
     min-height: 34px;
   }
 }
+
+@media (min-width: 1200px) {
+  .navbar-layout--gallery { grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px) auto; gap: 20px; padding-inline: 24px; }
+  .navbar-layout--gallery .logo img { max-width: 170px; height: auto !important; }
+  .navbar-layout--gallery .navbar-desktop-links { gap: clamp(12px, 1.2vw, 22px); }
+  .navbar-layout--gallery .navbar-desktop-links a { font-size: .95rem; }
+  .navbar-gallery-search { min-width: 0; }
+}

@@ -1,3 +1,5 @@
+import { useGallerySearch } from '../contexts/GallerySearchContext';
+import GallerySearchInput from './GallerySearchInput';
 import AssetImage from './AssetImage';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import './Navbar.css';
@@ -37,6 +39,8 @@ function CartAction({ count, isMobile }: { count: number; isMobile: boolean }) {
 
 export default function Navbar() {
   const location = useLocation();
+  const { binding: gallerySearch } = useGallerySearch();
+  const isGallery = location.pathname === '/gallery';
   const navigate = useNavigate();
   const openQuoteReview = useQuoteReview();
   const isAdmin = location.pathname.startsWith('/admin');
@@ -226,7 +230,7 @@ export default function Navbar() {
           </Link>
         </div>
       ) : (
-        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} navbar-layout h-full relative`}>
+        <div className={`${isFreeform ? 'w-full' : 'max-w-[var(--container-width)] mx-auto'} navbar-layout${isGallery ? ' navbar-layout--gallery' : ''} h-full relative`}>
           <Link to="/" className="logo flex items-center" style={{ flexShrink: 0 }}>
             <img className="seasonal-wordmark" src="/images/likhartisan-brown-wordmark.png" alt="LikhArtisan" style={{ height: isMobile ? '34px' : isTablet ? '38px' : '46px', width: 'auto' }} />
           </Link>
@@ -247,6 +251,11 @@ export default function Navbar() {
             </ul>
           )}
 
+          {isGallery && !isCompact && (
+            <div className="navbar-gallery-search">
+              <GallerySearchInput value={gallerySearch?.value ?? ''} onChange={value => gallerySearch?.onChange(value)} />
+            </div>
+          )}
           {/* Action icons */}
           <div className="navbar-actions">
             <CartAction count={user && !authLoading ? cartCount : 0} isMobile={isMobile} />
