@@ -12,7 +12,6 @@ import {
   LoaderCircle,
   LockKeyhole,
   Mail,
-  MapPin,
   Phone,
   Save,
   ShieldCheck,
@@ -263,10 +262,6 @@ function AccountPanelContent({ user }: { user: User }) {
         </section>
 
         <section className="account-card" aria-labelledby="account-address-title">
-          <div className="account-card__heading">
-            <span><MapPin size={20} aria-hidden="true" /></span>
-            <div><h2 id="account-address-title">Delivery addresses</h2><p>Your default address is used at cart and checkout.</p></div>
-          </div>
           <ProfileAddressBook key={addressEditorVersion} draft={draft} disabled={saveStatus === 'saving'} onSave={saveProfile}/>
           {errors.address&&<p role="alert">{errors.address}</p>}
         </section>

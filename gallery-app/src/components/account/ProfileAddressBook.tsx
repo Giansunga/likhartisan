@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BriefcaseBusiness, CircleCheck, House, MapPin, Plus, Trash2 } from 'lucide-react';
 import ProfileAddressEditor from './ProfileAddressEditor';
 import type { AccountProfileDraft } from './accountProfile';
 import { emptyAddressParts } from '../../lib/profileAddress';
@@ -10,6 +11,7 @@ export default function ProfileAddressBook({draft,disabled,onSave}:{draft:Accoun
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const addresses=draft.addresses||[];
+  const displayedAddresses=[...addresses].sort((a,b)=>Number(b.id===draft.defaultAddressId)-Number(a.id===draft.defaultAddressId));
   async function saveBook(next:SavedProfileAddress[],defaultId:string|null) {
     const active=next.find(item=>item.id===defaultId)||next[0];
     setBusy(true);setError('');
@@ -35,19 +37,24 @@ export default function ProfileAddressBook({draft,disabled,onSave}:{draft:Accoun
     await saveBook(next,draft.defaultAddressId||entry.id);
   }
   return <div className="profile-address-book">
-    <p className="profile-address-help">Choose a default address for cart and checkout. Addresses without a delivery pin can still be used for pickup.</p>
+    <div className="profile-address-book__heading">
+      <div className="account-card__heading">
+        <span><MapPin size={20} aria-hidden="true" /></span>
+        <div><h2 id="account-address-title">Delivery addresses</h2><p>Manage your saved addresses and choose a default for checkout.</p></div>
+      </div>
+      {!editing&&<button type="button" className="account-button account-button--primary" disabled={disabled||busy} onClick={()=>edit()}><Plus size={16} aria-hidden="true"/>Add address</button>}
+    </div>
     {!addresses.length&&!editing&&<p>No delivery addresses saved.</p>}
-    <div className="profile-address-book__list">{addresses.map(item=><article className="profile-address-book__card" key={item.id}>
-      <div><strong>{item.label}</strong>{item.id===draft.defaultAddressId&&<span className="profile-address-book__default">Default</span>}</div>
-      <address>{item.address}</address>
-      <small>{item.addressLat!==null&&item.addressLng!==null?'Delivery pin saved':'No delivery pin saved'}</small>
+    <div className="profile-address-book__list">{displayedAddresses.map(item=><article className={`profile-address-book__card${item.id===draft.defaultAddressId?' profile-address-book__card--default':''}`} key={item.id}>
+      <div className="profile-address-book__identity"><span className="profile-address-book__icon">{item.label.toLowerCase()==='work'?<BriefcaseBusiness size={22} aria-hidden="true"/>:<House size={22} aria-hidden="true"/>}</span><div><strong>{item.label}</strong>{item.id===draft.defaultAddressId&&<span className="profile-address-book__default">Default</span>}</div></div>
+      <div className="profile-address-book__details"><address>{item.address}</address>
+      <small className={item.addressLat!==null&&item.addressLng!==null?'profile-address-book__pin--saved':undefined}>{item.addressLat!==null&&item.addressLng!==null?<><CircleCheck size={14} aria-hidden="true"/>Delivery pin saved</>:<><MapPin size={14} aria-hidden="true"/>No delivery pin</>}</small></div>
       <div className="profile-address-book__actions">
-        <button type="button" className="account-button account-button--secondary" disabled={disabled||busy||Boolean(editing)} onClick={()=>edit(item)}>Edit {item.label}</button>
-        {item.id!==draft.defaultAddressId&&<button type="button" className="account-button account-button--secondary" disabled={disabled||busy||Boolean(editing)} onClick={()=>void saveBook(addresses,item.id)}>Set {item.label} as default</button>}
-        <button type="button" className="profile-clear-address" disabled={disabled||busy||Boolean(editing)} onClick={()=>void saveBook(addresses.filter(entry=>entry.id!==item.id),draft.defaultAddressId===item.id?addresses.find(entry=>entry.id!==item.id)?.id||null:draft.defaultAddressId||null)}>Remove {item.label}</button>
+        {item.id!==draft.defaultAddressId&&<button type="button" className="account-button account-button--secondary" aria-label={`Set ${item.label} as default`} disabled={disabled||busy||Boolean(editing)} onClick={()=>void saveBook(addresses,item.id)}>Set as default</button>}
+        <button type="button" className="account-button account-button--secondary" aria-label={`Edit ${item.label}`} disabled={disabled||busy||Boolean(editing)} onClick={()=>edit(item)}>Edit</button>
+        <button type="button" className="account-button account-button--secondary profile-address-book__remove" aria-label={`Remove ${item.label}`} title={`Remove ${item.label}`} disabled={disabled||busy||Boolean(editing)} onClick={()=>void saveBook(addresses.filter(entry=>entry.id!==item.id),draft.defaultAddressId===item.id?addresses.find(entry=>entry.id!==item.id)?.id||null:draft.defaultAddressId||null)}><Trash2 size={16} aria-hidden="true"/></button>
       </div>
     </article>)}</div>
-    {!editing&&<button type="button" className="account-button account-button--secondary" disabled={disabled||busy} onClick={()=>edit()}>Add address</button>}
     {editing&&<section className="profile-address-book__form" aria-label="Address form">
       <label>Address label<input maxLength={50} placeholder="Home, work, family…" value={editing.label} disabled={disabled||busy} onChange={event=>setEditing({...editing,label:event.target.value})}/></label>
       <ProfileAddressEditor draft={editing.value} disabled={disabled||busy} onChange={value=>setEditing({...editing,value})}/>

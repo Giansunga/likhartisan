@@ -109,6 +109,8 @@ describe('AccountPanel', () => {
     await waitFor(()=>expect(mocks.updateUser).toHaveBeenCalledTimes(2));
     expect(mocks.updateUser.mock.calls[1][0].data).toMatchObject({address:'Quezon City, Metro Manila',address_lat:14.6,address_lng:121});
     expect(mocks.updateUser.mock.calls[1][0].data.address_book).toHaveLength(2);
+    await waitFor(()=>expect(screen.getAllByRole('article')[0]).toHaveTextContent('Work'));
+    expect(screen.getAllByRole('article')[0]).toHaveTextContent('Default');
   });
 
   it('cancels an address draft without modifying saved metadata',()=>{
