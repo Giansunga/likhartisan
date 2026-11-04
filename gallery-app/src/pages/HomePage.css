@@ -109,7 +109,6 @@
 .home-shop-card__body { position: relative; display: flex; flex: 1; flex-direction: column; padding: 46px 24px 25px; }
 .home-shop-card__mark { position: absolute; top: -33px; left: 24px; width: 62px; height: 62px; display: grid; place-items: center; overflow: hidden; border: 4px solid #fffdf9; border-radius: 50%; background: var(--primary-color); color: #fff; font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700; box-shadow: 0 5px 14px rgba(51,25,8,.16); }
 .home-shop-card__mark img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.home-shop-card__issue { position: absolute; top: 18px; right: 24px; color: #9a7d68; font-size: .62rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .home-shop-card__location { display: flex; align-items: center; gap: 5px; margin: 0 0 9px; color: #957d6a !important; font-size: .7rem !important; font-weight: 700; line-height: 1.2 !important; }
 .home-shop-card__location svg { width: 13px; color: var(--accent-color); }
 .home-shop-card h3 { margin: 0; color: #49270f; font-family: var(--font-serif); font-size: 1.55rem; font-weight: 550; line-height: 1.08; }

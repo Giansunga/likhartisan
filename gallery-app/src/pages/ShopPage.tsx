@@ -283,7 +283,7 @@ export default function ShopPage() {
       </nav>
       <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} availability={storefront.productAvailability} ratings={storefront.productRatings} />
       <ShopStorySection shop={shop} membershipYear={membershipYear} />
-      <ShopMakersSection shop={{ id: shop.id, name: shop.name }} artisans={storefront.artisans} artisanCount={storefront.artisanCount} />
+      <ShopMakersSection shop={{ id: shop.id, name: shop.name }} artisans={storefront.artisans} />
     </main>
   );
 }

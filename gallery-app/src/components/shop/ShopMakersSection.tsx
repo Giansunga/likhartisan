@@ -4,11 +4,10 @@ import type { ShopArtisan } from './shopStorefront';
 
 interface ShopMakersSectionProps {
   artisans: ShopArtisan[];
-  artisanCount: number;
   shop?: { id: string; name: string };
 }
 
-export default function ShopMakersSection({ artisans, artisanCount, shop }: ShopMakersSectionProps) {
+export default function ShopMakersSection({ artisans, shop }: ShopMakersSectionProps) {
   return (
     <section className="shop-section shop-makers" id="shop-makers" aria-labelledby="shop-makers-title">
       <div className="shop-container">
@@ -16,7 +15,6 @@ export default function ShopMakersSection({ artisans, artisanCount, shop }: Shop
           <div>
             <p className="shop-kicker">People behind the pottery</p>
             <h2 id="shop-makers-title">Meet the makers</h2>
-            <p>{artisanCount ? `${artisanCount} local ${artisanCount === 1 ? 'artisan contributes' : 'artisans contribute'} to this shop.` : 'Artisan profiles will be added as the shop grows.'}</p>
           </div>
         </div>
         {artisans.length ? (

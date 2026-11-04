@@ -113,11 +113,10 @@ describe('ShopPage', () => {
     expect(screen.queryByText('Phone')).not.toBeInTheDocument();
   });
 
-  it('renders all eight assigned makers in order with the loaded count', async () => {
+  it('renders all eight assigned makers in order', async () => {
     mocks.artisans = { data: Array.from({ length: 8 }, (_, i) => ({ id: `a${i}`, name: `Maker ${i + 1}`, specialty: 'Potter', cover_image: '' })), count: 8, error: null };
     renderShop();
     await screen.findByRole('heading', { name: 'Maker 8' });
-    expect(screen.getByText('8 local artisans contribute to this shop.')).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { name: /Maker [1-8]/ }).map(e => e.textContent)).toEqual(Array.from({ length: 8 }, (_, i) => `Maker ${i + 1}`));
   });
 
