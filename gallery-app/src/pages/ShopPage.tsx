@@ -24,7 +24,7 @@ type ActionStatus = { tone: 'success' | 'error'; text: string } | null;
 const SHOP_FIELDS = 'id, name, owner_name, email, description, about, image, location, created_at';
 const PRODUCT_FIELDS = 'id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at';
 const ARTISAN_FIELDS = 'id, name, specialty, experience, description, cover_image, location';
-const PRODUCTS_PER_PAGE = 4;
+const PRODUCTS_PER_PAGE = 8;
 const SHOP_SECTIONS = [
   { hash: '#shop-products', label: 'Pieces' },
   { hash: '#shop-story', label: 'Our story' },

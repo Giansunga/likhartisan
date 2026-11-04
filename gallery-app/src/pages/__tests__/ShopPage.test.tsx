@@ -121,21 +121,22 @@ describe('ShopPage', () => {
     expect(screen.queryByText('Phone')).not.toBeInTheDocument();
   });
 
-  it('loads four featured pieces per page and shows the remaining products', async () => {
+  it('loads eight featured pieces per page and shows the remaining products', async () => {
     const product = mocks.products.data[0];
-    mocks.products.data = Array.from({ length: 6 }, (_, index) => ({
+    mocks.products.data = Array.from({ length: 10 }, (_, index) => ({
       ...product, id: `product-${index + 1}`, name: `Piece ${index + 1}`,
     }));
-    mocks.products.count = 6;
+    mocks.products.count = 10;
     renderShop();
 
-    expect(await screen.findByText('Showing 1–4 of 6 products')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /^Piece [1-4]/ })).toHaveLength(4);
-    expect(screen.queryByRole('heading', { name: 'Piece 5' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Showing 1–8 of 10 products')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: /^Piece \d+$/ })).toHaveLength(8);
+    expect(screen.queryByRole('heading', { name: 'Piece 9' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
 
-    expect(await screen.findByText('Showing 5–6 of 6 products')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Piece 5' })).toBeInTheDocument();
+    expect(await screen.findByText('Showing 9–10 of 10 products')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Piece 9' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Piece 10' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Piece 1' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
     expect(screen.getByRole('heading', { name: 'Clay House' })).toBeInTheDocument();
