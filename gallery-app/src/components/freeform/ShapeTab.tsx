@@ -1,9 +1,15 @@
 import { useControlDraft } from './useControlDraft';
 import { useState } from 'react';
-import { DEFAULT_SHAPE_PARAMS_IN, formatInches, type ShapeParamsInches } from '../../lib/measurements';
+import { DEFAULT_SHAPE_PARAMS_IN, formatInches, hasShapeTarget, type ShapeControlKey, type ShapeParamsInches } from '../../lib/measurements';
 
 type ShapeParams = ShapeParamsInches;
-type ShapeControlKey = 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize' | 'curvature';
+const UNAVAILABLE: Record<ShapeControlKey, string> = {
+  height: 'No reliable base and top detected for this model.',
+  bodyWidth: 'No reliable body target for this model.',
+  neckWidth: 'No distinct neck detected. Use Rim Size for the opening.',
+  rimSize: 'No reliable mouth rim detected for this model.',
+  curvature: 'No reliable wall area detected for this model.',
+};
 
 const SLIDERS: {
   key: ShapeControlKey;
@@ -42,13 +48,18 @@ export default function ShapeTab({
   const draftParams = controls.draft;
   const baselineShape = baseShape || DEFAULTS;
   // A saved outlier extends the range once; dragging never changes its endpoints.
-  const baselineKey = JSON.stringify([modelKey, baselineShape]);
-  const makeRanges = () => Object.fromEntries(SLIDERS.map(({ key, min, max }) => [key,
-    key === 'curvature' ? { min, max } : {
-      min: Math.min(Math.max(0.01, baselineShape[key] * 0.5), shapeParams[key]),
-      max: Math.max(baselineShape[key] * 1.5, shapeParams[key]),
-    },
-  ]));
+  const baselineKey = JSON.stringify([modelKey, baselineShape, shapeParams.targetProfile]);
+  const makeRanges = () => Object.fromEntries(SLIDERS.map(({ key, min, max }) => {
+    const profile = shapeParams.targetProfile;
+    const limits = profile?.version === 2 ? profile.limits?.[key] : undefined;
+    if (key === 'curvature') return [key, { min: limits?.[0] ?? min, max: limits?.[1] ?? max }];
+    const lower = baselineShape[key] * (limits?.[0] ?? 0.5);
+    const upper = baselineShape[key] * (limits?.[1] ?? 1.5);
+    return [key, profile?.version === 2 ? { min: lower, max: upper } : {
+      min: Math.min(Math.max(0.01, lower), shapeParams[key]),
+      max: Math.max(upper, shapeParams[key]),
+    }];
+  }));
   const [rangeState, setRangeState] = useState(() => ({ key: baselineKey, ranges: makeRanges() }));
   let ranges = rangeState.ranges;
   if (rangeState.key !== baselineKey) {
@@ -69,11 +80,7 @@ export default function ShapeTab({
           const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
           const change = val - baseline;
           const profile = shapeParams.targetProfile;
-          const unavailable = s.key === 'bodyWidth' && profile?.body === null
-            ? 'No reliable body target for this model.'
-            : s.key === 'neckWidth' && profile?.neck === null
-              ? 'No distinct neck detected. Use Rim Size for the opening.'
-              : null;
+          const unavailable = hasShapeTarget(profile, s.key) ? null : UNAVAILABLE[s.key];
           return (
             <div key={s.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>

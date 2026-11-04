@@ -3,12 +3,81 @@ export const CANONICAL_MEASUREMENT_UNIT = 'in' as const;
 
 export type MeasurementUnit = 'cm' | 'in';
 
-export type ShapeTargetProfile = {
+type LegacyShapeTargetProfile = {
   version: 1;
   body: number | null;
   neck: number | null;
   rim: number;
 };
+
+export type ShapeTargetProfileV2 = {
+  version: 2;
+  base: number;
+  top: number;
+  foot: number;
+  body: number | null;
+  neck: number | null;
+  rim: number | null;
+  mouthStart: number | null;
+  lipStart?: number;
+  // Each band stores its start, peak, end, and the correction toward a straight wall.
+  curve: [start: number, peak: number, end: number, straighten: number][];
+  limits?: Partial<Record<ShapeControlKey, [min: number, max: number]>>;
+};
+
+export type ShapeTargetProfile = LegacyShapeTargetProfile | ShapeTargetProfileV2;
+export type ShapeControlKey = 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize' | 'curvature';
+
+export function hasShapeTarget(profile: ShapeTargetProfile | undefined, key: ShapeControlKey): boolean {
+  if (!profile) return true;
+  if (key === 'bodyWidth') return profile.body !== null;
+  if (key === 'neckWidth') return profile.neck !== null;
+  if (profile.version === 1) return true;
+  if (key === 'height') return profile.top > profile.base;
+  if (key === 'rimSize') return profile.rim !== null;
+  return profile.curve.length > 0;
+}
+
+function isNormalizedHeight(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function readTargetProfile(profile: ShapeTargetProfile | undefined): ShapeTargetProfile | undefined {
+  if (profile?.version === 1 && isNormalizedHeight(profile.rim) && profile.rim >= 0.9
+    && (profile.body === null || (isNormalizedHeight(profile.body) && profile.body >= 0.12 && profile.body < profile.rim - 0.06))
+    && (profile.neck === null || (profile.body !== null && isNormalizedHeight(profile.neck)
+      && profile.neck > profile.body + 0.05 && profile.neck < profile.rim - 0.02))) return { ...profile };
+  if (profile?.version !== 2 || !isNormalizedHeight(profile.base) || !isNormalizedHeight(profile.top)
+    || !isNormalizedHeight(profile.foot) || profile.base > profile.foot || profile.foot > profile.top
+    || (profile.body !== null && (!isNormalizedHeight(profile.body) || profile.body <= profile.foot || profile.body >= profile.top))
+    || (profile.neck !== null && (!isNormalizedHeight(profile.neck) || profile.body === null
+      || profile.neck <= profile.body || profile.neck >= profile.top))
+    || (profile.rim === null ? profile.mouthStart !== null : !isNormalizedHeight(profile.rim)
+      || !isNormalizedHeight(profile.mouthStart) || profile.mouthStart >= profile.rim || profile.rim > profile.top
+      || profile.mouthStart <= (profile.neck ?? profile.body ?? profile.foot))
+    || (profile.lipStart !== undefined && (!isNormalizedHeight(profile.lipStart) || profile.rim === null
+      || profile.mouthStart === null || profile.lipStart <= profile.mouthStart || profile.lipStart > profile.rim))
+    || !Array.isArray(profile.curve) || profile.curve.length > 2) return undefined;
+  const curve: ShapeTargetProfileV2['curve'] = [];
+  for (const band of profile.curve) {
+    if (!Array.isArray(band) || band.length !== 4) return undefined;
+    const [start, peak, end, amount] = band;
+    if (!isNormalizedHeight(start) || !isNormalizedHeight(peak) || !isNormalizedHeight(end)
+      || start < profile.foot || start >= peak || peak >= end || end > (profile.mouthStart ?? profile.top)
+      || !Number.isFinite(amount) || Math.abs(amount) > 0.25) return undefined;
+    curve.push([start, peak, end, amount]);
+  }
+  const limits: ShapeTargetProfileV2['limits'] = {};
+  for (const key of [...SHAPE_DIMENSION_KEYS, 'curvature'] as const) {
+    const range = profile.limits?.[key];
+    if (Array.isArray(range) && range.length === 2 && range.every(Number.isFinite)
+      && (key === 'curvature' ? range[0] >= 0 && range[0] <= 50 && range[1] >= 50 && range[1] <= 100
+        : range[0] >= 0.5 && range[0] <= 1 && range[1] >= 1 && range[1] <= 1.5)) {
+      limits[key] = [range[0], range[1]];
+    }
+  }
+  return { ...profile, curve, ...(Object.keys(limits).length ? { limits } : { limits: undefined }) };
+}
 
 export type ShapeParamsInches = {
   height: number;
@@ -128,13 +197,8 @@ export function normalizeShapeParams<T extends { height: number; bodyWidth: numb
     && SHAPE_DIMENSION_KEYS.every((key) => Number.isFinite(metadata.baseline?.[key]) && metadata.baseline![key] > 0)) {
     withMetadata.geometryMode = 'baseline';
     withMetadata.baseline = { ...metadata.baseline };
-    const profile = metadata.targetProfile;
-    if (profile?.version === 1 && Number.isFinite(profile.rim) && profile.rim >= 0.9 && profile.rim <= 1
-      && (profile.body === null || (Number.isFinite(profile.body) && profile.body >= 0.12 && profile.body < profile.rim - 0.06))
-      && (profile.neck === null || (profile.body !== null && Number.isFinite(profile.neck)
-        && profile.neck > profile.body + 0.05 && profile.neck < profile.rim - 0.02))) {
-      withMetadata.targetProfile = { ...profile };
-    }
+    const profile = readTargetProfile(metadata.targetProfile);
+    if (profile) withMetadata.targetProfile = profile;
   } else {
     delete withMetadata.geometryMode;
     delete withMetadata.baseline;

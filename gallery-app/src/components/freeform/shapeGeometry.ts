@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { sectionScale } from './calibrateModel';
 import { computePatternNormals } from './exteriorPatternMask';
-import type { ShapeParamsInches } from '../../lib/measurements';
+import type { ShapeParamsInches, ShapeTargetProfileV2 } from '../../lib/measurements';
 
 export type ShapeParams = Omit<ShapeParamsInches, 'unit'> & { unit?: 'cm' | 'in' };
 type Shape = ShapeParams;
@@ -123,7 +123,49 @@ export function cacheProfileCoefficients(snapshot: GeometrySnapshot, bounds: Mod
 
 export function getShapeHeightScale(shape: ShapeParams): number {
   const baseline = shape.geometryMode === 'baseline' ? shape.baseline : undefined;
+  const profile = shape.targetProfile;
+  if (baseline && profile?.version === 2) {
+    if (profile.top <= profile.base) return 1;
+    return THREE.MathUtils.clamp(shape.height / baseline.height, ...(profile.limits?.height ?? [0.5, 1.5]));
+  }
   return THREE.MathUtils.clamp(shape.height / (baseline?.height ?? (shape.unit === 'in' ? 25 / 2.54 : 25)), 0.35, 1.8);
+}
+
+export function getShapeHeightPivot(shape: ShapeParams, bounds: ModelBounds): number {
+  return shape.geometryMode === 'baseline' && shape.targetProfile?.version === 2
+    ? bounds.minY + bounds.rangeY * shape.targetProfile.base : bounds.centerY;
+}
+
+function targetRadialScale(shape: ShapeParams, baseline: NonNullable<ShapeParams['baseline']>, profile: ShapeTargetProfileV2) {
+  const delta = (key: 'bodyWidth' | 'neckWidth' | 'rimSize') =>
+    THREE.MathUtils.clamp(shape[key] / baseline[key], ...(profile.limits?.[key] ?? [0.5, 1.5])) - 1;
+  const bodyDelta = delta('bodyWidth');
+  const neckDelta = delta('neckWidth');
+  const rimDelta = delta('rimSize');
+  const curvature = (THREE.MathUtils.clamp(shape.curvature, ...(profile.limits?.curvature ?? [0, 100])) - 50) / 50;
+  const { body, neck, foot, rim, mouthStart, top } = profile;
+  const lip = profile.lipStart ?? rim;
+  return (t: number) => {
+    let scale = 1;
+    const lipWeight = lip !== null && mouthStart !== null ? smoothstep(mouthStart, lip, t) : 0;
+    if (body !== null) {
+      if (t <= body) {
+        scale += bodyDelta * smoothstep(foot, body, t);
+      } else if (neck !== null && t < neck) {
+        scale += THREE.MathUtils.lerp(bodyDelta, neckDelta, smoothstep(body, neck, t));
+      } else {
+        const upperDelta = neck !== null ? neckDelta : bodyDelta;
+        const upperWeight = lip !== null ? 1 - lipWeight : 1 - smoothstep(neck ?? body, top, t);
+        scale += upperDelta * upperWeight;
+      }
+    }
+    scale += rimDelta * lipWeight;
+    for (const [start, peak, end, straighten] of profile.curve) {
+      const change = curvature < 0 ? -curvature * straighten : curvature * 0.12;
+      scale += change * localizedWeight(t, start, peak, end);
+    }
+    return scale;
+  };
 }
 
 export function applyShapeGeometry(
@@ -139,21 +181,24 @@ export function applyShapeGeometry(
     bodyWidth: shapeParams.bodyWidth * factor, neckWidth: shapeParams.neckWidth * factor, rimSize: shapeParams.rimSize * factor };
   const relativeBaseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
   const baselineFactor = factor;
-  const hScale = THREE.MathUtils.clamp(geometryShapeParams.height / (relativeBaseline ? relativeBaseline.height * baselineFactor : 25), 0.35, 1.8);
+  const hScale = getShapeHeightScale(shapeParams);
   const bodyDelta = normalizeParam(geometryShapeParams.bodyWidth, relativeBaseline ? relativeBaseline.bodyWidth * baselineFactor : 20);
   const neckDelta = normalizeParam(geometryShapeParams.neckWidth, relativeBaseline ? relativeBaseline.neckWidth * baselineFactor : 15);
   const rimDelta = normalizeParam(geometryShapeParams.rimSize, relativeBaseline ? relativeBaseline.rimSize * baselineFactor : 12);
   const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
   const profile = relativeBaseline ? shapeParams.targetProfile : undefined;
+  const legacyProfile = profile?.version === 1 ? profile : undefined;
+  const radialScale = profile?.version === 2 && relativeBaseline ? targetRadialScale(shapeParams, relativeBaseline, profile) : undefined;
   const relativeAnchors = relativeBaseline && !profile ? ([
       [sections.body, geometryShapeParams.bodyWidth / (relativeBaseline.bodyWidth * baselineFactor)],
       [sections.neck, geometryShapeParams.neckWidth / (relativeBaseline.neckWidth * baselineFactor)],
       [sections.rim, geometryShapeParams.rimSize / (relativeBaseline.rimSize * baselineFactor)],
     ] as [number, number][]).sort((a, b) => a[0] - b[0]) : null;
 
-  const { minY, rangeY, centerX, centerY, centerZ } = bounds;
-  const rimStart = profile ? ((profile.neck ?? profile.body ?? 0.82) + profile.rim) / 2 : 0;
-  const neckStart = profile?.body != null && profile.neck !== null ? (profile.body + profile.neck) / 2 : 0;
+  const { minY, rangeY, centerX, centerZ } = bounds;
+  const heightPivot = getShapeHeightPivot(shapeParams, bounds);
+  const rimStart = legacyProfile ? ((legacyProfile.neck ?? legacyProfile.body ?? 0.82) + legacyProfile.rim) / 2 : 0;
+  const neckStart = legacyProfile?.body != null && legacyProfile.neck !== null ? (legacyProfile.body + legacyProfile.neck) / 2 : 0;
   const { rootPositions, profileCoefficients, rootToLocal } = snapshot;
   const pos = geometry.getAttribute('position');
   const rootVertex = new THREE.Vector3();
@@ -165,14 +210,16 @@ export function applyShapeGeometry(
       ? sectionScale(t, relativeAnchors) + profileCoefficients[k + 3] * curvatureDelta
       : 1 + profileCoefficients[k] * bodyDelta + profileCoefficients[k + 1] * neckDelta
         + profileCoefficients[k + 2] * rimDelta + profileCoefficients[k + 3] * curvatureDelta;
-    if (profile) {
-      scaleXZ = 1 + rimDelta * smoothstep(rimStart, profile.rim, t)
+    if (radialScale) {
+      scaleXZ = radialScale(t);
+    } else if (legacyProfile) {
+      scaleXZ = 1 + rimDelta * smoothstep(rimStart, legacyProfile.rim, t)
         + profileCoefficients[k + 3] * curvatureDelta;
-      if (profile.body !== null) scaleXZ += bodyDelta * localizedWeight(t, 0.06, profile.body, profile.neck ?? profile.rim);
-      if (profile.neck !== null) scaleXZ += neckDelta * localizedWeight(t, neckStart, profile.neck, profile.rim);
+      if (legacyProfile.body !== null) scaleXZ += bodyDelta * localizedWeight(t, 0.06, legacyProfile.body, legacyProfile.neck ?? legacyProfile.rim);
+      if (legacyProfile.neck !== null) scaleXZ += neckDelta * localizedWeight(t, neckStart, legacyProfile.neck, legacyProfile.rim);
     }
     scaleXZ = THREE.MathUtils.clamp(scaleXZ, 0.25, 1.8);
-    rootVertex.set(centerX + (ox - centerX) * scaleXZ, centerY + (oy - centerY) * hScale,
+    rootVertex.set(centerX + (ox - centerX) * scaleXZ, heightPivot + (oy - heightPivot) * hScale,
       centerZ + (oz - centerZ) * scaleXZ).applyMatrix4(rootToLocal);
     pos.setXYZ(i, rootVertex.x, rootVertex.y, rootVertex.z);
   }

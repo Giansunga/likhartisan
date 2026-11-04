@@ -83,4 +83,24 @@ describe('design request snapshots', () => {
       version: 1, body: 0.75, neck: null, rim: 0.98,
     });
   });
+
+  it('round-trips version 2 target bands and limits in a design request', () => {
+    const shape = shapeFromModelBase({ height: 8, bodyWidth: 8, neckWidth: 5, rimSize: 6 });
+    shape.targetProfile = {
+      version: 2, base: 0, top: 1, foot: 0.04, body: 0.8, neck: null, rim: 0.975,
+      mouthStart: 0.9, curve: [[0.04, 0.42, 0.8, -0.1]], limits: { curvature: [0, 78] },
+    };
+    const snapshot = createDesignRequestSnapshot({
+      model: { id: 'model-2', name: 'Bowl', file: '/bowl.glb', thumbnail: '', category: 'Bowl' },
+      shape,
+      material: { finish: 'raw_clay', color: '#BE734F' },
+      decoration: { patternId: '', placement: 'middle', scale: 1, color: '#7A3E12', effect: 'painted' },
+      attachments: [], dimensions: { heightIn: 8, widthIn: 8, unit: 'in' },
+      estimate: { price: 100, productionDays: 1 },
+    });
+    const expected = structuredClone(shape.targetProfile);
+    shape.targetProfile.curve[0][3] = 0;
+    shape.targetProfile.limits!.curvature![1] = 100;
+    expect(normalizeDesignRequestSnapshot(JSON.parse(JSON.stringify(snapshot))).shape.targetProfile).toEqual(expected);
+  });
 });

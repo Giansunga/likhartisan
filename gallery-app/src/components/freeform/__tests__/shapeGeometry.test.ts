@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { shapeFromModelBase } from '../../../lib/measurements';
+import { shapeFromModelBase, type ShapeTargetProfileV2 } from '../../../lib/measurements';
 import { resolveShapeTargets } from '../calibrateModel';
 import { applyShapeGeometry, cacheProfileCoefficients, getBoundsFromSnapshots, getGeometrySnapshot, isUneditedShape, restoreSourceGeometry } from '../shapeGeometry';
 
@@ -125,5 +125,67 @@ describe('model-specific width targets', () => {
       expect(profile.body).not.toBeNull();
       expect(profile.neck).toBeNull();
     }
+  });
+
+  it('derives an uneven mouth and ignores a separate mesh above the vessel', () => {
+    const { mesh, root } = createVessel([[0, 0.55], [0.6, 0.9], [1, 1]]);
+    const positions = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i);
+      const angle = Math.atan2(positions.getZ(i), positions.getX(i));
+      positions.setY(i, y - Math.max(0, (y - 0.85) / 0.15) * 0.12 * (0.5 + 0.5 * Math.cos(4 * angle)));
+    }
+    const detached = new THREE.Mesh(new THREE.SphereGeometry(0.05));
+    detached.position.y = 2;
+    root.add(detached);
+    const profile = resolveShapeTargets(root, undefined, '/scalloped.glb');
+    expect(profile.version).toBe(2);
+    expect(profile.top).toBeCloseTo(1 / 2.05);
+    expect(profile.rim).toBeLessThan(profile.top * 0.92);
+    expect(profile.rim).toBeGreaterThan(profile.body!);
+  });
+
+  it('grounds height edits and keeps the body, neck, and lip reference widths during curvature edits', () => {
+    const { mesh, root } = createVessel([
+      [0, 0.55], [0.1, 0.6], [0.3, 0.9], [0.5, 1], [0.8, 0.5], [0.9, 0.6], [1, 0.66],
+    ]);
+    const targetProfile: ShapeTargetProfileV2 = {
+      version: 2, base: 0, top: 1, foot: 0.1, body: 0.5, neck: 0.8, mouthStart: 0.85, rim: 0.9,
+      curve: [[0.1, 0.3, 0.5, -0.1]],
+    };
+    const base = { ...shapeFromModelBase({ height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 6 }), targetProfile };
+    const snapshot = getGeometrySnapshot(mesh, root)!;
+    const bounds = getBoundsFromSnapshots([snapshot]);
+    cacheProfileCoefficients(snapshot, bounds);
+    const update = (change: Partial<typeof base>) =>
+      applyShapeGeometry(mesh.geometry, snapshot, bounds, { ...base, ...change }, { body: 0.45, neck: 0.8, rim: 0.98 });
+    const indexAt = (t: number) => snapshot.rootPositions.findIndex((y, index) => index % 3 === 1 && Math.abs(y - t) < 1e-5);
+    const widthAt = (t: number) => {
+      const index = indexAt(t);
+      const edited = mesh.geometry.getAttribute('position').array;
+      return Math.hypot(edited[index - 1], edited[index + 1]);
+    };
+    update({ height: 15 });
+    const positions = mesh.geometry.getAttribute('position').array;
+    expect(positions[indexAt(0)]).toBeCloseTo(0, 6);
+    expect(positions[indexAt(1)]).toBeCloseTo(1.5, 6);
+    expect(widthAt(0.5)).toBeCloseTo(1, 6);
+
+    update({ curvature: 0 });
+    expect(widthAt(0.3)).toBeCloseTo(0.81, 6);
+    update({ curvature: 100 });
+    expect(widthAt(0.3)).toBeCloseTo(1.008, 6);
+    expect(widthAt(0.1)).toBeCloseTo(0.6, 6);
+    expect(widthAt(0.5)).toBeCloseTo(1, 6);
+    expect(widthAt(0.8)).toBeCloseTo(0.5, 6);
+    expect(widthAt(0.9)).toBeCloseTo(0.6, 6);
+
+    update({ rimSize: 9 });
+    expect(widthAt(0.5)).toBeCloseTo(1, 6);
+    expect(widthAt(0.8)).toBeCloseTo(0.5, 6);
+    expect(widthAt(0.9)).toBeCloseTo(0.9, 6);
+    expect(widthAt(1)).toBeCloseTo(0.99, 6);
+    update({});
+    expect(positions).toEqual(snapshot.localPositions);
   });
 });

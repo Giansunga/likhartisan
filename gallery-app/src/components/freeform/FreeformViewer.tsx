@@ -25,7 +25,7 @@ import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 import type { ShapeTargetProfile } from '../../lib/measurements';
 import { getSectionAnchors, resolveShapeTargets } from './calibrateModel';
-import { applyShapeGeometry, getShapeHeightScale, getGeometrySnapshot, getBoundsFromSnapshots, cacheProfileCoefficients, type GeometrySnapshot, type ModelBounds, type ShapeParams } from './shapeGeometry';
+import { applyShapeGeometry, getShapeHeightScale, getShapeHeightPivot, getGeometrySnapshot, getBoundsFromSnapshots, cacheProfileCoefficients, type GeometrySnapshot, type ModelBounds, type ShapeParams } from './shapeGeometry';
 import { attachmentDesignRevision, validateAttachmentDesign, type AttachmentAnalysis } from './attachmentValidation';
 import { captureException } from '../../lib/sentry';
 
@@ -292,7 +292,8 @@ export function FreeformScene({
     const shapeChanged = appliedShapeRef.current !== shapeKey;
     const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
     const hScale = getShapeHeightScale(shapeParams);
-    const { minY, rangeY, centerY } = modelBoundsRef.current;
+    const { minY, rangeY } = modelBoundsRef.current;
+    const centerY = getShapeHeightPivot(shapeParams, modelBoundsRef.current);
     const decorProjection = getDecorationProjection(
       { minY, rangeY, centerY },
       hScale,

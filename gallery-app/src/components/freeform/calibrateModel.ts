@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PublicGLTFLoader } from '../../lib/publicModelLoader';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import type { ShapeTargetProfile } from '../../lib/measurements';
+import type { ShapeTargetProfileV2 } from '../../lib/measurements';
 
 type Dimensions = { height: number; bodyWidth: number; neckWidth: number; rimSize: number };
 type Point = THREE.Vector3;
@@ -10,74 +10,202 @@ type Triangle = [Point, Point, Point];
 // glTF stores coordinates in meters. The admin form records physical inches.
 const METERS_PER_INCH = 0.0254;
 
-const targetOverrides: Readonly<Record<string, ShapeTargetProfile>> = {
+const targetOverrides: Readonly<Record<string, Partial<ShapeTargetProfileV2>>> = {
   // Mini U-Shape Vase: its continuous wall opens straight into the rim.
   '9de75e12-fd41-43e7-89c0-6f6a1e51def1/1790400086755_8d06f3b5.glb': {
-    version: 1, body: 0.8125, neck: null, rim: 0.98,
+    body: 0.8125, neck: null,
+  },
+  // The coarse lip spans 94–100% of the Jarlet's height.
+  '14705771-7788-4c5b-b18d-42e1fdc3e059/1790431315660_d443df7f.glb': {
+    rim: 0.94, lipStart: 0.935,
+  },
+  // Full lip movement starts below the mouth reference plane so the
+  // interior faces crossing that plane scale with the exterior lip.
+  'ac003cd7-178d-423c-8672-3a4ca742b23d/1790220280284_bd2255cc.glb': {
+    lipStart: 0.953,
+  },
+  'eeb89cd2-85bb-4f8e-9605-935d7c25a800/original-eeb89cd2-85bb-4f8e-9605-935d7c25a800-1d42669d00ce6aa3.glb': {
+    foot: 0.14,
   },
 };
-const detectedTargets = new WeakMap<THREE.Group, ShapeTargetProfile>();
+const detectedTargets = new WeakMap<THREE.Group, { asset: string; profile: ShapeTargetProfileV2 }>();
 
-export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefined, assetUrl: string): ShapeTargetProfile {
+export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefined, assetUrl: string): ShapeTargetProfileV2 {
   const assetName = assetUrl.split(/[?#]/)[0].split('/').pop();
-  const override = targetOverrides[`${modelId}/${assetName}`];
-  if (override) return override;
+  const asset = `${modelId}/${assetName}`;
+  const override = targetOverrides[asset];
   const cached = detectedTargets.get(scene);
-  if (cached) return cached;
+  if (cached?.asset === asset) return cached.profile;
 
-  const triangles = trianglesAtWorldPositions(scene);
+  const allTriangles = trianglesAtWorldPositions(scene);
+  const allBounds = boundsOf(allTriangles);
+  const triangles = mainVessel(allTriangles, allBounds);
+  const bounds = boundsOf(triangles);
+  const totalHeight = allBounds.max.y - allBounds.min.y;
+  const height = bounds.max.y - bounds.min.y;
+  const profile: ShapeTargetProfileV2 = {
+    version: 2, base: 0, top: 0, foot: 0, body: null, neck: null, rim: null, mouthStart: null, curve: [],
+  };
+  if (Number.isFinite(height) && height > 0 && Number.isFinite(totalHeight)) {
+    const toRootHeight = (t: number) => THREE.MathUtils.clamp((bounds.min.y + height * t - allBounds.min.y) / totalHeight, 0, 1);
+    profile.base = toRootHeight(0);
+    profile.top = toRootHeight(1);
+    const rim = override?.rim === undefined ? findMouthBand(triangles, bounds) : override.rim;
+    detectWallTargets(triangles, bounds, rim, profile, toRootHeight, override);
+  }
+  detectedTargets.set(scene, { asset, profile });
+  return profile;
+}
+
+function boundsOf(triangles: Triangle[]) {
   const bounds = new THREE.Box3();
   for (const triangle of triangles) for (const vertex of triangle) bounds.expandByPoint(vertex);
+  return bounds;
+}
+
+// Weld coincident vertices for connectivity across GLB material and UV seams.
+// Weight components by surface area so a dense, detached accessory cannot win.
+function mainVessel(triangles: Triangle[], bounds: THREE.Box3): Triangle[] {
+  if (!triangles.length) return [];
+  const epsilon = bounds.getSize(new THREE.Vector3()).length() * 1e-6 || 1e-8;
+  const parents = Int32Array.from(triangles, (_, i) => i);
+  const firstOwner = new Map<string, number>();
+  function root(index: number): number {
+    while (parents[index] !== index) {
+      parents[index] = parents[parents[index]];
+      index = parents[index];
+    }
+    return index;
+  }
+  triangles.forEach((triangle, i) => {
+    for (const p of triangle) {
+      const key = `${Math.round(p.x / epsilon)},${Math.round(p.y / epsilon)},${Math.round(p.z / epsilon)}`;
+      const owner = firstOwner.get(key);
+      if (owner === undefined) firstOwner.set(key, i);
+      else parents[root(i)] = root(owner);
+    }
+  });
+  const areas = new Float64Array(triangles.length);
+  const edgeA = new THREE.Vector3();
+  const edgeB = new THREE.Vector3();
+  let largest = 0;
+  triangles.forEach(([a, b, c], i) => {
+    const component = root(i);
+    areas[component] += edgeA.subVectors(b, a).cross(edgeB.subVectors(c, a)).length();
+    if (areas[component] > areas[largest]) largest = component;
+  });
+  return triangles.filter((_, i) => root(i) === largest);
+}
+
+// The lowest point of the upper envelope across azimuths keeps a scalloped
+// or tilted lip together. A sector gap or a central cap leaves Rim unavailable.
+function findMouthBand(triangles: Triangle[], bounds: THREE.Box3): number | null {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const sectors = Array<number>(24).fill(-Infinity);
+  const mouthRadius = Math.min(size.x, size.z) * 0.12;
+  for (const triangle of triangles) for (const point of triangle) {
+    const x = point.x - center.x;
+    const z = point.z - center.z;
+    if (Math.hypot(x, z) < mouthRadius) continue;
+    const angle = Math.atan2(z, x) / (Math.PI * 2) + 0.5;
+    const sector = Math.floor(angle * sectors.length) % sectors.length;
+    sectors[sector] = Math.max(sectors[sector], (point.y - bounds.min.y) / size.y);
+  }
+  const bottom = Math.min(...sectors);
+  if (bottom < 0.65 || !Number.isFinite(bottom)) return null;
+  const cap = triangles.some(([a, b, c]) =>
+    [a, b, c].every((p) => p.y > bounds.min.y + size.y * (bottom - 0.025))
+      && Math.hypot((a.x + b.x + c.x) / 3 - center.x, (a.z + b.z + c.z) / 3 - center.z) < mouthRadius * 0.5);
+  return cap ? null : Math.min(0.985, bottom - 0.025);
+}
+
+function detectWallTargets(
+  triangles: Triangle[], bounds: THREE.Box3, rim: number | null, profile: ShapeTargetProfileV2,
+  toRootHeight: (height: number) => number, override?: Partial<ShapeTargetProfileV2>,
+) {
   const height = bounds.max.y - bounds.min.y;
-  let profile: ShapeTargetProfile = { version: 1, body: null, neck: null, rim: 0.98 };
-  if (Number.isFinite(height) && height > 0) {
-    const steps = 80;
-    const slices: Triangle[][] = Array.from({ length: steps - 1 }, () => []);
-    const sliceY = slices.map((_, i) => bounds.min.y + height * (i + 1) / steps);
-    for (const triangle of triangles) {
-      const [a, b, c] = triangle;
-      const low = Math.min(a.y, b.y, c.y);
-      const high = Math.max(a.y, b.y, c.y);
-      const first = Math.max(0, Math.floor((low - bounds.min.y) / height * steps) - 1);
-      const last = Math.min(slices.length - 1, Math.ceil((high - bounds.min.y) / height * steps) - 1);
-      for (let i = first; i <= last; i++) {
-        if (sliceY[i] >= low && sliceY[i] <= high) slices[i].push(triangle);
-      }
-    }
-    const widths = slices.map((triangles, i) => sectionWidth(triangles, sliceY[i]));
-    const smooth = widths.map((width, i) =>
-      (widths[i - 1] ?? width) * 0.25 + width * 0.5 + (widths[i + 1] ?? width) * 0.25);
-    // A neck must follow a shoulder and either open toward the rim or
-    // remain narrow for several slices. A tapered upper wall alone is not a neck.
-    let neckIndex: number | null = null;
-    let neckScore = 0;
-    for (let i = 32; i <= 73; i++) {
-      const width = smooth[i];
-      const shoulder = Math.max(...smooth.slice(14, i - 4));
-      const upper = smooth.slice(i + 1, Math.min(i + 6, smooth.length));
-      if (width <= 0 || shoulder < width * 1.12 || smooth[i - 3] < width * 0.99
-        || upper.some((sample) => sample < width * 0.98)
-        || Math.min(...upper.slice(0, 2)) > width * 1.12) continue;
-      const score = (shoulder - width) / shoulder;
-      if (score > neckScore + 0.005) {
-        neckIndex = i;
-        neckScore = score;
-      }
-    }
-    const bodyEnd = neckIndex === null ? 68 : neckIndex - 5;
-    const bodyWidths = smooth.slice(12, bodyEnd + 1).map((width, offset) => {
-      const i = offset + 12;
-      return Math.min(width, smooth[i - 2], smooth[i + 2]);
-    });
-    const widest = Math.max(...bodyWidths);
-    if (widest > 0 && smooth[77] > 0) {
-      const comparable = bodyWidths.flatMap((width, i) => width >= widest * 0.985 ? [i + 12] : []);
-      const bodyIndex = comparable[Math.floor(comparable.length / 2)];
-      profile = { ...profile, body: (bodyIndex + 1) / steps, neck: neckIndex === null ? null : (neckIndex + 1) / steps };
+  const steps = 80;
+  const slices: Triangle[][] = Array.from({ length: steps - 1 }, () => []);
+  const sliceY = slices.map((_, i) => bounds.min.y + height * (i + 1) / steps);
+  for (const triangle of triangles) {
+    const [a, b, c] = triangle;
+    const low = Math.min(a.y, b.y, c.y);
+    const high = Math.max(a.y, b.y, c.y);
+    const first = Math.max(0, Math.floor((low - bounds.min.y) / height * steps) - 1);
+    const last = Math.min(slices.length - 1, Math.ceil((high - bounds.min.y) / height * steps) - 1);
+    for (let i = first; i <= last; i++) {
+      if (sliceY[i] >= low && sliceY[i] <= high) slices[i].push(triangle);
     }
   }
-  detectedTargets.set(scene, profile);
-  return profile;
+  const widths = slices.map((triangles, i) => sectionWidth(triangles, sliceY[i]));
+  const smooth = widths.map((width, i) =>
+    (widths[i - 1] ?? width) * 0.25 + width * 0.5 + (widths[i + 1] ?? width) * 0.25);
+  // A neck must follow a shoulder and either open toward the rim or
+  // remain narrow for several slices. A tapered upper wall alone is not a neck.
+  let neckIndex: number | null = null;
+  let neckScore = 0;
+  for (let i = 32; i <= Math.min(73, Math.floor(((rim ?? 1) - 0.04) * steps) - 1); i++) {
+    const width = smooth[i];
+    const shoulder = Math.max(...smooth.slice(14, i - 4));
+    const upper = smooth.slice(i + 1, Math.min(i + 6, smooth.length));
+    if (width <= 0 || shoulder < width * 1.12 || smooth[i - 3] < width * 0.99
+      || upper.some((sample) => sample < width * 0.98)
+      || Math.min(...upper.slice(0, 2)) > width * 1.12) continue;
+    const score = (shoulder - width) / shoulder;
+    if (score > neckScore + 0.005) {
+      neckIndex = i;
+      neckScore = score;
+    }
+  }
+  const bodyEnd = Math.min(neckIndex === null ? 68 : neckIndex - 5, Math.floor(((rim ?? 1) - 0.075) * steps) - 1);
+  const bodyWidths = smooth.slice(12, bodyEnd + 1).map((width, offset) => {
+    const i = offset + 12;
+    return Math.min(width, smooth[i - 2], smooth[i + 2]);
+  });
+  const widest = Math.max(...bodyWidths);
+  const footIndex = smooth.slice(2, 10).findIndex((width, i) =>
+    width > 0 && Math.abs(smooth[i + 3] - width) < widest * 0.04);
+  profile.foot = override?.foot ?? toRootHeight((footIndex < 0 ? 5 : footIndex + 3) / steps);
+  if (widest > 0) {
+    const comparable = bodyWidths.flatMap((width, i) => width >= widest * 0.985 ? [i + 12] : []);
+    const bodyIndex = comparable[Math.floor(comparable.length / 2)];
+    profile.body = toRootHeight((bodyIndex + 1) / steps);
+    profile.neck = neckIndex === null ? null : toRootHeight((neckIndex + 1) / steps);
+  }
+  if (override?.body !== undefined) profile.body = override.body;
+  if (override?.neck !== undefined) profile.neck = override.neck;
+  if (rim !== null) {
+    const rimHeight = toRootHeight(rim);
+    const wall = profile.neck ?? profile.body ?? profile.foot;
+    if (rimHeight > wall + 0.02) {
+      profile.rim = rimHeight;
+      const lip = override?.lipStart ?? rimHeight;
+      profile.mouthStart = THREE.MathUtils.lerp(wall, lip, profile.neck === null ? 0.2 : 0.35);
+      if (override?.lipStart !== undefined) profile.lipStart = lip;
+    }
+  }
+  if (profile.body === null) return;
+  const upperWall = profile.neck === null
+    ? profile.mouthStart ?? toRootHeight(0.9)
+    : (profile.body + profile.neck) / 2;
+  const widthAt = (t: number) => {
+    const local = (t - profile.base) / (profile.top - profile.base);
+    const index = THREE.MathUtils.clamp(local * steps - 1, 0, smooth.length - 1);
+    return THREE.MathUtils.lerp(smooth[Math.floor(index)], smooth[Math.ceil(index)], index % 1);
+  };
+  for (const [start, end] of [[profile.foot, profile.body], [profile.body, upperWall]]) {
+    const span = profile.top - profile.base;
+    // Very short upper-wall bands can sit entirely between vertex rings.
+    // Keep rounding on the main wall instead of creating a small bulge at the shoulder.
+    if (end - start < span * (start === profile.body ? 0.12 : 0.075)) continue;
+    const peak = (start + end) / 2;
+    const original = widthAt(peak);
+    if (original <= 0) continue;
+    const chord = (widthAt(start) + widthAt(end)) / 2;
+    profile.curve.push([start, peak, end, THREE.MathUtils.clamp(chord / original - 1, -0.2, 0.2)]);
+  }
+  if (override?.limits) profile.limits = override.limits;
 }
 
 function trianglesAtWorldPositions(scene: THREE.Group): Triangle[] {

@@ -33,6 +33,13 @@ describe('model baseline and mock estimate', () => {
       .toEqual({ price: 1110, productionDays: 5 });
   });
 
+  it('prices active width edits and ignores unavailable neck and rim adjustments', () => {
+    expect(estimate({ shape: {
+      ...shape, bodyWidth: 9, neckWidth: 6, rimSize: 5,
+      targetProfile: { version: 2, base: 0, top: 1, foot: 0.05, body: 0.7, neck: null, rim: null, mouthStart: null, curve: [] },
+    } })).toEqual({ price: 1310, productionDays: 6 });
+  });
+
   it('applies finish, pattern, and existing attachment adjustments independently', () => {
     expect(estimate({ material: { ...raw, finish: 'glazed' } })).toEqual({ price: 1450, productionDays: 7 });
     expect(estimate({ decoration: { ...DEFAULT_DECORATION, patternId: 'wave', effect: 'engraved', placement: 'full' } }))

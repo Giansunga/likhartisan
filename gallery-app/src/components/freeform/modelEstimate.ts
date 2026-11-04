@@ -1,6 +1,6 @@
 import type { DecorationParams } from './decor';
 import type { MaterialParams } from './materials';
-import type { ShapeParamsInches } from '../../lib/measurements';
+import { hasShapeTarget, type ShapeParamsInches } from '../../lib/measurements';
 
 export type ModelBase = {
   height: number;
@@ -51,10 +51,12 @@ export function estimateModelDesign(input: {
   attachmentDays: number;
 }) {
   const { base, shape, material, decoration } = input;
-  const heightDelta = shape.height - base.height;
-  const widthDelta = shape.bodyWidth - base.bodyWidth;
+  const delta = (key: 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize') =>
+    hasShapeTarget(shape.targetProfile, key) ? shape[key] - base[key] : 0;
+  const heightDelta = delta('height');
+  const widthDelta = delta('bodyWidth');
   const shapePrice = heightDelta * 80 + widthDelta * 60
-    + (shape.neckWidth - base.neckWidth) * 30 + (shape.rimSize - base.rimSize) * 30;
+    + delta('neckWidth') * 30 + delta('rimSize') * 30;
   const finishPrice = material.finish === 'glazed' ? 200
     : material.finish === 'acrylic_paint' ? 100
       : material.finish === 'water_paint' ? 50 : 0;

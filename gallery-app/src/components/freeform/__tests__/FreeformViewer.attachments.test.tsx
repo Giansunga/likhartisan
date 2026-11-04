@@ -69,7 +69,9 @@ function expectMountedOnCurrentSurface(group: THREE.Group, attachments: Attachme
 
 describe('submitted handle placement', () => {
   it('mounts a read-only handle on the shaped surface on the first frame and after a shape update', async () => {
-    const targeted: ShapeParams = { ...shape, targetProfile: { version: 1, body: 0.68, neck: null, rim: 0.98 } };
+    const targeted: ShapeParams = { ...shape, bodyWidth: 9, rimSize: 9, neckWidth: 6, targetProfile: {
+      version: 2, base: 0, top: 1, foot: 0.06, body: 0.68, neck: null, rim: 0.98, mouthStart: 0.83, curve: [],
+    } };
     const editor = await viewer(false, [selection], targeted);
     editor.frame(); editor.frame();
     const saved = JSON.parse(JSON.stringify(editor.analyzed.mock.calls.at(-1)![0].attachments)) as AttachmentSelection[];
@@ -77,7 +79,7 @@ describe('submitted handle placement', () => {
     preview.frame();
     expectMountedOnCurrentSurface(preview.group(), saved);
     const originalMount = preview.group().children[1].position.clone();
-    await preview.render({ ...targeted, bodyWidth: 9.9 });
+    await preview.render({ ...targeted, bodyWidth: 8.9 });
     preview.frame();
     expectMountedOnCurrentSurface(preview.group(), saved);
     expect(preview.group().children[1].position.distanceTo(originalMount)).toBeGreaterThan(0.00001);

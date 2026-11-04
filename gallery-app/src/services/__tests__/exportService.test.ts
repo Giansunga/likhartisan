@@ -89,8 +89,11 @@ describe('exportSceneToGLB finish output', () => {
     source.add(mesh);
     const baseline = shapeFromModelBase({ height: 8, bodyWidth: 8, neckWidth: 5, rimSize: 6 });
     const shape: ShapeParams = {
-      ...baseline, bodyWidth: 11.8,
-      targetProfile: { version: 1, body: 0.81, neck: null, rim: 0.98 },
+      ...baseline, height: 10, bodyWidth: 11.8, rimSize: 7.2, curvature: 70,
+      targetProfile: {
+        version: 2, base: 0, top: 1, foot: 0.04, body: 0.81, neck: null,
+        rim: 0.98, mouthStart: 0.9, curve: [[0.04, 0.4, 0.81, -0.05]],
+      },
     };
     await exportSceneToGLB(source, shape, { finish: 'raw_clay', color: '#BE734F' });
 
