@@ -25,7 +25,12 @@ export type ShapeTargetProfileV2 = {
   limits?: Partial<Record<ShapeControlKey, [min: number, max: number]>>;
 };
 
-export type ShapeTargetProfile = LegacyShapeTargetProfile | ShapeTargetProfileV2;
+export type ShapeTargetProfileV3 = Omit<ShapeTargetProfileV2, 'version'> & {
+  version: 3;
+  neckKind: 'natural' | 'upperWall' | null;
+};
+
+export type ShapeTargetProfile = LegacyShapeTargetProfile | ShapeTargetProfileV2 | ShapeTargetProfileV3;
 export type ShapeControlKey = 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize' | 'curvature';
 
 export function hasShapeTarget(profile: ShapeTargetProfile | undefined, key: ShapeControlKey): boolean {
@@ -47,7 +52,7 @@ function readTargetProfile(profile: ShapeTargetProfile | undefined): ShapeTarget
     && (profile.body === null || (isNormalizedHeight(profile.body) && profile.body >= 0.12 && profile.body < profile.rim - 0.06))
     && (profile.neck === null || (profile.body !== null && isNormalizedHeight(profile.neck)
       && profile.neck > profile.body + 0.05 && profile.neck < profile.rim - 0.02))) return { ...profile };
-  if (profile?.version !== 2 || !isNormalizedHeight(profile.base) || !isNormalizedHeight(profile.top)
+  if ((profile?.version !== 2 && profile?.version !== 3) || !isNormalizedHeight(profile.base) || !isNormalizedHeight(profile.top)
     || !isNormalizedHeight(profile.foot) || profile.base > profile.foot || profile.foot > profile.top
     || (profile.body !== null && (!isNormalizedHeight(profile.body) || profile.body <= profile.foot || profile.body >= profile.top))
     || (profile.neck !== null && (!isNormalizedHeight(profile.neck) || profile.body === null
@@ -58,6 +63,13 @@ function readTargetProfile(profile: ShapeTargetProfile | undefined): ShapeTarget
     || (profile.lipStart !== undefined && (!isNormalizedHeight(profile.lipStart) || profile.rim === null
       || profile.mouthStart === null || profile.lipStart <= profile.mouthStart || profile.lipStart > profile.rim))
     || !Array.isArray(profile.curve) || profile.curve.length > 2) return undefined;
+  if (profile.version === 3) {
+    const lip = profile.lipStart ?? profile.rim;
+    const spacing = (profile.top - profile.base) * 0.05 - 1e-8;
+    if (profile.neck === null ? profile.neckKind !== null
+      : (profile.neckKind !== 'natural' && profile.neckKind !== 'upperWall') || profile.body === null
+        || profile.neck - profile.body < spacing || (lip !== null && lip - profile.neck < spacing)) return undefined;
+  }
   const curve: ShapeTargetProfileV2['curve'] = [];
   for (const band of profile.curve) {
     if (!Array.isArray(band) || band.length !== 4) return undefined;

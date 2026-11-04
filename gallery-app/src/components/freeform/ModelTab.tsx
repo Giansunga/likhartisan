@@ -2,6 +2,7 @@ import AssetImage from '../AssetImage';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { modelBaseFromRow, type ModelBase, type ModelBaseColumns } from './modelEstimate';
+import { hasAuditedShapeAsset } from './shapeAssetEligibility';
 
 interface Model3D extends ModelBaseColumns {
   id: string;
@@ -33,7 +34,8 @@ export default function ModelTab({
         .eq('shop_id', shopId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
-      if (data) setModels((data as Model3D[]).filter((model) => modelBaseFromRow(model) !== null));
+      if (data) setModels((data as Model3D[]).filter((model) =>
+        modelBaseFromRow(model) !== null && hasAuditedShapeAsset(model.id, model.file_url)));
       setLoading(false);
     })();
   }, [shopId]);

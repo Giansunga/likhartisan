@@ -30,6 +30,21 @@ describe('ShapeTab', () => {
     expect(screen.getByRole('slider', { name: 'Neck Width' })).toBeEnabled();
   });
 
+  it('enables upper-wall width with the verified range on a straight vessel', () => {
+    const base = shapeFromModelBase({ height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 4 });
+    render(<ShapeTab shapeParams={{ ...base, targetProfile: {
+      version: 3, base: 0, top: 1, foot: 0.04, body: 0.62, neck: 0.82,
+      neckKind: 'upperWall', rim: 0.975, mouthStart: 0.875, curve: [[0.04, 0.33, 0.62, 0]],
+      limits: { neckWidth: [0.85, 1.15] },
+    } }} baseShape={base} onChange={vi.fn()} />);
+    const neck = screen.getByRole('slider', { name: 'Neck Width' });
+    expect(neck).toBeEnabled();
+    expect(Number(neck.getAttribute('min'))).toBeCloseTo(4.25);
+    expect(Number(neck.getAttribute('max'))).toBeCloseTo(5.75);
+    expect(screen.getByText('Upper wall below the rim.')).toBeInTheDocument();
+    expect(screen.getAllByRole('slider').every((slider) => !slider.hasAttribute('disabled'))).toBe(true);
+  });
+
   it('coalesces rapid slider changes into one preview update per frame', () => {
     const onChange = vi.fn();
     render(<ShapeTab shapeParams={initialShape} onChange={onChange} />);

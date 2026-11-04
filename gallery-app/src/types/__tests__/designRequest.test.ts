@@ -84,12 +84,13 @@ describe('design request snapshots', () => {
     });
   });
 
-  it('round-trips version 2 target bands and limits in a design request', () => {
+  it.each([2, 3] as const)('round-trips version %s target bands and limits in a design request', (version) => {
     const shape = shapeFromModelBase({ height: 8, bodyWidth: 8, neckWidth: 5, rimSize: 6 });
     shape.targetProfile = {
       version: 2, base: 0, top: 1, foot: 0.04, body: 0.8, neck: null, rim: 0.975,
       mouthStart: 0.9, curve: [[0.04, 0.42, 0.8, -0.1]], limits: { curvature: [0, 78] },
     };
+    if (version === 3) shape.targetProfile = { ...shape.targetProfile, version, body: 0.65, neck: 0.84, neckKind: 'upperWall' };
     const snapshot = createDesignRequestSnapshot({
       model: { id: 'model-2', name: 'Bowl', file: '/bowl.glb', thumbnail: '', category: 'Bowl' },
       shape,

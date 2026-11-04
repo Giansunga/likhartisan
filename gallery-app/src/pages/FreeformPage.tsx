@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import FreeformViewer from '../components/freeform/FreeformViewer';
 import ModelTab from '../components/freeform/ModelTab';
+import { hasAuditedShapeAsset } from '../components/freeform/shapeAssetEligibility';
 import ShapeTab from '../components/freeform/ShapeTab';
 import MaterialTab from '../components/freeform/MaterialTab';
 import DecorTab from '../components/freeform/DecorTab';
@@ -97,7 +98,7 @@ export default function FreeformPage() {
   /* Design params */
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
   const [needsShapeTargets, setNeedsShapeTargets] = useState(false);
-  const modelAssetPinned = Boolean(shapeParams.targetProfile) || needsShapeTargets;
+  const auditedAsset = hasAuditedShapeAsset(selectedModelId, selectedModel);
   const [resolvedTargets, setResolvedTargets] = useState<{ file: string; id: string | null; profile: ShapeTargetProfile }>();
   const activeTargets = resolvedTargets?.file === selectedModel && resolvedTargets.id === selectedModelId
     ? resolvedTargets.profile : undefined;
@@ -217,7 +218,7 @@ export default function FreeformPage() {
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
   const isReviewStep = activeStep === 'review';
   const resetShape = shapeFromModelBase(shapeParams.baseline ?? modelBase ?? DEFAULT_SHAPE);
-  if (activeTargets) resetShape.targetProfile = activeTargets;
+  if (activeTargets || shapeParams.targetProfile) resetShape.targetProfile = activeTargets ?? shapeParams.targetProfile;
 
   /* ─── Helpers ─── */
 
@@ -254,16 +255,15 @@ export default function FreeformPage() {
   useEffect(() => {
     if (!selectedModel) return;
     let cancelled = false;
-    const baseQuery = supabase.from('models_3d').select('file_url,base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days');
+    const baseQuery = supabase.from('models_3d').select('base_height_in,base_body_width_in,base_neck_width_in,base_rim_size_in,base_price_php,base_production_days');
     (selectedModelId ? baseQuery.eq('id', selectedModelId) : baseQuery.eq('file_url', selectedModel))
       .maybeSingle().then(({ data }) => {
         if (cancelled) return;
         const base = modelBaseFromRow(data);
         if (base || !revisionMode) setModelBase(base);
-        if (!revisionMode && !modelAssetPinned && selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
       });
     return () => { cancelled = true; };
-  }, [selectedModel, selectedModelId, revisionMode, modelAssetPinned]);
+  }, [selectedModel, selectedModelId, revisionMode]);
 
 function applyDesign(design: {
     model_file: string;
@@ -317,7 +317,7 @@ function applyDesign(design: {
       }
 
       setModelBase(null);
-      setSelectedModel(design.shape_params?.targetProfile ? design.model_file : design.models_3d?.file_url || design.model_file);
+      setSelectedModel(design.model_file || design.models_3d?.file_url || '');
       setSelectedModelId(design.model_id || null);
       setModelName(design.model_name);
       setModelCategory(design.models_3d?.category || 'Vase');
@@ -427,7 +427,7 @@ function applyDesign(design: {
               ? supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('id', data.model_id)
               : supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('file_url', data.model_file);
             const { data: savedModel } = await modelQuery.maybeSingle();
-            const modelFile = data.shape_params?.targetProfile ? data.model_file : savedModel?.file_url || data.model_file;
+            const modelFile = data.model_file || savedModel?.file_url || '';
             applyDesign({ ...data, model_file: modelFile, model_id: savedModel?.id || data.model_id, shop_name: shopName });
             setModelCategory(savedModel?.category || 'Vase');
             setModelThumbnail(savedModel?.thumbnail || data.thumbnail || '');
@@ -443,13 +443,13 @@ function applyDesign(design: {
           ? supabase.from('models_3d').select('*').eq('id', navState.modelId)
           : supabase.from('models_3d').select('*').eq('file_url', navState.modelUrl);
         const { data: navModel } = await modelQuery.maybeSingle();
-        if (!navModel || navModel.status !== 'active') {
+        const navBase = modelBaseFromRow(navModel);
+        if (!navModel || navModel.status !== 'active' || !navBase || !hasAuditedShapeAsset(navModel.id, navModel.file_url)) {
           toast.error('The featured model is no longer available. Please choose another model.');
           setShopSelectOpen(true);
           shopModalShownRef.current = true;
           return;
         }
-        const navBase = modelBaseFromRow(navModel);
         selectModel(
           navModel?.file_url || navState.modelUrl,
           navState.modelName || 'Selected Model',
@@ -460,7 +460,6 @@ function applyDesign(design: {
           navBase,
         );
         if (navState.featuredLook && isValidLandingLook(navState.featuredLook, navModel as LandingModel)) {
-          setNeedsShapeTargets(false);
           setShapeParams(navState.featuredLook.shape);
           setMaterialParams(normalizeMaterialParams(navState.featuredLook.material));
           setDecorationParams(navState.featuredLook.decoration);
@@ -543,7 +542,7 @@ function applyDesign(design: {
     const shouldReset = !selectedModel || await confirmAction('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
     setShapeParams(resetShape);
-    setNeedsShapeTargets(!activeTargets && Boolean(selectedModel));
+    setNeedsShapeTargets(!activeTargets && auditedAsset);
     setMaterialParams(DEFAULT_MATERIAL);
     setDecorationParams(DEFAULT_DECORATION);
     setAttachmentParams([]);
@@ -840,7 +839,7 @@ function applyDesign(design: {
                 ))}
                 {activeStep === 'shape' && (
                   <ShapeTab shapeParams={shapeParams} baseShape={resetShape} modelKey={selectedModel}
-                    targetsPending={needsShapeTargets} resetDisabled={!activeTargets}
+                    targetsPending={needsShapeTargets} resetDisabled={auditedAsset && !activeTargets}
                     onChange={setShapeParams} onInteractionChange={setControlInteraction} />
                 )}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
@@ -892,7 +891,7 @@ function applyDesign(design: {
             <FreeformViewer
               modelFile={selectedModel}
               modelId={selectedModelId ?? undefined}
-              onShapeTargets={handleShapeTargets}
+              onShapeTargets={auditedAsset ? handleShapeTargets : undefined}
               fallbackSrc={modelThumbnail}
               fallbackAlt={modelName || 'Selected model preview'}
               shapeParams={shapeParams}

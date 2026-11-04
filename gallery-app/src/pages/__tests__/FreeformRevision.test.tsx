@@ -150,3 +150,4 @@ describe('buyer revision', () => {
     expect(screen.getAllByText('Test Shop').length).toBeGreaterThan(0);
   });
 });
+vi.mock('../../components/freeform/shapeAssetEligibility', () => ({ hasAuditedShapeAsset: () => true }));

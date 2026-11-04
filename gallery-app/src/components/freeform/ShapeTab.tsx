@@ -51,11 +51,11 @@ export default function ShapeTab({
   const baselineKey = JSON.stringify([modelKey, baselineShape, shapeParams.targetProfile]);
   const makeRanges = () => Object.fromEntries(SLIDERS.map(({ key, min, max }) => {
     const profile = shapeParams.targetProfile;
-    const limits = profile?.version === 2 ? profile.limits?.[key] : undefined;
+    const limits = (profile?.version === 2 || profile?.version === 3) ? profile.limits?.[key] : undefined;
     if (key === 'curvature') return [key, { min: limits?.[0] ?? min, max: limits?.[1] ?? max }];
     const lower = baselineShape[key] * (limits?.[0] ?? 0.5);
     const upper = baselineShape[key] * (limits?.[1] ?? 1.5);
-    return [key, profile?.version === 2 ? { min: lower, max: upper } : {
+    return [key, (profile?.version === 2 || profile?.version === 3) ? { min: lower, max: upper } : {
       min: Math.min(Math.max(0.01, lower), shapeParams[key]),
       max: Math.max(upper, shapeParams[key]),
     }];
@@ -87,7 +87,7 @@ export default function ShapeTab({
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.label}</label>
                 <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{s.key === 'curvature' ? `${change > 0 ? '+' : ''}${change.toFixed(0)}%` : `${change > 0 ? '+' : ''}${formatInches(change)}`}</span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{unavailable ?? s.description}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{unavailable ?? (s.key === 'neckWidth' && profile?.version === 3 && profile.neckKind === 'upperWall' ? 'Upper wall below the rim.' : s.description)}</p>
               <input
                 type="range"
                 disabled={targetsPending || Boolean(unavailable)}

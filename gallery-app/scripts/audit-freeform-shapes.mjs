@@ -101,6 +101,7 @@ try {
       }
       const active = controls.filter((key) => hasShapeTarget(profile, key));
       row.disabled = controls.filter((key) => !active.includes(key));
+      if (row.disabled.length) throw Error('Missing shape targets: ' + row.disabled.join(', '));
       const targets = { foot: profile.foot, bodyWidth: profile.body, neckWidth: profile.neck, rimSize: profile.rim };
       const measuredKeys = Object.keys(targets).filter((key) => targets[key] !== null);
       const slices = Array.from({ length: 55 }, (_, i) => profile.base + (profile.top - profile.base) * i / 54);

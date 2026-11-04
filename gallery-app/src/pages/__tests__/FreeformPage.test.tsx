@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FreeformPage from '../FreeformPage';
 import type { ShapeParamsInches, ShapeTargetProfile } from '../../lib/measurements';
 
+vi.mock('../../components/freeform/shapeAssetEligibility', () => ({ hasAuditedShapeAsset: () => true }));
+
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: null, loading: false }),
 }));
@@ -30,7 +32,9 @@ vi.mock('../../components/freeform/FreeformViewer', () => ({
   }) {
     useEffect(() => {
       if (modelFile) onShapeTargets?.({
-        version: 1, body: 0.65, neck: modelFile.includes('bowl') ? null : 0.87, rim: 0.98,
+        version: 3, base: 0, top: 1, foot: 0.04, body: 0.65,
+        neck: modelFile.includes('bowl') ? 0.84 : 0.87,
+        neckKind: modelFile.includes('bowl') ? 'upperWall' : 'natural', rim: 0.98, mouthStart: 0.92, curve: [],
       });
     }, [modelFile, onShapeTargets]);
     return <div data-testid="freeform-viewer" data-fallback-src={fallbackSrc} data-neck-target={JSON.stringify(shapeParams.targetProfile?.neck)} />;
@@ -83,7 +87,7 @@ describe('FreeformPage send-to-shop flow', () => {
     render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: { modelUrl: '/models/vase.glb', modelName: 'Test Vase', shopId: 'shop-1' } }]}><FreeformPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-neck-target', '0.87'));
     fireEvent.click(await screen.findByRole('button', { name: 'Choose bowl' }));
-    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-neck-target', 'null'));
+    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-neck-target', '0.84'));
   });
   it('passes the selected model photo to the viewer even when navigation omitted its thumbnail', async () => {
     render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: { modelUrl: '/models/vase.glb', modelName: 'Test Vase' } }]}><FreeformPage /></MemoryRouter>);

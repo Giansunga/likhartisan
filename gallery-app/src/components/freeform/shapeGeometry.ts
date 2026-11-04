@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { sectionScale } from './calibrateModel';
 import { computePatternNormals } from './exteriorPatternMask';
-import type { ShapeParamsInches, ShapeTargetProfileV2 } from '../../lib/measurements';
+import type { ShapeParamsInches, ShapeTargetProfileV2, ShapeTargetProfileV3 } from '../../lib/measurements';
 
 export type ShapeParams = Omit<ShapeParamsInches, 'unit'> & { unit?: 'cm' | 'in' };
 type Shape = ShapeParams;
@@ -124,7 +124,7 @@ export function cacheProfileCoefficients(snapshot: GeometrySnapshot, bounds: Mod
 export function getShapeHeightScale(shape: ShapeParams): number {
   const baseline = shape.geometryMode === 'baseline' ? shape.baseline : undefined;
   const profile = shape.targetProfile;
-  if (baseline && profile?.version === 2) {
+  if (baseline && (profile?.version === 2 || profile?.version === 3)) {
     if (profile.top <= profile.base) return 1;
     return THREE.MathUtils.clamp(shape.height / baseline.height, ...(profile.limits?.height ?? [0.5, 1.5]));
   }
@@ -132,11 +132,11 @@ export function getShapeHeightScale(shape: ShapeParams): number {
 }
 
 export function getShapeHeightPivot(shape: ShapeParams, bounds: ModelBounds): number {
-  return shape.geometryMode === 'baseline' && shape.targetProfile?.version === 2
+  return shape.geometryMode === 'baseline' && (shape.targetProfile?.version === 2 || shape.targetProfile?.version === 3)
     ? bounds.minY + bounds.rangeY * shape.targetProfile.base : bounds.centerY;
 }
 
-function targetRadialScale(shape: ShapeParams, baseline: NonNullable<ShapeParams['baseline']>, profile: ShapeTargetProfileV2) {
+function targetRadialScale(shape: ShapeParams, baseline: NonNullable<ShapeParams['baseline']>, profile: ShapeTargetProfileV2 | ShapeTargetProfileV3) {
   const delta = (key: 'bodyWidth' | 'neckWidth' | 'rimSize') =>
     THREE.MathUtils.clamp(shape[key] / baseline[key], ...(profile.limits?.[key] ?? [0.5, 1.5])) - 1;
   const bodyDelta = delta('bodyWidth');
@@ -188,7 +188,7 @@ export function applyShapeGeometry(
   const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
   const profile = relativeBaseline ? shapeParams.targetProfile : undefined;
   const legacyProfile = profile?.version === 1 ? profile : undefined;
-  const radialScale = profile?.version === 2 && relativeBaseline ? targetRadialScale(shapeParams, relativeBaseline, profile) : undefined;
+  const radialScale = (profile?.version === 2 || profile?.version === 3) && relativeBaseline ? targetRadialScale(shapeParams, relativeBaseline, profile) : undefined;
   const relativeAnchors = relativeBaseline && !profile ? ([
       [sections.body, geometryShapeParams.bodyWidth / (relativeBaseline.bodyWidth * baselineFactor)],
       [sections.neck, geometryShapeParams.neckWidth / (relativeBaseline.neckWidth * baselineFactor)],

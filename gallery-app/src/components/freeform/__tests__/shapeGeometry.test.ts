@@ -115,7 +115,7 @@ describe('model-specific width targets', () => {
     expect(mesh.geometry.getAttribute('position').array).toEqual(snapshot.localPositions);
   });
 
-  it('recognizes a bowl and a straight planter as neckless', () => {
+  it('assigns an independent upper-wall target to bowls and straight planters', () => {
     for (const points of [
       [[0, 0.35], [0.4, 0.8], [1, 1]],
       [[0, 0.8], [1, 0.8]],
@@ -123,7 +123,9 @@ describe('model-specific width targets', () => {
       const { root } = createVessel(points);
       const profile = resolveShapeTargets(root, undefined, '/neckless.glb');
       expect(profile.body).not.toBeNull();
-      expect(profile.neck).toBeNull();
+      expect(profile.neckKind).toBe('upperWall');
+      expect(profile.neck).toBeCloseTo(profile.body! + (profile.rim! - profile.body!) * 0.6);
+      expect(profile.rim! - profile.neck!).toBeGreaterThanOrEqual(0.05 - 1e-8);
     }
   });
 
@@ -139,7 +141,7 @@ describe('model-specific width targets', () => {
     detached.position.y = 2;
     root.add(detached);
     const profile = resolveShapeTargets(root, undefined, '/scalloped.glb');
-    expect(profile.version).toBe(2);
+    expect(profile.version).toBe(3);
     expect(profile.top).toBeCloseTo(1 / 2.05);
     expect(profile.rim).toBeLessThan(profile.top * 0.92);
     expect(profile.rim).toBeGreaterThan(profile.body!);

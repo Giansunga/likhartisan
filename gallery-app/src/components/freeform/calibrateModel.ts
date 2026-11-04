@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PublicGLTFLoader } from '../../lib/publicModelLoader';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import type { ShapeTargetProfileV2 } from '../../lib/measurements';
+import type { ShapeTargetProfileV3 } from '../../lib/measurements';
 
 type Dimensions = { height: number; bodyWidth: number; neckWidth: number; rimSize: number };
 type Point = THREE.Vector3;
@@ -10,10 +10,14 @@ type Triangle = [Point, Point, Point];
 // glTF stores coordinates in meters. The admin form records physical inches.
 const METERS_PER_INCH = 0.0254;
 
-const targetOverrides: Readonly<Record<string, Partial<ShapeTargetProfileV2>>> = {
-  // Mini U-Shape Vase: its continuous wall opens straight into the rim.
+const targetOverrides: Readonly<Record<string, Partial<ShapeTargetProfileV3>>> = {
+  // Target existing wall rings on the coarse Mini U-Shape Vase mesh.
   '9de75e12-fd41-43e7-89c0-6f6a1e51def1/1790400086755_8d06f3b5.glb': {
-    body: 0.8125, neck: null,
+    body: 0.7278, neck: 0.8674, neckKind: 'upperWall', lipStart: 0.9579,
+  },
+  'e474b847-db24-4b11-bab9-d4aed0628abb/original-e474b847-db24-4b11-bab9-d4aed0628abb-a2a2a8a0d47c8bd9.glb': {
+    body: 0.62, neck: 0.82, neckKind: 'upperWall',
+    limits: { bodyWidth: [0.75, 1.5], neckWidth: [0.85, 1.15] },
   },
   // The coarse lip spans 94–100% of the Jarlet's height.
   '14705771-7788-4c5b-b18d-42e1fdc3e059/1790431315660_d443df7f.glb': {
@@ -28,9 +32,9 @@ const targetOverrides: Readonly<Record<string, Partial<ShapeTargetProfileV2>>> =
     foot: 0.14,
   },
 };
-const detectedTargets = new WeakMap<THREE.Group, { asset: string; profile: ShapeTargetProfileV2 }>();
+const detectedTargets = new WeakMap<THREE.Group, { asset: string; profile: ShapeTargetProfileV3 }>();
 
-export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefined, assetUrl: string): ShapeTargetProfileV2 {
+export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefined, assetUrl: string): ShapeTargetProfileV3 {
   const assetName = assetUrl.split(/[?#]/)[0].split('/').pop();
   const asset = `${modelId}/${assetName}`;
   const override = targetOverrides[asset];
@@ -43,8 +47,8 @@ export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefi
   const bounds = boundsOf(triangles);
   const totalHeight = allBounds.max.y - allBounds.min.y;
   const height = bounds.max.y - bounds.min.y;
-  const profile: ShapeTargetProfileV2 = {
-    version: 2, base: 0, top: 0, foot: 0, body: null, neck: null, rim: null, mouthStart: null, curve: [],
+  const profile: ShapeTargetProfileV3 = {
+    version: 3, base: 0, top: 0, foot: 0, body: null, neck: null, neckKind: null, rim: null, mouthStart: null, curve: [],
   };
   if (Number.isFinite(height) && height > 0 && Number.isFinite(totalHeight)) {
     const toRootHeight = (t: number) => THREE.MathUtils.clamp((bounds.min.y + height * t - allBounds.min.y) / totalHeight, 0, 1);
@@ -121,8 +125,8 @@ function findMouthBand(triangles: Triangle[], bounds: THREE.Box3): number | null
 }
 
 function detectWallTargets(
-  triangles: Triangle[], bounds: THREE.Box3, rim: number | null, profile: ShapeTargetProfileV2,
-  toRootHeight: (height: number) => number, override?: Partial<ShapeTargetProfileV2>,
+  triangles: Triangle[], bounds: THREE.Box3, rim: number | null, profile: ShapeTargetProfileV3,
+  toRootHeight: (height: number) => number, override?: Partial<ShapeTargetProfileV3>,
 ) {
   const height = bounds.max.y - bounds.min.y;
   const steps = 80;
@@ -158,7 +162,13 @@ function detectWallTargets(
       neckScore = score;
     }
   }
-  const bodyEnd = Math.min(neckIndex === null ? 68 : neckIndex - 5, Math.floor(((rim ?? 1) - 0.075) * steps) - 1);
+  const span = profile.top - profile.base;
+  const lip = override?.lipStart ?? toRootHeight(rim ?? 1);
+  const naturalNeck = override?.neck !== undefined ? override.neck
+    : neckIndex === null ? null : toRootHeight((neckIndex + 1) / steps);
+  const neck = naturalNeck === null ? null : Math.min(naturalNeck, lip - span * 0.05);
+  const bodyCeiling = neck === null ? lip - span * 0.125 : neck - span * 0.05;
+  const bodyEnd = Math.min(68, Math.floor((bodyCeiling - profile.base) / span * steps + 1e-8) - 1);
   const bodyWidths = smooth.slice(12, bodyEnd + 1).map((width, offset) => {
     const i = offset + 12;
     return Math.min(width, smooth[i - 2], smooth[i + 2]);
@@ -171,17 +181,18 @@ function detectWallTargets(
     const comparable = bodyWidths.flatMap((width, i) => width >= widest * 0.985 ? [i + 12] : []);
     const bodyIndex = comparable[Math.floor(comparable.length / 2)];
     profile.body = toRootHeight((bodyIndex + 1) / steps);
-    profile.neck = neckIndex === null ? null : toRootHeight((neckIndex + 1) / steps);
   }
-  if (override?.body !== undefined) profile.body = override.body;
-  if (override?.neck !== undefined) profile.neck = override.neck;
+  if (override?.body != null && override.body <= bodyCeiling + 1e-8) profile.body = override.body;
+  if (profile.body !== null && rim !== null) {
+    profile.neck = neck ?? THREE.MathUtils.lerp(profile.body, lip, 0.6);
+    profile.neckKind = override?.neckKind ?? (neck === null ? 'upperWall' : 'natural');
+  }
   if (rim !== null) {
     const rimHeight = toRootHeight(rim);
     const wall = profile.neck ?? profile.body ?? profile.foot;
     if (rimHeight > wall + 0.02) {
       profile.rim = rimHeight;
-      const lip = override?.lipStart ?? rimHeight;
-      profile.mouthStart = THREE.MathUtils.lerp(wall, lip, profile.neck === null ? 0.2 : 0.35);
+      profile.mouthStart = THREE.MathUtils.lerp(wall, lip, 0.35);
       if (override?.lipStart !== undefined) profile.lipStart = lip;
     }
   }
@@ -195,7 +206,6 @@ function detectWallTargets(
     return THREE.MathUtils.lerp(smooth[Math.floor(index)], smooth[Math.ceil(index)], index % 1);
   };
   for (const [start, end] of [[profile.foot, profile.body], [profile.body, upperWall]]) {
-    const span = profile.top - profile.base;
     // Very short upper-wall bands can sit entirely between vertex rings.
     // Keep rounding on the main wall instead of creating a small bulge at the shoulder.
     if (end - start < span * (start === profile.body ? 0.12 : 0.075)) continue;
