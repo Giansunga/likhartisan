@@ -1,5 +1,5 @@
 import AssetImage from '../AssetImage';
-import { Heart, LoaderCircle, MapPin, MessageCircle, Package, Store, Users } from 'lucide-react';
+import { Heart, LoaderCircle, MessageSquare, Package, Store } from 'lucide-react';
 import type { ShopProfile } from './shopStorefront';
 
 interface ShopHeroProps {
@@ -30,14 +30,6 @@ export default function ShopHero({
   return (
     <>
       <header className="shop-hero">
-        <div className="shop-hero__media" aria-hidden={!shop.banner}>
-          <AssetImage
-            src={shop.banner || '/images/vases_collection.png'}
-            alt={shop.banner ? `${shop.name} shop cover` : ''}
-            fetchPriority="high"
-          />
-        </div>
-        <div className="shop-hero__overlay" />
         <div className="shop-container shop-hero__content">
           <div className="shop-hero__identity">
             <div className="shop-hero__avatar">
@@ -45,9 +37,7 @@ export default function ShopHero({
             </div>
             <div className="shop-hero__copy">
               <p className="shop-hero__eyebrow">Local pottery shop</p>
-              <h1 className="system-hero-title system-hero-title--profile">{shop.name}</h1>
-              {shop.description ? <p className="shop-hero__tagline">{shop.description}</p> : null}
-              {shop.location ? <p className="shop-hero__location"><MapPin aria-hidden="true" /> {shop.location}</p> : null}
+              <h1>{shop.name}</h1>
               <div className="shop-hero__actions">
                 <a className="shop-button shop-button--primary" href="#shop-products">
                   <Package aria-hidden="true" /> Browse pieces
@@ -63,7 +53,7 @@ export default function ShopHero({
                   {following ? 'Following' : 'Follow'}
                 </button>
                 <button className="shop-button shop-button--secondary" type="button" disabled={messagePending} onClick={onMessage}>
-                  {messagePending ? <LoaderCircle className="shop-spin" aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}
+                  {messagePending ? <LoaderCircle className="shop-spin" aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}
                   Message shop
                 </button>
               </div>
@@ -80,7 +70,6 @@ export default function ShopHero({
             <div><dt>Local makers</dt><dd>{artisanCount}</dd></div>
             <div><dt>Member since</dt><dd>{membershipYear ?? '—'}</dd></div>
           </dl>
-          <div className="shop-metrics__note"><Users aria-hidden="true" /> Made by participating Santo Tomas artisans</div>
         </div>
       </section>
     </>

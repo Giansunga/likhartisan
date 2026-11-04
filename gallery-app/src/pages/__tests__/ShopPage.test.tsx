@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
       description: 'Small-batch pottery from Santo Tomas.',
       about: 'Our family shapes every piece together.',
       image: '',
-      banner: '',
       location: 'Santo Tomas, Pampanga',
       created_at: '2022-04-20T00:00:00.000Z',
     },
@@ -27,7 +26,7 @@ const mocks = vi.hoisted(() => ({
       technique: '', shop_id: 'shop-1', shop_name: 'Clay House', status: 'active', views: 0,
       created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z',
     }],
-    count: 14,
+    count: 1,
     error: null,
   },
   followers: { data: null, count: 2, error: null },
@@ -50,8 +49,11 @@ vi.mock('../../lib/supabase', () => ({
     from: mocks.from.mockImplementation((table: string) => {
       let operation = 'select';
       let countQuery = false;
+      let range: [number, number] | undefined;
       const result = () => {
-        if (table === 'products') return mocks.products;
+        if (table === 'products') {
+          return range ? { ...mocks.products, data: mocks.products.data.slice(range[0], range[1] + 1) } : mocks.products;
+        }
         if (table === 'artisans') return mocks.artisans;
         if (table === 'product_variations') return mocks.variations;
         if (table === 'product_reviews') return mocks.reviews;
@@ -63,6 +65,7 @@ vi.mock('../../lib/supabase', () => ({
         eq: vi.fn(() => query),
         order: vi.fn(() => query),
         limit: vi.fn(() => { if (table === 'artisans') throw new Error('Do not truncate shop artisans'); return query; }),
+        range: vi.fn((from: number, to: number) => { range = [from, to]; return query; }),
         in: vi.fn(() => query),
         not: vi.fn(() => query),
         insert: vi.fn(() => { operation = 'insert'; return query; }),
@@ -90,10 +93,14 @@ function renderShop() {
 }
 
 describe('ShopPage', () => {
+  const initialProducts = mocks.products.data;
+
   beforeEach(() => {
     mocks.user = null;
     mocks.artisans = { data: [], count: 0, error: null };
     mocks.shop.error = null;
+    mocks.products.data = initialProducts;
+    mocks.products.count = initialProducts.length;
     mocks.products.error = null;
     mocks.followAction.error = null;
     mocks.following.data = null;
@@ -104,13 +111,34 @@ describe('ShopPage', () => {
     renderShop();
 
     expect(await screen.findByRole('heading', { name: 'Clay House' })).toBeInTheDocument();
-    expect(screen.getByText('14')).toBeInTheDocument();
+    expect(screen.getByText('Active pieces')).toBeInTheDocument();
     expect(screen.getByText('2022')).toBeInTheDocument();
     expect(screen.getByText('₱0.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /View all 14 pieces/i })).toHaveAttribute('href', '/gallery?shop=shop-1');
+    expect(screen.getByRole('link', { name: 'Browse pieces' })).toHaveAttribute('href', '#shop-products');
+    expect(screen.getByRole('link', { name: 'Pieces' })).toHaveAttribute('aria-current', 'location');
     expect(screen.queryByText('Verified Shop')).not.toBeInTheDocument();
     expect(screen.queryByText('100%')).not.toBeInTheDocument();
     expect(screen.queryByText('Phone')).not.toBeInTheDocument();
+  });
+
+  it('loads four featured pieces per page and shows the remaining products', async () => {
+    const product = mocks.products.data[0];
+    mocks.products.data = Array.from({ length: 6 }, (_, index) => ({
+      ...product, id: `product-${index + 1}`, name: `Piece ${index + 1}`,
+    }));
+    mocks.products.count = 6;
+    renderShop();
+
+    expect(await screen.findByText('Showing 1–4 of 6 products')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /^Piece [1-4]/ })).toHaveLength(4);
+    expect(screen.queryByRole('heading', { name: 'Piece 5' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+
+    expect(await screen.findByText('Showing 5–6 of 6 products')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Piece 5' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Piece 1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Clay House' })).toBeInTheDocument();
   });
 
   it('renders all eight assigned makers in order', async () => {

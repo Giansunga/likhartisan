@@ -9,7 +9,6 @@ export interface ShopProfile {
   description: string;
   about: string;
   image: string;
-  banner: string;
   location: string;
   created_at: string;
 }

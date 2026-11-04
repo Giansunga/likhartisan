@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, RefreshCw, Store } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import ShopHero from '../components/shop/ShopHero';
 import ShopMakersSection from '../components/shop/ShopMakersSection';
 import ShopProductsSection from '../components/shop/ShopProductsSection';
@@ -21,12 +21,52 @@ import '../styles/shop-profile.css';
 
 type ActionStatus = { tone: 'success' | 'error'; text: string } | null;
 
-const SHOP_FIELDS = 'id, name, owner_name, email, description, about, image, banner, location, created_at';
+const SHOP_FIELDS = 'id, name, owner_name, email, description, about, image, location, created_at';
 const PRODUCT_FIELDS = 'id, name, description, category, price, stock, image, model3d, materials, dimensions, height, opening_diameter, measurement_unit, technique, shop_id, shop_name, status, views, created_at, updated_at';
 const ARTISAN_FIELDS = 'id, name, specialty, experience, description, cover_image, location';
+const PRODUCTS_PER_PAGE = 4;
+const SHOP_SECTIONS = [
+  { hash: '#shop-products', label: 'Pieces' },
+  { hash: '#shop-story', label: 'Our story' },
+  { hash: '#shop-makers', label: 'Artisans' },
+];
+
+async function loadProductPage(shopId: string, page: number) {
+  const offset = (page - 1) * PRODUCTS_PER_PAGE;
+  const result = await supabase.from('products')
+    .select(PRODUCT_FIELDS, { count: 'exact' })
+    .eq('shop_id', shopId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .order('id')
+    .range(offset, offset + PRODUCTS_PER_PAGE - 1);
+
+  if (result.error) throw result.error;
+
+  const products = (result.data ?? []).map(row => mapSupabaseProduct(row));
+  const productCount = result.count ?? offset + products.length;
+  if (!products.length) {
+    return { products, productCount, productPrices: {}, productAvailability: {}, productRatings: {} };
+  }
+
+  const productIds = products.map(product => product.id);
+  const [variationResult, reviewResult] = await Promise.all([
+    supabase.from('product_variations').select('product_id, price, stock').in('product_id', productIds),
+    supabase.from('product_reviews').select('product_id, rating').in('product_id', productIds),
+  ]);
+  const { prices, availability } = summarizeCatalogVariations(variationResult.error ? [] : variationResult.data ?? []);
+  return {
+    products,
+    productCount,
+    productPrices: prices,
+    productAvailability: availability,
+    productRatings: reviewResult.error ? {} : getProductRatingSummaries(reviewResult.data ?? []),
+  };
+}
 
 export default function ShopPage() {
   const { id } = useParams();
+  const { hash } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const requestId = useRef(0);
@@ -34,6 +74,9 @@ export default function ShopPage() {
   const [storefront, setStorefront] = useState<ShopStorefrontData>(EMPTY_STOREFRONT_DATA);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [productPage, setProductPage] = useState(1);
+  const [productPagePending, setProductPagePending] = useState(false);
+  const [productPageError, setProductPageError] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
   const [messagePending, setMessagePending] = useState(false);
@@ -45,6 +88,9 @@ export default function ShopPage() {
     setLoadError(null);
     setShop(null);
     setStorefront(EMPTY_STOREFRONT_DATA);
+    setProductPage(1);
+    setProductPagePending(false);
+    setProductPageError(false);
 
     if (!id) {
       setLoading(false);
@@ -63,14 +109,8 @@ export default function ShopPage() {
       const loadedShop = shopResult.data as ShopProfile;
       setShop(loadedShop);
 
-      const [productResult, followerResult, artisanResult] = await Promise.all([
-        supabase
-          .from('products')
-          .select(PRODUCT_FIELDS, { count: 'exact' })
-          .eq('shop_id', id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(8),
+      const [productData, followerResult, artisanResult] = await Promise.all([
+        loadProductPage(id, 1),
         supabase.from('shop_followers').select('*', { count: 'exact', head: true }).eq('shop_id', id),
         supabase
           .from('artisans')
@@ -80,37 +120,12 @@ export default function ShopPage() {
       ]);
 
       if (currentRequest !== requestId.current) return;
-      if (productResult.error) throw productResult.error;
-
-      const products = (productResult.data ?? []).map(row => mapSupabaseProduct(row));
-      const productIds = products.map(product => product.id);
-      let productPrices: Record<string, number> = {};
-      let productAvailability: Record<string, boolean> = {};
-      let productRatings = {};
-
-      if (productIds.length) {
-        const [variationResult, reviewResult] = await Promise.all([
-          supabase.from('product_variations').select('product_id, price, stock').in('product_id', productIds),
-          supabase.from('product_reviews').select('product_id, rating').in('product_id', productIds),
-        ]);
-        if (currentRequest !== requestId.current) return;
-        if (!variationResult.error) {
-          const summary = summarizeCatalogVariations(variationResult.data ?? []);
-          productPrices = summary.prices;
-          productAvailability = summary.availability;
-        }
-        if (!reviewResult.error) productRatings = getProductRatingSummaries(reviewResult.data ?? []);
-      }
 
       setStorefront({
-        products,
-        productCount: productResult.count ?? products.length,
+        ...productData,
         followerCount: followerResult.error ? 0 : followerResult.count ?? 0,
         artisanCount: artisanResult.error ? 0 : artisanResult.data?.length ?? 0,
         artisans: artisanResult.error ? [] : (artisanResult.data ?? []) as ShopArtisan[],
-        productPrices,
-        productAvailability,
-        productRatings,
       });
     } catch (error) {
       if (currentRequest !== requestId.current) return;
@@ -153,6 +168,24 @@ export default function ShopPage() {
 
     return () => { active = false; };
   }, [id, user?.id]);
+
+  async function handleProductPageChange(page: number) {
+    if (!id || productPagePending || page === productPage) return;
+    const currentRequest = requestId.current;
+    setProductPagePending(true);
+    setProductPageError(false);
+    try {
+      const productData = await loadProductPage(id, page);
+      if (currentRequest !== requestId.current) return;
+      setStorefront(current => ({ ...current, ...productData }));
+      setProductPage(page);
+      document.getElementById('shop-products')?.scrollIntoView?.({ block: 'start' });
+    } catch {
+      if (currentRequest === requestId.current) setProductPageError(true);
+    } finally {
+      if (currentRequest === requestId.current) setProductPagePending(false);
+    }
+  }
 
   async function handleFollow() {
     if (!user?.id) {
@@ -227,7 +260,7 @@ export default function ShopPage() {
       <main className="shop-page shop-loading" aria-busy="true" aria-label="Loading shop">
         <div className="shop-loading__hero" />
         <div className="shop-container shop-loading__body">
-          <div /><div /><div />
+          <div /><div /><div /><div />
         </div>
       </main>
     );
@@ -262,6 +295,7 @@ export default function ShopPage() {
   }
 
   const membershipYear = getMembershipYear(shop.created_at);
+  const activeSection = SHOP_SECTIONS.find(section => section.hash === hash) ?? SHOP_SECTIONS[0];
 
   return (
     <main className="shop-page seasonal-storefront-shell">
@@ -279,9 +313,27 @@ export default function ShopPage() {
         onMessage={() => void handleMessageShop()}
       />
       <nav className="shop-section-nav" aria-label="Shop sections">
-        <div className="shop-container"><a href="#shop-products">Pieces</a><a href="#shop-story">Our story</a><a href="#shop-makers">Artisans</a></div>
+        <div className="shop-container">
+          {SHOP_SECTIONS.map(section => (
+            <a key={section.hash} href={section.hash} aria-current={activeSection === section ? 'location' : undefined}>
+              {section.label}
+            </a>
+          ))}
+        </div>
       </nav>
-      <ShopProductsSection shopId={shop.id} shopName={shop.name} products={storefront.products} productCount={storefront.productCount} prices={storefront.productPrices} availability={storefront.productAvailability} ratings={storefront.productRatings} />
+      <ShopProductsSection
+        shopName={shop.name}
+        products={storefront.products}
+        productCount={storefront.productCount}
+        prices={storefront.productPrices}
+        availability={storefront.productAvailability}
+        ratings={storefront.productRatings}
+        page={productPage}
+        pageSize={PRODUCTS_PER_PAGE}
+        pagePending={productPagePending}
+        pageError={productPageError}
+        onPageChange={page => void handleProductPageChange(page)}
+      />
       <ShopStorySection shop={shop} membershipYear={membershipYear} />
       <ShopMakersSection shop={{ id: shop.id, name: shop.name }} artisans={storefront.artisans} />
     </main>
