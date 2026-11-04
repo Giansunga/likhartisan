@@ -65,6 +65,7 @@ describe('design request snapshots', () => {
 
   it('keeps the new model baseline with a request even if the original shape is edited later', () => {
     const shape = shapeFromModelBase({ height: 13, bodyWidth: 14, neckWidth: 8, rimSize: 10 });
+    shape.targetProfile = { version: 1, body: 0.75, neck: null, rim: 0.98 };
     const snapshot = createDesignRequestSnapshot({
       model: { id: 'model-1', name: 'Pot', file: '/pot.glb', thumbnail: '', category: 'Pot' },
       shape,
@@ -74,8 +75,12 @@ describe('design request snapshots', () => {
       estimate: { price: 100, productionDays: 1 },
     });
     shape.baseline!.height = 99;
+    shape.targetProfile.body = 0.4;
     expect(snapshot.shape.geometryMode).toBe('baseline');
     expect(snapshot.shape.baseline?.height).toBe(13);
     expect(normalizeDesignRequestSnapshot(snapshot).shape.baseline?.height).toBe(13);
+    expect(normalizeDesignRequestSnapshot(snapshot).shape.targetProfile).toEqual({
+      version: 1, body: 0.75, neck: null, rim: 0.98,
+    });
   });
 });

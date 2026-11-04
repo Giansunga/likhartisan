@@ -41,6 +41,9 @@ function normalizeParam(value: number, midpoint: number): number {
   return THREE.MathUtils.clamp((value - midpoint) / midpoint, -1, 1);
 }
 
+function localizedWeight(t: number, start: number, target: number, end: number): number {
+  return t <= target ? smoothstep(start, target, t) : 1 - smoothstep(target, end, t);
+}
 
 export function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnapshot | null {
   const geometry = mesh.geometry;
@@ -141,13 +144,16 @@ export function applyShapeGeometry(
   const neckDelta = normalizeParam(geometryShapeParams.neckWidth, relativeBaseline ? relativeBaseline.neckWidth * baselineFactor : 15);
   const rimDelta = normalizeParam(geometryShapeParams.rimSize, relativeBaseline ? relativeBaseline.rimSize * baselineFactor : 12);
   const curvatureDelta = normalizeParam(geometryShapeParams.curvature, 50);
-  const relativeAnchors = relativeBaseline ? ([
+  const profile = relativeBaseline ? shapeParams.targetProfile : undefined;
+  const relativeAnchors = relativeBaseline && !profile ? ([
       [sections.body, geometryShapeParams.bodyWidth / (relativeBaseline.bodyWidth * baselineFactor)],
       [sections.neck, geometryShapeParams.neckWidth / (relativeBaseline.neckWidth * baselineFactor)],
       [sections.rim, geometryShapeParams.rimSize / (relativeBaseline.rimSize * baselineFactor)],
     ] as [number, number][]).sort((a, b) => a[0] - b[0]) : null;
 
   const { minY, rangeY, centerX, centerY, centerZ } = bounds;
+  const rimStart = profile ? ((profile.neck ?? profile.body ?? 0.82) + profile.rim) / 2 : 0;
+  const neckStart = profile?.body != null && profile.neck !== null ? (profile.body + profile.neck) / 2 : 0;
   const { rootPositions, profileCoefficients, rootToLocal } = snapshot;
   const pos = geometry.getAttribute('position');
   const rootVertex = new THREE.Vector3();
@@ -155,10 +161,17 @@ export function applyShapeGeometry(
     const ox = rootPositions[i * 3], oy = rootPositions[i * 3 + 1], oz = rootPositions[i * 3 + 2];
     const t = Math.max(0, Math.min(1, (oy - minY) / rangeY));
     const k = i * 4;
-    const scaleXZ = THREE.MathUtils.clamp(relativeAnchors
+    let scaleXZ = relativeAnchors
       ? sectionScale(t, relativeAnchors) + profileCoefficients[k + 3] * curvatureDelta
       : 1 + profileCoefficients[k] * bodyDelta + profileCoefficients[k + 1] * neckDelta
-        + profileCoefficients[k + 2] * rimDelta + profileCoefficients[k + 3] * curvatureDelta, 0.25, 1.8);
+        + profileCoefficients[k + 2] * rimDelta + profileCoefficients[k + 3] * curvatureDelta;
+    if (profile) {
+      scaleXZ = 1 + rimDelta * smoothstep(rimStart, profile.rim, t)
+        + profileCoefficients[k + 3] * curvatureDelta;
+      if (profile.body !== null) scaleXZ += bodyDelta * localizedWeight(t, 0.06, profile.body, profile.neck ?? profile.rim);
+      if (profile.neck !== null) scaleXZ += neckDelta * localizedWeight(t, neckStart, profile.neck, profile.rim);
+    }
+    scaleXZ = THREE.MathUtils.clamp(scaleXZ, 0.25, 1.8);
     rootVertex.set(centerX + (ox - centerX) * scaleXZ, centerY + (oy - centerY) * hScale,
       centerZ + (oz - centerZ) * scaleXZ).applyMatrix4(rootToLocal);
     pos.setXYZ(i, rootVertex.x, rootVertex.y, rootVertex.z);

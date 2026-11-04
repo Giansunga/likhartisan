@@ -23,7 +23,8 @@ import { applyFinishToMaterial, applyFinishToScene, disposeFinishedScene, ensure
 import type { MaterialParams } from './materials';
 import { inchesToCm } from '../../lib/measurements';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
-import { getSectionAnchors } from './calibrateModel';
+import type { ShapeTargetProfile } from '../../lib/measurements';
+import { getSectionAnchors, resolveShapeTargets } from './calibrateModel';
 import { applyShapeGeometry, getShapeHeightScale, getGeometrySnapshot, getBoundsFromSnapshots, cacheProfileCoefficients, type GeometrySnapshot, type ModelBounds, type ShapeParams } from './shapeGeometry';
 import { attachmentDesignRevision, validateAttachmentDesign, type AttachmentAnalysis } from './attachmentValidation';
 import { captureException } from '../../lib/sentry';
@@ -117,6 +118,8 @@ export function FreeformScene({
   attachmentSockets = [],
   selectedSocketIds = [],
   onMorphDetected,
+  modelId,
+  onShapeTargets,
   onControlsReady,
   onAttachmentError,
   onSocketsChange,
@@ -128,6 +131,8 @@ export function FreeformScene({
   previewMode = false,
 }: {
   modelFile: string;
+  modelId?: string;
+  onShapeTargets?: (profile: ShapeTargetProfile) => void;
   shapeParams: ShapeParams;
   materialParams: MaterialParams;
   decorationParams?: DecorationParams;
@@ -146,6 +151,9 @@ export function FreeformScene({
   previewMode?: boolean;
 }) {
   const gltf = useLoader(PublicGLTFLoader, modelFile);
+  useEffect(() => {
+    if (onShapeTargets) onShapeTargets(resolveShapeTargets(gltf.scene, modelId, modelFile));
+  }, [gltf.scene, modelFile, modelId, onShapeTargets]);
   const { camera, controls, gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const initialized = useRef(false);
@@ -279,7 +287,7 @@ export function FreeformScene({
     }
 
     const relativeBaseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
-    const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${relativeBaseline ? Object.values(relativeBaseline).join('|') : 'legacy'}`;
+    const shapeKey = `${geometryShapeParams.height}|${geometryShapeParams.bodyWidth}|${geometryShapeParams.neckWidth}|${geometryShapeParams.rimSize}|${geometryShapeParams.curvature}|${relativeBaseline ? Object.values(relativeBaseline).join('|') : 'legacy'}|${JSON.stringify(shapeParams.targetProfile)}`;
     const appearanceKey = `${materialParams.color}|${materialParams.finish}|${decorationParams.patternId}|${decorationParams.color}|${decorationParams.effect}|${decorationParams.placement}|${decorationParams.scale}|${decorTexture?.uuid || ''}`;
     const shapeChanged = appliedShapeRef.current !== shapeKey;
     const appearanceChanged = appliedAppearanceRef.current !== appearanceKey;
@@ -437,6 +445,8 @@ export default function FreeformViewer({
   attachmentSockets = [],
   selectedSocketIds = [],
   onMorphDetected,
+  modelId,
+  onShapeTargets,
   onControlsReady,
   onAttachmentError,
   onSocketsChange,
@@ -448,6 +458,8 @@ export default function FreeformViewer({
   preview = false,
 }: {
   modelFile: string;
+  modelId?: string;
+  onShapeTargets?: (profile: ShapeTargetProfile) => void;
   fallbackSrc?: string;
   fallbackAlt?: string;
   shapeParams: ShapeParams;
@@ -535,6 +547,8 @@ export default function FreeformViewer({
             <FreeformScene
               key={modelFile}
               modelFile={modelFile}
+              modelId={modelId}
+              onShapeTargets={onShapeTargets}
               shapeParams={shapeParams}
               materialParams={materialParams}
               decorationParams={decorationParams}

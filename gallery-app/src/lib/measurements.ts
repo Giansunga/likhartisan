@@ -3,6 +3,13 @@ export const CANONICAL_MEASUREMENT_UNIT = 'in' as const;
 
 export type MeasurementUnit = 'cm' | 'in';
 
+export type ShapeTargetProfile = {
+  version: 1;
+  body: number | null;
+  neck: number | null;
+  rim: number;
+};
+
 export type ShapeParamsInches = {
   height: number;
   bodyWidth: number;
@@ -11,6 +18,7 @@ export type ShapeParamsInches = {
   curvature: number;
   unit: 'in';
   geometryMode?: 'baseline';
+  targetProfile?: ShapeTargetProfile;
   baseline?: Pick<ShapeParamsInches, 'height' | 'bodyWidth' | 'neckWidth' | 'rimSize'>;
 };
 
@@ -114,11 +122,19 @@ export function normalizeShapeParams<T extends { height: number; bodyWidth: numb
   }
   next.curvature = finiteNumber(next.curvature) as T['curvature'];
   const metadata = input as ShapeParamsInches | null | undefined;
-  const withMetadata = next as T & Pick<ShapeParamsInches, 'geometryMode' | 'baseline'>;
+  const withMetadata = next as T & Pick<ShapeParamsInches, 'geometryMode' | 'baseline' | 'targetProfile'>;
+  delete withMetadata.targetProfile;
   if (source === 'in' && metadata?.geometryMode === 'baseline' && metadata.baseline
     && SHAPE_DIMENSION_KEYS.every((key) => Number.isFinite(metadata.baseline?.[key]) && metadata.baseline![key] > 0)) {
     withMetadata.geometryMode = 'baseline';
     withMetadata.baseline = { ...metadata.baseline };
+    const profile = metadata.targetProfile;
+    if (profile?.version === 1 && Number.isFinite(profile.rim) && profile.rim >= 0.9 && profile.rim <= 1
+      && (profile.body === null || (Number.isFinite(profile.body) && profile.body >= 0.12 && profile.body < profile.rim - 0.06))
+      && (profile.neck === null || (profile.body !== null && Number.isFinite(profile.neck)
+        && profile.neck > profile.body + 0.05 && profile.neck < profile.rim - 0.02))) {
+      withMetadata.targetProfile = { ...profile };
+    }
   } else {
     delete withMetadata.geometryMode;
     delete withMetadata.baseline;

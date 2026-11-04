@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { shapeFromModelBase } from '../../../lib/measurements';
+import { resolveShapeTargets } from '../calibrateModel';
 import { applyShapeGeometry, cacheProfileCoefficients, getBoundsFromSnapshots, getGeometrySnapshot, isUneditedShape, restoreSourceGeometry } from '../shapeGeometry';
 
 describe('original model geometry', () => {
@@ -62,6 +63,67 @@ describe('original model geometry', () => {
       expect(geometry.getAttribute('position').array).toEqual(originalPositions);
       expect(geometry.getAttribute('normal').array).toEqual(originalNormals);
       expect(mesh.morphTargetInfluences).toEqual([0.4]);
+    }
+  });
+});
+
+describe('model-specific width targets', () => {
+  function createVessel(points: [number, number][]) {
+    const rings = points.flatMap(([height, radius], i) => {
+      const next = points[i + 1];
+      if (!next) return [new THREE.Vector2(radius, height)];
+      return Array.from({ length: 20 }, (_, j) => new THREE.Vector2(
+        THREE.MathUtils.lerp(radius, next[1], j / 20),
+        THREE.MathUtils.lerp(height, next[0], j / 20),
+      ));
+    });
+    const mesh = new THREE.Mesh(new THREE.LatheGeometry(rings, 32));
+    const root = new THREE.Group();
+    root.add(mesh);
+    return { mesh, root };
+  }
+
+  it('finds a high body and a short neck close to the rim', () => {
+    const { mesh, root } = createVessel([
+      [0, 0.55], [0.5, 0.8], [0.75, 1], [0.81, 1], [0.9, 0.5], [0.94, 0.5], [1, 0.65],
+    ]);
+    const profile = resolveShapeTargets(root, undefined, '/short-neck.glb');
+    expect(profile.body).toBeGreaterThan(0.73);
+    expect(profile.neck).toBeGreaterThan(0.89);
+    const snapshot = getGeometrySnapshot(mesh, root)!;
+    const bounds = getBoundsFromSnapshots([snapshot]);
+    cacheProfileCoefficients(snapshot, bounds);
+    const base = { ...shapeFromModelBase({ height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 4 }), targetProfile: profile };
+    const widthAt = (height: number) => {
+      const positions = mesh.geometry.getAttribute('position');
+      let radius = 0;
+      for (let i = 0; i < positions.count; i++) {
+        if (Math.abs(positions.getY(i) - height) < 1e-5) radius = Math.max(radius, Math.hypot(positions.getX(i), positions.getZ(i)));
+      }
+      return 2 * radius;
+    };
+    const legacySections = { body: 0.45, neck: 0.8, rim: 0.98 };
+    applyShapeGeometry(mesh.geometry, snapshot, bounds, { ...base, bodyWidth: 12 }, legacySections);
+    expect(widthAt(0.75)).toBeGreaterThan(2.9);
+    expect(widthAt(0.94)).toBeCloseTo(1, 5);
+    expect(widthAt(1)).toBeCloseTo(1.3, 5);
+    applyShapeGeometry(mesh.geometry, snapshot, bounds, { ...base, neckWidth: 7.5 }, legacySections);
+    expect(widthAt(0.75)).toBeCloseTo(2, 5);
+    expect(widthAt(0.92)).toBeGreaterThan(1.45);
+    expect(widthAt(1)).toBeCloseTo(1.3, 5);
+    applyShapeGeometry(mesh.geometry, snapshot, bounds, base, legacySections);
+    expect(mesh.geometry.getAttribute('position').array).toEqual(snapshot.localPositions);
+  });
+
+  it('recognizes a bowl and a straight planter as neckless', () => {
+    for (const points of [
+      [[0, 0.35], [0.4, 0.8], [1, 1]],
+      [[0, 0.8], [1, 0.8]],
+    ] as [number, number][][]) {
+      const { root } = createVessel(points);
+      const profile = resolveShapeTargets(root, undefined, '/neckless.glb');
+      expect(profile.body).not.toBeNull();
+      expect(profile.neck).toBeNull();
     }
   });
 });

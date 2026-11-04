@@ -25,7 +25,7 @@ import { getFinishDefinition, normalizeMaterialParams, type MaterialParams } fro
 import { attachmentTotals, normalizeAttachmentSelections, selectedSocketIds, type AttachmentSelection, type GeneratedAttachmentSocket } from '../components/freeform/attachments';
 import type { AttachmentPlacementLimitMap } from '../components/freeform/attachmentPlacement';
 import { MIN_DESIGN_REQUEST_QUANTITY, isValidDesignRequestQuantity, createDesignRequestSnapshot, normalizeDesignRequestSnapshot, type DesignRequestSnapshotV1 } from '../types/designRequest';
-import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams, shapeFromModelBase } from '../lib/measurements';
+import { DEFAULT_SHAPE_PARAMS_IN, formatInches, normalizeShapeParams, shapeFromModelBase, type ShapeTargetProfile } from '../lib/measurements';
 import { isValidLandingLook, type LandingLook, type LandingModel } from '../lib/landing3dFeature';
 import { estimateModelDesign, modelBaseFromRow, type ModelBase } from '../components/freeform/modelEstimate';
 import * as THREE from 'three';
@@ -96,6 +96,17 @@ export default function FreeformPage() {
 
   /* Design params */
   const [shapeParams, setShapeParams] = useState(DEFAULT_SHAPE);
+  const [needsShapeTargets, setNeedsShapeTargets] = useState(false);
+  const modelAssetPinned = Boolean(shapeParams.targetProfile) || needsShapeTargets;
+  const [resolvedTargets, setResolvedTargets] = useState<{ file: string; id: string | null; profile: ShapeTargetProfile }>();
+  const activeTargets = resolvedTargets?.file === selectedModel && resolvedTargets.id === selectedModelId
+    ? resolvedTargets.profile : undefined;
+  const handleShapeTargets = useCallback((profile: ShapeTargetProfile) => {
+    setResolvedTargets({ file: selectedModel, id: selectedModelId, profile });
+    if (!needsShapeTargets) return;
+    setShapeParams((shape) => ({ ...shape, targetProfile: profile }));
+    setNeedsShapeTargets(false);
+  }, [selectedModel, selectedModelId, needsShapeTargets]);
   const [materialParams, setMaterialParams] = useState(DEFAULT_MATERIAL);
   const [decorationParams, setDecorationParams] = useState<DecorationParams>(DEFAULT_DECORATION);
   const [attachmentParams, setAttachmentParams] = useState<AttachmentSelection[]>([]);
@@ -172,18 +183,17 @@ export default function FreeformPage() {
   const currentDesign = JSON.stringify([selectedModelId || selectedModel, selectedShopId, shapeParams, materialParams, decorationParams, attachmentParams]);
   const hasUnsavedChanges = Boolean(selectedModel) && cleanDesign !== currentDesign;
   const markDesignClean = useRef(false);
-  const [, refreshCleanState] = useState(0);
+  const [cleanRequest, refreshCleanState] = useState(0);
   function recordCleanDesign() {
     markDesignClean.current = true;
     refreshCleanState(revision => revision + 1);
   }
   useEffect(() => {
-    if (markDesignClean.current) {
+    if (markDesignClean.current && !needsShapeTargets) {
       markDesignClean.current = false;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Capture the completed load/reset transaction.
       setCleanDesign(currentDesign);
     }
-  });
+  }, [cleanRequest, currentDesign, needsShapeTargets]);
   useUnsavedProgress(hasUnsavedChanges);
 
   /* UI state */
@@ -206,6 +216,8 @@ export default function FreeformPage() {
 
   const stepIndex = STEPS.findIndex((s) => s.key === activeStep);
   const isReviewStep = activeStep === 'review';
+  const resetShape = shapeFromModelBase(shapeParams.baseline ?? modelBase ?? DEFAULT_SHAPE);
+  if (activeTargets) resetShape.targetProfile = activeTargets;
 
   /* ─── Helpers ─── */
 
@@ -225,7 +237,9 @@ export default function FreeformPage() {
     setModelThumbnail(thumbnail || '');
     setModelBase(base);
     if (resetParams) {
-      setShapeParams(base ? shapeFromModelBase(base) : DEFAULT_SHAPE);
+      const baselineShape = shapeFromModelBase(base ?? DEFAULT_SHAPE);
+      setShapeParams(baselineShape);
+      setNeedsShapeTargets(true);
       setMaterialParams(DEFAULT_MATERIAL);
       setDecorationParams(DEFAULT_DECORATION);
       if (attachmentParams.length) toast.info('Attachments were removed because the base model changed.');
@@ -246,10 +260,10 @@ export default function FreeformPage() {
         if (cancelled) return;
         const base = modelBaseFromRow(data);
         if (base || !revisionMode) setModelBase(base);
-        if (!revisionMode && selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
+        if (!revisionMode && !modelAssetPinned && selectedModelId && data?.file_url && data.file_url !== selectedModel) setSelectedModel(data.file_url);
       });
     return () => { cancelled = true; };
-  }, [selectedModel, selectedModelId, revisionMode]);
+  }, [selectedModel, selectedModelId, revisionMode, modelAssetPinned]);
 
 function applyDesign(design: {
     model_file: string;
@@ -267,6 +281,7 @@ function applyDesign(design: {
     setSelectedModel(design.model_file);
     setSelectedModelId(design.model_id || null);
     setModelName(design.model_name);
+    setNeedsShapeTargets(false);
     setShapeParams(normalizeShapeParams(design.shape_params, DEFAULT_SHAPE, design.measurement_unit === 'in' ? 'in' : 'cm'));
     setMaterialParams(normalizeMaterialParams(design.material_params));
     setDecorationParams(design.decor_params || DEFAULT_DECORATION);
@@ -302,12 +317,13 @@ function applyDesign(design: {
       }
 
       setModelBase(null);
-      setSelectedModel(design.models_3d?.file_url || design.model_file);
+      setSelectedModel(design.shape_params?.targetProfile ? design.model_file : design.models_3d?.file_url || design.model_file);
       setSelectedModelId(design.model_id || null);
       setModelName(design.model_name);
       setModelCategory(design.models_3d?.category || 'Vase');
       setModelThumbnail(design.models_3d?.thumbnail || design.thumbnail || '');
 
+      setNeedsShapeTargets(false);
       setShapeParams(normalizeShapeParams(design.shape_params, DEFAULT_SHAPE, design.measurement_unit === 'in' ? 'in' : 'cm'));
       setMaterialParams(normalizeMaterialParams(design.material_params));
       setDecorationParams(design.decor_params || DEFAULT_DECORATION);
@@ -368,6 +384,7 @@ function applyDesign(design: {
         setModelName(snapshot.model.name);
         setModelCategory(snapshot.model.category || 'Vase');
         setModelThumbnail(snapshot.model.thumbnail || '');
+        setNeedsShapeTargets(false);
         setShapeParams(snapshot.shape);
         setMaterialParams(normalizeMaterialParams(snapshot.material));
         setDecorationParams(snapshot.decoration);
@@ -410,7 +427,8 @@ function applyDesign(design: {
               ? supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('id', data.model_id)
               : supabase.from('models_3d').select('id,category,thumbnail,file_url').eq('file_url', data.model_file);
             const { data: savedModel } = await modelQuery.maybeSingle();
-            applyDesign({ ...data, model_file: savedModel?.file_url || data.model_file, model_id: savedModel?.id || data.model_id, shop_name: shopName });
+            const modelFile = data.shape_params?.targetProfile ? data.model_file : savedModel?.file_url || data.model_file;
+            applyDesign({ ...data, model_file: modelFile, model_id: savedModel?.id || data.model_id, shop_name: shopName });
             setModelCategory(savedModel?.category || 'Vase');
             setModelThumbnail(savedModel?.thumbnail || data.thumbnail || '');
             setActiveStep('review');
@@ -442,6 +460,7 @@ function applyDesign(design: {
           navBase,
         );
         if (navState.featuredLook && isValidLandingLook(navState.featuredLook, navModel as LandingModel)) {
+          setNeedsShapeTargets(false);
           setShapeParams(navState.featuredLook.shape);
           setMaterialParams(normalizeMaterialParams(navState.featuredLook.material));
           setDecorationParams(navState.featuredLook.decoration);
@@ -523,7 +542,8 @@ function applyDesign(design: {
   async function handleResetDesign() {
     const shouldReset = !selectedModel || await confirmAction('Reset all shape, material, pattern, and attachment changes?');
     if (!shouldReset) return;
-    setShapeParams(modelBase ? shapeFromModelBase(modelBase) : DEFAULT_SHAPE);
+    setShapeParams(resetShape);
+    setNeedsShapeTargets(!activeTargets && Boolean(selectedModel));
     setMaterialParams(DEFAULT_MATERIAL);
     setDecorationParams(DEFAULT_DECORATION);
     setAttachmentParams([]);
@@ -561,6 +581,7 @@ function applyDesign(design: {
   }
 
   async function handleSaveDesign() {
+    if (needsShapeTargets) { toast.info('Wait for the model to finish loading.'); return; }
     if (!requireAttachmentsReady()) return;
     if (!user) {
       window.dispatchEvent(new CustomEvent('open-auth', { detail: { view: 'signin' } }));
@@ -644,6 +665,7 @@ function applyDesign(design: {
   }
 
   async function handleSubmitToShop(quantity: number, buyerNote: string) {
+    if (needsShapeTargets) { toast.info('Wait for the model to finish loading.'); return; }
     if (!requireAttachmentsReady()) return;
     if (!selectedShop || !selectedModel) return;
     setSubmitting(true);
@@ -816,7 +838,11 @@ function applyDesign(design: {
                     <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Choose a shop to browse pottery models</p>
                   </div>
                 ))}
-                {activeStep === 'shape' && <ShapeTab shapeParams={shapeParams} baseShape={shapeParams.geometryMode === 'baseline' && shapeParams.baseline ? shapeFromModelBase(shapeParams.baseline) : modelBase ? shapeFromModelBase(modelBase) : DEFAULT_SHAPE} onChange={setShapeParams} onInteractionChange={setControlInteraction} />}
+                {activeStep === 'shape' && (
+                  <ShapeTab shapeParams={shapeParams} baseShape={resetShape} modelKey={selectedModel}
+                    targetsPending={needsShapeTargets} resetDisabled={!activeTargets}
+                    onChange={setShapeParams} onInteractionChange={setControlInteraction} />
+                )}
                 {activeStep === 'material' && <MaterialTab materialParams={materialParams} onChange={setMaterialParams} shopName={selectedShopName} />}
                 {activeStep === 'decor' && <DecorTab decoration={decorationParams} onChange={setDecorationParams} />}
                 {activeStep === 'attachment' && (
@@ -865,6 +891,8 @@ function applyDesign(design: {
           <div className="freeform-viewer-canvas freeform-viewer">
             <FreeformViewer
               modelFile={selectedModel}
+              modelId={selectedModelId ?? undefined}
+              onShapeTargets={handleShapeTargets}
               fallbackSrc={modelThumbnail}
               fallbackAlt={modelName || 'Selected model preview'}
               shapeParams={shapeParams}

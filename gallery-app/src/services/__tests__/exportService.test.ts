@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { disposeFinishTextureCache } from '../../components/freeform/finishMaterials';
 import { calibrateModelScene, measureModelScene } from '../../components/freeform/calibrateModel';
+import { shapeFromModelBase } from '../../lib/measurements';
+import { applyShapeGeometry, cacheProfileCoefficients, getBoundsFromSnapshots, getGeometrySnapshot, type ShapeParams } from '../../components/freeform/shapeGeometry';
 
 const exporterState = vi.hoisted(() => ({ scene: null as THREE.Object3D | null }));
 
@@ -79,5 +81,25 @@ describe('exportSceneToGLB finish output', () => {
     expect(measured.neckWidth).toBeCloseTo(6.5, 1);
     expect(measured.rimSize).toBeCloseTo(8.5, 1);
     expect(measureModelScene(stored).height).toBeCloseTo(13, 1);
+  });
+
+  it('exports the same vertices the editor renders for model-specific targets', async () => {
+    const source = new THREE.Group();
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.6, 2, 24, 32), new THREE.MeshStandardMaterial());
+    source.add(mesh);
+    const baseline = shapeFromModelBase({ height: 8, bodyWidth: 8, neckWidth: 5, rimSize: 6 });
+    const shape: ShapeParams = {
+      ...baseline, bodyWidth: 11.8,
+      targetProfile: { version: 1, body: 0.81, neck: null, rim: 0.98 },
+    };
+    await exportSceneToGLB(source, shape, { finish: 'raw_clay', color: '#BE734F' });
+
+    const snapshot = getGeometrySnapshot(mesh, source)!;
+    const bounds = getBoundsFromSnapshots([snapshot]);
+    cacheProfileCoefficients(snapshot, bounds);
+    applyShapeGeometry(mesh.geometry, snapshot, bounds, shape, { body: 0.45, neck: 0.8, rim: 0.98 });
+
+    const exported = exporterState.scene?.getObjectByProperty('isMesh', true) as THREE.Mesh;
+    expect(exported.geometry.getAttribute('position').array).toEqual(mesh.geometry.getAttribute('position').array);
   });
 });

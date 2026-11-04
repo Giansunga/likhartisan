@@ -4,8 +4,7 @@ import { applyFinishToScene, generateCylindricalUVs } from '../components/freefo
 import type { MaterialParams } from '../components/freeform/materials';
 import { inchesToCm } from '../lib/measurements';
 import { calibrateModelScene, getSectionAnchors, sectionScale } from '../components/freeform/calibrateModel';
-
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number; unit?: 'cm' | 'in'; geometryMode?: 'baseline'; baseline?: { height: number; bodyWidth: number; neckWidth: number; rimSize: number } };
+import { applyShapeGeometry, cacheProfileCoefficients, getGeometrySnapshot, getBoundsFromSnapshots, type GeometrySnapshot, type ShapeParams } from '../components/freeform/shapeGeometry';
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -50,64 +49,6 @@ function getProfileScale(t: number, shapeParams: ShapeParams, relativeAnchors: [
   return THREE.MathUtils.clamp(1 + scaleOffset + bellyCurve + shoulderCurve, 0.25, 1.8);
 }
 
-type GeometrySnapshot = { rootPositions: Float32Array; rootToLocal: THREE.Matrix4 };
-type ModelBounds = { minY: number; rangeY: number; centerX: number; centerY: number; centerZ: number };
-
-function getGeometrySnapshot(mesh: THREE.Mesh, root: THREE.Group): GeometrySnapshot | null {
-  const geometry = mesh.geometry;
-  const position = geometry.attributes.position;
-  if (!position) return null;
-
-  root.updateWorldMatrix(true, true);
-  mesh.updateWorldMatrix(true, false);
-
-  const rootInverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
-  const localToRoot = new THREE.Matrix4().multiplyMatrices(rootInverse, mesh.matrixWorld);
-  const rootToLocal = new THREE.Matrix4().multiplyMatrices(
-    new THREE.Matrix4().copy(mesh.matrixWorld).invert(),
-    root.matrixWorld
-  );
-
-  const localPositions = position.array.slice() as Float32Array;
-  const rootPositions = new Float32Array(localPositions.length);
-  const vertex = new THREE.Vector3();
-
-  for (let i = 0; i < position.count; i++) {
-    vertex.set(localPositions[i * 3], localPositions[i * 3 + 1], localPositions[i * 3 + 2]);
-    vertex.applyMatrix4(localToRoot);
-    rootPositions[i * 3] = vertex.x;
-    rootPositions[i * 3 + 1] = vertex.y;
-    rootPositions[i * 3 + 2] = vertex.z;
-  }
-
-  return { rootPositions, rootToLocal };
-}
-
-function getBoundsFromSnapshots(snapshots: Iterable<GeometrySnapshot>): ModelBounds {
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-
-  for (const snapshot of snapshots) {
-    for (let i = 0; i < snapshot.rootPositions.length; i += 3) {
-      const x = snapshot.rootPositions[i];
-      const y = snapshot.rootPositions[i + 1];
-      const z = snapshot.rootPositions[i + 2];
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
-    }
-  }
-
-  return {
-    minY,
-    rangeY: maxY - minY || 1,
-    centerX: (minX + maxX) / 2,
-    centerY: (minY + maxY) / 2,
-    centerZ: (minZ + maxZ) / 2,
-  };
-}
-
 function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): void {
   const geometryShapeParams = shapeParams.unit === 'in'
     ? {
@@ -132,6 +73,13 @@ function applyDeformationToClone(clone: THREE.Group, shapeParams: ShapeParams): 
   if (geometrySnapshots.size === 0) return;
 
   const modelBounds = getBoundsFromSnapshots(geometrySnapshots.values());
+  if (shapeParams.targetProfile && shapeParams.geometryMode === 'baseline' && shapeParams.baseline) {
+    geometrySnapshots.forEach((snapshot, geometry) => {
+      cacheProfileCoefficients(snapshot, modelBounds);
+      applyShapeGeometry(geometry, snapshot, modelBounds, shapeParams, { body: 0.45, neck: 0.8, rim: 0.98 });
+    });
+    return;
+  }
   const baseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
   let relativeAnchors: [number, number][] | null = null;
   if (baseline) {
@@ -212,7 +160,7 @@ export async function exportSceneToGLB(
   generateCylindricalUVs(clone);
   applyDeformationToClone(clone, shapeParams);
   const baseline = shapeParams.geometryMode === 'baseline' ? shapeParams.baseline : undefined;
-  if (baseline && (shapeParams.height !== baseline.height || shapeParams.bodyWidth !== baseline.bodyWidth
+  if (baseline && !shapeParams.targetProfile && (shapeParams.height !== baseline.height || shapeParams.bodyWidth !== baseline.bodyWidth
     || shapeParams.neckWidth !== baseline.neckWidth || shapeParams.rimSize !== baseline.rimSize
     || shapeParams.curvature !== 50)) {
     clone = calibrateModelScene(clone, shapeParams);

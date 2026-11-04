@@ -21,6 +21,15 @@ describe('ShapeTab', () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
+  it('disables neck editing only on models without a detected neck', () => {
+    const base = shapeFromModelBase({ height: 10, bodyWidth: 8, neckWidth: 5, rimSize: 4 });
+    const view = render(<ShapeTab shapeParams={{ ...base, targetProfile: { version: 1, body: 0.8, neck: null, rim: 0.98 } }} onChange={vi.fn()} />);
+    expect(screen.getByRole('slider', { name: 'Neck Width' })).toBeDisabled();
+    expect(screen.getByRole('slider', { name: 'Rim Size' })).toBeEnabled();
+    view.rerender(<ShapeTab shapeParams={{ ...base, targetProfile: { version: 1, body: 0.6, neck: 0.85, rim: 0.98 } }} onChange={vi.fn()} />);
+    expect(screen.getByRole('slider', { name: 'Neck Width' })).toBeEnabled();
+  });
+
   it('coalesces rapid slider changes into one preview update per frame', () => {
     const onChange = vi.fn();
     render(<ShapeTab shapeParams={initialShape} onChange={onChange} />);

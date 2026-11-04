@@ -7,6 +7,7 @@ import { createAttachmentSelection, type AttachmentSelection } from '../attachme
 import { GENERATED_ATTACHMENT_RECIPES } from '../generatedAttachmentCatalog';
 import { resolveAttachmentMount } from '../attachmentPlacement';
 import type { AttachmentAnalysis } from '../attachmentValidation';
+import type { ShapeParams } from '../shapeGeometry';
 
 vi.mock('@react-three/fiber', async importOriginal => {
   const THREE = await import('three');
@@ -30,7 +31,7 @@ const selection = createAttachmentSelection({ recipe, shopId: null, priceAdjustm
 const cleanup: Array<() => void> = [];
 afterEach(async () => { await act(async () => cleanup.splice(0).forEach(dispose => dispose())); });
 
-async function viewer(paused: boolean, attachments = [selection]) {
+async function viewer(paused: boolean, attachments = [selection], initialShape: ShapeParams = shape) {
   const canvas = document.createElement('canvas');
   const root = createRoot(canvas);
   const renderer = {
@@ -41,7 +42,7 @@ async function viewer(paused: boolean, attachments = [selection]) {
   } as unknown as THREE.WebGLRenderer;
   await root.configure({ gl: renderer, frameloop: 'never', size: { width: 800, height: 600, top: 0, left: 0 }, dpr: 1 });
   const analyzed = vi.fn<(analysis: AttachmentAnalysis) => void>();
-  const render = async (nextShape = shape) => {
+  const render = async (nextShape = initialShape) => {
     await act(async () => root.render(<FreeformScene modelFile="bowl.gltf" shapeParams={nextShape}
       materialParams={{ color: '#A5E0CF', finish: 'glazed' }} attachmentParams={attachments}
       pauseAttachmentAnalysis={paused} showAttachmentSockets={false} onMorphDetected={() => {}}
@@ -68,15 +69,18 @@ function expectMountedOnCurrentSurface(group: THREE.Group, attachments: Attachme
 
 describe('submitted handle placement', () => {
   it('mounts a read-only handle on the shaped surface on the first frame and after a shape update', async () => {
-    const editor = await viewer(false);
+    const targeted: ShapeParams = { ...shape, targetProfile: { version: 1, body: 0.68, neck: null, rim: 0.98 } };
+    const editor = await viewer(false, [selection], targeted);
     editor.frame(); editor.frame();
     const saved = JSON.parse(JSON.stringify(editor.analyzed.mock.calls.at(-1)![0].attachments)) as AttachmentSelection[];
-    const preview = await viewer(true, saved);
+    const preview = await viewer(true, saved, targeted);
     preview.frame();
     expectMountedOnCurrentSurface(preview.group(), saved);
-    await preview.render({ ...shape, bodyWidth: 8, neckWidth: 8, rimSize: 8 });
+    const originalMount = preview.group().children[1].position.clone();
+    await preview.render({ ...targeted, bodyWidth: 9.9 });
     preview.frame();
     expectMountedOnCurrentSurface(preview.group(), saved);
+    expect(preview.group().children[1].position.distanceTo(originalMount)).toBeGreaterThan(0.00001);
   });
 
   it('recreates the accepted editor placements after submitting and cold-loading the shop viewer', async () => {

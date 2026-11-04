@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PublicGLTFLoader } from '../../lib/publicModelLoader';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import type { ShapeTargetProfile } from '../../lib/measurements';
 
 type Dimensions = { height: number; bodyWidth: number; neckWidth: number; rimSize: number };
 type Point = THREE.Vector3;
@@ -8,6 +9,76 @@ type Triangle = [Point, Point, Point];
 
 // glTF stores coordinates in meters. The admin form records physical inches.
 const METERS_PER_INCH = 0.0254;
+
+const targetOverrides: Readonly<Record<string, ShapeTargetProfile>> = {
+  // Mini U-Shape Vase: its continuous wall opens straight into the rim.
+  '9de75e12-fd41-43e7-89c0-6f6a1e51def1/1790400086755_8d06f3b5.glb': {
+    version: 1, body: 0.8125, neck: null, rim: 0.98,
+  },
+};
+const detectedTargets = new WeakMap<THREE.Group, ShapeTargetProfile>();
+
+export function resolveShapeTargets(scene: THREE.Group, modelId: string | undefined, assetUrl: string): ShapeTargetProfile {
+  const assetName = assetUrl.split(/[?#]/)[0].split('/').pop();
+  const override = targetOverrides[`${modelId}/${assetName}`];
+  if (override) return override;
+  const cached = detectedTargets.get(scene);
+  if (cached) return cached;
+
+  const triangles = trianglesAtWorldPositions(scene);
+  const bounds = new THREE.Box3();
+  for (const triangle of triangles) for (const vertex of triangle) bounds.expandByPoint(vertex);
+  const height = bounds.max.y - bounds.min.y;
+  let profile: ShapeTargetProfile = { version: 1, body: null, neck: null, rim: 0.98 };
+  if (Number.isFinite(height) && height > 0) {
+    const steps = 80;
+    const slices: Triangle[][] = Array.from({ length: steps - 1 }, () => []);
+    const sliceY = slices.map((_, i) => bounds.min.y + height * (i + 1) / steps);
+    for (const triangle of triangles) {
+      const [a, b, c] = triangle;
+      const low = Math.min(a.y, b.y, c.y);
+      const high = Math.max(a.y, b.y, c.y);
+      const first = Math.max(0, Math.floor((low - bounds.min.y) / height * steps) - 1);
+      const last = Math.min(slices.length - 1, Math.ceil((high - bounds.min.y) / height * steps) - 1);
+      for (let i = first; i <= last; i++) {
+        if (sliceY[i] >= low && sliceY[i] <= high) slices[i].push(triangle);
+      }
+    }
+    const widths = slices.map((triangles, i) => sectionWidth(triangles, sliceY[i]));
+    const smooth = widths.map((width, i) =>
+      (widths[i - 1] ?? width) * 0.25 + width * 0.5 + (widths[i + 1] ?? width) * 0.25);
+    // A neck must follow a shoulder and either open toward the rim or
+    // remain narrow for several slices. A tapered upper wall alone is not a neck.
+    let neckIndex: number | null = null;
+    let neckScore = 0;
+    for (let i = 32; i <= 73; i++) {
+      const width = smooth[i];
+      const shoulder = Math.max(...smooth.slice(14, i - 4));
+      const upper = smooth.slice(i + 1, Math.min(i + 6, smooth.length));
+      if (width <= 0 || shoulder < width * 1.12 || smooth[i - 3] < width * 0.99
+        || upper.some((sample) => sample < width * 0.98)
+        || Math.min(...upper.slice(0, 2)) > width * 1.12) continue;
+      const score = (shoulder - width) / shoulder;
+      if (score > neckScore + 0.005) {
+        neckIndex = i;
+        neckScore = score;
+      }
+    }
+    const bodyEnd = neckIndex === null ? 68 : neckIndex - 5;
+    const bodyWidths = smooth.slice(12, bodyEnd + 1).map((width, offset) => {
+      const i = offset + 12;
+      return Math.min(width, smooth[i - 2], smooth[i + 2]);
+    });
+    const widest = Math.max(...bodyWidths);
+    if (widest > 0 && smooth[77] > 0) {
+      const comparable = bodyWidths.flatMap((width, i) => width >= widest * 0.985 ? [i + 12] : []);
+      const bodyIndex = comparable[Math.floor(comparable.length / 2)];
+      profile = { ...profile, body: (bodyIndex + 1) / steps, neck: neckIndex === null ? null : (neckIndex + 1) / steps };
+    }
+  }
+  detectedTargets.set(scene, profile);
+  return profile;
+}
 
 function trianglesAtWorldPositions(scene: THREE.Group): Triangle[] {
   const triangles: Triangle[] = [];

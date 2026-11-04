@@ -10,15 +10,17 @@ import { applyFinishToScene, disposeFinishedScene, generateCylindricalUVs } from
 import type { MaterialParams } from './materials';
 import NeutralStudioEnvironment from './NeutralStudioEnvironment';
 import { livePreviewScenes } from './previewSceneRegistry';
+import { FreeformScene } from './FreeformViewer';
+import type { ShapeParams } from './shapeGeometry';
 
-type ShapeParams = { height: number; bodyWidth: number; neckWidth: number; rimSize: number; curvature: number };
 function PreviewScene({
   modelFile,
   materialParams,
+  showModel,
 }: {
   modelFile: string;
-  shapeParams: ShapeParams;
   materialParams: MaterialParams;
+  showModel: boolean;
 }) {
   const gltf = useLoader(PublicGLTFLoader, modelFile);
   const materialFinish = materialParams.finish;
@@ -57,7 +59,7 @@ function PreviewScene({
     return () => { livePreviewScenes.delete(modelFile); };
   }, [clone, modelFile]);
 
-  return <primitive object={clone} />;
+  return showModel ? <primitive object={clone} /> : null;
 }
 
 export default function PreviewModal({
@@ -152,7 +154,11 @@ export default function PreviewModal({
             <directionalLight position={[-4, 6, -3]} intensity={0.42} color="#F2F6FF" />
             <spotLight position={[0, 10, 0]} intensity={0.55} angle={0.35} penumbra={0.8} color="#FFFFFF" />
             <Suspense fallback={null}>
-              <PreviewScene modelFile={modelFile} shapeParams={shapeParams} materialParams={materialParams} />
+              <PreviewScene modelFile={modelFile} materialParams={materialParams} showModel={!shapeParams.targetProfile} />
+              {shapeParams.targetProfile && (
+                <FreeformScene modelFile={modelFile} shapeParams={shapeParams} materialParams={materialParams}
+                  onMorphDetected={() => {}} showAttachmentSockets={false} previewMode />
+              )}
             </Suspense>
             <OrbitControls
               makeDefault

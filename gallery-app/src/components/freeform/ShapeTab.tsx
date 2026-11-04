@@ -14,7 +14,7 @@ const SLIDERS: {
 }[] = [
   { key: 'height', label: 'Height', description: 'Full pottery height', min: 2, max: 20 },
   { key: 'bodyWidth', label: 'Body Width', description: 'Widest part / mid-part', min: 2, max: 16 },
-  { key: 'neckWidth', label: 'Neck Width', description: 'Narrow neck opening', min: 1, max: 12 },
+  { key: 'neckWidth', label: 'Neck Width', description: 'Narrow section below the rim', min: 1, max: 12 },
   { key: 'rimSize', label: 'Rim Size', description: 'Mouth rim / flare diameter', min: 1, max: 10 },
   { key: 'curvature', label: 'Curvature', description: 'Body curve — low = straighter, high = fuller', min: 0, max: 100 },
 ];
@@ -26,9 +26,15 @@ export default function ShapeTab({
   baseShape,
   onChange,
   onInteractionChange,
+  modelKey = '',
+  targetsPending = false,
+  resetDisabled = false,
 }: {
   shapeParams: ShapeParams;
   baseShape?: ShapeParams;
+  modelKey?: string;
+  targetsPending?: boolean;
+  resetDisabled?: boolean;
   onChange: (params: ShapeParams) => void;
   onInteractionChange?: (active: boolean) => void;
 }) {
@@ -36,7 +42,7 @@ export default function ShapeTab({
   const draftParams = controls.draft;
   const baselineShape = baseShape || DEFAULTS;
   // A saved outlier extends the range once; dragging never changes its endpoints.
-  const baselineKey = JSON.stringify(baselineShape);
+  const baselineKey = JSON.stringify([modelKey, baselineShape]);
   const makeRanges = () => Object.fromEntries(SLIDERS.map(({ key, min, max }) => [key,
     key === 'curvature' ? { min, max } : {
       min: Math.min(Math.max(0.01, baselineShape[key] * 0.5), shapeParams[key]),
@@ -62,15 +68,22 @@ export default function ShapeTab({
           const max = ranges[s.key].max;
           const pct = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
           const change = val - baseline;
+          const profile = shapeParams.targetProfile;
+          const unavailable = s.key === 'bodyWidth' && profile?.body === null
+            ? 'No reliable body target for this model.'
+            : s.key === 'neckWidth' && profile?.neck === null
+              ? 'No distinct neck detected. Use Rim Size for the opening.'
+              : null;
           return (
             <div key={s.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dark)' }}>{s.label}</label>
                 <span style={{ fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary-color)' }}>{s.key === 'curvature' ? `${change > 0 ? '+' : ''}${change.toFixed(0)}%` : `${change > 0 ? '+' : ''}${formatInches(change)}`}</span>
               </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{s.description}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>{unavailable ?? s.description}</p>
               <input
                 type="range"
+                disabled={targetsPending || Boolean(unavailable)}
                 min={min}
                 max={max}
                 value={val}
@@ -94,7 +107,7 @@ export default function ShapeTab({
         })}
       </div>
 
-      <button onClick={() => controls.reset({ ...baselineShape })} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
+      <button disabled={resetDisabled || targetsPending} onClick={() => controls.reset({ ...baselineShape })} className="freeform-tab-btn-outline" style={{ marginTop: '24px' }}>
         Reset Shape
       </button>
     </div>

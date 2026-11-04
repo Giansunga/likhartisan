@@ -1,8 +1,10 @@
 import PopupHost from '../../components/Popup';
+import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FreeformPage from '../FreeformPage';
+import type { ShapeParamsInches, ShapeTargetProfile } from '../../lib/measurements';
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: null, loading: false }),
@@ -12,7 +14,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: { from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: {
-        id: 'model-1', status: 'active', file_url: '/models/vase.glb', thumbnail: '/models/vase.jpg', base_height_in: 10, base_body_width_in: 8,
+        id: 'model-1', shop_id: 'shop-1', status: 'active', file_url: '/models/vase.glb', thumbnail: '/models/vase.jpg', base_height_in: 10, base_body_width_in: 8,
         base_neck_width_in: 5, base_rim_size_in: 4, base_price_php: 1250, base_production_days: 5,
       } })) })),
     })),
@@ -20,11 +22,25 @@ vi.mock('../../lib/supabase', () => ({
 }));
 
 vi.mock('../../components/freeform/FreeformViewer', () => ({
-  default: ({ fallbackSrc }: { fallbackSrc?: string }) => <div data-testid="freeform-viewer" data-fallback-src={fallbackSrc} />,
+  default: function MockFreeformViewer({ fallbackSrc, modelFile, onShapeTargets, shapeParams }: {
+    fallbackSrc?: string;
+    modelFile: string;
+    onShapeTargets?: (profile: ShapeTargetProfile) => void;
+    shapeParams: ShapeParamsInches;
+  }) {
+    useEffect(() => {
+      if (modelFile) onShapeTargets?.({
+        version: 1, body: 0.65, neck: modelFile.includes('bowl') ? null : 0.87, rim: 0.98,
+      });
+    }, [modelFile, onShapeTargets]);
+    return <div data-testid="freeform-viewer" data-fallback-src={fallbackSrc} data-neck-target={JSON.stringify(shapeParams.targetProfile?.neck)} />;
+  },
 }));
 
 vi.mock('../../components/freeform/ModelTab', () => ({
-  default: () => <div>Model choices</div>,
+  default: ({ onSelect }: { onSelect: (file: string, name: string, category: string) => void }) => (
+    <div>Model choices<button onClick={() => onSelect('/models/bowl.glb', 'Test Bowl', 'Bowl')}>Choose bowl</button></div>
+  ),
 }));
 
 vi.mock('../../components/freeform/ShapeTab', () => ({
@@ -63,6 +79,12 @@ vi.mock('../../components/freeform/SendDesignRequestModal', () => ({
 }));
 
 describe('FreeformPage send-to-shop flow', () => {
+  it('uses the newly selected model targets when switching from a vase to a bowl', async () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: { modelUrl: '/models/vase.glb', modelName: 'Test Vase', shopId: 'shop-1' } }]}><FreeformPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-neck-target', '0.87'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose bowl' }));
+    await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-neck-target', 'null'));
+  });
   it('passes the selected model photo to the viewer even when navigation omitted its thumbnail', async () => {
     render(<MemoryRouter initialEntries={[{ pathname: '/freeform', state: { modelUrl: '/models/vase.glb', modelName: 'Test Vase' } }]}><FreeformPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByTestId('freeform-viewer')).toHaveAttribute('data-fallback-src', '/models/vase.jpg'));
