@@ -292,7 +292,6 @@ export default function AboutPage() {
                           <h3>{artisan.name}</h3>
                           <p className="about-maker-card__specialty">{artisan.specialty || 'Pottery artisan'}</p>
                           {artisan.description && <p className="about-maker-card__description">{artisan.description}</p>}
-                          <span>View profile <ArrowRight aria-hidden="true" /></span>
                         </div>
                       </Link>
                     </motion.article>

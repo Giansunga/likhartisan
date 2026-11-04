@@ -2755,8 +2755,7 @@ body {
 .about-button svg,
 .about-text-link svg,
 .about-step a svg,
-.about-source-note a svg,
-.about-maker-card__body span svg {
+.about-source-note a svg {
   width: 17px;
   height: 17px;
   transition: transform 180ms ease;
@@ -2770,8 +2769,7 @@ body {
 .about-button:hover svg,
 .about-text-link:hover svg,
 .about-step a:hover svg,
-.about-source-note a:hover svg,
-.about-maker-card:hover .about-maker-card__body span svg {
+.about-source-note a:hover svg {
   transform: translateX(4px);
 }
 
@@ -3220,16 +3218,6 @@ body {
   -webkit-line-clamp: 3;
 }
 
-.about-maker-card__body > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: auto;
-  color: var(--about-clay);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
 .about-maker-card--loading {
   border: 0;
   background: linear-gradient(105deg, #efe6dd 25%, #f8f2ec 38%, #efe6dd 52%);
@@ -3501,8 +3489,7 @@ body {
   .about-step a svg,
   .about-source-note a svg,
   .about-maker-card,
-  .about-maker-card__image img,
-  .about-maker-card__body span svg {
+  .about-maker-card__image img {
     transition: none;
   }
 
