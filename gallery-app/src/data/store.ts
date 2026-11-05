@@ -22,7 +22,8 @@ export interface AddToCartResult {
 export function addToCart(userId: string | null | undefined, item: CartItem, maximumQuantity?: number): AddToCartResult {
   if (!userId) return { addedQty: 0, quantity: 0, maximum: null };
   const cart = getCart(userId);
-  const existing = cart.find(i => i.productId === item.productId && i.variationId === item.variationId);
+  const existingIndex = cart.findIndex(i => i.productId === item.productId && i.variationId === item.variationId);
+  const existing = cart[existingIndex];
   const requested = Math.max(0, Math.floor(Number(item.qty) || 0));
   const maximum = Number.isFinite(maximumQuantity)
     ? Math.max(0, Math.floor(maximumQuantity as number))
@@ -35,8 +36,8 @@ export function addToCart(userId: string | null | undefined, item: CartItem, max
     return { addedQty, quantity: current, maximum: Number.isFinite(maximum) ? maximum : null };
   }
 
-  if (existing) existing.qty = quantity;
-  else cart.push({ ...item, qty: quantity });
+  if (existing) cart.splice(existingIndex, 1);
+  cart.unshift({ ...(existing ?? item), qty: quantity });
   setCart(userId, cart);
   return { addedQty, quantity, maximum: Number.isFinite(maximum) ? maximum : null };
 }

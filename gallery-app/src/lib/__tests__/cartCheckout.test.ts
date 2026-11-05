@@ -82,6 +82,18 @@ describe('cart checkout contract', () => {
     addToCart('buyer', first, 1);
     addToCart('buyer', second, 3);
 
-    expect(getCart('buyer')).toEqual([{ ...first, qty: 1 }, second]);
+    expect(getCart('buyer')).toEqual([second, { ...first, qty: 1 }]);
+  });
+
+  it('moves a line to the top only when another unit is added', () => {
+    const first = { ...cart[0], qty: 1 };
+    const second = { ...cart[1], qty: 1 };
+    setCart('buyer', [second, first]);
+
+    expect(addToCart('buyer', first, 1).addedQty).toBe(0);
+    expect(getCart('buyer')).toEqual([second, first]);
+
+    expect(addToCart('buyer', first, 2).addedQty).toBe(1);
+    expect(getCart('buyer')).toEqual([{ ...first, qty: 2 }, second]);
   });
 });
