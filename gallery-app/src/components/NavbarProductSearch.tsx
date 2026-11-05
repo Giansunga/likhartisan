@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Store } from 'lucide-react';
+import { Search, Store } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGallerySearch } from '../contexts/GallerySearchContext';
 import { useShopDirectory } from '../contexts/ShopDirectoryContext';
@@ -27,6 +27,7 @@ export default function NavbarProductSearch() {
   const matches = normalizedQuery.length >= 2 ? searchShops(directory.shops, query).slice(0, 5) : [];
   const options = [
     { id: 'search-shops', label: `Search “${query}” shops`, destination: `/shops?${new URLSearchParams({ q: query })}`, shop: null },
+    { id: 'search-products', label: `Search “${query}” products`, destination: `/gallery?${new URLSearchParams({ q: query })}`, shop: null },
     ...matches.map(shop => ({ id: `shop-${shop.id}`, label: shop.name, destination: `/shop/${shop.id}`, shop })),
   ];
   const activeIndex = options.findIndex(option => option.id === activeId);
@@ -70,6 +71,7 @@ export default function NavbarProductSearch() {
   function selectOption(index: number) {
     setOpenFor(null);
     setActiveId(null);
+    if (options[index].id === 'search-products' && activeBinding?.target === '/gallery') return;
     navigate(options[index].destination);
   }
 
@@ -128,9 +130,10 @@ export default function NavbarProductSearch() {
                 onClick={() => selectOption(index)}>
                 {option.shop?.image
                   ? <AssetImage className="navbar-search-shop-image" src={option.shop.image} alt="" />
-                  : <span className="navbar-search-shop-icon"><Store aria-hidden="true" /></span>}
+                  : <span className="navbar-search-shop-icon">{option.id === 'search-products' ? <Search aria-hidden="true" /> : <Store aria-hidden="true" />}</span>}
                 <span className="navbar-search-option-copy">
                   <span>{option.label}</span>
+                  {option.id === 'search-products' && <small>Product names or featured artisans</small>}
                   {option.shop?.location && <small>{option.shop.location}</small>}
                 </span>
               </button>

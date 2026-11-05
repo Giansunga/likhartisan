@@ -112,6 +112,7 @@ describe('shop search', () => {
     await screen.findByRole('option', { name: /Clay House/ });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
     const activeId = input.getAttribute('aria-activedescendant');
     expect(document.getElementById(activeId!)).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -149,9 +150,17 @@ describe('shop search', () => {
     renderSearch();
     typeQuery('C');
     await waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
-    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getAllByRole('option')).toHaveLength(2);
     typeQuery('Clay');
-    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(6));
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(7));
+  });
+
+  it.each(['/', '/shops'])('can search products by featured artisan from %s', async path => {
+    renderSearch(path);
+    typeQuery('José Mercado');
+    fireEvent.click(screen.getByRole('option', { name: /Search “José Mercado” products/ }));
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/gallery?q=Jos%C3%A9+Mercado');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
   it('shows retryable directory failures separately from empty results', async () => {

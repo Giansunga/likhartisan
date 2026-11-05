@@ -68,10 +68,15 @@ describe('GalleryPage', () => {
       { ...product('Other bowl', 5), shop_id: 'shop-2', featured_artisan_id: 'artisan-2' },
     ], error: null });
     mocks.artisans.mockResolvedValue({ data: [{ id: 'artisan-1', shop_id: 'shop-1', name: 'José Mercado' }, { id: 'artisan-2', shop_id: 'shop-2', name: 'Other Maker' }], error: null });
-    const { container } = render(<MemoryRouter initialEntries={['/gallery?q=Jose%20Mercado']}><Routes>
-      <Route path="/gallery" element={<GalleryPage />} />
+    const { container } = render(<MemoryRouter initialEntries={['/shops']}><GallerySearchProvider><NavbarProductSearch /><Routes>
+      <Route path="/shops" element={<p>Shop results</p>} />
+      <Route path="/gallery" element={<ActualGalleryPage />} />
       <Route path="/product/:id" element={<ReturnControls />} />
-    </Routes></MemoryRouter>);
+    </Routes></GallerySearchProvider></MemoryRouter>);
+    const search = screen.getByRole('combobox', { name: 'Search products or shops' });
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: 'Jose Mercado' } });
+    fireEvent.click(screen.getByRole('option', { name: /Search “Jose Mercado” products/ }));
     await waitFor(() => expect(container.querySelectorAll('[data-gallery-product]')).toHaveLength(1));
     expect(screen.getByAltText('Handmade bowl')).toBeInTheDocument();
     expect(screen.queryByAltText('Other bowl')).not.toBeInTheDocument();
