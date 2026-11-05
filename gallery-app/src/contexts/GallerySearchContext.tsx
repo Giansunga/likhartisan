@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
-type GallerySearchBinding = { value: string; onChange: (value: string) => void };
+type GallerySearchBinding = { target: '/gallery' | '/shops'; value: string; onChange: (value: string) => void };
 const GallerySearchContext = createContext<{
   binding: GallerySearchBinding | null;
   setBinding: (binding: GallerySearchBinding | null) => void;

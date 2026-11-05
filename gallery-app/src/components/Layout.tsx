@@ -1,4 +1,5 @@
 import { GallerySearchProvider } from '../contexts/GallerySearchContext';
+import { ShopDirectoryProvider } from '../contexts/ShopDirectoryContext';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useEffect, Component, type ReactNode } from 'react';
 import Navbar from './Navbar';
@@ -64,7 +65,7 @@ export default function Layout() {
   }, [location.hash, location.pathname, location.search, galleryOwner]);
 
   return (
-    <GallerySearchProvider><LayoutErrorBoundary>
+    <GallerySearchProvider><ShopDirectoryProvider><LayoutErrorBoundary>
       <div className="seasonal-storefront-shell min-h-screen bg-cream">
         <a href="#main-content" style={{
           position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden',
@@ -98,6 +99,6 @@ export default function Layout() {
         {!hideFooter && <Footer />}
         {!hideBottomNav && <BottomNav />}
       </div>
-    </LayoutErrorBoundary></GallerySearchProvider>
+    </LayoutErrorBoundary></ShopDirectoryProvider></GallerySearchProvider>
   );
 }

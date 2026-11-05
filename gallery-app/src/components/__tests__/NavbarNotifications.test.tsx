@@ -70,14 +70,14 @@ describe('Navbar notification routing', () => {
 
   it.each(['/', '/shops', '/artisans', '/freeform', '/signin', '/update-password', '/dashboard', '/chat', '/cart', '/checkout', '/missing'])('offers product search on customer route %s', (path) => {
     renderNavbar(path);
-    expect(screen.getAllByRole('searchbox', { name: 'Search artisan crafts' })).toHaveLength(1);
+    expect(screen.getAllByRole('combobox', { name: 'Search products or shops' })).toHaveLength(1);
   });
 
   it('opens Gallery with the submitted product query and encodes special characters', () => {
-    renderNavbar('/shops');
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'white & gold' } });
-    expect(screen.getByLabelText('current location')).toHaveTextContent('/shops');
-    fireEvent.submit(screen.getByRole('search', { name: 'Search gallery products' }));
+    renderNavbar('/artisans');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'white & gold' } });
+    expect(screen.getByLabelText('current location')).toHaveTextContent('/artisans');
+    fireEvent.submit(screen.getByRole('search', { name: 'Search products or shops' }));
     expect(screen.getByLabelText('current location')).toHaveTextContent('/gallery?q=white+%26+gold');
   });
 
@@ -90,7 +90,7 @@ describe('Navbar notification routing', () => {
 
   it('does not add product search to the artisan dashboard', () => {
     renderNavbar('/artisan-dashboard');
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
   it.each([768, 769, 820, 834, 1024, 1194, 1199, 1200, 1280, 1366])('selects the navigation layout at %ipx', (width) => {

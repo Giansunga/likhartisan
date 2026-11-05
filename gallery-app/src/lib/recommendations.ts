@@ -47,7 +47,7 @@ export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
   return result;
 }
 
-export function normalizeSearchQuery(query: string): string {
+export function normalizeSearchQuery(query: string, maximumLength = 100): string {
   return query
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -55,7 +55,7 @@ export function normalizeSearchQuery(query: string): string {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ')
-    .slice(0, 100);
+    .slice(0, maximumLength);
 }
 
 function queryTokens(query: string): string[] {

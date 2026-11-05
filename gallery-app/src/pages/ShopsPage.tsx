@@ -1,42 +1,60 @@
 import './ListingPages.css';
 import AssetImage from '../components/AssetImage';
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-
-interface Shop {
-  id: string;
-  name: string;
-  owner_name: string;
-  email: string;
-  description: string;
-  banner: string;
-  image: string;
-  location: string;
-}
+import { useGallerySearch } from '../contexts/GallerySearchContext';
+import { useShopDirectory } from '../contexts/ShopDirectoryContext';
+import { searchShops } from '../lib/shopSearch';
 
 export default function ShopsPage() {
-  const [shops, setShops] = useState<Shop[]>([]);
+  const directory = useShopDirectory();
+  const { ensureLoaded } = directory;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') || '';
+  const { setBinding } = useGallerySearch();
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const shops = useMemo(() => searchShops(directory.shops, query), [directory.shops, query]);
+  const changeSearch = useCallback((value: string) => {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (value) next.set('q', value);
+      else next.delete('q');
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }, [setSearchParams]);
+
+  useLayoutEffect(() => {
+    setBinding({ target: '/shops', value: query, onChange: changeSearch });
+    return () => setBinding(null);
+  }, [query, changeSearch, setBinding]);
 
   useEffect(() => {
-    async function fetchShops() {
-      const { data } = await supabase.from('shops').select('id, name, owner_name, email, description, banner, image, location').order('name');
-      if (data) setShops(data.filter(shop => shop.name?.trim()));
-    }
-    fetchShops();
-  }, []);
+    ensureLoaded();
+  }, [ensureLoaded]);
 
   return (
     <div className="listing-page">
-      <header className="listing-container listing-page-heading"><h1 className="listing-title">Shops</h1></header>
+      <header className="listing-container listing-page-heading">
+        <h1 className="listing-title">Shops</h1>
+        <div className="shop-search-results-context">
+          {directory.status === 'ready' && <p role="status">{shops.length} {shops.length === 1 ? 'shop' : 'shops'}{query.trim() ? ` for “${query.trim()}”` : ''}</p>}
+          {query && <button type="button" className="shop-search-clear" onClick={() => changeSearch('')}>Clear search</button>}
+        </div>
+      </header>
 
       <section className="artisan-grid-section">
         <div className="max-w-[var(--container-width)] mx-auto px-6">
-          {shops.length === 0 ? (
+          {directory.status === 'idle' || directory.status === 'loading' ? (
+            <p className="shop-search-state" role="status">Loading shops…</p>
+          ) : directory.status === 'error' ? (
+            <div className="shop-search-state" role="alert">
+              <p>Shops couldn’t load. Please try again.</p>
+              <button type="button" className="shop-search-clear" onClick={directory.retry}>Retry</button>
+            </div>
+          ) : shops.length === 0 ? (
             <div className="text-center py-20">
-              <p className="text-brown-medium text-lg">No shops registered yet.</p>
+              <p className="text-brown-medium text-lg">{query.trim() ? 'No shops match your search. Try a different shop name.' : 'No shops registered yet.'}</p>
             </div>
           ) : (
             <div className="artisan-grid">

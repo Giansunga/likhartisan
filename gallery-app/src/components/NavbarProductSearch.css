@@ -1,0 +1,109 @@
+.navbar-product-search {
+  position: relative;
+}
+
+.navbar-search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: max(100%, 340px);
+  max-width: calc(100vw - 32px);
+  max-height: min(440px, calc(100dvh - var(--nav-height) - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 14px;
+  color: var(--text-dark);
+  background: var(--bg-primary);
+  box-shadow: 0 10px 30px rgb(30 20 10 / 16%);
+}
+
+.navbar-search-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text-dark);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.navbar-search-option:hover,
+.navbar-search-option[aria-selected="true"] {
+  background: var(--bg-secondary);
+}
+
+.navbar-search-option:focus-visible,
+.navbar-search-feedback button:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.navbar-search-shop-image,
+.navbar-search-shop-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  color: var(--primary-color);
+  background: var(--bg-secondary);
+}
+
+.navbar-search-shop-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.navbar-search-option-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+  font-size: .94rem;
+  line-height: 1.35;
+}
+
+.navbar-search-option-copy small {
+  color: var(--text-muted);
+  font-size: .8rem;
+}
+
+.navbar-search-feedback {
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+
+.navbar-search-feedback:not(:empty) {
+  padding: 8px 10px;
+}
+
+.navbar-search-feedback button {
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--primary-color);
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 1199px) {
+  .navbar-search-panel {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+}

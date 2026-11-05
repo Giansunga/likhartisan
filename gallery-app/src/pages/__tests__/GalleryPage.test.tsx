@@ -240,7 +240,7 @@ describe('GalleryPage', () => {
       <Route path="/product/:id" element={<ReturnControls />} />
     </Routes></GallerySearchProvider></MemoryRouter>);
     await screen.findByRole('link', { name: /Moon jar/ });
-    expect(screen.getAllByRole('searchbox', { name: 'Search artisan crafts' })).toHaveLength(1);
+    expect(screen.getAllByRole('searchbox', { name: 'Search products or shops' })).toHaveLength(1);
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Moon jar' } });
     expect(screen.queryByRole('link', { name: /Sun planter/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: /Moon jar/ }));
@@ -259,13 +259,13 @@ describe('GalleryPage', () => {
     mocks.order.mockResolvedValue({ data: rows, error: null });
     render(<MemoryRouter initialEntries={['/gallery?category=Vases&shop=clay&q=Moon']}><GalleryPage /></MemoryRouter>);
     await screen.findByRole('link', { name: /Moon jar/ });
-    expect(screen.getByRole('searchbox')).toHaveValue('Moon');
+    expect(screen.getByRole('combobox', { name: 'Search products or shops' })).toHaveValue('Moon');
     expect(screen.queryByRole('link', { name: /Sun vase/ })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Sun' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search products or shops' }), { target: { value: 'Sun' } });
     expect(screen.getByRole('link', { name: /Sun vase/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Moon jar/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vases' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search products or shops' }), { target: { value: '' } });
     expect(screen.getByRole('link', { name: /Moon jar/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear shop filter' })).toBeInTheDocument();
   });
@@ -277,7 +277,7 @@ describe('GalleryPage', () => {
     first.unmount();
     render(<MemoryRouter initialEntries={['/gallery?q=Sun']}><GalleryPage /></MemoryRouter>);
     await screen.findByRole('link', { name: /Sun planter/ });
-    expect(screen.getByRole('searchbox')).toHaveValue('Sun');
+    expect(screen.getByRole('combobox', { name: 'Search products or shops' })).toHaveValue('Sun');
     expect(screen.queryByRole('link', { name: /Moon jar/ })).not.toBeInTheDocument();
   });
 
@@ -286,7 +286,7 @@ describe('GalleryPage', () => {
     render(<MemoryRouter><GalleryPage /></MemoryRouter>);
     await screen.findByRole('link', { name: /Moon vase/ });
     fireEvent.click(screen.getByRole('button', { name: 'Planters' }));
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Moon' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search products or shops' }), { target: { value: 'Moon' } });
     expect(screen.getByRole('link', { name: /Moon planter/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Moon vase/ })).not.toBeInTheDocument();
   });

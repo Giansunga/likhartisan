@@ -61,7 +61,7 @@ function GalleryView({ owner }: { owner: string }) {
   }, [setSearchParams]);
   const { setBinding } = useGallerySearch();
   useLayoutEffect(() => {
-    setBinding({ value: search, onChange: changeSearch });
+    setBinding({ target: '/gallery', value: search, onChange: changeSearch });
     return () => setBinding(null);
   }, [search, changeSearch, setBinding]);
   const [sort, setSort] = useState(restored?.sort ?? 'recommended');

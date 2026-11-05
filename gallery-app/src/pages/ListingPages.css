@@ -33,3 +33,37 @@ html:is(.theme-christmas, .theme-valentines) .gallery-toolbar { border-bottom-co
   .gallery-results-heading { padding-top: 18px; align-items: center; }
   .listing-title { font-size: 1.4rem; }
 }
+.shop-search-results-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.shop-search-results-context p {
+  margin: 0;
+}
+
+.shop-search-clear {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  color: var(--primary-color);
+  background: var(--bg-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.shop-search-clear:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.shop-search-state {
+  padding-block: 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
