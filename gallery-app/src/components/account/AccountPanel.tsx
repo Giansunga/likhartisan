@@ -61,7 +61,6 @@ function AccountPanelContent({ user }: { user: User }) {
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
 
   const dirty = isAccountDraftDirty(draft, savedProfile);
-  const completedFields = [draft.fullName, draft.phone, draft.address].filter(value => value.trim()).length;
 
   function updateField(field: keyof AccountProfileDraft, value: string) {
     setDraft(current => ({ ...current, [field]: value }));
@@ -203,10 +202,7 @@ function AccountPanelContent({ user }: { user: User }) {
 
   return (
     <section className="account-panel" aria-labelledby="account-page-title">
-      <header className="account-panel__header">
-        <div><h1 id="account-page-title">My Account</h1><p>Keep your profile and delivery details accurate for a smoother checkout.</p></div>
-        <span className="account-profile-completion"><Check size={14} aria-hidden="true" /> {completedFields} of 3 details complete</span>
-      </header>
+      <h1 id="account-page-title" className="account-visually-hidden">My Account</h1>
 
       <section className="account-hero" aria-label="Profile overview">
         <div className="account-avatar-wrap">

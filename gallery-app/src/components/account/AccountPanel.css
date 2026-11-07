@@ -4,7 +4,6 @@
   color: var(--text-dark);
 }
 
-.account-panel__header,
 .account-hero,
 .account-card,
 .account-savebar {
@@ -14,16 +13,6 @@
   box-shadow: 0 12px 34px rgba(59, 38, 21, .045);
 }
 
-.account-panel__header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 25px 27px;
-  background: linear-gradient(135deg, #fffaf5, #fff);
-}
-
-.account-panel__header h1,
 .account-panel--signed-out h1 {
   margin: 0;
   color: var(--primary-color);
@@ -31,25 +20,11 @@
   line-height: 1;
 }
 
-.account-panel__header p,
 .account-panel--signed-out p {
   margin: 8px 0 0;
   color: var(--text-light);
   font-size: .82rem;
   line-height: 1.5;
-}
-
-.account-profile-completion {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  padding: 7px 10px;
-  border-radius: 999px;
-  color: #2c7148;
-  background: #edf8f1;
-  font-size: .7rem;
-  font-weight: 800;
 }
 
 .account-hero {
@@ -575,20 +550,11 @@
 @media (max-width: 600px) {
   .account-panel { gap: 14px; }
 
-  .account-panel__header,
   .account-hero,
   .account-card,
   .account-savebar {
     border-radius: 15px;
   }
-
-  .account-panel__header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 21px 18px;
-  }
-
-  .account-panel__header h1 { font-size: 2.2rem; }
 
   .account-hero {
     align-items: flex-start;
