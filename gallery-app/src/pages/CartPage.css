@@ -1,6 +1,6 @@
 .cart-page {
   min-height: 100vh;
-  padding: calc(var(--nav-height) + 42px) 0 120px;
+  padding: 24px 0 120px;
   color: var(--text-dark);
   background:
     radial-gradient(circle at 0 0, color-mix(in srgb, var(--bg-tertiary) 75%, transparent), transparent 34rem),
@@ -777,7 +777,7 @@
 
 @media (max-width: 768px) {
   .cart-page {
-    padding: calc(var(--nav-height) + 22px) 0 158px;
+    padding: 16px 0 158px;
   }
 
   .cart-shell {
