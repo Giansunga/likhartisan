@@ -16,6 +16,7 @@ import { getAuthDestination } from '../lib/authDestination';
 import type { User } from '@supabase/supabase-js';
 import NotificationDropdown from './notifications/NotificationDropdown';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBuyerUnreadMessages } from '../hooks/useBuyerUnreadMessages';
 import { notificationDestination, notificationViewAllDestination } from '../lib/notifications';
 import type { NotificationContext, NotificationRecord } from '../types/notifications';
 import { useQuoteReview } from './chat/QuoteReviewContext';
@@ -77,6 +78,8 @@ export default function Navbar() {
   useEffect(() => { const destination = shoppingDestination(); if (!authLoading && !user && destination && location.pathname !== destination) clearShoppingDestination(); }, [location.pathname, authLoading, user]);
   const notificationContext: NotificationContext = 'buyer';
   const notificationData = useNotifications(isArtisanDashboard ? undefined : user?.id, notificationContext, 10);
+  const unreadMessages = useBuyerUnreadMessages(isAdmin || isArtisanDashboard || authLoading ? undefined : user?.id);
+  const chatLabel = unreadMessages ? `Chat, ${unreadMessages} unread ${unreadMessages === 1 ? 'message' : 'messages'}` : 'Chat';
 
   useEffect(() => {
     setShowNavigation(false);
@@ -269,10 +272,13 @@ export default function Navbar() {
                   {showNotifications && (isMobile ? createPortal(notifDropdown, document.body) : notifDropdown)}
                 </div>
 
-                <Link to="/chat" aria-label="Chat" className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                <Link to="/chat" aria-label={chatLabel} className="nav-icon-btn relative rounded-full flex items-center justify-center text-brown-medium hover:bg-cream-secondary hover:text-accent transition-all" style={{ width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6" aria-hidden="true">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
+                  {unreadMessages > 0 && (
+                    <span className="navbar-chat-badge" aria-hidden="true">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
+                  )}
                 </Link>
 
                 {!isMobile && isSuperAdmin && (

@@ -9,6 +9,7 @@ const reload = vi.fn(async () => undefined);
 const openQuoteReview = vi.fn();
 let requestedContext: NotificationContext | undefined;
 let buyerNotifications: NotificationRecord[] = [];
+let unreadMessages = 0;
 let userForTest: { id: string; email: string; user_metadata: Record<string, unknown> } | null = { id: 'user-1', email: 'buyer@example.test', user_metadata: {} };
 let resizeViewport: (width: number) => void = () => {};
 
@@ -18,6 +19,9 @@ const buyerQuote: NotificationRecord = { id: 'buyer-quote', user_id: 'user-1', t
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: userForTest }) }));
 vi.mock('../chat/QuoteReviewContext', () => ({ useQuoteReview: () => openQuoteReview }));
+vi.mock('../../hooks/useBuyerUnreadMessages', () => ({
+  useBuyerUnreadMessages: (userId?: string) => userId ? unreadMessages : 0,
+}));
 vi.mock('../../hooks/useNotifications', () => ({
   useNotifications: (_userId: string, context: NotificationContext) => {
     requestedContext = context;
@@ -183,10 +187,22 @@ describe('Navbar notification routing', () => {
     vi.clearAllMocks();
     requestedContext = undefined;
     buyerNotifications = [buyerOrder];
+    unreadMessages = 0;
     userForTest = { id: 'user-1', email: 'buyer@example.test', user_metadata: {} };
     resizeViewport = () => {};
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })) });
   });
+
+  it.each([[0, 'Chat', ''], [1, 'Chat, 1 unread message', '1'], [125, 'Chat, 125 unread messages', '99+']])(
+    'shows the appropriate chat badge for %i unread messages',
+    (count, label, badge) => {
+      unreadMessages = count;
+      renderNavbar('/chat');
+      const chat = screen.getByRole('link', { name: label });
+      expect(chat).toHaveAttribute('href', '/chat');
+      expect(chat.textContent).toBe(badge);
+    },
+  );
 
   it('opens a buyer order from public navigation using the exact URL', async () => {
     renderNavbar('/gallery');

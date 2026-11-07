@@ -10,6 +10,7 @@ import { API_BASE } from '../lib/api';
 import { FALLBACK_BUYER_NAME } from '../lib/constants';
 import { getChatMessagePreview } from '../lib/chatMessages';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { BUYER_INBOX_CHANGED_EVENT } from '../hooks/useBuyerUnreadMessages';
 import BuyerMessageList from '../components/chat/BuyerMessageList';
 import {
   BuyerChatHeader,
@@ -230,7 +231,8 @@ export default function ChatPage() {
   async function deleteConversation(convId: string) {
     if (!await confirmAction('Delete this conversation? This cannot be undone.')) return;
     await supabase.from('messages').delete().eq('conversation_id', convId);
-    await supabase.from('conversations').delete().eq('id', convId);
+    const { error } = await supabase.from('conversations').delete().eq('id', convId);
+    if (!error) window.dispatchEvent(new Event(BUYER_INBOX_CHANGED_EVENT));
     setConversations(prev => prev.filter(c => c.id !== convId));
     if (selectedConv?.id === convId) {
       setSelectedConv(null);
@@ -311,7 +313,8 @@ export default function ChatPage() {
         });
         // Conversation is actively viewed - keep buyer_unread at 0 in DB
         if (newMsg.sender_id !== userId) {
-          await supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
+          const { error } = await supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id);
+          if (!error) window.dispatchEvent(new Event(BUYER_INBOX_CHANGED_EVENT));
         }
         setConversations(prev => prev.map(c => c.id === selectedConv.id ? {
           ...c,
@@ -389,6 +392,7 @@ export default function ChatPage() {
     });
     supabase.from('conversations').update({ buyer_unread: 0 }).eq('id', selectedConv.id).then(({ error }) => {
       if (error) console.error('Failed to mark buyer conversation read:', error);
+      else window.dispatchEvent(new Event(BUYER_INBOX_CHANGED_EVENT));
     });
   }, [selectedConv]);
 

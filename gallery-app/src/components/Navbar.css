@@ -23,6 +23,24 @@
   gap: 12px;
 }
 
+.navbar-chat-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 3px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: .65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .navbar-profile-button {
   display: flex;
   align-items: center;
@@ -109,6 +127,11 @@
 }
 
 @media (max-width: 768px) {
+  .navbar-chat-badge {
+    top: 0;
+    right: 0;
+  }
+
   .navbar-layout {
     display: flex;
     justify-content: space-between;
